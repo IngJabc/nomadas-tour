@@ -36,7 +36,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white">
-      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-sm">
+      <div className="bg-white p-8 rounded-2xl shadow-md w-full max-w-sm relative">
+        <Link href="/" className="absolute top-4 left-4 text-sm text-blue-600 hover:underline">
+          ← Inicio
+        </Link>
         <h1 className="text-2xl font-bold text-gray-800 mb-6 text-center">Iniciar sesión</h1>
 
         <form onSubmit={handleSubmit} className="space-y-4">

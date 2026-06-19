@@ -3,16 +3,26 @@
 import { useState } from 'react';
 import { Route } from '@/types';
 
+interface TripFormData {
+  route_id: string;
+  departure_at: string;
+  price: number;
+  total_seats: number;
+  decks: number;
+}
+
 interface TripFormProps {
   routes: Route[];
-  onSubmit: (data: { route_id: string; departure_at: string; price: number }) => Promise<void>;
-  initialData?: { route_id: string; departure_at: string; price: number };
+  onSubmit: (data: TripFormData) => Promise<void>;
+  initialData?: TripFormData;
 }
 
 export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
   const [routeId, setRouteId] = useState(initialData?.route_id ?? '');
   const [departureAt, setDepartureAt] = useState(initialData?.departure_at ?? '');
   const [price, setPrice] = useState(initialData?.price?.toString() ?? '');
+  const [totalSeats, setTotalSeats] = useState(initialData?.total_seats?.toString() ?? '30');
+  const [decks, setDecks] = useState(initialData?.decks?.toString() ?? '1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +41,8 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
         route_id: routeId,
         departure_at: departureAt,
         price: Number(price),
+        total_seats: Number(totalSeats),
+        decks: Number(decks),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -67,16 +79,46 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
         />
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Precio (COP)</label>
+          <input
+            type="number"
+            min="0"
+            step="100"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Total asientos</label>
+          <input
+            type="number"
+            min="4"
+            max="100"
+            value={totalSeats}
+            onChange={(e) => setTotalSeats(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Precio (COP)</label>
-        <input
-          type="number"
-          min="0"
-          step="100"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
+        <label className="block text-sm font-medium text-gray-700 mb-1">Pisos</label>
+        <select
+          value={decks}
+          onChange={(e) => setDecks(e.target.value)}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        >
+          <option value="1">1 piso</option>
+          <option value="2">2 pisos</option>
+        </select>
+        {Number(decks) > 1 && (
+          <p className="text-xs text-gray-400 mt-1">
+            Por ahora se muestra el layout del primer piso
+          </p>
+        )}
       </div>
 
       {error && <p className="text-red-500 text-sm">{error}</p>}

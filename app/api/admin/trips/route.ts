@@ -43,6 +43,8 @@ export async function POST(request: Request) {
         route_id: parsed.data.route_id,
         departure_at: new Date(parsed.data.departure_at).toISOString(),
         price: parsed.data.price,
+        total_seats: parsed.data.total_seats,
+        decks: parsed.data.decks,
         status: 'active',
       })
       .select()
@@ -52,9 +54,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: tripError.message }, { status: 500 });
     }
 
-    // Create default seats for the trip
+    // Create seats for the trip
     const seatCodes = [
-      ...Array.from({ length: 30 }, (_, i) => `A${i + 1}`),
+      ...Array.from({ length: parsed.data.total_seats }, (_, i) => `A${i + 1}`),
       'G',
     ];
 

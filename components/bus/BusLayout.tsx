@@ -1,7 +1,8 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Seat as SeatType } from '@/types';
-import { BUS_LAYOUT } from '@/constants/bus';
+import { generateBusLayout } from '@/constants/bus';
 import { Seat } from './Seat';
 
 interface BusLayoutProps {
@@ -9,6 +10,7 @@ interface BusLayoutProps {
   selectedSeats: SeatType[];
   onToggleSeat: (seat: SeatType) => void;
   isSelected: (seatId: string) => boolean;
+  totalSeats?: number;
 }
 
 export function BusLayout({
@@ -16,33 +18,31 @@ export function BusLayout({
   selectedSeats,
   onToggleSeat,
   isSelected,
+  totalSeats = 30,
 }: BusLayoutProps) {
+  const layout = useMemo(() => generateBusLayout(totalSeats), [totalSeats]);
   const guideSeat: SeatType | null = seats['G'] ?? null;
 
   return (
     <div className="bg-gray-100 p-6 rounded-2xl inline-block">
       <div className="flex flex-col items-center gap-4">
-        {/* Guia seat */}
-        <div className="flex justify-start w-full mb-2">
-          {guideSeat && (
+        {guideSeat && (
+          <div className="flex justify-start w-full mb-2">
             <Seat
               seat={guideSeat}
               isSelected={false}
               onSelect={() => {}}
             />
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Bus body */}
         <div className="bg-white rounded-2xl p-6 shadow-md border-2 border-gray-300">
-          {/* Front of bus */}
           <div className="flex justify-center mb-4">
             <div className="w-16 h-8 bg-gray-300 rounded-t-full" />
           </div>
 
-          {/* Seats grid */}
           <div className="space-y-2">
-            {BUS_LAYOUT.rows.map((row, rowIndex) => (
+            {layout.rows.map((row, rowIndex) => (
               <div key={rowIndex} className="flex gap-8 items-center">
                 {/* Left side */}
                 <div className="flex gap-1">
@@ -80,6 +80,7 @@ export function BusLayout({
                 {/* Right side */}
                 <div className="flex gap-1">
                   {row.right.map((seatCode, idx) => {
+                    if (!seatCode) return <div key={`empty-${idx}`} className="w-14 h-14" />;
                     const seat = seats[seatCode] ?? {
                       id: '',
                       trip_id: '',

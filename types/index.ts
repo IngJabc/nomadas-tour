@@ -14,6 +14,8 @@ export interface Trip {
   departure_at: string;
   price: number;
   status: 'active' | 'cancelled' | 'completed';
+  total_seats: number;
+  decks: number;
   route?: Route;
 }
 
