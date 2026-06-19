@@ -9,7 +9,6 @@ interface BusLayoutProps {
   seats: Record<string, SeatType>;
   selectedSeats: SeatType[];
   onToggleSeat: (seat: SeatType) => void;
-  isSelected: (seatId: string) => boolean;
   totalSeats?: number;
 }
 
@@ -17,7 +16,6 @@ export function BusLayout({
   seats,
   selectedSeats,
   onToggleSeat,
-  isSelected,
   totalSeats = 30,
 }: BusLayoutProps) {
   const layout = useMemo(() => generateBusLayout(totalSeats), [totalSeats]);

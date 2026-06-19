@@ -10,6 +10,7 @@ interface BookingPanelProps {
   price: number;
   onSuccess: (bookingIds: string[]) => void;
   onClear: () => void;
+  onReleaseLocks?: (seatIds: string[]) => Promise<void>;
 }
 
 export function BookingPanel({
@@ -18,6 +19,7 @@ export function BookingPanel({
   price,
   onSuccess,
   onClear,
+  onReleaseLocks,
 }: BookingPanelProps) {
   const [passengerName, setPassengerName] = useState('');
   const [passengerEmail, setPassengerEmail] = useState('');
@@ -37,8 +39,10 @@ export function BookingPanel({
 
     try {
       const bookingIds: string[] = [];
+      let failed = false;
 
       for (const seat of selectedSeats) {
+        if (failed) break;
         const res = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -53,7 +57,16 @@ export function BookingPanel({
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || 'Error al confirmar reserva');
+          // Release remaining locks (Bug #3: orphaned locks)
+          const remainingSeats = selectedSeats
+            .filter((s) => s.seat_code !== seat.seat_code)
+            .map((s) => s.id);
+          if (remainingSeats.length > 0 && onReleaseLocks) {
+            await onReleaseLocks(remainingSeats);
+          }
+          throw new Error(
+            `Asiento ${seat.seat_code}: ${data.error || 'Error al confirmar reserva'}`,
+          );
         }
 
         if (data.booking?.id) {

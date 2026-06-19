@@ -30,7 +30,9 @@ export function Seat({ seat, isSelected, onSelect }: SeatProps) {
       : STATUS_COLORS[seat.status] ?? STATUS_COLORS.available;
 
   const handleClick = () => {
-    if (isGuide || seat.status !== 'available') return;
+    if (isGuide) return;
+    // Permitir click si está disponible, o si está locked por el usuario actual (para deseleccionar)
+    if (seat.status !== 'available' && !isSelected) return;
     onSelect(seat);
   };
 

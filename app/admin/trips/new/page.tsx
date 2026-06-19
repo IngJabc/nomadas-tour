@@ -29,37 +29,15 @@ export default function NewTripPage() {
     total_seats: number;
     decks: number;
   }) => {
-    const { error } = await supabase.from('trips').insert({
-      route_id: data.route_id,
-      departure_at: new Date(data.departure_at).toISOString(),
-      price: data.price,
-      total_seats: data.total_seats,
-      decks: data.decks,
-      status: 'active',
+    const response = await fetch('/api/admin/trips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
 
-    if (error) throw error;
-
-    const { data: trip } = await supabase
-      .from('trips')
-      .select('id')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (trip) {
-      const seatCodes = [
-        ...Array.from({ length: data.total_seats }, (_, i) => `A${i + 1}`),
-        'G',
-      ];
-
-      await supabase.from('seats').insert(
-        seatCodes.map((code) => ({
-          trip_id: trip.id,
-          seat_code: code,
-          status: code === 'G' ? 'locked' : 'available',
-        })),
-      );
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.error || 'Error al crear viaje');
     }
 
     router.push('/admin/trips');
