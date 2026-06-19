@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRealtimeSeats } from '@/hooks/useRealtimeSeats';
 import { BusLayout } from '@/components/bus/BusLayout';
@@ -20,6 +20,10 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [success, setSuccess] = useState(false);
   const [lastBookingId, setLastBookingId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const myLocalLocks = useRef<Set<string>>(new Set());
+  const selectedSeatsRef = useRef<Seat[]>([]);
+  const clearedSeatsRef = useRef<Set<string>>(new Set());
   const supabase = createClient();
 
   // Cleanup: remove from selection only seats reserved by others or locked by others
@@ -44,50 +48,154 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
     getUserId();
   }, [seats, supabase]);
 
-  const toggleSeat = async (seat: Seat) => {
-    if (seat.status !== 'available') return;
+  // Track current user id
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (!mounted) return;
+        setUserId(data.user?.id ?? null);
+      } catch {
+        setUserId(null);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  // Reconcile selection with server state and restore locks after reload
+  useEffect(() => {
+    if (!userId) return;
+
+    // Clean up cleared seats tracking once Realtime confirms they're no longer locked
+    if (clearedSeatsRef.current.size > 0) {
+      for (const seatCode of clearedSeatsRef.current) {
+        const live = seats[seatCode];
+        if (live && live.status !== 'locked') {
+          clearedSeatsRef.current.delete(seatCode);
+        }
+      }
+    }
 
     setSelectedSeats((prev) => {
-      const isDeselecting = prev.some((s) => s.id === seat.id);
-
-      if (isDeselecting) {
-        supabase
-          .from('seats')
-          .update({ status: 'available', locked_by: null, locked_at: null })
-          .eq('id', seat.id)
-          .eq('locked_by', user.id)
-          .then();
-        return prev.filter((s) => s.id !== seat.id);
-      }
-
-      supabase
-        .from('seats')
-        .update({ status: 'locked', locked_by: user.id, locked_at: new Date().toISOString() })
-        .eq('id', seat.id)
-        .eq('status', 'available')
-        .then(({ error }) => {
-          if (error) {
-            setSelectedSeats((p) => p.filter((s) => s.id !== seat.id));
+      const filtered = prev.filter((s) => {
+        const live = seats[s.seat_code];
+        if (!live) return false;
+        if (live.status === 'available') {
+          // Stop tracking cleared seats once Realtime confirms they're available
+          clearedSeatsRef.current.delete(s.seat_code);
+          // Only keep if optimistically selected (lock not yet confirmed by Realtime)
+          return myLocalLocks.current.has(s.id);
+        }
+        if (live.status === 'reserved') return false;
+        if (live.status === 'locked') {
+          if (live.locked_by) {
+            return live.locked_by === userId;
           }
-        });
+          return myLocalLocks.current.has(s.id);
+        }
+        return false;
+      });
 
-      return [...prev, seat];
+      // Restore seats locked by current user (e.g. after page reload)
+      // Skip seats that were explicitly cleared by Cancelar
+      const existingCodes = new Set(filtered.map((s) => s.seat_code));
+      const restored = Object.values(seats).filter(
+        (s) =>
+          s.status === 'locked' &&
+          s.locked_by === userId &&
+          !existingCodes.has(s.seat_code) &&
+          !clearedSeatsRef.current.has(s.seat_code),
+      );
+
+      if (restored.length === 0) return filtered;
+      // Track restored seats so future Realtime updates don't remove them
+      restored.forEach((s) => myLocalLocks.current.add(s.id));
+      return [...filtered, ...restored];
     });
+  }, [seats, userId]);
+
+  const releaseLocks = async (seatIds: string[]): Promise<void> => {
+    if (seatIds.length === 0) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from('seats')
+      .update({ status: 'available', locked_by: null, locked_at: null })
+      .in('id', seatIds)
+      .eq('locked_by', user.id);
   };
 
-  const isSelected = (seatId: string) => {
-    return selectedSeats.some((s) => s.id === seatId);
+  const toggleSeat = async (seat: Seat) => {
+    // Guard against placeholder seats with empty id (Bug #6)
+    if (!seat.id) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    setUserId(user.id);
+
+    const isDeselecting = selectedSeats.some((s) => s.seat_code === seat.seat_code);
+
+    if (isDeselecting) {
+      setSelectedSeats((prev) => prev.filter((s) => s.seat_code !== seat.seat_code));
+      myLocalLocks.current.delete(seat.id);
+      await releaseLocks([seat.id]);
+      return;
+    }
+
+    if (seat.status !== 'available') return;
+
+    // Optimistic select with dedup guard (Bug #4: double-click)
+    setSelectedSeats((prev) => {
+      if (prev.some((s) => s.seat_code === seat.seat_code)) return prev;
+      return [...prev, seat];
+    });
+    myLocalLocks.current.add(seat.id);
+
+    // Try to acquire lock atomically (only if status still 'available')
+    const { data: updatedRows, error: updateError } = await supabase
+      .from('seats')
+      .update({ status: 'locked', locked_by: user.id, locked_at: new Date().toISOString() })
+      .eq('id', seat.id)
+      .eq('status', 'available')
+      .select();
+
+    // Revert optimistic selection if lock acquisition failed
+    if (updateError || !updatedRows || updatedRows.length === 0) {
+      myLocalLocks.current.delete(seat.id);
+      setSelectedSeats((prev) => prev.filter((s) => s.seat_code !== seat.seat_code));
+    }
   };
 
   const handleSuccess = (bookingIds: string[]) => {
     setSuccess(true);
+    myLocalLocks.current = new Set();  // Bug #8: cleanup refs
+    clearedSeatsRef.current = new Set();
     setSelectedSeats([]);
     if (bookingIds.length > 0) {
       setLastBookingId(bookingIds[0]);
     }
+  };
+
+  const handleClear = async () => {
+    const seatsToRelease = selectedSeatsRef.current;
+    if (seatsToRelease.length === 0) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setSelectedSeats([]);
+      return;
+    }
+    // Track which seats were cleared so restore doesn't re-add them
+    seatsToRelease.forEach((s) => clearedSeatsRef.current.add(s.seat_code));
+    const seatIds = seatsToRelease.map((s) => s.id);
+    myLocalLocks.current = new Set();
+    setSelectedSeats([]);
+    await supabase
+      .from('seats')
+      .update({ status: 'available', locked_by: null, locked_at: null })
+      .in('id', seatIds)
+      .eq('locked_by', user.id);
   };
 
   if (loading) {
@@ -138,7 +246,6 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
           seats={seats}
           selectedSeats={selectedSeats}
           onToggleSeat={toggleSeat}
-          isSelected={isSelected}
           totalSeats={totalSeats}
         />
         <SeatLegend />
@@ -149,7 +256,8 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
           tripId={tripId}
           price={price}
           onSuccess={handleSuccess}
-          onClear={() => setSelectedSeats([])}
+          onClear={handleClear}
+          onReleaseLocks={releaseLocks}
         />
       </div>
     </div>

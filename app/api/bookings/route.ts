@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const { trip_id, seat_id, passenger_name, passenger_email } = parsed.data;
     const adminClient = createAdminClient();
 
-    // Verify seat is available
+    // Verify seat is available or locked by this user
     const { data: seat } = await adminClient
       .from('seats')
       .select('*')
@@ -37,7 +37,11 @@ export async function POST(request: Request) {
       .eq('trip_id', trip_id)
       .single();
 
-    if (!seat || seat.status !== 'available') {
+    const isBookable =
+      seat?.status === 'available' ||
+      (seat?.status === 'locked' && seat.locked_by === user.id);
+
+    if (!seat || !isBookable) {
       return NextResponse.json(
         { error: 'El asiento no está disponible' },
         { status: 409 },
@@ -76,7 +80,8 @@ export async function POST(request: Request) {
         locked_by: null,
         locked_at: null,
       })
-      .eq('id', seat_id);
+      .eq('id', seat_id)
+      .in('status', ['available', 'locked']);
 
     if (updateError) {
       await adminClient.from('bookings').delete().eq('id', booking.id);

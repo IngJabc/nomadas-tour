@@ -5,10 +5,9 @@ export function formatDateTime(dateString: string): string {
 }
 
 export function formatPrice(price: number): string {
-  return new Intl.NumberFormat('es-CO', {
+  return new Intl.NumberFormat('es-ES', {
     style: 'currency',
-    currency: 'COP',
-    minimumFractionDigits: 0,
+    currency: 'EUR',
   }).format(price);
 }
 

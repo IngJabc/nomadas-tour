@@ -28,6 +28,9 @@ export function useRealtimeSeats(tripId: string) {
         for (const seat of data ?? []) {
           seatsMap[seat.seat_code] = seat as Seat;
         }
+        // Debug: show fetched seats count
+        // eslint-disable-next-line no-console
+        console.debug('[useRealtimeSeats] fetched seats:', Object.keys(seatsMap).length);
         setSeats(seatsMap);
         setError(null);
       } catch (err) {
@@ -51,6 +54,9 @@ export function useRealtimeSeats(tripId: string) {
         },
         (payload: RealtimePostgresChangesPayload<Seat>) => {
           const updatedSeat = payload.new as Seat;
+          // Debug: log realtime payload for seat updates
+          // eslint-disable-next-line no-console
+          console.debug('[useRealtimeSeats] realtime update:', updatedSeat?.seat_code, updatedSeat?.status, 'locked_by=', updatedSeat?.locked_by);
           setSeats((prev) => ({
             ...prev,
             [updatedSeat.seat_code]: updatedSeat,
