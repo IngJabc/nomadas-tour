@@ -13,6 +13,8 @@ export const tripSchema = z.object({
   route_id: z.string().uuid('Seleccione una ruta'),
   departure_at: z.string().min(1, 'Seleccione fecha y hora'),
   price: z.number().positive('El precio debe ser positivo'),
+  total_seats: z.number().int().min(4, 'Mínimo 4 asientos').max(100, 'Máximo 100 asientos'),
+  decks: z.number().int().min(1).max(2),
 });
 
 export type TripFormData = z.infer<typeof tripSchema>;

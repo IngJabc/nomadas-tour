@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { bookingSchema } from '@/lib/validations/booking';
 
 export async function POST(request: Request) {
@@ -14,11 +15,22 @@ export async function POST(request: Request) {
       );
     }
 
+    // Get authenticated user
+    const serverSupabase = await createServerSupabaseClient();
+    const { data: { user } } = await serverSupabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Debes iniciar sesión para reservar' },
+        { status: 401 },
+      );
+    }
+
     const { trip_id, seat_id, passenger_name, passenger_email } = parsed.data;
-    const supabase = createAdminClient();
+    const adminClient = createAdminClient();
 
     // Verify seat is available
-    const { data: seat } = await supabase
+    const { data: seat } = await adminClient
       .from('seats')
       .select('*')
       .eq('id', seat_id)
@@ -36,9 +48,10 @@ export async function POST(request: Request) {
     const qrCode = `CAMPING-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
     // Create booking and update seat in transaction
-    const { data: booking, error: bookingError } = await supabase
+    const { data: booking, error: bookingError } = await adminClient
       .from('bookings')
       .insert({
+        user_id: user.id,
         trip_id,
         seat_id,
         passenger_name,
@@ -56,7 +69,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminClient
       .from('seats')
       .update({
         status: 'reserved',
@@ -66,8 +79,7 @@ export async function POST(request: Request) {
       .eq('id', seat_id);
 
     if (updateError) {
-      // Rollback booking
-      await supabase.from('bookings').delete().eq('id', booking.id);
+      await adminClient.from('bookings').delete().eq('id', booking.id);
       return NextResponse.json(
         { error: 'Error al actualizar el asiento' },
         { status: 500 },

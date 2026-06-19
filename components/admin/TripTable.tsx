@@ -29,6 +29,7 @@ export function TripTable({ trips, onEdit, onDelete }: TripTableProps) {
           <tr className="border-b border-gray-200">
             <th className="text-left py-3 px-4 font-medium text-gray-600">Salida</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">Ruta</th>
+            <th className="text-left py-3 px-4 font-medium text-gray-600">Bus</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">Precio</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">Estado</th>
             <th className="text-left py-3 px-4 font-medium text-gray-600">Acciones</th>
@@ -40,6 +41,9 @@ export function TripTable({ trips, onEdit, onDelete }: TripTableProps) {
               <td className="py-3 px-4">{formatDateTime(trip.departure_at)}</td>
               <td className="py-3 px-4">
                 {trip.route?.origin ?? '—'} → {trip.route?.destination ?? '—'}
+              </td>
+              <td className="py-3 px-4 text-xs text-gray-500">
+                {trip.total_seats} asientos {trip.decks > 1 ? `(${trip.decks} pisos)` : ''}
               </td>
               <td className="py-3 px-4">{formatPrice(trip.price)}</td>
               <td className="py-3 px-4">

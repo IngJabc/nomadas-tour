@@ -15,6 +15,8 @@ export default function EditTripPage() {
     route_id: string;
     departure_at: string;
     price: number;
+    total_seats: number;
+    decks: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -35,6 +37,8 @@ export default function EditTripPage() {
             .toISOString()
             .slice(0, 16),
           price: tripRes.data.price,
+          total_seats: tripRes.data.total_seats,
+          decks: tripRes.data.decks,
         });
       }
       setLoading(false);
@@ -46,6 +50,8 @@ export default function EditTripPage() {
     route_id: string;
     departure_at: string;
     price: number;
+    total_seats: number;
+    decks: number;
   }) => {
     const { error } = await supabase
       .from('trips')
@@ -53,6 +59,8 @@ export default function EditTripPage() {
         route_id: data.route_id,
         departure_at: new Date(data.departure_at).toISOString(),
         price: data.price,
+        total_seats: data.total_seats,
+        decks: data.decks,
       })
       .eq('id', tripId);
 

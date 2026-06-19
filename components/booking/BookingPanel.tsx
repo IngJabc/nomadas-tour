@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { Seat } from '@/types';
-import { formatPrice, generateQRCode } from '@/lib/utils';
-import { createClient } from '@/lib/supabase/client';
+import { formatPrice } from '@/lib/utils';
 
 interface BookingPanelProps {
   selectedSeats: Seat[];
   tripId: string;
   price: number;
-  onSuccess: () => void;
+  onSuccess: (bookingIds: string[]) => void;
   onClear: () => void;
 }
 
@@ -24,7 +23,6 @@ export function BookingPanel({
   const [passengerEmail, setPassengerEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
 
   const total = selectedSeats.length * price;
 
@@ -38,32 +36,32 @@ export function BookingPanel({
     setError(null);
 
     try {
-      const { data: user } = await supabase.auth.getUser();
+      const bookingIds: string[] = [];
 
       for (const seat of selectedSeats) {
-        const qrCode = generateQRCode();
-
-        const { error: bookingError } = await supabase.from('bookings').insert({
-          user_id: user.user?.id ?? null,
-          trip_id: tripId,
-          seat_id: seat.id,
-          passenger_name: passengerName.trim(),
-          passenger_email: passengerEmail.trim(),
-          qr_code: qrCode,
-          status: 'confirmed',
+        const res = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            trip_id: tripId,
+            seat_id: seat.id,
+            passenger_name: passengerName.trim(),
+            passenger_email: passengerEmail.trim(),
+          }),
         });
 
-        if (bookingError) throw bookingError;
+        const data = await res.json();
 
-        const { error: updateError } = await supabase
-          .from('seats')
-          .update({ status: 'reserved', locked_by: null, locked_at: null })
-          .eq('id', seat.id);
+        if (!res.ok) {
+          throw new Error(data.error || 'Error al confirmar reserva');
+        }
 
-        if (updateError) throw updateError;
+        if (data.booking?.id) {
+          bookingIds.push(data.booking.id);
+        }
       }
 
-      onSuccess();
+      onSuccess(bookingIds);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al confirmar reserva');
     } finally {
