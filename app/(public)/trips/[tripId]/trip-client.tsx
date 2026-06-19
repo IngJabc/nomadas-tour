@@ -26,6 +26,11 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
   const clearedSeatsRef = useRef<Set<string>>(new Set());
   const supabase = createClient();
 
+  // Keep ref in sync with state (avoids stale closure in async handlers)
+  useEffect(() => {
+    selectedSeatsRef.current = selectedSeats;
+  }, [selectedSeats]);
+
   // Cleanup: remove from selection only seats reserved by others or locked by others
   useEffect(() => {
     const getUserId = async () => {
