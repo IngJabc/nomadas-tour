@@ -22,12 +22,27 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
   const [lastBookingId, setLastBookingId] = useState<string | null>(null);
   const supabase = createClient();
 
-  // Cleanup: when Realtime updates a seat to reserved/locked, remove from selection
+  // Cleanup: remove from selection only seats reserved by others or locked by others
   useEffect(() => {
-    setSelectedSeats((prev) =>
-      prev.filter((s) => seats[s.seat_code]?.status === 'available'),
-    );
-  }, [seats]);
+    const getUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+
+      setSelectedSeats((prev) =>
+        prev.filter((s) => {
+          const updated = seats[s.seat_code];
+          if (!updated) return true;
+          // Keep if still available
+          if (updated.status === 'available') return true;
+          // Keep if locked by the current user (they can still deselect it)
+          if (updated.status === 'locked' && updated.locked_by === currentUserId) return true;
+          // Remove if reserved (someone else confirmed) or locked by another user
+          return false;
+        }),
+      );
+    };
+    getUserId();
+  }, [seats, supabase]);
 
   const toggleSeat = async (seat: Seat) => {
     if (seat.status !== 'available') return;
