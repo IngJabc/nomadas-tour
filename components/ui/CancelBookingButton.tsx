@@ -5,8 +5,7 @@ export function CancelBookingButton() {
     <button
       type="button"
       onClick={() => alert('Función de cancelación próximamente')}
-      style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }}
-      className="hover:underline"
+      className="font-['Poppins',sans-serif] font-normal text-[13px] text-red-500 bg-none border-none cursor-pointer hover:underline"
     >
       Cancelar reserva
     </button>

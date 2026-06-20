@@ -80,17 +80,8 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* LEFT: Hero column — hidden on mobile (same as Login) */}
-      <div
-        className="hidden lg:flex lg:w-1/2 relative flex-col items-center justify-center overflow-hidden px-8"
-        style={{
-          background:
-            "linear-gradient(135deg, var(--color-brand-dark), var(--color-brand-navy))",
-        }}
-      >
-        <div
-          className="absolute bottom-0 left-0 right-0 z-0 opacity-20 pointer-events-none"
-          aria-hidden
-        >
+      <div className="hidden lg:flex lg:w-1/2 relative flex-col items-center justify-center overflow-hidden px-8 bg-gradient-to-br from-brand-dark to-brand-navy">
+        <div className="absolute bottom-0 left-0 right-0 z-0 opacity-20 pointer-events-none" aria-hidden>
           <svg
             viewBox="0 0 1440 320"
             preserveAspectRatio="xMidYMax slice"
@@ -116,38 +107,16 @@ export default function RegisterPage() {
             height={80}
             priority
           />
-          <div
-            className="mt-4"
-            style={{
-              width: 60,
-              height: 4,
-              background: "var(--color-brand-cyan)",
-              borderRadius: 2,
-            }}
-          />
+          <div className="mt-4 w-15 h-1 bg-brand-cyan rounded-sm" />
         </div>
 
-        <p
-          className="relative z-10 mt-6 text-center"
-          style={{
-            fontFamily: "var(--font-sans)",
-            fontWeight: 400,
-            fontSize: 18,
-            color: "rgba(255,255,255,0.7)",
-            maxWidth: 280,
-          }}
-        >
+        <p className="relative z-10 mt-6 text-center font-['Poppins',sans-serif] font-normal text-lg text-white/70 max-w-[280px]">
           Viaja con nosotros, llega seguro
         </p>
 
         <div className="relative z-10 mt-16 flex gap-8 sm:gap-12">
           <div className="flex flex-col items-center gap-2">
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              style={{ color: "var(--color-brand-cyan)" }}
-            >
+            <svg className="w-5 h-5 text-brand-cyan" viewBox="0 0 24 24" fill="none">
               <path
                 d="M3 13V6a2 2 0 012-2h14a2 2 0 012 2v7"
                 stroke="currentColor"
@@ -163,24 +132,12 @@ export default function RegisterPage() {
                 strokeLinejoin="round"
               />
             </svg>
-            <span
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontWeight: 400,
-                fontSize: 12,
-                color: "rgba(255,255,255,0.6)",
-              }}
-            >
+            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">
               Rutas seguras
             </span>
           </div>
           <div className="flex flex-col items-center gap-2">
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              style={{ color: "var(--color-brand-cyan)" }}
-            >
+            <svg className="w-5 h-5 text-brand-cyan" viewBox="0 0 24 24" fill="none">
               <path
                 d="M9 12l2 2 4-4"
                 stroke="currentColor"
@@ -196,24 +153,12 @@ export default function RegisterPage() {
                 strokeLinejoin="round"
               />
             </svg>
-            <span
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontWeight: 400,
-                fontSize: 12,
-                color: "rgba(255,255,255,0.6)",
-              }}
-            >
+            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">
               Reserva en minutos
             </span>
           </div>
           <div className="flex flex-col items-center gap-2">
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              style={{ color: "var(--color-brand-cyan)" }}
-            >
+            <svg className="w-5 h-5 text-brand-cyan" viewBox="0 0 24 24" fill="none">
               <path
                 d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
                 stroke="currentColor"
@@ -229,14 +174,7 @@ export default function RegisterPage() {
                 strokeLinejoin="round"
               />
             </svg>
-            <span
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontWeight: 400,
-                fontSize: 12,
-                color: "rgba(255,255,255,0.6)",
-              }}
-            >
+            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">
               Seguimiento en tiempo real
             </span>
           </div>
@@ -244,10 +182,7 @@ export default function RegisterPage() {
       </div>
 
       {/* RIGHT: Form column */}
-      <div
-        className="w-full lg:w-1/2 flex items-center justify-center px-8 sm:px-12 py-12"
-        style={{ background: "var(--color-brand-surface)" }}
-      >
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-8 sm:px-12 py-12 bg-brand-surface">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -256,23 +191,8 @@ export default function RegisterPage() {
         >
           {/* Mobile-only small logo */}
           <div className="lg:hidden flex justify-center mb-6">
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                background: "var(--color-brand-navy)",
-                borderRadius: 8,
-              }}
-              className="flex items-center justify-center"
-            >
-              <span
-                style={{
-                  fontFamily: "var(--font-heading)",
-                  fontWeight: 800,
-                  fontSize: 16,
-                  color: "#ffffff",
-                }}
-              >
+            <div className="w-8 h-8 bg-brand-navy rounded-lg flex items-center justify-center">
+              <span className="font-['Montserrat',sans-serif] font-extrabold text-base text-white">
                 N
               </span>
             </div>
@@ -280,13 +200,7 @@ export default function RegisterPage() {
 
           <Link
             href="/"
-            className="inline-flex items-center gap-1 mb-6"
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontWeight: 400,
-              fontSize: 13,
-              color: "var(--color-brand-muted)",
-            }}
+            className="inline-flex items-center gap-1 mb-6 font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted"
           >
             <svg
               className="w-4 h-4"
@@ -304,42 +218,17 @@ export default function RegisterPage() {
             Volver al inicio
           </Link>
 
-          <h1
-            style={{
-              fontFamily: "var(--font-heading)",
-              fontWeight: 800,
-              fontSize: 28,
-              color: "var(--color-brand-navy)",
-            }}
-          >
+          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[28px] text-brand-navy">
             Crea tu cuenta
           </h1>
-          <p
-            className="mt-2 mb-8"
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontWeight: 400,
-              fontSize: 14,
-              color: "var(--color-brand-muted)",
-            }}
-          >
+          <p className="mt-2 mb-8 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
             Únete y reserva tus asientos en segundos
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {/* Name */}
             <div>
-              <label
-                className="block mb-1.5"
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 500,
-                  fontSize: 12,
-                  color: "var(--color-brand-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
+              <label className="block mb-1.5 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
                 Nombre completo
               </label>
               <div className="relative">
@@ -349,19 +238,7 @@ export default function RegisterPage() {
                   onChange={(e) => setName(e.target.value)}
                   required
                   placeholder="Tu nombre completo"
-                  className="w-full"
-                  style={{
-                    border: "1.5px solid #e5e7eb",
-                    borderRadius: 10,
-                    padding: "12px 40px 12px 16px",
-                    fontFamily: "var(--font-sans)",
-                    fontWeight: 400,
-                    fontSize: 14,
-                    color: "var(--color-brand-navy)",
-                    background: "#ffffff",
-                    outline: "none",
-                    transition: "border-color 200ms, box-shadow 200ms",
-                  }}
+                  className="w-full border-[1.5px] border-gray-200 rounded-xl py-3 pl-4 pr-10 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none transition-[border-color,box-shadow] duration-200"
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
@@ -373,10 +250,7 @@ export default function RegisterPage() {
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 />
-                <div
-                  className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: "var(--color-brand-muted)" }}
-                >
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-brand-muted">
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -396,17 +270,7 @@ export default function RegisterPage() {
 
             {/* Email */}
             <div>
-              <label
-                className="block mb-1.5"
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 500,
-                  fontSize: 12,
-                  color: "var(--color-brand-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
+              <label className="block mb-1.5 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
                 Correo electrónico
               </label>
               <div className="relative">
@@ -416,19 +280,7 @@ export default function RegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="ejemplo@correo.com"
-                  className="w-full"
-                  style={{
-                    border: "1.5px solid #e5e7eb",
-                    borderRadius: 10,
-                    padding: "12px 40px 12px 16px",
-                    fontFamily: "var(--font-sans)",
-                    fontWeight: 400,
-                    fontSize: 14,
-                    color: "var(--color-brand-navy)",
-                    background: "#ffffff",
-                    outline: "none",
-                    transition: "border-color 200ms, box-shadow 200ms",
-                  }}
+                  className="w-full border-[1.5px] border-gray-200 rounded-xl py-3 pl-4 pr-10 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none transition-[border-color,box-shadow] duration-200"
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
@@ -440,10 +292,7 @@ export default function RegisterPage() {
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 />
-                <div
-                  className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"
-                  style={{ color: "var(--color-brand-muted)" }}
-                >
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-brand-muted">
                   <svg
                     className="w-5 h-5"
                     fill="none"
@@ -463,17 +312,7 @@ export default function RegisterPage() {
 
             {/* Password */}
             <div>
-              <label
-                className="block mb-1.5"
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 500,
-                  fontSize: 12,
-                  color: "var(--color-brand-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
+              <label className="block mb-1.5 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
                 Contraseña
               </label>
               <div className="relative">
@@ -484,19 +323,7 @@ export default function RegisterPage() {
                   required
                   minLength={6}
                   placeholder="Mínimo 6 caracteres"
-                  className="w-full"
-                  style={{
-                    border: "1.5px solid #e5e7eb",
-                    borderRadius: 10,
-                    padding: "12px 40px 12px 16px",
-                    fontFamily: "var(--font-sans)",
-                    fontWeight: 400,
-                    fontSize: 14,
-                    color: "var(--color-brand-navy)",
-                    background: "#ffffff",
-                    outline: "none",
-                    transition: "border-color 200ms, box-shadow 200ms",
-                  }}
+                  className="w-full border-[1.5px] border-gray-200 rounded-xl py-3 pl-4 pr-10 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none transition-[border-color,box-shadow] duration-200"
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
@@ -513,8 +340,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5"
-                  style={{ color: "var(--color-brand-muted)" }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-brand-muted"
                   tabIndex={-1}
                   aria-label={
                     showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
@@ -575,13 +401,8 @@ export default function RegisterPage() {
                     ))}
                   </div>
                   <p
-                    className="mt-1"
-                    style={{
-                      fontFamily: "var(--font-sans)",
-                      fontWeight: 400,
-                      fontSize: 11,
-                      color: strength.color,
-                    }}
+                    className="mt-1 font-['Poppins',sans-serif] font-normal text-[11px]"
+                    style={{ color: strength.color }}
                   >
                     {strength.label}
                   </p>
@@ -591,17 +412,7 @@ export default function RegisterPage() {
 
             {/* Confirm password */}
             <div>
-              <label
-                className="block mb-1.5"
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 500,
-                  fontSize: 12,
-                  color: "var(--color-brand-muted)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
+              <label className="block mb-1.5 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
                 Confirmar contraseña
               </label>
               <div className="relative">
@@ -611,19 +422,7 @@ export default function RegisterPage() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   placeholder="Repite la contraseña"
-                  className="w-full"
-                  style={{
-                    border: "1.5px solid #e5e7eb",
-                    borderRadius: 10,
-                    padding: "12px 40px 12px 16px",
-                    fontFamily: "var(--font-sans)",
-                    fontWeight: 400,
-                    fontSize: 14,
-                    color: "var(--color-brand-navy)",
-                    background: "#ffffff",
-                    outline: "none",
-                    transition: "border-color 200ms, box-shadow 200ms",
-                  }}
+                  className="w-full border-[1.5px] border-gray-200 rounded-xl py-3 pl-4 pr-10 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none transition-[border-color,box-shadow] duration-200"
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
@@ -638,8 +437,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowConfirm((s) => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5"
-                  style={{ color: "var(--color-brand-muted)" }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-brand-muted"
                   tabIndex={-1}
                   aria-label={
                     showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"
@@ -679,10 +477,7 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <p
-                className="text-red-400 text-sm font-medium bg-red-50 px-3 py-2 rounded-xl"
-                style={{ fontFamily: "var(--font-sans)", fontWeight: 400 }}
-              >
+              <p className="text-red-400 text-sm font-medium bg-red-50 px-3 py-2 rounded-xl font-['Poppins',sans-serif] font-normal">
                 {error}
               </p>
             )}
@@ -701,26 +496,13 @@ export default function RegisterPage() {
                   borderRadius: 4,
                 }}
               />
-              <span
-                style={{
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 400,
-                  fontSize: 12,
-                  color: "var(--color-brand-muted)",
-                }}
-              >
+              <span className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted">
                 Acepto los{" "}
-                <span
-                  style={{ color: "var(--color-brand-cyan)" }}
-                  className="hover:underline"
-                >
+                <span className="text-brand-cyan hover:underline">
                   Términos y Condiciones
                 </span>{" "}
                 y la{" "}
-                <span
-                  style={{ color: "var(--color-brand-cyan)" }}
-                  className="hover:underline"
-                >
+                <span className="text-brand-cyan hover:underline">
                   Política de Privacidad
                 </span>
               </span>
@@ -729,20 +511,12 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading || !acceptedTerms}
-              className="w-full flex items-center justify-center"
+              className="w-full flex items-center justify-center h-12 text-white font-['Poppins',sans-serif] font-semibold text-[15px] rounded-xl border-none transition-colors duration-200"
               style={{
-                height: 48,
                 background: loading
                   ? "var(--color-brand-blue)"
                   : "var(--color-brand-cyan)",
-                color: "#ffffff",
-                fontFamily: "var(--font-sans)",
-                fontWeight: 600,
-                fontSize: 15,
-                borderRadius: 10,
-                border: "none",
                 cursor: loading || !acceptedTerms ? "not-allowed" : "pointer",
-                transition: "background 200ms",
                 opacity: loading || !acceptedTerms ? 0.5 : 1,
               }}
               onMouseEnter={(e) => {
@@ -781,24 +555,11 @@ export default function RegisterPage() {
           </form>
 
           {/* Footer */}
-          <p
-            className="text-center mt-6"
-            style={{
-              fontFamily: "var(--font-sans)",
-              fontWeight: 400,
-              fontSize: 14,
-              color: "var(--color-brand-muted)",
-            }}
-          >
+          <p className="text-center mt-6 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
             ¿Ya tienes cuenta?{" "}
             <Link
               href="/login"
-              style={{
-                fontFamily: "var(--font-sans)",
-                fontWeight: 600,
-                color: "var(--color-brand-cyan)",
-              }}
-              className="hover:underline"
+              className="font-['Poppins',sans-serif] font-semibold text-brand-cyan hover:underline"
             >
               Inicia sesión
             </Link>

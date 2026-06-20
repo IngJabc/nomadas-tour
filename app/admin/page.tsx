@@ -30,79 +30,64 @@ export default async function AdminDashboardPage() {
     .select('*', { count: 'exact', head: true });
 
   return (
-    <div style={{ background: '#f1f5f9', minHeight: '100vh' }}>
-      <div className="max-w-7xl mx-auto" style={{ padding: '32px 24px' }}>
+    <div className="bg-slate-100 min-h-screen">
+      <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Breadcrumb + Title */}
         <div className="mb-8">
-          <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 12, color: 'var(--color-brand-muted)' }}>
+          <p className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted">
             Admin / Panel
           </p>
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, color: 'var(--color-brand-navy)' }}>
+          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[26px] text-brand-navy">
             Panel de Administración
           </h1>
         </div>
 
         {/* Metrics cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
-          <div
-            className="bg-white rounded-2xl p-6"
-            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
-          >
+          <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(8,142,184,0.1)' }}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[rgba(8,142,184,0.1)]">
+                <svg className="w-5 h-5 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p className="font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">
                 Viajes activos
               </p>
             </div>
-            <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 36, color: 'var(--color-brand-navy)', lineHeight: 1 }}>
+            <p className="font-['Montserrat',sans-serif] font-extrabold text-4xl text-brand-navy leading-none">
               {tripsCount ?? 0}
             </p>
           </div>
 
-          <div
-            className="bg-white rounded-2xl p-6"
-            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
-          >
+          <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(8,142,184,0.1)' }}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[rgba(8,142,184,0.1)]">
+                <svg className="w-5 h-5 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p className="font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">
                 Reservas confirmadas
               </p>
             </div>
-            <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 36, color: 'var(--color-brand-navy)', lineHeight: 1 }}>
+            <p className="font-['Montserrat',sans-serif] font-extrabold text-4xl text-brand-navy leading-none">
               {bookingsCount ?? 0}
             </p>
           </div>
 
-          <div
-            className="bg-white rounded-2xl p-6"
-            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
-          >
+          <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(8,142,184,0.1)' }}
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[rgba(8,142,184,0.1)]">
+                <svg className="w-5 h-5 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                 </svg>
               </div>
-              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <p className="font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">
                 Rutas
               </p>
             </div>
-            <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 36, color: 'var(--color-brand-navy)', lineHeight: 1 }}>
+            <p className="font-['Montserrat',sans-serif] font-extrabold text-4xl text-brand-navy leading-none">
               {routesCount ?? 0}
             </p>
           </div>
@@ -112,26 +97,19 @@ export default async function AdminDashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <Link
             href="/admin/trips"
-            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5"
-            style={{
-              boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-              borderLeft: '4px solid var(--color-brand-cyan)',
-              textDecoration: 'none',
-            }}
+            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.07)] border-l-4 border-l-brand-cyan no-underline"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: 'var(--color-brand-navy)' }}
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-brand-navy">
+                <svg className="w-6 h-6 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
               <div>
-                <h2 style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 17, color: 'var(--color-brand-navy)' }}>
+                <h2 className="font-['Poppins',sans-serif] font-semibold text-[17px] text-brand-navy">
                   Gestión de viajes
                 </h2>
-                <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
                   Crear, editar y eliminar viajes
                 </p>
               </div>
@@ -140,26 +118,19 @@ export default async function AdminDashboardPage() {
 
           <Link
             href="/admin/routes"
-            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5"
-            style={{
-              boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
-              borderLeft: '4px solid var(--color-brand-cyan)',
-              textDecoration: 'none',
-            }}
+            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.07)] border-l-4 border-l-brand-cyan no-underline"
           >
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: 'var(--color-brand-navy)' }}
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-brand-navy">
+                <svg className="w-6 h-6 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
                 </svg>
               </div>
               <div>
-                <h2 style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 17, color: 'var(--color-brand-navy)' }}>
+                <h2 className="font-['Poppins',sans-serif] font-semibold text-[17px] text-brand-navy">
                   Gestión de rutas
                 </h2>
-                <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
                   Administrar rutas disponibles
                 </p>
               </div>

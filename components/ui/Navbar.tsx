@@ -41,10 +41,8 @@ export function Navbar() {
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full`}
+      className="sticky top-0 z-50 w-full bg-brand-navy h-16"
       style={{
-        background: "var(--color-brand-navy)",
-        height: 64,
         boxShadow: scrolled ? "0 2px 12px rgba(0,0,0,0.4)" : "none",
       }}
     >
@@ -73,16 +71,14 @@ export function Navbar() {
         <nav className="hidden md:flex items-center gap-6">
           <Link
             href="/"
-            className="text-white text-sm"
-            style={{ opacity: 0.75, transition: "opacity 150ms" }}
+            className="text-white text-sm opacity-75 hover:opacity-100 transition-opacity duration-150"
           >
             Viajes
           </Link>
           {user?.user_metadata?.role === "admin" && (
             <Link
               href="/admin"
-              className="text-white text-sm"
-              style={{ opacity: 0.75, transition: "opacity 150ms" }}
+              className="text-white text-sm opacity-75 hover:opacity-100 transition-opacity duration-150"
             >
               Panel Admin
             </Link>
@@ -94,13 +90,7 @@ export function Navbar() {
             <>
               <Link
                 href="/dashboard"
-                className="px-5 py-2 rounded-full text-sm font-semibold"
-                style={{
-                  background: "var(--color-brand-cyan)",
-                  color: "white",
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 600,
-                }}
+                className="px-5 py-2 rounded-full text-sm font-semibold bg-brand-cyan text-white font-['Poppins',sans-serif]"
               >
                 Mis reservas
               </Link>
@@ -122,13 +112,7 @@ export function Navbar() {
               </Link>
               <Link
                 href="/register"
-                className="px-5 py-2 rounded-full text-sm font-semibold"
-                style={{
-                  background: "var(--color-brand-cyan)",
-                  color: "white",
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 600,
-                }}
+                className="px-5 py-2 rounded-full text-sm font-semibold bg-brand-cyan text-white font-['Poppins',sans-serif]"
               >
                 Registrarse
               </Link>
@@ -178,8 +162,7 @@ export function Navbar() {
         aria-modal="true"
         className={`fixed top-0 right-0 h-full w-[280px] transform ${
           open ? "translate-x-0" : "translate-x-full"
-        } transition-transform duration-200 z-50`}
-        style={{ background: "var(--color-brand-dark)" }}
+        } transition-transform duration-200 z-50 bg-brand-dark`}
       >
         <div className="h-16 px-4 flex items-center justify-between">
           <Link
@@ -237,13 +220,7 @@ export function Navbar() {
               <Link
                 href="/dashboard"
                 onClick={() => setOpen(false)}
-                className="block w-full text-center px-4 py-2 rounded-full"
-                style={{
-                  background: "var(--color-brand-cyan)",
-                  color: "white",
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 600,
-                }}
+                className="block w-full text-center px-4 py-2 rounded-full bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold"
               >
                 Mis reservas
               </Link>
@@ -259,13 +236,7 @@ export function Navbar() {
               <Link
                 href="/register"
                 onClick={() => setOpen(false)}
-                className="block w-full text-center px-4 py-2 rounded-full"
-                style={{
-                  background: "var(--color-brand-cyan)",
-                  color: "white",
-                  fontFamily: "var(--font-sans)",
-                  fontWeight: 600,
-                }}
+                className="block w-full text-center px-4 py-2 rounded-full bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold"
               >
                 Registrarse
               </Link>

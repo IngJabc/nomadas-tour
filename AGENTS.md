@@ -197,17 +197,27 @@ Guía: fondo #00000C | border 2px solid #00D4FF
 ### Layout del bus
 
 - **Distribución:** 2 asientos izquierda + pasillo central (32px, vacío) + 2 asientos derecha por fila
-- **Orden:** A1 esquina superior izquierda, izquierda→derecha, arriba→abajo
-  - Fila 1: [A1][A2] |pasillo| [A3][A4]
-  - Fila 2: [A5][A6] |pasillo| [A7][A8]
-  - Fila 3: [A9][A10] |pasillo| [A11][A12] ...
+- **Orden (bottom-to-top):** A1, A2 en la fila más cercana al fondo (abajo); mayor número = más cerca del frente (arriba)
+  - Última fila (fondo): [A1][A2] |pasillo| [A3][A4]
+  - Penúltima: [A5][A6] |pasillo| [A7][A8]
+  - Primera fila (frente): [A29][A30] |pasillo| (restantes)
 - **Pasillo:** div completamente vacío (width 32px, flex-shrink 0), sin íconos ni SVGs
-- **Asiento del guía:** renderizado FUERA de la grilla, entre FRENTE y el cuerpo del bus
+- **Carrocería exterior:** fondo #d1d5db, border-radius 40px superior / 24px inferior, borde 3px #9ca3af, sombra exterior
+- **Parabrisas:** franja #6b7280 de 24px en la parte superior, "FRENTE" en la cabina inferior
+- **Laterales:** dos franjas verticales #9ca3af de 10px a cada lado del cuerpo (ventanas)  
+- **Cuerpo del bus (asientos):** fondo #00000C, padding 16px
+- **Zona inferior (cabina):** franja #6b7280 de 80px, dividida en:
+  - **Guía (izquierda):** rectángulo 48×48px fondo #166534, borde 2px #00D4FF, label "G" blanco
+  - **Conductor (derecha):** SVG volante 36px sobre rectángulo 48×48px fondo #ea580c
+- **Ruedas:** 2 pares (delanteras y traseras), 20×36px, border-radius 6px, fondo #1f2937, position absolute
+- **Puerta:** rectángulo #9ca3af de 14×160px lado izquierdo, borde derecho 2px #6b7280, label vertical "Puerta Principal". Los asientos izquierdos de filas A1–A16 se renderizan como divs vacíos
+- **Franja carrocería:** barra vertical #16a34a de 12px en lado derecho del bus
+- **Asiento del guía:** div renderizado en la zona de cabina (franja gris inferior), NUNCA dentro de la grilla de asientos
 - Si la cantidad de asientos no es múltiplo de 4, la última fila muestra los restantes en el mismo orden
 
 La leyenda SIEMPRE va encima del mapa, nunca debajo.
-El mapa SIEMPRE tiene etiquetas "FRENTE" (arriba) y "FONDO" (abajo).
-A1 es el frente del bus (parte superior del mapa).
+"FONDO" va ARRIBA del bus (parte superior del componente), "FRENTE" va en la zona de la cabina inferior.
+A1 es la fila más cercana al fondo (abajo del bus).
 
 ---
 

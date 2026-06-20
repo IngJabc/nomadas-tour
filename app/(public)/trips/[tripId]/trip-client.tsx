@@ -192,12 +192,12 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
 
   if (loading) {
     return (
-      <div className="min-h-screen" style={{ background: '#f1f5f9' }}>
-        <div className="max-w-7xl mx-auto" style={{ padding: '32px 24px' }}>
+      <div className="min-h-screen bg-slate-100">
+        <div className="max-w-7xl mx-auto py-8 px-6">
           <div className="flex flex-col lg:flex-row gap-8 items-start justify-center animate-pulse">
             <div className="flex flex-col items-center gap-6">
-              <div className="bg-white rounded-2xl p-4" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
-                <div style={{ background: 'var(--color-brand-dark)', borderRadius: 20, padding: 16 }}>
+              <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
+                <div className="bg-brand-dark rounded-[20px] p-4">
                   <div className="flex justify-center mb-4">
                     <div className="w-20 h-10 bg-slate-600 rounded-t-2xl" />
                   </div>
@@ -222,7 +222,7 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
               </div>
             </div>
             <div className="w-full lg:w-80">
-              <div className="bg-white rounded-2xl p-6 space-y-4" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
+              <div className="bg-white rounded-2xl p-6 space-y-4 shadow-[0_4px_16px_rgba(0,0,0,0.08)]">
                 <div className="h-6 bg-slate-200 rounded-lg w-1/2" />
                 <div className="h-4 bg-slate-200 rounded-lg w-3/4" />
                 <div className="h-4 bg-slate-200 rounded-lg w-1/3" />
@@ -239,27 +239,16 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
   const isNotLoggedIn = !authLoading && !userId;
 
   return (
-    <div className="min-h-screen" style={{ background: '#f1f5f9' }}>
-      <div className="max-w-7xl mx-auto" style={{ padding: '32px 24px' }}>
+    <div className="min-h-screen bg-slate-100">
+      <div className="max-w-7xl mx-auto py-8 px-6">
         <div className="pt-12">
           {/* Not logged in alert (spec: only if not authenticated) */}
           {isNotLoggedIn && (
-            <div
-              style={{
-                background: '#fffbeb',
-                border: '1px solid #fcd34d',
-                borderRadius: 10,
-                padding: '12px 16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                marginBottom: 24,
-              }}
-            >
-              <span style={{ fontSize: 16 }}>⚠️</span>
-              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: '#92400e' }}>
+            <div className="bg-amber-50 border border-amber-300 rounded-xl py-3 px-4 flex items-center gap-2.5 mb-6">
+              <span className="text-base">⚠️</span>
+              <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-amber-800">
                 Necesitas{' '}
-                <Link href="/login" style={{ color: 'var(--color-brand-cyan)', fontWeight: 600, textDecoration: 'none' }}>
+                <Link href="/login" className="text-brand-cyan font-semibold no-underline">
                   iniciar sesión
                 </Link>{' '}
                 para seleccionar y reservar asientos

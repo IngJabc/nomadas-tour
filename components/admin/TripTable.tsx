@@ -20,87 +20,52 @@ export function TripTable({ trips, onEdit, onDelete }: TripTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr style={{ background: '#f8fafc' }}>
-            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Salida</th>
-            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ruta</th>
-            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bus</th>
-            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Precio</th>
-            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Estado</th>
-            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Acciones</th>
+          <tr className="bg-slate-50">
+            <th className="text-left px-5 py-3 font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">Salida</th>
+            <th className="text-left px-5 py-3 font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">Ruta</th>
+            <th className="text-left px-5 py-3 font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">Bus</th>
+            <th className="text-left px-5 py-3 font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">Precio</th>
+            <th className="text-left px-5 py-3 font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">Estado</th>
+            <th className="text-left px-5 py-3 font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">Acciones</th>
           </tr>
         </thead>
         <tbody>
           {trips.map((trip) => {
             const s = STATUS_STYLES[trip.status] ?? STATUS_STYLES.active;
             return (
-              <tr key={trip.id} style={{ borderBottom: '1px solid #f1f5f9' }}
-                className="hover:bg-[#f8fafc] transition-colors"
-              >
-                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-navy)' }}>
+              <tr key={trip.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <td className="px-5 py-4 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy">
                   {formatDateTime(trip.departure_at)}
                 </td>
-                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-navy)' }}>
+                <td className="px-5 py-4 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy">
                   {trip.route?.origin ?? '—'} → {trip.route?.destination ?? '—'}
                 </td>
-                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                <td className="px-5 py-4 font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
                   {trip.total_seats} asientos
                 </td>
-                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, color: 'var(--color-brand-cyan)' }}>
+                <td className="px-5 py-4 font-['Poppins',sans-serif] font-semibold text-sm text-brand-cyan">
                   {formatPrice(trip.price)}
                 </td>
-                <td style={{ padding: '16px 20px' }}>
-                  <span style={{
-                    display: 'inline-block',
-                    background: s.bg,
-                    color: s.text,
-                    fontFamily: 'var(--font-sans)',
-                    fontWeight: 600,
-                    fontSize: 11,
-                    padding: '3px 10px',
-                    borderRadius: 9999,
-                  }}>
+                <td className="px-5 py-4">
+                  <span className="inline-block font-['Poppins',sans-serif] font-semibold text-[11px] px-[10px] py-[3px] rounded-full" style={{ background: s.bg, color: s.text }}>
                     {s.label}
                   </span>
                 </td>
-                <td style={{ padding: '16px 20px' }}>
+                <td className="px-5 py-4">
                   <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => onEdit(trip)}
-                      style={{
-                        background: '#eff6ff',
-                        color: 'var(--color-brand-blue)',
-                        fontFamily: 'var(--font-sans)',
-                        fontWeight: 600,
-                        fontSize: 12,
-                        padding: '5px 12px',
-                        borderRadius: 8,
-                        border: 'none',
-                        cursor: 'pointer',
-                        transition: 'opacity 150ms',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                      className="font-['Poppins',sans-serif] font-semibold text-xs px-3 py-[5px] rounded-lg border-none cursor-pointer transition-opacity duration-150 hover:opacity-70"
+                      style={{ background: '#eff6ff', color: 'var(--color-brand-blue)' }}
                     >
                       Editar
                     </button>
                     <button
                       type="button"
                       onClick={() => onDelete(trip.id)}
-                      style={{
-                        background: '#fef2f2',
-                        color: '#ef4444',
-                        fontFamily: 'var(--font-sans)',
-                        fontWeight: 600,
-                        fontSize: 12,
-                        padding: '5px 12px',
-                        borderRadius: 8,
-                        border: 'none',
-                        cursor: 'pointer',
-                        transition: 'opacity 150ms',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                      className="font-['Poppins',sans-serif] font-semibold text-xs px-3 py-[5px] rounded-lg border-none cursor-pointer transition-opacity duration-150 hover:opacity-70"
+                      style={{ background: '#fef2f2', color: '#ef4444' }}
                     >
                       Eliminar
                     </button>

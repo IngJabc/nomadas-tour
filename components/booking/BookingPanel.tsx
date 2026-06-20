@@ -109,17 +109,10 @@ export function BookingPanel({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-            textAlign: 'center',
-          }}
+          className="bg-white rounded-2xl p-6 text-center"
+          style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
         >
-          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ background: '#ecfdf5' }}
-          >
+          <div className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 bg-emerald-50">
             <motion.svg
               width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth={2.5}
               initial={{ pathLength: 0 }}
@@ -130,10 +123,10 @@ export function BookingPanel({
             </motion.svg>
           </div>
 
-          <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 20, color: 'var(--color-brand-navy)' }}>
+          <h3 className="font-['Montserrat',sans-serif] font-bold text-xl text-brand-navy">
             ¡Reserva confirmada!
           </h3>
-          <p className="mb-5" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-muted)' }}>
+          <p className="mb-5 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
             Tus asientos han sido reservados exitosamente.
           </p>
 
@@ -143,67 +136,39 @@ export function BookingPanel({
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-cyan)" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
                 </svg>
-                <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 13, color: 'var(--color-brand-navy)' }}>
+                <span className="font-['Poppins',sans-serif] font-semibold text-[13px] text-brand-navy">
                   Asiento {code}
                 </span>
-                <span className="ml-auto" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                <span className="ml-auto font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
                   {formatPrice(price)}
                 </span>
               </div>
             ))}
           </div>
 
-          <div style={{ height: 1, background: '#f1f5f9', margin: '12px 0' }} />
+          <div className="h-px bg-slate-100 my-3" />
 
           <div className="flex items-center justify-between mb-5">
-            <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 16, color: 'var(--color-brand-navy)' }}>
+            <span className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">
               Total pagado
             </span>
-            <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 22, color: 'var(--color-brand-cyan)' }}>
+            <span className="font-['Montserrat',sans-serif] font-extrabold text-[22px] text-brand-cyan">
               {formatPrice(((lastSeatCodes ? lastSeatCodes.length : (lastBookingIds ? lastBookingIds.length : selectedSeats.length)) * price) || 0)}
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div className="flex gap-2.5">
             {lastBookingIds && lastBookingIds[0] && (
               <Link
                 href={`/bookings/${lastBookingIds[0]}`}
-                style={{
-                  flex: 1,
-                  padding: '10px 14px',
-                  background: '#f1f5f9',
-                  color: 'var(--color-brand-navy)',
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: 600,
-                  fontSize: 14,
-                  borderRadius: 10,
-                  textDecoration: 'none',
-                  transition: 'background 200ms',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
+                className="flex-1 px-3.5 py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
               >
                 Ver boleto
               </Link>
             )}
             <Link
               href="/dashboard"
-              style={{
-                flex: 1,
-                padding: '12px 20px',
-                background: 'var(--color-brand-cyan)',
-                color: '#ffffff',
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 600,
-                fontSize: 14,
-                borderRadius: 10,
-                textDecoration: 'none',
-                transition: 'background 200ms',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+              className="flex-1 px-5 py-3 bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-brand-blue)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-brand-cyan)'; }}
             >
@@ -218,24 +183,20 @@ export function BookingPanel({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.2 }}
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-          }}
+          className="bg-white rounded-2xl p-6"
+          style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
         >
           <div className="flex items-center gap-2 mb-5">
-            <div style={{ width: 4, height: 18, background: 'var(--color-brand-cyan)', borderRadius: 2 }} />
-            <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 18, color: 'var(--color-brand-navy)' }}>
+            <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
+            <h3 className="font-['Montserrat',sans-serif] font-bold text-lg text-brand-navy">
               Tu reserva
             </h3>
           </div>
           <div className="flex flex-col items-center py-8 text-center">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-muted)" strokeWidth={1.5} style={{ marginBottom: 16 }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-brand-muted)" strokeWidth={1.5} className="mb-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
             </svg>
-            <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)', maxWidth: 200, lineHeight: 1.5 }}>
+            <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted max-w-[200px] leading-normal">
               Selecciona un asiento del mapa para continuar
             </p>
           </div>
@@ -247,12 +208,8 @@ export function BookingPanel({
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -40 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: 24,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
-          }}
+          className="bg-white rounded-2xl p-6"
+          style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
         >
           {/* Error banner */}
           <AnimatePresence>
@@ -262,15 +219,9 @@ export function BookingPanel({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
-                className="mb-4"
-                style={{
-                  background: '#fef2f2',
-                  border: '1px solid #ef4444',
-                  borderRadius: 10,
-                  padding: '10px 14px',
-                }}
+                className="mb-4 bg-red-50 border border-red-500 rounded-xl px-3.5 py-2.5"
               >
-                <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: '#ef4444' }}>
+                <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-red-500">
                   No se pudo completar la reserva. Inténtalo de nuevo.
                 </p>
               </motion.div>
@@ -278,8 +229,8 @@ export function BookingPanel({
           </AnimatePresence>
 
           <div className="flex items-center gap-2 mb-5">
-            <div style={{ width: 4, height: 18, background: 'var(--color-brand-cyan)', borderRadius: 2 }} />
-            <h3 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 18, color: 'var(--color-brand-navy)' }}>
+            <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
+            <h3 className="font-['Montserrat',sans-serif] font-bold text-lg text-brand-navy">
               Tu reserva
             </h3>
           </div>
@@ -290,28 +241,16 @@ export function BookingPanel({
               <div key={s.seat_code} className="flex items-center justify-between py-1">
                 <div className="flex items-center gap-3">
                   <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      background: 'rgba(8,142,184,0.1)',
-                      color: 'var(--color-brand-cyan)',
-                      fontFamily: 'var(--font-sans)',
-                      fontWeight: 600,
-                      fontSize: 12,
-                      padding: '2px 8px',
-                      borderRadius: 6,
-                      minWidth: 32,
-                      textAlign: 'center',
-                    }}
+                    className="inline-flex items-center justify-center text-brand-cyan font-['Poppins',sans-serif] font-semibold text-xs px-2 py-0.5 rounded-md min-w-[32px] text-center"
+                    style={{ background: 'rgba(8,142,184,0.1)' }}
                   >
                     {s.seat_code}
                   </span>
-                  <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-navy)' }}>
+                  <span className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-navy">
                     Asiento {s.seat_code}
                   </span>
                 </div>
-                <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 13, color: 'var(--color-brand-navy)' }}>
+                <span className="font-['Poppins',sans-serif] font-semibold text-[13px] text-brand-navy">
                   {formatPrice(price)}
                 </span>
               </div>
@@ -319,14 +258,14 @@ export function BookingPanel({
           </div>
 
           {/* Separator */}
-          <div style={{ height: 1, background: '#f1f5f9', margin: '12px 0' }} />
+          <div className="h-px bg-slate-100 my-3" />
 
           {/* Total */}
           <div className="flex items-center justify-between mb-5">
-            <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, color: 'var(--color-brand-navy)' }}>
+            <span className="font-['Poppins',sans-serif] font-semibold text-sm text-brand-navy">
               Total
             </span>
-            <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 22, color: 'var(--color-brand-cyan)' }}>
+            <span className="font-['Montserrat',sans-serif] font-extrabold text-[22px] text-brand-cyan">
               {formatPrice(total)}
             </span>
           </div>
@@ -334,9 +273,7 @@ export function BookingPanel({
           {/* Passenger form */}
           <div className="space-y-3 mb-4">
             <div>
-              <label className="block mb-1"
-                style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-              >
+              <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
                 Nombre del pasajero
               </label>
               <input
@@ -344,19 +281,8 @@ export function BookingPanel({
                 value={passengerName}
                 onChange={(e) => setPassengerName(e.target.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñüÜ\s]/g, ''))}
                 placeholder="Ej. Juan Pérez"
-                className="w-full"
-                style={{
-                  border: '1.5px solid #e5e7eb',
-                  borderRadius: 10,
-                  padding: '10px 14px',
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: 400,
-                  fontSize: 14,
-                  color: 'var(--color-brand-navy)',
-                  background: '#ffffff',
-                  outline: 'none',
-                  transition: 'border-color 200ms, box-shadow 200ms',
-                }}
+                className="w-full border-[1.5px] border-gray-200 rounded-xl px-3.5 py-2.5 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none"
+                style={{ transition: 'border-color 200ms, box-shadow 200ms' }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
@@ -368,9 +294,7 @@ export function BookingPanel({
               />
             </div>
             <div>
-              <label className="block mb-1"
-                style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-              >
+              <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
                 Cédula del pasajero
               </label>
               <input
@@ -379,19 +303,8 @@ export function BookingPanel({
                 value={passengerCedula}
                 onChange={(e) => setPassengerCedula(e.target.value.replace(/\D/g, '').slice(0, 8))}
                 placeholder="Ej. 12345678"
-                className="w-full"
-                style={{
-                  border: '1.5px solid #e5e7eb',
-                  borderRadius: 10,
-                  padding: '10px 14px',
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: 400,
-                  fontSize: 14,
-                  color: 'var(--color-brand-navy)',
-                  background: '#ffffff',
-                  outline: 'none',
-                  transition: 'border-color 200ms, box-shadow 200ms',
-                }}
+                className="w-full border-[1.5px] border-gray-200 rounded-xl px-3.5 py-2.5 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none"
+                style={{ transition: 'border-color 200ms, box-shadow 200ms' }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
                   e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
@@ -415,19 +328,8 @@ export function BookingPanel({
               type="button"
               onClick={onClear}
               disabled={loading}
-              style={{
-                flex: 1,
-                padding: '10px 16px',
-                background: '#f1f5f9',
-                color: 'var(--color-brand-navy)',
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 600,
-                fontSize: 14,
-                borderRadius: 10,
-                border: 'none',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'background 200ms',
-              }}
+              className="flex-1 px-4 py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl border-none transition-colors duration-200"
+              style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
               onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#e2e8f0'; }}
               onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#f1f5f9'; }}
             >
@@ -437,18 +339,10 @@ export function BookingPanel({
               type="button"
               onClick={handleConfirm}
               disabled={loading}
+              className="flex-1 px-4 py-2.5 text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl border-none transition-colors duration-200"
               style={{
-                flex: 1,
-                padding: '10px 16px',
                 background: loading ? '#94a3b8' : 'var(--color-brand-cyan)',
-                color: '#ffffff',
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 600,
-                fontSize: 14,
-                borderRadius: 10,
-                border: 'none',
                 cursor: loading ? 'not-allowed' : 'pointer',
-                transition: 'background 200ms',
               }}
               onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = 'var(--color-brand-blue)'; }}
               onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = 'var(--color-brand-cyan)'; }}

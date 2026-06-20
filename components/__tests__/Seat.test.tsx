@@ -24,8 +24,8 @@ describe('Seat component', () => {
   it('renders available seat with cyan background', () => {
     render(<Seat seat={createSeat()} isSelected={false} onSelect={() => {}} />);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('from-cyan-400');
-    expect(btn.className).toContain('cursor-pointer');
+    expect(btn.style.background).toContain('var(--color-brand-cyan)');
+    expect(btn.style.cursor).toBe('pointer');
   });
 
   it('renders reserved seat with slate background and disabled', () => {
@@ -37,12 +37,12 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('from-slate-400');
-    expect(btn.className).toContain('cursor-not-allowed');
+    expect(btn.style.background).toContain('rgb(55, 65, 81)');
+    expect(btn.style.cursor).toBe('not-allowed');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('renders locked seat with orange background and disabled', () => {
+  it('renders locked seat with disabled', () => {
     render(
       <Seat
         seat={createSeat({ status: 'locked', locked_by: 'other-user' })}
@@ -51,7 +51,7 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('from-orange-400');
+    expect(btn.style.background).toContain('rgb(55, 65, 81)');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -64,11 +64,11 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('from-amber-400');
+    expect(btn.style.background).toContain('rgb(245, 158, 11)');
     expect((btn as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('renders guide seat with brand-dark and disabled', () => {
+  it('renders unknown status seat as slate and disabled', () => {
     render(
       <Seat
         seat={createSeat({ seat_code: 'G', status: 'locked' })}
@@ -77,7 +77,7 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('from-brand-dark');
+    expect(btn.style.background).toContain('rgb(55, 65, 81)');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 

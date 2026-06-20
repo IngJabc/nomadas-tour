@@ -75,40 +75,29 @@ export default async function DashboardPage() {
   const groups = groupBookings(bookings ?? []);
 
   return (
-    <div style={{ background: '#f1f5f9' }} className="min-h-screen">
-      <main className="pt-20" style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+    <div className="min-h-screen bg-slate-100">
+      <main className="pt-20 max-w-[1100px] mx-auto py-8 px-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-1">
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, color: 'var(--color-brand-navy)' }}>
+          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[26px] text-brand-navy">
             Hola, {userName} &#x1f44b;
           </h1>
           {isAdmin && (
             <Link
               href="/admin"
-              style={{
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 600,
-                fontSize: 11,
-                color: 'var(--color-brand-cyan)',
-                background: 'rgba(8,142,184,0.1)',
-                padding: '3px 10px',
-                borderRadius: 9999,
-                textDecoration: 'none',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-              }}
+              className="font-['Poppins',sans-serif] font-semibold text-[11px] text-brand-cyan bg-brand-cyan/10 px-2.5 py-0.5 rounded-full no-underline uppercase tracking-wider"
             >
               Panel Admin &rarr;
             </Link>
           )}
         </div>
-        <p className="mb-8" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-muted)' }}>
+        <p className="mb-8 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
           Aquí están todas tus reservas
         </p>
 
         {groups.length === 0 ? (
           /* Empty state */
-          <div className="mx-auto text-center" style={{ background: '#ffffff', borderRadius: 20, padding: 48, maxWidth: 480, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+          <div className="mx-auto text-center bg-white rounded-[20px] p-12 max-w-[480px] shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <svg className="mx-auto mb-6" width="160" height="100" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
               <rect x="30" y="35" width="100" height="40" rx="8" fill="#088eb8" opacity="0.15" />
               <rect x="40" y="42" width="12" height="8" rx="2" fill="#088eb8" opacity="0.4" />
@@ -121,25 +110,15 @@ export default async function DashboardPage() {
               <path d="M40 30h80v8H40z" fill="#088eb8" opacity="0.08" />
               <path d="M20 40l8-10h104l8 10" stroke="#088eb8" strokeWidth="1.5" fill="none" opacity="0.15" />
             </svg>
-            <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 20, color: 'var(--color-brand-navy)' }}>
+            <h2 className="font-['Montserrat',sans-serif] font-bold text-xl text-brand-navy">
               Aún no tienes reservas
             </h2>
-            <p className="mx-auto mt-2 mb-6" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-muted)', maxWidth: 320 }}>
+            <p className="mx-auto mt-2 mb-6 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted max-w-[320px]">
               Explora los viajes disponibles y reserva tu asiento en minutos.
             </p>
             <Link
               href="/"
-              className="inline-flex items-center hover:bg-[var(--color-brand-blue)]"
-              style={{
-                background: 'var(--color-brand-cyan)',
-                color: '#ffffff',
-                fontFamily: 'var(--font-sans)',
-                fontWeight: 600,
-                fontSize: 14,
-                borderRadius: 10,
-                padding: '12px 24px',
-                transition: 'background 200ms',
-              }}
+              className="inline-flex items-center bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl px-6 py-3 transition-colors duration-200 hover:bg-brand-blue"
             >
               Ver viajes disponibles &rarr;
             </Link>
@@ -153,51 +132,44 @@ export default async function DashboardPage() {
               return (
                 <div
                   key={group.tripId}
-                  className="relative bg-white"
-                  style={{ borderRadius: 16, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
+                  className="relative bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.07)]"
                 >
                   {/* Top status strip */}
                   <div
+                    className="h-1 rounded-t-2xl"
                     style={{
-                      height: 4,
                       background: group.hasCancelled ? '#ef4444' : 'var(--color-brand-cyan)',
-                      borderRadius: '16px 16px 0 0',
                     }}
                   />
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4" style={{ padding: '20px 24px' }}>
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4 py-5 px-6">
                     {/* Left zone */}
                     <div className="w-full sm:flex-1">
                       <span
-                        className="inline-block mb-2"
+                        className="inline-block mb-2 font-['Poppins',sans-serif] font-semibold text-[11px] px-2.5 py-0.5 rounded-full"
                         style={{
                           background: badge.bg,
                           color: badge.text,
-                          fontFamily: 'var(--font-sans)',
-                          fontWeight: 600,
-                          fontSize: 11,
-                          padding: '3px 10px',
-                          borderRadius: 9999,
                         }}
                       >
                         {badge.label}
                       </span>
-                      <h3 style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 17, color: 'var(--color-brand-navy)' }}>
+                      <h3 className="font-['Poppins',sans-serif] font-semibold text-[17px] text-brand-navy">
                         {group.origin} → {group.destination}
                       </h3>
-                      <p className="mt-1" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                      <p className="mt-1 font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
                         {formatDate(group.departureAt)}
                       </p>
-                      <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                      <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
                         Asientos: {group.seatCodes.join(', ')}
                       </p>
                     </div>
                     {/* Right zone */}
                     <div className="flex sm:flex-col items-start sm:items-end gap-2 sm:gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
                       <div className="text-right">
-                        <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 22, color: 'var(--color-brand-cyan)' }}>
+                        <div className="font-['Montserrat',sans-serif] font-extrabold text-[22px] text-brand-cyan">
                           {totalPrice.toFixed(2).replace('.', ',')} €
                         </div>
-                        <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 11, color: 'var(--color-brand-muted)' }}>
+                        <div className="font-['Poppins',sans-serif] font-normal text-[11px] text-brand-muted">
                           Total pagado
                         </div>
                       </div>
@@ -206,8 +178,7 @@ export default async function DashboardPage() {
                           <>
                             <Link
                               href={`/bookings/${firstId}`}
-                              style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 13, color: 'var(--color-brand-cyan)' }}
-                              className="hover:underline"
+                              className="font-['Poppins',sans-serif] font-semibold text-[13px] text-brand-cyan hover:underline"
                             >
                               Ver detalles &rarr;
                             </Link>

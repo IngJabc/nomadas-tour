@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const NAV_ITEMS = [
+  { href: '/admin', label: 'Panel', icon: '📊' },
+  { href: '/admin/bookings', label: 'Pasajeros', icon: '👥' },
   { href: '/admin/trips', label: 'Viajes', icon: '📋' },
   { href: '/admin/routes', label: 'Rutas', icon: '🗺️' },
 ];
@@ -17,8 +19,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen flex">
       {/* Mobile hamburger trigger — visible only on small screens */}
       <button
-        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-lg"
-        style={{ background: 'var(--color-brand-dark)' }}
+        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-brand-dark"
         onClick={() => setDrawerOpen(true)}
         aria-label="Abrir menú admin"
       >
@@ -35,12 +36,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Sidebar */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-40 w-[220px] flex flex-col
+          fixed inset-y-0 left-0 z-40 w-[220px] flex flex-col bg-brand-dark
           transform transition-transform duration-200
           ${drawerOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0 lg:fixed
         `}
-        style={{ background: 'var(--color-brand-dark)' }}
       >
         {/* Close button for mobile */}
         <button
@@ -55,11 +55,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Logo */}
         <div className="px-6 pt-8 pb-4 flex flex-col items-center">
-          <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white font-bold text-lg" style={{ fontFamily: 'var(--font-heading)' }}>
+          <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white font-bold text-lg font-['Montserrat',sans-serif]">
             N
           </div>
-          <div className="mt-2 px-2 py-0.5 rounded" style={{ background: 'rgba(8,142,184,0.2)' }}>
-            <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 10, color: 'var(--color-brand-cyan)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          <div className="mt-2 px-2 py-0.5 rounded bg-[rgba(8,142,184,0.2)]">
+            <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-cyan uppercase tracking-wider">
               Panel Admin
             </span>
           </div>
@@ -68,24 +68,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Nav links */}
         <nav className="flex-1 px-3 py-2 flex flex-col gap-1">
           {NAV_ITEMS.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const active = item.href === '/admin'
+              ? pathname === '/admin'
+              : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={() => setDrawerOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm rounded-r-lg transition-colors"
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontWeight: 500,
-                  fontSize: 14,
-                  color: active ? '#ffffff' : 'rgba(255,255,255,0.65)',
-                  background: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  borderLeft: active ? '3px solid var(--color-brand-cyan)' : '3px solid transparent',
-                  borderRadius: '0 8px 8px 0',
-                }}
-                onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#ffffff'; }}
-                onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.65)'; }}}
+                className={`flex items-center gap-3 px-4 py-2.5 text-sm rounded-r-lg transition-colors font-['Poppins',sans-serif] font-medium border-l-[3px] border-solid ${
+                  active
+                    ? 'bg-white/10 text-white border-l-brand-cyan'
+                    : 'bg-transparent text-white/65 hover:bg-white/5 hover:text-white border-l-transparent'
+                }`}
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
@@ -98,8 +93,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="px-6 py-6 border-t border-white/10">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5"
-            style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 12, color: 'rgba(255,255,255,0.4)' }}
+            className="inline-flex items-center gap-1.5 font-['Poppins',sans-serif] font-normal text-xs text-white/40"
             onClick={() => setDrawerOpen(false)}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -111,7 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Content */}
-      <main className="flex-1 lg:ml-[220px] min-h-screen" style={{ background: '#f1f5f9' }}>
+      <main className="flex-1 lg:ml-[220px] min-h-screen bg-slate-100">
         {children}
       </main>
     </div>

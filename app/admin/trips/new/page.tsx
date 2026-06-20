@@ -55,7 +55,7 @@ export default function NewTripPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-surface to-white">
       <main className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div style={{ background: '#ffffff', borderRadius: 16, padding: 24, boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+        <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
           <TripForm routes={routes} onSubmit={handleSubmit} />
         </div>
       </main>

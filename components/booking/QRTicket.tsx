@@ -89,22 +89,13 @@ export function QRTicket({ bookings }: QRTicketProps) {
           )}
           <div className="flex justify-between py-3">
             <span className="text-sm text-slate-400">Asientos</span>
-            <div className="flex flex-wrap gap-1.5 justify-end" style={{ maxWidth: 200 }}>
+            <div className="flex flex-wrap gap-1.5 justify-end max-w-[200px]">
               {seatCodes.length > 4 ? (
                 <div className="grid grid-cols-2 gap-1">
                   {seatCodes.map((code) => (
                     <span
                       key={code}
-                      style={{
-                        background: 'rgba(0,212,255,0.1)',
-                        color: '#00D4FF',
-                        fontFamily: 'var(--font-sans)',
-                        fontWeight: 600,
-                        fontSize: 13,
-                        borderRadius: 6,
-                        padding: '2px 8px',
-                        textAlign: 'center',
-                      }}
+                      className="bg-brand-cyan/10 text-brand-cyan font-['Poppins',sans-serif] font-semibold text-[13px] rounded-md px-2 py-0.5 text-center"
                     >
                       {code}
                     </span>
@@ -114,15 +105,7 @@ export function QRTicket({ bookings }: QRTicketProps) {
                 seatCodes.map((code) => (
                   <span
                     key={code}
-                    style={{
-                      background: 'rgba(0,212,255,0.1)',
-                      color: '#00D4FF',
-                      fontFamily: 'var(--font-sans)',
-                      fontWeight: 600,
-                      fontSize: 13,
-                      borderRadius: 6,
-                      padding: '2px 8px',
-                    }}
+                    className="bg-brand-cyan/10 text-brand-cyan font-['Poppins',sans-serif] font-semibold text-[13px] rounded-md px-2 py-0.5"
                   >
                     {code}
                   </span>
