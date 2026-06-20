@@ -33,11 +33,11 @@ export default async function HomePage() {
   }
 
   return (
-    <div style={{ background: '#f1f5f9' }} className="min-h-screen">
+    <div className="min-h-screen bg-slate-100">
       <main className="pt-20 max-w-[1100px] mx-auto px-6 py-8">
         <div className="flex items-start gap-3 mb-6">
-          <div style={{ width: 4, height: 28, background: 'var(--color-brand-cyan)' }} />
-          <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 28, color: 'var(--color-brand-navy)' }}>Viajes disponibles</h2>
+          <div className="w-1 h-7 bg-brand-cyan" />
+          <h2 className="font-['Montserrat',sans-serif] font-extrabold text-[28px] text-brand-navy">Viajes disponibles</h2>
         </div>
 
         {!trips || trips.length === 0 ? (
@@ -47,8 +47,8 @@ export default async function HomePage() {
               <circle cx="30" cy="65" r="6" fill="#cbdffd" />
               <circle cx="70" cy="65" r="6" fill="#cbdffd" />
             </svg>
-            <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 18, color: 'var(--color-brand-navy)' }}>No hay viajes disponibles por ahora</div>
-            <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-muted)' }}>Vuelve pronto, estamos preparando nuevas rutas</div>
+            <div className="font-['Poppins',sans-serif] font-semibold text-lg text-brand-navy">No hay viajes disponibles por ahora</div>
+            <div className="font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">Vuelve pronto, estamos preparando nuevas rutas</div>
           </div>
         ) : (
           <div className="flex flex-col gap-4">

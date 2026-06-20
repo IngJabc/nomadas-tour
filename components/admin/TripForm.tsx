@@ -26,20 +26,7 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const inputStyle = {
-    border: '1.5px solid #e5e7eb',
-    borderRadius: 10,
-    padding: '10px 14px',
-    fontFamily: 'var(--font-sans)',
-    fontWeight: 400 as const,
-    fontSize: 14,
-    color: 'var(--color-brand-navy)',
-    background: '#ffffff',
-    outline: 'none',
-    width: '100%',
-    boxSizing: 'border-box' as const,
-    transition: 'border-color 200ms, box-shadow 200ms',
-  };
+  const inputClass = "border-[1.5px] border-gray-200 rounded-xl px-[14px] py-[10px] font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none w-full box-border transition-[border-color,box-shadow] duration-200";
 
   const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
     e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
@@ -79,23 +66,21 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
   return (
     <form onSubmit={handleSubmit}>
       <div className="flex items-center gap-3 mb-4">
-        <div style={{ width: 4, height: 18, background: 'var(--color-brand-cyan)', borderRadius: 2 }} />
-        <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 16, color: 'var(--color-brand-navy)' }}>
+        <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
+        <h2 className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">
           {initialData ? 'Editar viaje' : 'Nuevo viaje'}
         </h2>
       </div>
 
       <div className="flex flex-wrap gap-3 items-end">
         <div className="flex-1 min-w-[200px]">
-          <label className="block mb-1"
-            style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-          >
+          <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Ruta
           </label>
           <select
             value={routeId}
             onChange={(e) => setRouteId(e.target.value)}
-            style={inputStyle}
+            className={inputClass}
             onFocus={handleFocus}
             onBlur={handleBlur}
           >
@@ -109,25 +94,21 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
         </div>
 
         <div className="flex-1 min-w-[200px]">
-          <label className="block mb-1"
-            style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-          >
+          <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Fecha y hora de salida
           </label>
           <input
             type="datetime-local"
             value={departureAt}
             onChange={(e) => setDepartureAt(e.target.value)}
-            style={inputStyle}
+            className={inputClass}
             onFocus={handleFocus}
             onBlur={handleBlur}
           />
         </div>
 
         <div className="flex-1 min-w-[200px]">
-          <label className="block mb-1"
-            style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-          >
+          <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Precio por asiento (EUR)
           </label>
           <input
@@ -137,16 +118,14 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             placeholder="Ej. 25"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            style={inputStyle}
+            className={inputClass}
             onFocus={handleFocus}
             onBlur={handleBlur}
           />
         </div>
 
         <div className="flex-1 min-w-[200px]">
-          <label className="block mb-1"
-            style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-          >
+          <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Total de asientos
           </label>
           <input
@@ -156,22 +135,20 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             placeholder="30"
             value={totalSeats}
             onChange={(e) => setTotalSeats(e.target.value)}
-            style={inputStyle}
+            className={inputClass}
             onFocus={handleFocus}
             onBlur={handleBlur}
           />
         </div>
 
         <div className="flex-1 min-w-[200px]">
-          <label className="block mb-1"
-            style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-          >
+          <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Pisos
           </label>
           <select
             value={decks}
             onChange={(e) => setDecks(e.target.value)}
-            style={inputStyle}
+            className={inputClass}
             onFocus={handleFocus}
             onBlur={handleBlur}
           >
@@ -179,7 +156,7 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             <option value="2">2 pisos</option>
           </select>
           {Number(decks) > 1 && (
-            <p className="mt-1" style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--color-brand-muted)' }}>
+            <p className="mt-1 font-['Poppins',sans-serif] text-xs text-brand-muted">
               Por ahora se muestra el layout del primer piso
             </p>
           )}
@@ -189,21 +166,7 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
           <button
             type="submit"
             disabled={loading}
-            style={{
-              background: 'var(--color-brand-navy)',
-              color: '#ffffff',
-              fontFamily: 'var(--font-sans)',
-              fontWeight: 600,
-              fontSize: 14,
-              padding: '10px 24px',
-              borderRadius: 10,
-              border: 'none',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              opacity: loading ? 0.4 : 1,
-              transition: 'background 200ms',
-            }}
-            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = 'var(--color-brand-blue)'; }}
-            onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = 'var(--color-brand-navy)'; }}
+            className="font-['Poppins',sans-serif] font-semibold text-sm px-6 py-[10px] rounded-xl border-none transition-colors duration-200 bg-brand-navy hover:bg-brand-blue disabled:opacity-40 disabled:cursor-not-allowed text-white"
           >
             {loading ? 'Guardando...' : initialData ? 'Actualizar' : 'Crear'}
           </button>
@@ -211,7 +174,7 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
       </div>
 
       {error && (
-        <p className="mt-3" style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: '#ef4444' }}>{error}</p>
+        <p className="mt-3 font-['Poppins',sans-serif] text-[13px] text-red-500">{error}</p>
       )}
     </form>
   );
