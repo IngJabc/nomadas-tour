@@ -64,13 +64,20 @@ export async function POST(request: Request) {
     // Look up trip route for destination short code
     const { data: trip } = await adminClient
       .from('trips')
-      .select('route:routes(*)')
+      .select('route_id')
       .eq('id', trip_id)
       .single();
 
-    if (trip?.route) {
-      const dest = shortDest(trip.route.destination);
-      niceCode = `NT-${dest}-${groupKey}`;
+    if (trip) {
+      const { data: route } = await adminClient
+        .from('routes')
+        .select('destination')
+        .eq('id', trip.route_id)
+        .single();
+      if (route) {
+        const dest = shortDest(route.destination);
+        niceCode = `NT-${dest}-${groupKey}`;
+      }
     }
 
     // Check if this code already exists (reuse across seats in same transaction)

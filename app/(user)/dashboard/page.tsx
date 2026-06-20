@@ -129,7 +129,7 @@ export default async function DashboardPage() {
             </p>
             <Link
               href="/"
-              className="inline-flex items-center"
+              className="inline-flex items-center hover:bg-[var(--color-brand-blue)]"
               style={{
                 background: 'var(--color-brand-cyan)',
                 color: '#ffffff',
@@ -140,7 +140,6 @@ export default async function DashboardPage() {
                 padding: '12px 24px',
                 transition: 'background 200ms',
               }}
-              className="hover:bg-[var(--color-brand-blue)]"
             >
               Ver viajes disponibles &rarr;
             </Link>

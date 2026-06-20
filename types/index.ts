@@ -1,4 +1,4 @@
-export type SeatStatus = 'available' | 'reserved' | 'locked';
+export type SeatStatus = 'available' | 'reserved' | 'locked' | 'blocked';
 
 export interface Route {
   id: string;
