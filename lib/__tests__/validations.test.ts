@@ -6,7 +6,7 @@ describe('bookingSchema', () => {
     trip_id: '550e8400-e29b-41d4-a716-446655440000',
     seat_id: '550e8400-e29b-41d4-a716-446655440001',
     passenger_name: 'Juan Pérez',
-    passenger_email: 'juan@example.com',
+    passenger_cedula: '12345678',
   };
 
   it('accepts valid booking data', () => {
@@ -29,8 +29,18 @@ describe('bookingSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects invalid email', () => {
-    const result = bookingSchema.safeParse({ ...validBooking, passenger_email: 'not-an-email' });
+  it('rejects empty cedula', () => {
+    const result = bookingSchema.safeParse({ ...validBooking, passenger_cedula: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects cedula with letters', () => {
+    const result = bookingSchema.safeParse({ ...validBooking, passenger_cedula: '12ab' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects overlong cedula', () => {
+    const result = bookingSchema.safeParse({ ...validBooking, passenger_cedula: '123456789' });
     expect(result.success).toBe(false);
   });
 

@@ -3,6 +3,15 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { bookingSchema } from '@/lib/validations/booking';
 
+function shortDest(text: string): string {
+  const clean = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z\s]/g, '');
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 2) {
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+  return clean.substring(0, 2).toUpperCase();
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -26,7 +35,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { trip_id, seat_id, passenger_name, passenger_email } = parsed.data;
+    const { trip_id, seat_id, passenger_name, passenger_cedula, qr_code: clientQrKey } = parsed.data;
     const adminClient = createAdminClient();
 
     // Verify seat is available or locked by this user
@@ -48,10 +57,36 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate unique QR code
-    const qrCode = `CAMPING-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    // Generate nice QR code: NT-{DEST_SHORT}-{group_key}
+    const groupKey = clientQrKey ?? Math.random().toString(36).substring(2, 10).toUpperCase();
+    let niceCode = `NT-${groupKey}`;
 
-    // Create booking and update seat in transaction
+    // Look up trip route for destination short code
+    const { data: trip } = await adminClient
+      .from('trips')
+      .select('route:routes(*)')
+      .eq('id', trip_id)
+      .single();
+
+    if (trip?.route) {
+      const dest = shortDest(trip.route.destination);
+      niceCode = `NT-${dest}-${groupKey}`;
+    }
+
+    // Check if this code already exists (reuse across seats in same transaction)
+    let qrCode = niceCode;
+    const { data: existing } = await adminClient
+      .from('bookings')
+      .select('qr_code')
+      .eq('qr_code', niceCode)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      qrCode = existing.qr_code;
+    }
+
+    // Create booking and update seat
     const { data: booking, error: bookingError } = await adminClient
       .from('bookings')
       .insert({
@@ -59,7 +94,7 @@ export async function POST(request: Request) {
         trip_id,
         seat_id,
         passenger_name,
-        passenger_email,
+        passenger_email: passenger_cedula,
         qr_code: qrCode,
         status: 'confirmed',
       })

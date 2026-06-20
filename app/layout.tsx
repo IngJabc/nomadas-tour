@@ -1,10 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Poppins, Montserrat, Geist_Mono } from "next/font/google";
+import { Navbar } from '@/components/ui/Navbar';
+import { Toaster } from "react-hot-toast";
 import "./globals.css";
+import "./design-tokens.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const poppins = Poppins({
+  // reuse the existing CSS variable name to keep globals.css unchanged
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "600", "700"],
+});
+
+const montserrat = Montserrat({
+  variable: "--font-heading",
+  subsets: ["latin"],
+  weight: ["700", "800"],
 });
 
 const geistMono = Geist_Mono({
@@ -13,8 +24,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Camping Cascada del Vino - Reserva de Asientos",
-  description: "Sistema de selección y reserva de asientos de autobús en tiempo real",
+  title: "Nómadas Tours",
+  description:
+    "Sistema de selección y reserva de asientos de autobús en tiempo real",
 };
 
 export default function RootLayout({
@@ -25,9 +37,28 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${poppins.variable} ${montserrat.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-brand-surface text-brand-navy">
+        {/* Global navbar */}
+        <Navbar />
+        {children}
+        <Toaster
+          position="bottom-right"
+          toastOptions={{
+            duration: 4000,
+            style: {
+              borderRadius: "12px",
+              padding: "12px 16px",
+              fontSize: "14px",
+              background: "var(--color-brand-navy)",
+              color: "var(--color-brand-surface)",
+            },
+            success: { iconTheme: { primary: "var(--color-brand-cyan)", secondary: "var(--color-brand-surface)" } },
+            error: { iconTheme: { primary: "#fb923c", secondary: "var(--color-brand-surface)" } },
+          }}
+        />
+      </body>
     </html>
   );
 }

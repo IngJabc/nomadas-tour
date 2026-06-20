@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { User } from '@supabase/supabase-js';
 
 export function AuthNav() {
   const [user, setUser] = useState<User | null>(null);
+  const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
@@ -24,32 +26,45 @@ export function AuthNav() {
   }, [supabase]);
 
   return (
-    <div className="flex gap-3 items-center">
+    <div className="flex gap-2 sm:gap-3 items-center">
       {user ? (
         <>
+          {user.user_metadata?.role === 'admin' && (
+            <Link
+              href="/admin"
+              className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-amber-300 hover:text-amber-200 transition-colors whitespace-nowrap"
+            >
+              Admin
+            </Link>
+          )}
           <Link
             href="/dashboard"
-            className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200"
+            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-cyan-light transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
           >
             Mis reservas
           </Link>
-          <form action="/auth/signout" method="post">
-            <button className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
-              Cerrar sesión
-            </button>
-          </form>
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push('/login');
+              router.refresh();
+            }}
+            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-red-300 hover:text-red-200 transition-colors whitespace-nowrap"
+          >
+            Cerrar sesión
+          </button>
         </>
       ) : (
         <>
           <Link
             href="/login"
-            className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200"
+            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white/70 hover:text-white transition-colors whitespace-nowrap"
           >
             Iniciar sesión
           </Link>
           <Link
             href="/register"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-cyan-light transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
           >
             Registrarse
           </Link>
