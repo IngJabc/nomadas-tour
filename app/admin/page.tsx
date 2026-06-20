@@ -4,13 +4,13 @@ import Link from 'next/link';
 
 export default async function AdminDashboardPage() {
   const supabase = await createServerSupabaseClient();
-  const { data: user } = await supabase.auth.getUser();
+  const { data: userData } = await supabase.auth.getUser();
 
-  if (!user.user) {
+  if (!userData.user) {
     redirect('/login');
   }
 
-  const role = user.user?.user_metadata?.role ?? 'user';
+  const role = userData.user?.user_metadata?.role ?? 'user';
   if (role !== 'admin') {
     redirect('/dashboard');
   }
@@ -30,59 +30,143 @@ export default async function AdminDashboardPage() {
     .select('*', { count: 'exact', head: true });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Panel Admin</h1>
-          <div className="flex gap-3">
-            <Link
-              href="/"
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-            >
-              Sitio web
-            </Link>
-            <form action="/auth/signout" method="post">
-              <button className="px-4 py-2 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
-                Cerrar sesión
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-md">
-            <p className="text-sm text-gray-500">Viajes activos</p>
-            <p className="text-3xl font-bold text-gray-800">{tripsCount ?? 0}</p>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-md">
-            <p className="text-sm text-gray-500">Reservas confirmadas</p>
-            <p className="text-3xl font-bold text-gray-800">{bookingsCount ?? 0}</p>
-          </div>
-          <div className="bg-white rounded-xl p-6 shadow-md">
-            <p className="text-sm text-gray-500">Rutas</p>
-            <p className="text-3xl font-bold text-gray-800">{routesCount ?? 0}</p>
-          </div>
+    <div style={{ background: '#f1f5f9', minHeight: '100vh' }}>
+      <div className="max-w-7xl mx-auto" style={{ padding: '32px 24px' }}>
+        {/* Breadcrumb + Title */}
+        <div className="mb-8">
+          <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 12, color: 'var(--color-brand-muted)' }}>
+            Admin / Panel
+          </p>
+          <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 26, color: 'var(--color-brand-navy)' }}>
+            Panel de Administración
+          </h1>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Metrics cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
+          <div
+            className="bg-white rounded-2xl p-6"
+            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(8,142,184,0.1)' }}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Viajes activos
+              </p>
+            </div>
+            <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 36, color: 'var(--color-brand-navy)', lineHeight: 1 }}>
+              {tripsCount ?? 0}
+            </p>
+          </div>
+
+          <div
+            className="bg-white rounded-2xl p-6"
+            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(8,142,184,0.1)' }}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Reservas confirmadas
+              </p>
+            </div>
+            <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 36, color: 'var(--color-brand-navy)', lineHeight: 1 }}>
+              {bookingsCount ?? 0}
+            </p>
+          </div>
+
+          <div
+            className="bg-white rounded-2xl p-6"
+            style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: 'rgba(8,142,184,0.1)' }}
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+              </div>
+              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Rutas
+              </p>
+            </div>
+            <p style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 36, color: 'var(--color-brand-navy)', lineHeight: 1 }}>
+              {routesCount ?? 0}
+            </p>
+          </div>
+        </div>
+
+        {/* Quick links */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
           <Link
             href="/admin/trips"
-            className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
+            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5"
+            style={{
+              boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+              borderLeft: '4px solid var(--color-brand-cyan)',
+              textDecoration: 'none',
+            }}
           >
-            <h2 className="text-lg font-semibold text-gray-800">Gestión de viajes</h2>
-            <p className="text-sm text-gray-500 mt-1">Crear, editar y eliminar viajes</p>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'var(--color-brand-navy)' }}
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 17, color: 'var(--color-brand-navy)' }}>
+                  Gestión de viajes
+                </h2>
+                <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                  Crear, editar y eliminar viajes
+                </p>
+              </div>
+            </div>
           </Link>
+
           <Link
             href="/admin/routes"
-            className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
+            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5"
+            style={{
+              boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+              borderLeft: '4px solid var(--color-brand-cyan)',
+              textDecoration: 'none',
+            }}
           >
-            <h2 className="text-lg font-semibold text-gray-800">Gestión de rutas</h2>
-            <p className="text-sm text-gray-500 mt-1">Administrar rutas disponibles</p>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+                style={{ background: 'var(--color-brand-navy)' }}
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="var(--color-brand-cyan)" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+              </div>
+              <div>
+                <h2 style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 17, color: 'var(--color-brand-navy)' }}>
+                  Gestión de rutas
+                </h2>
+                <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                  Administrar rutas disponibles
+                </p>
+              </div>
+            </div>
           </Link>
         </div>
-      </main>
+      </div>
     </div>
   );
 }

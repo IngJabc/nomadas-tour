@@ -9,16 +9,10 @@ interface TripTableProps {
   onDelete: (tripId: string) => void;
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  active: 'Activo',
-  cancelled: 'Cancelado',
-  completed: 'Completado',
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  active: 'text-green-600 bg-green-100',
-  cancelled: 'text-red-600 bg-red-100',
-  completed: 'text-gray-600 bg-gray-100',
+const STATUS_STYLES: Record<string, { label: string; bg: string; text: string }> = {
+  active: { label: 'Activo', bg: '#ecfdf5', text: '#059669' },
+  cancelled: { label: 'Inactivo', bg: '#f1f5f9', text: '#6b7280' },
+  completed: { label: 'Completado', bg: '#f1f5f9', text: '#6b7280' },
 };
 
 export function TripTable({ trips, onEdit, onDelete }: TripTableProps) {
@@ -26,51 +20,95 @@ export function TripTable({ trips, onEdit, onDelete }: TripTableProps) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-200">
-            <th className="text-left py-3 px-4 font-medium text-gray-600">Salida</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">Ruta</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">Bus</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">Precio</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">Estado</th>
-            <th className="text-left py-3 px-4 font-medium text-gray-600">Acciones</th>
+          <tr style={{ background: '#f8fafc' }}>
+            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Salida</th>
+            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Ruta</th>
+            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Bus</th>
+            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Precio</th>
+            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Estado</th>
+            <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {trips.map((trip) => (
-            <tr key={trip.id} className="border-b border-gray-100 hover:bg-gray-50">
-              <td className="py-3 px-4">{formatDateTime(trip.departure_at)}</td>
-              <td className="py-3 px-4">
-                {trip.route?.origin ?? '—'} → {trip.route?.destination ?? '—'}
-              </td>
-              <td className="py-3 px-4 text-xs text-gray-500">
-                {trip.total_seats} asientos {trip.decks > 1 ? `(${trip.decks} pisos)` : ''}
-              </td>
-              <td className="py-3 px-4">{formatPrice(trip.price)}</td>
-              <td className="py-3 px-4">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[trip.status]}`}>
-                  {STATUS_LABELS[trip.status]}
-                </span>
-              </td>
-              <td className="py-3 px-4">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => onEdit(trip)}
-                    className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-lg hover:bg-blue-200"
-                  >
-                    Editar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(trip.id)}
-                    className="px-3 py-1 text-xs font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200"
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {trips.map((trip) => {
+            const s = STATUS_STYLES[trip.status] ?? STATUS_STYLES.active;
+            return (
+              <tr key={trip.id} style={{ borderBottom: '1px solid #f1f5f9' }}
+                className="hover:bg-[#f8fafc] transition-colors"
+              >
+                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-navy)' }}>
+                  {formatDateTime(trip.departure_at)}
+                </td>
+                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-navy)' }}>
+                  {trip.route?.origin ?? '—'} → {trip.route?.destination ?? '—'}
+                </td>
+                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>
+                  {trip.total_seats} asientos
+                </td>
+                <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 14, color: 'var(--color-brand-cyan)' }}>
+                  {formatPrice(trip.price)}
+                </td>
+                <td style={{ padding: '16px 20px' }}>
+                  <span style={{
+                    display: 'inline-block',
+                    background: s.bg,
+                    color: s.text,
+                    fontFamily: 'var(--font-sans)',
+                    fontWeight: 600,
+                    fontSize: 11,
+                    padding: '3px 10px',
+                    borderRadius: 9999,
+                  }}>
+                    {s.label}
+                  </span>
+                </td>
+                <td style={{ padding: '16px 20px' }}>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(trip)}
+                      style={{
+                        background: '#eff6ff',
+                        color: 'var(--color-brand-blue)',
+                        fontFamily: 'var(--font-sans)',
+                        fontWeight: 600,
+                        fontSize: 12,
+                        padding: '5px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'opacity 150ms',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(trip.id)}
+                      style={{
+                        background: '#fef2f2',
+                        color: '#ef4444',
+                        fontFamily: 'var(--font-sans)',
+                        fontWeight: 600,
+                        fontSize: 12,
+                        padding: '5px 12px',
+                        borderRadius: 8,
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'opacity 150ms',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

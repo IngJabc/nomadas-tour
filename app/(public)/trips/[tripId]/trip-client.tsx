@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { useRealtimeSeats } from '@/hooks/useRealtimeSeats';
 import { BusLayout } from '@/components/bus/BusLayout';
 import { SeatLegend } from '@/components/bus/SeatLegend';
@@ -13,25 +15,25 @@ interface TripClientProps {
   tripId: string;
   price: number;
   totalSeats: number;
+  origin?: string;
+  destination?: string;
 }
 
-export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
+export function TripClient({ tripId, price, totalSeats, origin, destination }: TripClientProps) {
   const { seats, loading } = useRealtimeSeats(tripId);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
-  const [success, setSuccess] = useState(false);
-  const [lastBookingId, setLastBookingId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const myLocalLocks = useRef<Set<string>>(new Set());
   const selectedSeatsRef = useRef<Seat[]>([]);
   const clearedSeatsRef = useRef<Set<string>>(new Set());
+  const router = useRouter();
   const supabase = createClient();
 
-  // Keep ref in sync with state (avoids stale closure in async handlers)
   useEffect(() => {
     selectedSeatsRef.current = selectedSeats;
   }, [selectedSeats]);
 
-  // Cleanup: remove from selection only seats reserved by others or locked by others
   useEffect(() => {
     const getUserId = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -41,11 +43,8 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
         prev.filter((s) => {
           const updated = seats[s.seat_code];
           if (!updated) return true;
-          // Keep if still available
           if (updated.status === 'available') return true;
-          // Keep if locked by the current user (they can still deselect it)
           if (updated.status === 'locked' && updated.locked_by === currentUserId) return true;
-          // Remove if reserved (someone else confirmed) or locked by another user
           return false;
         }),
       );
@@ -53,7 +52,6 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
     getUserId();
   }, [seats, supabase]);
 
-  // Track current user id
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -61,8 +59,10 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
         const { data } = await supabase.auth.getUser();
         if (!mounted) return;
         setUserId(data.user?.id ?? null);
+        setAuthLoading(false);
       } catch {
         setUserId(null);
+        setAuthLoading(false);
       }
     })();
     return () => {
@@ -70,11 +70,9 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
     };
   }, [supabase]);
 
-  // Reconcile selection with server state and restore locks after reload
   useEffect(() => {
     if (!userId) return;
 
-    // Clean up cleared seats tracking once Realtime confirms they're no longer locked
     if (clearedSeatsRef.current.size > 0) {
       for (const seatCode of clearedSeatsRef.current) {
         const live = seats[seatCode];
@@ -89,9 +87,7 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
         const live = seats[s.seat_code];
         if (!live) return false;
         if (live.status === 'available') {
-          // Stop tracking cleared seats once Realtime confirms they're available
           clearedSeatsRef.current.delete(s.seat_code);
-          // Only keep if optimistically selected (lock not yet confirmed by Realtime)
           return myLocalLocks.current.has(s.id);
         }
         if (live.status === 'reserved') return false;
@@ -104,8 +100,6 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
         return false;
       });
 
-      // Restore seats locked by current user (e.g. after page reload)
-      // Skip seats that were explicitly cleared by Cancelar
       const existingCodes = new Set(filtered.map((s) => s.seat_code));
       const restored = Object.values(seats).filter(
         (s) =>
@@ -116,7 +110,6 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
       );
 
       if (restored.length === 0) return filtered;
-      // Track restored seats so future Realtime updates don't remove them
       restored.forEach((s) => myLocalLocks.current.add(s.id));
       return [...filtered, ...restored];
     });
@@ -134,10 +127,12 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
   };
 
   const toggleSeat = async (seat: Seat) => {
-    // Guard against placeholder seats with empty id (Bug #6)
     if (!seat.id) return;
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      toast.error('Debes iniciar sesión para seleccionar asientos', { id: 'login-required' });
+      return;
+    }
     setUserId(user.id);
 
     const isDeselecting = selectedSeats.some((s) => s.seat_code === seat.seat_code);
@@ -151,14 +146,12 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
 
     if (seat.status !== 'available') return;
 
-    // Optimistic select with dedup guard (Bug #4: double-click)
     setSelectedSeats((prev) => {
       if (prev.some((s) => s.seat_code === seat.seat_code)) return prev;
       return [...prev, seat];
     });
     myLocalLocks.current.add(seat.id);
 
-    // Try to acquire lock atomically (only if status still 'available')
     const { data: updatedRows, error: updateError } = await supabase
       .from('seats')
       .update({ status: 'locked', locked_by: user.id, locked_at: new Date().toISOString() })
@@ -166,21 +159,16 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
       .eq('status', 'available')
       .select();
 
-    // Revert optimistic selection if lock acquisition failed
     if (updateError || !updatedRows || updatedRows.length === 0) {
       myLocalLocks.current.delete(seat.id);
       setSelectedSeats((prev) => prev.filter((s) => s.seat_code !== seat.seat_code));
+      toast.error('Este asiento ya no está disponible', { id: 'lock-failed' });
     }
   };
 
   const handleSuccess = (bookingIds: string[]) => {
-    setSuccess(true);
-    myLocalLocks.current = new Set();  // Bug #8: cleanup refs
+    myLocalLocks.current = new Set();
     clearedSeatsRef.current = new Set();
-    setSelectedSeats([]);
-    if (bookingIds.length > 0) {
-      setLastBookingId(bookingIds[0]);
-    }
   };
 
   const handleClear = async () => {
@@ -191,7 +179,6 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
       setSelectedSeats([]);
       return;
     }
-    // Track which seats were cleared so restore doesn't re-add them
     seatsToRelease.forEach((s) => clearedSeatsRef.current.add(s.seat_code));
     const seatIds = seatsToRelease.map((s) => s.id);
     myLocalLocks.current = new Set();
@@ -205,65 +192,103 @@ export function TripClient({ tripId, price, totalSeats }: TripClientProps) {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-      </div>
-    );
-  }
-
-  if (success) {
-    return (
-      <div className="text-center py-12">
-        <div className="bg-green-100 text-green-700 rounded-xl p-8 inline-block max-w-md">
-          <h2 className="text-2xl font-bold mb-2">¡Reserva confirmada!</h2>
-          <p className="mb-6">Tu(s) asiento(s) han sido reservados exitosamente</p>
-          <div className="flex gap-3 justify-center">
-            {lastBookingId && (
-              <Link
-                href={`/bookings/${lastBookingId}`}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              >
-                Ver mi boleto
-              </Link>
-            )}
-            <Link
-              href="/dashboard"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Mis reservas
-            </Link>
-            <Link
-              href="/"
-              className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-            >
-              Ver más viajes
-            </Link>
+      <div className="min-h-screen" style={{ background: '#f1f5f9' }}>
+        <div className="max-w-7xl mx-auto" style={{ padding: '32px 24px' }}>
+          <div className="flex flex-col lg:flex-row gap-8 items-start justify-center animate-pulse">
+            <div className="flex flex-col items-center gap-6">
+              <div className="bg-white rounded-2xl p-4" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+                <div style={{ background: 'var(--color-brand-dark)', borderRadius: 20, padding: 16 }}>
+                  <div className="flex justify-center mb-4">
+                    <div className="w-20 h-10 bg-slate-600 rounded-t-2xl" />
+                  </div>
+                  <div className="space-y-2">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="flex gap-8 items-center">
+                        <div className="flex gap-1">
+                          {Array.from({ length: 3 }).map((_, j) => (
+                            <div key={j} className="w-10 h-10 rounded-xl bg-slate-500" />
+                          ))}
+                        </div>
+                        <div className="w-6" />
+                        <div className="flex gap-1">
+                          {Array.from({ length: 3 }).map((_, j) => (
+                            <div key={j} className="w-10 h-10 rounded-xl bg-slate-500" />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="w-full lg:w-80">
+              <div className="bg-white rounded-2xl p-6 space-y-4" style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}>
+                <div className="h-6 bg-slate-200 rounded-lg w-1/2" />
+                <div className="h-4 bg-slate-200 rounded-lg w-3/4" />
+                <div className="h-4 bg-slate-200 rounded-lg w-1/3" />
+                <div className="h-10 bg-slate-200 rounded-xl" />
+                <div className="h-10 bg-slate-200 rounded-xl" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  const isNotLoggedIn = !authLoading && !userId;
+
   return (
-    <div className="flex flex-col lg:flex-row gap-8 items-start">
-      <div className="flex flex-col items-center gap-6">
-        <BusLayout
-          seats={seats}
-          selectedSeats={selectedSeats}
-          onToggleSeat={toggleSeat}
-          totalSeats={totalSeats}
-        />
-        <SeatLegend />
-      </div>
-      <div className="w-full lg:w-80 sticky top-8">
-        <BookingPanel
-          selectedSeats={selectedSeats}
-          tripId={tripId}
-          price={price}
-          onSuccess={handleSuccess}
-          onClear={handleClear}
-          onReleaseLocks={releaseLocks}
-        />
+    <div className="min-h-screen" style={{ background: '#f1f5f9' }}>
+      <div className="max-w-7xl mx-auto" style={{ padding: '32px 24px' }}>
+        <div className="pt-12">
+          {/* Not logged in alert (spec: only if not authenticated) */}
+          {isNotLoggedIn && (
+            <div
+              style={{
+                background: '#fffbeb',
+                border: '1px solid #fcd34d',
+                borderRadius: 10,
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 24,
+              }}
+            >
+              <span style={{ fontSize: 16 }}>⚠️</span>
+              <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: '#92400e' }}>
+                Necesitas{' '}
+                <Link href="/login" style={{ color: 'var(--color-brand-cyan)', fontWeight: 600, textDecoration: 'none' }}>
+                  iniciar sesión
+                </Link>{' '}
+                para seleccionar y reservar asientos
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 lg:gap-8 items-start">
+            <div className="flex flex-col items-center gap-4 min-w-0">
+              <SeatLegend />
+              <BusLayout
+                seats={seats}
+                selectedSeats={selectedSeats}
+                onToggleSeat={toggleSeat}
+                totalSeats={totalSeats}
+              />
+            </div>
+            <aside className="lg:sticky lg:top-20 self-start w-full">
+              <BookingPanel
+                selectedSeats={selectedSeats}
+                tripId={tripId}
+                price={price}
+                onSuccess={handleSuccess}
+                onClear={handleClear}
+                onReleaseLocks={releaseLocks}
+              />
+            </aside>
+          </div>
+        </div>
       </div>
     </div>
   );

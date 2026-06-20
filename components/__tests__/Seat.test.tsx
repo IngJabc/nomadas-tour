@@ -21,14 +21,14 @@ describe('Seat component', () => {
     expect(screen.getByText('A1')).toBeDefined();
   });
 
-  it('renders available seat with blue background', () => {
+  it('renders available seat with cyan background', () => {
     render(<Seat seat={createSeat()} isSelected={false} onSelect={() => {}} />);
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('bg-blue-500');
+    expect(btn.className).toContain('from-cyan-400');
     expect(btn.className).toContain('cursor-pointer');
   });
 
-  it('renders reserved seat with red background and disabled', () => {
+  it('renders reserved seat with slate background and disabled', () => {
     render(
       <Seat
         seat={createSeat({ status: 'reserved' })}
@@ -37,12 +37,12 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('bg-red-500');
+    expect(btn.className).toContain('from-slate-400');
     expect(btn.className).toContain('cursor-not-allowed');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('renders locked seat with amber background and disabled', () => {
+  it('renders locked seat with orange background and disabled', () => {
     render(
       <Seat
         seat={createSeat({ status: 'locked', locked_by: 'other-user' })}
@@ -51,11 +51,11 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('bg-amber-500');
+    expect(btn.className).toContain('from-orange-400');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it('renders selected seat as green regardless of status', () => {
+  it('renders selected seat as amber regardless of status', () => {
     render(
       <Seat
         seat={createSeat({ status: 'locked', locked_by: 'my-user' })}
@@ -64,11 +64,11 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('bg-green-500');
+    expect(btn.className).toContain('from-amber-400');
     expect((btn as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('renders guide seat with dark green and disabled', () => {
+  it('renders guide seat with brand-dark and disabled', () => {
     render(
       <Seat
         seat={createSeat({ seat_code: 'G', status: 'locked' })}
@@ -77,7 +77,7 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.className).toContain('bg-green-800');
+    expect(btn.className).toContain('from-brand-dark');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 

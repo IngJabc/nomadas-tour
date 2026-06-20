@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Route } from '@/types';
-import Link from 'next/link';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 
 export default function AdminRoutesPage() {
   const [routes, setRoutes] = useState<Route[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [duration, setDuration] = useState('');
@@ -50,103 +51,252 @@ export default function AdminRoutesPage() {
   };
 
   const handleDelete = async (routeId: string) => {
-    if (!confirm('¿Eliminar esta ruta?')) return;
+    setDeleteId(null);
     await supabase.from('routes').delete().eq('id', routeId);
     fetchRoutes();
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-    </div>;
+    return (
+      <div className="flex items-center justify-center min-h-screen" style={{ background: '#f1f5f9' }}>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-navy" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Rutas</h1>
-          <Link
-            href="/admin"
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-          >
-            Panel
-          </Link>
+    <div style={{ background: '#f1f5f9', minHeight: '100vh' }}>
+      <div className="max-w-7xl mx-auto" style={{ padding: '32px 24px' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 12, color: 'var(--color-brand-muted)' }}>
+              Admin / Rutas
+            </p>
+            <h1 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 24, color: 'var(--color-brand-navy)' }}>
+              Rutas
+            </h1>
+          </div>
         </div>
-      </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <form onSubmit={handleCreate} className="bg-white rounded-xl p-6 shadow-md mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Nueva ruta</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <input
-              type="text"
-              placeholder="Origen"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <input
-              type="text"
-              placeholder="Destino"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <div className="flex gap-2">
+        {/* Inline create form */}
+        <form
+          onSubmit={handleCreate}
+          className="mb-6"
+          style={{
+            background: '#ffffff',
+            borderRadius: 16,
+            padding: 24,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+          }}
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div style={{ width: 4, height: 18, background: 'var(--color-brand-cyan)', borderRadius: 2 }} />
+            <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 16, color: 'var(--color-brand-navy)' }}>
+              Nueva ruta
+            </h2>
+          </div>
+
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex-1 min-w-[180px]">
+              <label className="block mb-1"
+                style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+              >
+                Origen
+              </label>
+              <input
+                type="text"
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                placeholder="Ej. Barquisimeto"
+                className="w-full"
+                style={{
+                  border: '1.5px solid #e5e7eb',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 400,
+                  fontSize: 14,
+                  color: 'var(--color-brand-navy)',
+                  background: '#ffffff',
+                  outline: 'none',
+                  transition: 'border-color 200ms, box-shadow 200ms',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+            <div className="flex-1 min-w-[180px]">
+              <label className="block mb-1"
+                style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+              >
+                Destino
+              </label>
+              <input
+                type="text"
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                placeholder="Ej. La Olla"
+                className="w-full"
+                style={{
+                  border: '1.5px solid #e5e7eb',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 400,
+                  fontSize: 14,
+                  color: 'var(--color-brand-navy)',
+                  background: '#ffffff',
+                  outline: 'none',
+                  transition: 'border-color 200ms, box-shadow 200ms',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <label className="block mb-1"
+                style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+              >
+                Duración (min)
+              </label>
               <input
                 type="number"
-                placeholder="Duración (min)"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="120"
+                className="w-full"
+                style={{
+                  border: '1.5px solid #e5e7eb',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 400,
+                  fontSize: 14,
+                  color: 'var(--color-brand-navy)',
+                  background: '#ffffff',
+                  outline: 'none',
+                  transition: 'border-color 200ms, box-shadow 200ms',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
+            </div>
+            <div className="shrink-0">
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                style={{
+                  background: 'var(--color-brand-navy)',
+                  color: '#ffffff',
+                  fontFamily: 'var(--font-sans)',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  padding: '10px 24px',
+                  borderRadius: 10,
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background 200ms',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-brand-blue)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-brand-navy)'; }}
               >
                 Crear
               </button>
             </div>
           </div>
-          {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+          {error && (
+            <p className="mt-3" style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: '#ef4444' }}>{error}</p>
+          )}
         </form>
 
-        <div className="bg-white rounded-xl shadow-md">
-          {routes.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No hay rutas registradas</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Origen</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Destino</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Duración</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-600">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {routes.map((route) => (
-                  <tr key={route.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">{route.origin}</td>
-                    <td className="py-3 px-4">{route.destination}</td>
-                    <td className="py-3 px-4">{route.duration_minutes} min</td>
-                    <td className="py-3 px-4">
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(route.id)}
-                        className="px-3 py-1 text-xs font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200"
-                      >
-                        Eliminar
-                      </button>
-                    </td>
+        {/* Table */}
+        {routes.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+              </svg>
+            </div>
+            <p style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-muted)' }}>No hay rutas registradas</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.07)' }}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ background: '#f8fafc' }}>
+                    <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Origen</th>
+                    <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Destino</th>
+                    <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Duración</th>
+                    <th className="text-left" style={{ padding: '12px 20px', fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 12, color: 'var(--color-brand-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </main>
+                </thead>
+                <tbody>
+                  {routes.map((route) => (
+                    <tr key={route.id} style={{ borderBottom: '1px solid #f1f5f9' }}
+                      className="hover:bg-[#f8fafc] transition-colors"
+                    >
+                      <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-navy)' }}>{route.origin}</td>
+                      <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-navy)' }}>{route.destination}</td>
+                      <td style={{ padding: '16px 20px', fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>{route.duration_minutes} min</td>
+                      <td style={{ padding: '16px 20px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteId(route.id)}
+                          style={{
+                            background: '#fef2f2',
+                            color: '#ef4444',
+                            fontFamily: 'var(--font-sans)',
+                            fontWeight: 600,
+                            fontSize: 12,
+                            padding: '5px 12px',
+                            borderRadius: 8,
+                            border: 'none',
+                            cursor: 'pointer',
+                            transition: 'opacity 150ms',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <ConfirmModal
+        open={deleteId !== null}
+        title="Eliminar ruta"
+        message="¿Estás seguro de eliminar esta ruta? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        cancelLabel="Cancelar"
+        onConfirm={() => deleteId && handleDelete(deleteId)}
+        onCancel={() => setDeleteId(null)}
+      />
     </div>
   );
 }

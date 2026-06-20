@@ -28,7 +28,7 @@ export function useBooking(tripId: string) {
 
   const confirmBooking = async (
     passengerName: string,
-    passengerEmail: string,
+    passengerCedula: string,
   ) => {
     setLoading(true);
     setError(null);
@@ -37,14 +37,15 @@ export function useBooking(tripId: string) {
       const { data: user } = await supabase.auth.getUser();
 
       for (const seat of selectedSeats) {
-        const qrCode = `CAMPING-${Date.now()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+        const groupKey = Math.random().toString(36).substring(2, 10).toUpperCase();
+        const qrCode = `NT-${groupKey}`;
 
         const { error: bookingError } = await supabase.from('bookings').insert({
           user_id: user.user?.id ?? null,
           trip_id: tripId,
           seat_id: seat.id,
           passenger_name: passengerName,
-          passenger_email: passengerEmail,
+          passenger_email: passengerCedula,
           qr_code: qrCode,
           status: 'confirmed',
         });

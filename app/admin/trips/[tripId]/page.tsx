@@ -70,29 +70,21 @@ export default function EditTripPage() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-    </div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-brand-surface to-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-navy" />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 py-6 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Editar viaje</h1>
-          <Link
-            href="/admin/trips"
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300"
-          >
-            Volver
-          </Link>
+    <div className="min-h-screen bg-gradient-to-b from-brand-surface to-white">
+      <main className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="bg-white rounded-2xl p-5 sm:p-8 shadow-sm border border-slate-200/60">
+          {initialData && (
+            <TripForm routes={routes} onSubmit={handleSubmit} initialData={initialData} />
+          )}
         </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        {initialData && (
-          <TripForm routes={routes} onSubmit={handleSubmit} initialData={initialData} />
-        )}
       </main>
     </div>
   );

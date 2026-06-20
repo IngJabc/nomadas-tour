@@ -1,66 +1,59 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
-import Link from 'next/link';
-import { formatDateTime, formatPrice } from '@/lib/utils';
-import { AuthNav } from '@/components/ui/AuthNav';
+import { TripsListClient } from '@/components/trips/TripsListClient';
 
 export default async function HomePage() {
   const supabase = await createServerSupabaseClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
   const { data: trips } = await supabase
     .from('trips')
     .select('*, route:routes(*)')
     .eq('status', 'active')
     .order('departure_at', { ascending: true });
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-5xl mx-auto px-4 py-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Camping Cascada del Vino</h1>
-            <p className="text-gray-500 mt-1">Reserva tu asiento de autobús</p>
-          </div>
-          <AuthNav />
-        </div>
-      </header>
+  // Compute real available seats per trip
+  let tripsWithAvailability: any[] = [];
 
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">Viajes disponibles</h2>
+  if (trips && trips.length > 0) {
+    const tripIds = trips.map((t: any) => t.id);
+    const { data: allSeats } = await supabase
+      .from('seats')
+      .select('trip_id, status')
+      .in('trip_id', tripIds);
+
+    const availableMap: Record<string, number> = {};
+    for (const seat of allSeats || []) {
+      if (seat.status === 'available') {
+        availableMap[seat.trip_id] = (availableMap[seat.trip_id] || 0) + 1;
+      }
+    }
+
+    tripsWithAvailability = trips.map((t: any) => ({
+      ...t,
+      available_seats: availableMap[t.id] ?? 0,
+    }));
+  }
+
+  return (
+    <div style={{ background: '#f1f5f9' }} className="min-h-screen">
+      <main className="pt-20 max-w-[1100px] mx-auto px-6 py-8">
+        <div className="flex items-start gap-3 mb-6">
+          <div style={{ width: 4, height: 28, background: 'var(--color-brand-cyan)' }} />
+          <h2 style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 28, color: 'var(--color-brand-navy)' }}>Viajes disponibles</h2>
+        </div>
 
         {!trips || trips.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No hay viajes disponibles en este momento</p>
+          <div className="text-center mt-20">
+            <svg className="mx-auto mb-6" width="120" height="80" viewBox="0 0 120 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="10" y="30" width="80" height="30" rx="6" fill="#e6eef6" />
+              <circle cx="30" cy="65" r="6" fill="#cbdffd" />
+              <circle cx="70" cy="65" r="6" fill="#cbdffd" />
+            </svg>
+            <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 600, fontSize: 18, color: 'var(--color-brand-navy)' }}>No hay viajes disponibles por ahora</div>
+            <div style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14, color: 'var(--color-brand-muted)' }}>Vuelve pronto, estamos preparando nuevas rutas</div>
           </div>
         ) : (
-          <div className="grid gap-4">
-            {trips.map((trip) => (
-              <Link
-                key={trip.id}
-                href={`/trips/${trip.id}`}
-                className="block bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      {trip.route?.origin} → {trip.route?.destination}
-                    </h3>
-                    <p className="text-sm text-gray-500 mt-1">
-                      {formatDateTime(trip.departure_at)}
-                    </p>
-                    <p className="text-sm text-gray-400">
-                      Duración: {trip.route?.duration_minutes} min &middot; {trip.total_seats} asientos{trip.decks > 1 ? ` (${trip.decks} pisos)` : ''}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-600">
-                      {formatPrice(trip.price)}
-                    </p>
-                    <p className="text-xs text-gray-400">por asiento</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
+          <div className="flex flex-col gap-4">
+            {/* @ts-ignore */}
+            <TripsListClient trips={tripsWithAvailability} />
           </div>
         )}
       </main>

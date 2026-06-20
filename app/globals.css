@@ -1,19 +1,67 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Deprecated local tokens: use design-tokens.css instead */
+  --color-brand-navy: var(--color-brand-navy, #0c142d);
+  --color-brand-dark: var(--color-brand-dark, #071946);
+  --color-brand-mid: var(--color-brand-mid, #1c2234);
+  --color-brand-cyan: var(--color-brand-cyan, #088eb8);
+  --color-brand-cyan-light: var(--color-brand-cyan-light, #08a7bc);
+  --color-brand-blue: var(--color-brand-blue, #0b32c4);
+  --color-brand-surface: var(--color-brand-surface, #fdfdfd);
+  --color-brand-muted: var(--color-brand-muted, #6b7280);
+}
+
+:root {
+  /* keep legacy fallbacks but prefer design tokens */
+  --background: var(--background, #f8fafc);
+  --foreground: var(--foreground, var(--color-brand-navy, #0c142d));
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-weight: 400; /* regular body weight */
+}
+
+::selection {
+  background-color: rgba(8, 142, 184, 0.15);
+  color: #0c142d;
+}
+
+/* Headings use stronger weight and tighter letter spacing for better contrast */
+h1, h2, h3, h4, h5 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Form inputs and buttons: slightly smaller font weight for compactness on mobile */
+input, textarea, select, button {
+  font-weight: 500;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: rgba(12, 20, 45, 0.1);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(12, 20, 45, 0.2);
 }

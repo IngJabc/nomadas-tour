@@ -1,18 +1,21 @@
 export function SeatLegend() {
   const items = [
-    { label: 'Disponible', color: 'bg-blue-500' },
-    { label: 'Seleccionado', color: 'bg-green-500' },
-    { label: 'Reservado', color: 'bg-red-500' },
-    { label: 'Bloqueado', color: 'bg-amber-500' },
-    { label: 'Guía', color: 'bg-green-800' },
+    { label: 'Disponible', color: '#08a7bc' },
+    { label: 'Seleccionado', color: '#f59e0b' },
+    { label: 'Reservado', color: '#6b7280' },
+    { label: 'Bloqueado', color: '#f97316' },
+    { label: 'Guía', color: 'var(--color-brand-dark)' },
   ];
 
   return (
-    <div className="flex flex-wrap gap-4 justify-center">
+    <div className="w-full flex flex-wrap gap-4 items-center justify-center">
       {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-2">
-          <div className={`w-5 h-5 rounded ${item.color}`} />
-          <span className="text-sm text-gray-600">{item.label}</span>
+        <div key={item.label} className="flex items-center gap-3">
+          <div
+            className="rounded-full"
+            style={{ width: 10, height: 10, background: item.color }}
+          />
+          <span style={{ fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 13, color: 'var(--color-brand-muted)' }}>{item.label}</span>
         </div>
       ))}
     </div>

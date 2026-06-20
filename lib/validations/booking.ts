@@ -3,8 +3,16 @@ import { z } from 'zod';
 export const bookingSchema = z.object({
   trip_id: z.string().uuid(),
   seat_id: z.string().uuid(),
-  passenger_name: z.string().min(2, 'Nombre debe tener al menos 2 caracteres'),
-  passenger_email: z.string().email('Email inválido'),
+  passenger_name: z
+    .string()
+    .min(2, 'Nombre debe tener al menos 2 caracteres')
+    .regex(/^[A-Za-zÁÉÍÓÚÑáéíóúñüÜ\s]+$/, 'Nombre solo puede contener letras y espacios'),
+  passenger_cedula: z
+    .string()
+    .min(4, 'Cédula debe tener al menos 4 dígitos')
+    .max(8, 'Cédula debe tener máximo 8 dígitos')
+    .regex(/^\d+$/, 'Cédula solo puede contener números'),
+  qr_code: z.string().optional(),
 });
 
 export type BookingFormData = z.infer<typeof bookingSchema>;

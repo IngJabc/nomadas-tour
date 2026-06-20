@@ -1,7 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { Seat as SeatType } from '@/types';
-import { cn } from '@/lib/utils';
 
 interface SeatProps {
   seat: SeatType | null;
@@ -9,45 +9,92 @@ interface SeatProps {
   onSelect: (seat: SeatType) => void;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  available: 'bg-blue-500 hover:bg-blue-600 cursor-pointer',
-  reserved: 'bg-red-500 cursor-not-allowed',
-  locked: 'bg-amber-500 cursor-not-allowed',
-  guide: 'bg-green-800 cursor-not-allowed',
-  selected: 'bg-green-500 hover:bg-green-600 cursor-pointer',
-};
-
 export function Seat({ seat, isSelected, onSelect }: SeatProps) {
   if (!seat) {
-    return <div className="w-14 h-14" />;
+    return <div className="w-10 h-10 sm:w-14 sm:h-14" />;
   }
 
   const isGuide = seat.seat_code === 'G';
-  const statusClass = isGuide
-    ? STATUS_COLORS.guide
-    : isSelected
-      ? STATUS_COLORS.selected
-      : STATUS_COLORS[seat.status] ?? STATUS_COLORS.available;
+  const isClickable = !isGuide && (seat.status === 'available' || isSelected);
+
+  let bg = '';
+  let textColor = '';
+  let cursor = '';
+
+  if (isGuide) {
+    bg = '#071946';
+    textColor = '#ffffff';
+    cursor = 'default';
+  } else if (isSelected) {
+    bg = '#f59e0b';
+    textColor = '#ffffff';
+    cursor = 'pointer';
+  } else if (seat.status === 'available') {
+    bg = '#00D4FF';
+    textColor = '#ffffff';
+    cursor = 'pointer';
+  } else if (seat.status === 'reserved') {
+    bg = '#374151';
+    textColor = '#6b7280';
+    cursor = 'not-allowed';
+  } else if (seat.status === 'blocked') {
+    bg = '#7c3aed';
+    textColor = '#ffffff';
+    cursor = 'not-allowed';
+  } else {
+    bg = '#374151';
+    textColor = '#6b7280';
+    cursor = 'not-allowed';
+  }
 
   const handleClick = () => {
-    if (isGuide) return;
-    // Permitir click si está disponible, o si está locked por el usuario actual (para deseleccionar)
-    if (seat.status !== 'available' && !isSelected) return;
+    if (!isClickable) return;
     onSelect(seat);
   };
 
+  const isLockedByOther = seat.status === 'locked' && !isSelected;
+
   return (
-    <button
+    <motion.button
       type="button"
       onClick={handleClick}
-      disabled={isGuide || (seat.status !== 'available' && !isSelected)}
-      className={cn(
-        'w-14 h-14 rounded-lg flex items-center justify-center text-white font-bold text-sm transition-colors duration-150',
-        statusClass,
-      )}
-      title={`Asiento ${seat.seat_code} - ${isGuide ? 'Guía' : seat.status}`}
+      disabled={!isClickable}
+      whileHover={isClickable && !isSelected ? { scale: 1.05, boxShadow: '0 4px 12px rgba(0,212,255,0.4)' } : undefined}
+      whileTap={isClickable ? { scale: 0.95 } : undefined}
+      animate={
+        isLockedByOther
+          ? { scale: [1, 1.05, 1] }
+          : isSelected
+            ? { scale: [1, 1.1, 1] }
+            : undefined
+      }
+      transition={
+        isLockedByOther
+          ? { duration: 2, repeat: Infinity, ease: 'easeInOut' }
+          : isSelected
+            ? { duration: 0.2 }
+            : { type: 'spring', stiffness: 500, damping: 20 }
+      }
+      style={{
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        background: isGuide ? bg : bg,
+        color: textColor,
+        cursor,
+        border: isGuide ? '2px solid #00D4FF' : 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 10,
+        fontWeight: 700,
+        boxShadow: isSelected ? '0 4px 12px rgba(245,158,11,0.4)' : isLockedByOther ? '0 0 0 2px rgba(239,68,68,0.5)' : 'none',
+        opacity: seat.status === 'blocked' ? 0.7 : 1,
+      }}
+      className="sm:w-14 sm:h-14 sm:text-sm"
+      title={`Asiento ${seat.seat_code}`}
     >
-      {seat.seat_code}
-    </button>
+      <span style={{ lineHeight: 1 }}>{seat.seat_code}</span>
+    </motion.button>
   );
 }
