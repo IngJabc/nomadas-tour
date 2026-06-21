@@ -121,15 +121,25 @@ export function BusLayout({
   const layout = useMemo(() => generateBusLayout(totalSeats), [totalSeats]);
   const reversedRows = useMemo(() => [...layout.rows].reverse(), [layout.rows]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const busContentRef = useRef<HTMLDivElement>(null);
   const carroceriaRef = useRef<HTMLDivElement>(null);
   const blackBodyRef = useRef<HTMLDivElement>(null);
   const doorRowRef = useRef<HTMLDivElement>(null);
 
+  const [scale, setScale] = useState(1);
   const [wheelTops, setWheelTops] = useState({ upper: 60, lower: 300 });
   const [doorTop, setDoorTop] = useState(0);
 
+  const BUS_NATURAL_WIDTH = 360;
+
   useLayoutEffect(() => {
     function measure() {
+      if (containerRef.current && busContentRef.current) {
+        const containerWidth = containerRef.current.offsetWidth;
+        const s = Math.min(1, containerWidth / BUS_NATURAL_WIDTH);
+        setScale(s);
+      }
       if (!carroceriaRef.current || !blackBodyRef.current) return;
       const carRect = carroceriaRef.current.getBoundingClientRect();
       const bbRect = blackBodyRef.current.getBoundingClientRect();
@@ -173,20 +183,30 @@ export function BusLayout({
   };
 
   return (
-    <div className="flex flex-col items-center w-full max-w-[360px] mx-auto">
+    <div ref={containerRef} className="flex flex-col items-center w-full">
+      <div
+        ref={busContentRef}
+        style={{
+          transform: `scale(${scale})`,
+          transformOrigin: "top center",
+          width: BUS_NATURAL_WIDTH,
+          maxWidth: BUS_NATURAL_WIDTH,
+          flexShrink: 0,
+        }}
+      >
       {/* FONDO */}
       <div className="flex items-center gap-2 mb-3">
         <CrosshairIcon />
-        <span className="font-['Poppins',sans-serif] font-semibold text-[12px] uppercase tracking-[0.1em] text-[#6b7280]">
+        <span className="font-['Poppins',sans-serif] font-semibold text-[12px] uppercase tracking-[0.1em] text-brand-muted">
           FONDO
         </span>
       </div>
 
       <div
         ref={carroceriaRef}
-        className="relative w-full overflow-visible"
+        className="relative overflow-visible"
         style={{
-          background: "#c8ccd4",
+          background: "#d1d5db",
           borderRadius: 36,
           border: "3px solid #9ca3af",
           boxShadow: "0 8px 32px rgba(0,0,0,0.22)",
@@ -196,8 +216,8 @@ export function BusLayout({
         <div
           className="-mx-[10px] mt-[10px]"
           style={{
-            background: "#4b5563",
-            height: 36,
+            background: "#6b7280",
+            height: 24,
             borderRadius: "30px 30px 0 0",
           }}
         />
@@ -247,7 +267,7 @@ export function BusLayout({
           {/* El contenedor con flex h-full mantiene el texto perfectamente centrado verticalmente con la puerta */}
           <div className="absolute right-full mr-3 flex items-center justify-center h-full">
             <span
-              className="font-['Poppins',sans-serif] font-semibold text-[10px] text-[#6b7280] whitespace-nowrap"
+              className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted whitespace-nowrap"
               style={{
                 writingMode: "vertical-rl",
                 transform: "rotate(180deg)",
@@ -349,7 +369,7 @@ export function BusLayout({
             style={{
               width: 56,
               height: 56,
-              background: "#1e3a5f",
+              background: "#166534",
               border: "2px solid #00D4FF",
             }}
           >
@@ -399,9 +419,10 @@ export function BusLayout({
 
       <div className="flex items-center gap-2 mt-3">
         <CrosshairIcon />
-        <span className="font-['Poppins',sans-serif] font-semibold text-[12px] uppercase tracking-[0.1em] text-[#6b7280]">
+        <span className="font-['Poppins',sans-serif] font-semibold text-[12px] uppercase tracking-[0.1em] text-brand-muted">
           FRENTE
         </span>
+      </div>
       </div>
     </div>
   );

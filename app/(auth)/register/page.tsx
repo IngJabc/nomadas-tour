@@ -78,7 +78,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="flex-1 flex pt-16">
       {/* LEFT: Hero column — hidden on mobile (same as Login) */}
       <div className="hidden lg:flex lg:w-1/2 relative flex-col items-center justify-center overflow-hidden px-8 bg-gradient-to-br from-brand-dark to-brand-navy">
         <div className="absolute bottom-0 left-0 right-0 z-0 opacity-20 pointer-events-none" aria-hidden>
@@ -107,7 +107,7 @@ export default function RegisterPage() {
             height={80}
             priority
           />
-          <div className="mt-4 w-15 h-1 bg-brand-cyan rounded-sm" />
+          <div className="mt-4             w-16 h-1 bg-brand-cyan rounded-sm" />
         </div>
 
         <p className="relative z-10 mt-6 text-center font-['Poppins',sans-serif] font-normal text-lg text-white/70 max-w-[280px]">
@@ -182,7 +182,7 @@ export default function RegisterPage() {
       </div>
 
       {/* RIGHT: Form column */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-8 sm:px-12 py-12 bg-brand-surface">
+      <div className="w-full lg:w-1/2 flex items-start lg:items-center justify-center px-5 sm:px-8 lg:px-12 py-8 sm:py-12 bg-brand-surface">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -190,8 +190,8 @@ export default function RegisterPage() {
           className="w-full max-w-sm"
         >
           {/* Mobile-only small logo */}
-          <div className="lg:hidden flex justify-center mb-6">
-            <div className="w-8 h-8 bg-brand-navy rounded-lg flex items-center justify-center">
+          <div className="lg:hidden flex justify-center mb-5">
+            <div className="w-9 h-9 bg-brand-navy rounded-xl flex items-center justify-center">
               <span className="font-['Montserrat',sans-serif] font-extrabold text-base text-white">
                 N
               </span>
@@ -200,7 +200,7 @@ export default function RegisterPage() {
 
           <Link
             href="/"
-            className="inline-flex items-center gap-1 mb-6 font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted"
+            className="inline-flex items-center gap-1 mb-5 sm:mb-6 font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted"
           >
             <svg
               className="w-4 h-4"
@@ -218,10 +218,10 @@ export default function RegisterPage() {
             Volver al inicio
           </Link>
 
-          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[28px] text-brand-navy">
+          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[24px] sm:text-[28px] text-brand-navy">
             Crea tu cuenta
           </h1>
-          <p className="mt-2 mb-8 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
+          <p className="mt-2 mb-6 sm:mb-8 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
             Únete y reserva tus asientos en segundos
           </p>
 
@@ -243,7 +243,7 @@ export default function RegisterPage() {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
                     e.currentTarget.style.boxShadow =
-                      "0 0 0 3px rgba(8,142,184,0.15)";
+                      "0 0 0 3px rgba(0,212,255,0.15)";
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = "#e5e7eb";
@@ -285,7 +285,7 @@ export default function RegisterPage() {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
                     e.currentTarget.style.boxShadow =
-                      "0 0 0 3px rgba(8,142,184,0.15)";
+                      "0 0 0 3px rgba(0,212,255,0.15)";
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = "#e5e7eb";
@@ -328,7 +328,7 @@ export default function RegisterPage() {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
                     e.currentTarget.style.boxShadow =
-                      "0 0 0 3px rgba(8,142,184,0.15)";
+                      "0 0 0 3px rgba(0,212,255,0.15)";
                     setPasswordFocused(true);
                   }}
                   onBlur={(e) => {
@@ -427,7 +427,7 @@ export default function RegisterPage() {
                     e.currentTarget.style.borderColor =
                       "var(--color-brand-cyan)";
                     e.currentTarget.style.boxShadow =
-                      "0 0 0 3px rgba(8,142,184,0.15)";
+                      "0 0 0 3px rgba(0,212,255,0.15)";
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = "#e5e7eb";

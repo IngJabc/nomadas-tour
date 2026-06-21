@@ -103,12 +103,12 @@ export function ConfirmModal({
               </svg>
             </div>
             <h3 id="confirm-modal-title" className="text-lg font-bold text-brand-navy text-center mb-2">{title}</h3>
-            <p className="text-sm text-slate-500 text-center mb-6">{message}</p>
+            <p className="text-sm text-brand-muted text-center mb-6">{message}</p>
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-brand-muted bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
               >
                 {cancelLabel}
               </button>

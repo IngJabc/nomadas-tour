@@ -101,7 +101,7 @@ export async function POST(request: Request) {
         trip_id,
         seat_id,
         passenger_name,
-        passenger_email: passenger_cedula,
+        passenger_cedula,
         qr_code: qrCode,
         status: 'confirmed',
       })

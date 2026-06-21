@@ -157,18 +157,18 @@ export function BookingPanel({
             </span>
           </div>
 
-          <div className="flex gap-2.5">
+          <div className="flex flex-col sm:flex-row gap-2.5">
             {lastBookingIds && lastBookingIds[0] && (
               <Link
                 href={`/bookings/${lastBookingIds[0]}`}
-                className="flex-1 px-3.5 py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
+                className="w-full sm:flex-1 px-3.5 py-3 sm:py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
               >
                 Ver boleto
               </Link>
             )}
             <Link
               href="/dashboard"
-              className="flex-1 px-5 py-3 bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
+              className="w-full sm:flex-1 px-5 py-3 bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-brand-blue)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-brand-cyan)'; }}
             >
@@ -242,7 +242,7 @@ export function BookingPanel({
                 <div className="flex items-center gap-3">
                   <span
                     className="inline-flex items-center justify-center text-brand-cyan font-['Poppins',sans-serif] font-semibold text-xs px-2 py-0.5 rounded-md min-w-[32px] text-center"
-                    style={{ background: 'rgba(8,142,184,0.1)' }}
+                    style={{ background: 'rgba(0,212,255,0.1)' }}
                   >
                     {s.seat_code}
                   </span>
@@ -285,7 +285,7 @@ export function BookingPanel({
                 style={{ transition: 'border-color 200ms, box-shadow 200ms' }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0,212,255,0.15)';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#e5e7eb';
@@ -307,7 +307,7 @@ export function BookingPanel({
                 style={{ transition: 'border-color 200ms, box-shadow 200ms' }}
                 onFocus={(e) => {
                   e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0,212,255,0.15)';
                 }}
                 onBlur={(e) => {
                   e.currentTarget.style.borderColor = '#e5e7eb';
@@ -322,13 +322,13 @@ export function BookingPanel({
             key={`shake-${shakeKey}`}
             animate={error ? { x: [0, -4, 4, -4, 4, 0] } : undefined}
             transition={{ duration: 0.4 }}
-            className="flex gap-3"
+            className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3"
           >
             <button
               type="button"
               onClick={onClear}
               disabled={loading}
-              className="flex-1 px-4 py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl border-none transition-colors duration-200"
+              className="w-full sm:flex-1 px-4 py-3 sm:py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl border-none transition-colors duration-200"
               style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
               onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#e2e8f0'; }}
               onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#f1f5f9'; }}
@@ -339,7 +339,7 @@ export function BookingPanel({
               type="button"
               onClick={handleConfirm}
               disabled={loading}
-              className="flex-1 px-4 py-2.5 text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl border-none transition-colors duration-200"
+              className="w-full sm:flex-1 px-4 py-3 sm:py-2.5 text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl border-none transition-colors duration-200"
               style={{
                 background: loading ? '#94a3b8' : 'var(--color-brand-cyan)',
                 cursor: loading ? 'not-allowed' : 'pointer',

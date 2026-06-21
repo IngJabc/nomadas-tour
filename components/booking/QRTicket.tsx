@@ -40,55 +40,55 @@ export function QRTicket({ bookings }: QRTicketProps) {
   const qrValue = generateQRContent(first, seatCodes);
 
   return (
-    <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 max-w-sm mx-auto overflow-hidden">
-      <div className="p-6 sm:p-8">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-brand-navy rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-navy/20">
-            <svg className="w-6 h-6 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 w-full max-w-sm mx-auto overflow-hidden">
+      <div className="p-5 sm:p-8">
+        <div className="text-center mb-5 sm:mb-6">
+          <div className="w-11 h-11 sm:w-12 sm:h-12 bg-brand-navy rounded-xl flex items-center justify-center mx-auto mb-3 shadow-lg shadow-brand-navy/20">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="font-bold text-lg text-brand-navy tracking-tight">
+          <h3 className="font-bold text-base sm:text-lg text-brand-navy tracking-tight">
             {first.trip?.route?.origin ?? '?'} → {first.trip?.route?.destination ?? '?'}
           </h3>
-          <p className="text-sm text-slate-400">{first.trip ? formatDateTime(first.trip.departure_at) : 'Boleto de viaje'}</p>
+          <p className="text-xs sm:text-sm text-brand-muted">{first.trip ? formatDateTime(first.trip.departure_at) : 'Boleto de viaje'}</p>
         </div>
 
-        <div className="flex justify-center mb-6">
-          <div className="bg-white p-4 rounded-2xl shadow-inner border border-slate-100">
-            <QRCode value={qrValue} size={180} />
+        <div className="flex justify-center mb-5 sm:mb-6">
+          <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-inner border border-slate-100">
+            <QRCode value={qrValue} size={160} />
           </div>
         </div>
 
         <div className="space-y-0 divide-y divide-slate-100">
           <div className="flex justify-between py-3">
-            <span className="text-sm text-slate-400">Código</span>
+            <span className="text-sm text-brand-muted">Código</span>
             <span className="text-sm font-mono font-bold text-brand-navy">{first.qr_code}</span>
           </div>
           <div className="flex justify-between py-3">
-            <span className="text-sm text-slate-400">Pasajero</span>
+            <span className="text-sm text-brand-muted">Pasajero</span>
             <span className="text-sm font-medium text-brand-navy">{first.passenger_name}</span>
           </div>
           <div className="flex justify-between py-3">
-            <span className="text-sm text-slate-400">Cédula</span>
+            <span className="text-sm text-brand-muted">Cédula</span>
             <span className="text-sm font-medium text-brand-navy">{first.passenger_email}</span>
           </div>
           {first.trip && (
             <>
               <div className="flex justify-between py-3">
-                <span className="text-sm text-slate-400">Ruta</span>
+                <span className="text-sm text-brand-muted">Ruta</span>
                 <span className="text-sm font-medium text-brand-navy text-right">
                   {first.trip.route?.origin} → {first.trip.route?.destination}
                 </span>
               </div>
               <div className="flex justify-between py-3">
-                <span className="text-sm text-slate-400">Salida</span>
+                <span className="text-sm text-brand-muted">Salida</span>
                 <span className="text-sm font-medium text-brand-navy">{formatDateTime(first.trip.departure_at)}</span>
               </div>
             </>
           )}
           <div className="flex justify-between py-3">
-            <span className="text-sm text-slate-400">Asientos</span>
+            <span className="text-sm text-brand-muted">Asientos</span>
             <div className="flex flex-wrap gap-1.5 justify-end max-w-[200px]">
               {seatCodes.length > 4 ? (
                 <div className="grid grid-cols-2 gap-1">
@@ -114,11 +114,11 @@ export function QRTicket({ bookings }: QRTicketProps) {
             </div>
           </div>
           <div className="flex justify-between py-3">
-            <span className="text-sm text-slate-400">Total</span>
+            <span className="text-sm text-brand-muted">Total</span>
             <span className="text-sm font-bold text-brand-cyan">{formatPrice(totalPrice)}</span>
           </div>
           <div className="flex justify-between py-3">
-            <span className="text-sm text-slate-400">Estado</span>
+            <span className="text-sm text-brand-muted">Estado</span>
             <span
               className={`font-semibold px-2.5 py-0.5 rounded-full text-xs ${
                 first.status === 'confirmed'
@@ -133,7 +133,7 @@ export function QRTicket({ bookings }: QRTicketProps) {
       </div>
 
       <div className="bg-slate-50/80 px-6 sm:px-8 py-4 border-t border-slate-100">
-        <p className="text-xs text-slate-400 text-center">
+        <p className="text-xs text-brand-muted text-center">
           Presenta este código QR al abordar el bus
         </p>
       </div>

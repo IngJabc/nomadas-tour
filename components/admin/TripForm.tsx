@@ -17,6 +17,9 @@ interface TripFormProps {
   initialData?: TripFormData;
 }
 
+const inputClass =
+  "w-full border-[1.5px] border-gray-200 rounded-xl px-3.5 py-2.5 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none transition-all duration-200 focus:border-brand-cyan focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)]";
+
 export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
   const [routeId, setRouteId] = useState(initialData?.route_id ?? '');
   const [departureAt, setDepartureAt] = useState(initialData?.departure_at ?? '');
@@ -25,18 +28,6 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
   const [decks, setDecks] = useState(initialData?.decks?.toString() ?? '1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const inputClass = "border-[1.5px] border-gray-200 rounded-xl px-[14px] py-[10px] font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none w-full box-border transition-[border-color,box-shadow] duration-200";
-
-  const handleFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
-    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(8,142,184,0.12)';
-  };
-
-  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.currentTarget.style.borderColor = '#e5e7eb';
-    e.currentTarget.style.boxShadow = 'none';
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -72,8 +63,8 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
         </h2>
       </div>
 
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex-1 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3 items-stretch sm:items-end">
+        <div className="flex-1 min-w-0 sm:min-w-[180px]">
           <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Ruta
           </label>
@@ -81,8 +72,6 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             value={routeId}
             onChange={(e) => setRouteId(e.target.value)}
             className={inputClass}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
           >
             <option value="">Seleccione una ruta</option>
             {routes.map((route) => (
@@ -93,7 +82,7 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
           </select>
         </div>
 
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-0 sm:min-w-[180px]">
           <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Fecha y hora de salida
           </label>
@@ -102,14 +91,12 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             value={departureAt}
             onChange={(e) => setDepartureAt(e.target.value)}
             className={inputClass}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
           />
         </div>
 
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-0 sm:min-w-[140px]">
           <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
-            Precio por asiento (EUR)
+            Precio (EUR)
           </label>
           <input
             type="number"
@@ -119,14 +106,12 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className={inputClass}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
           />
         </div>
 
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-0 sm:min-w-[140px]">
           <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
-            Total de asientos
+            Asientos
           </label>
           <input
             type="number"
@@ -136,12 +121,10 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             value={totalSeats}
             onChange={(e) => setTotalSeats(e.target.value)}
             className={inputClass}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
           />
         </div>
 
-        <div className="flex-1 min-w-[200px]">
+        <div className="flex-1 min-w-0 sm:min-w-[120px]">
           <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
             Pisos
           </label>
@@ -149,8 +132,6 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
             value={decks}
             onChange={(e) => setDecks(e.target.value)}
             className={inputClass}
-            onFocus={handleFocus}
-            onBlur={handleBlur}
           >
             <option value="1">1 piso</option>
             <option value="2">2 pisos</option>
@@ -162,11 +143,11 @@ export function TripForm({ routes, onSubmit, initialData }: TripFormProps) {
           )}
         </div>
 
-        <div className="shrink-0">
+        <div className="shrink-0 w-full sm:w-auto">
           <button
             type="submit"
             disabled={loading}
-            className="font-['Poppins',sans-serif] font-semibold text-sm px-6 py-[10px] rounded-xl border-none transition-colors duration-200 bg-brand-navy hover:bg-brand-blue disabled:opacity-40 disabled:cursor-not-allowed text-white"
+            className="w-full sm:w-auto bg-brand-navy text-white font-['Poppins',sans-serif] font-semibold text-sm px-6 py-2.5 rounded-xl border-none cursor-pointer transition-colors duration-200 hover:bg-brand-blue disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {loading ? 'Guardando...' : initialData ? 'Actualizar' : 'Crear'}
           </button>

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins, Montserrat, Geist_Mono } from "next/font/google";
+import { Poppins, Montserrat } from "next/font/google";
 import { Navbar } from '@/components/ui/Navbar';
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
@@ -18,11 +18,6 @@ const montserrat = Montserrat({
   weight: ["700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: "Nómadas Tours",
   description:
@@ -37,7 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${poppins.variable} ${montserrat.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${poppins.variable} ${montserrat.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-brand-surface text-brand-navy">
         {/* Global navbar */}

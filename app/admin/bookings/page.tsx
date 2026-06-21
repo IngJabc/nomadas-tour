@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 
 type BookingRow = {
@@ -11,6 +12,7 @@ type BookingRow = {
   seat_id: string;
   passenger_name: string;
   passenger_email: string;
+  passenger_cedula: string;
   qr_code: string;
   status: string;
   created_at: string;
@@ -98,6 +100,7 @@ const TRIP_STATUS_STYLES: Record<string, { label: string; pill: string }> = {
 };
 
 export default function AdminBookingsPage() {
+  const router = useRouter();
   const [bookings, setBookings] = useState<BookingRow[]>([]);
   const [filtered, setFiltered] = useState<BookingRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,21 +158,21 @@ export default function AdminBookingsPage() {
   };
 
   return (
-    <div className="bg-slate-100 min-h-screen">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <p className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted">
-              Admin / Pasajeros
+              <Link href="/admin" className="text-brand-cyan no-underline hover:underline">Admin</Link>
+              {' / Pasajeros'}
             </p>
-            <h1 className="font-['Montserrat',sans-serif] font-extrabold text-2xl text-brand-navy">
+            <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[22px] sm:text-2xl text-brand-navy">
               Pasajeros y reservas
             </h1>
           </div>
           <Link
             href="/admin/trips"
-            className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm whitespace-nowrap no-underline hover:bg-brand-blue transition-colors duration-200"
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm whitespace-nowrap no-underline hover:bg-brand-blue transition-colors duration-200"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M8 3v10M3 8h10" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
@@ -179,7 +182,7 @@ export default function AdminBookingsPage() {
         </div>
 
         {/* Metrics */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <div className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.07)] border-l-4 border-l-brand-cyan">
             <p className="font-['Poppins',sans-serif] font-semibold text-[11px] text-brand-muted uppercase tracking-wider">
               Pasajeros
@@ -229,13 +232,13 @@ export default function AdminBookingsPage() {
             </svg>
             <input
               type="text"
-              placeholder="Buscar pasajero, ruta, asiento, código QR..."
+              placeholder="Buscar pasajero, cédula, ruta, asiento, código QR..."
               value={search}
               onChange={(e) => handleSearch(e.target.value)}
               className="w-full py-3 pl-10 pr-4 border-[1.5px] border-gray-200 rounded-xl font-['Poppins',sans-serif] text-sm font-normal text-brand-navy bg-white outline-none focus:border-brand-cyan focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all box-border"
             />
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
             {['', 'confirmed', 'cancelled'].map((s) => {
               const label = s === '' ? 'Todas' : s === 'confirmed' ? 'Confirmadas' : 'Canceladas';
               const active = statusFilter === s;
@@ -271,14 +274,14 @@ export default function AdminBookingsPage() {
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="w-8 h-8 text-brand-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
             <p className="font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
               {search || statusFilter ? 'No hay resultados con esos filtros' : 'Aún no hay reservas registradas'}
             </p>
-            {(search || statusFilter) && (
+            {search || statusFilter ? (
               <button
                 type="button"
                 onClick={() => { setSearch(''); setStatusFilter(''); }}
@@ -286,6 +289,13 @@ export default function AdminBookingsPage() {
               >
                 Limpiar filtros
               </button>
+            ) : (
+              <Link
+                href="/admin/trips"
+                className="mt-4 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm no-underline hover:bg-brand-blue transition-colors"
+              >
+                Ver viajes disponibles
+              </Link>
             )}
           </div>
         ) : (
@@ -301,7 +311,7 @@ export default function AdminBookingsPage() {
                   <button
                     type="button"
                     onClick={() => toggleRoute(route.routeKey)}
-                    className="w-full flex items-center gap-3 px-5 py-4 bg-none border-none cursor-pointer text-left border-l-4 border-l-brand-cyan"
+                    className="w-full flex items-center gap-3 px-4 sm:px-5 py-4 bg-none border-none cursor-pointer text-left border-l-4 border-l-brand-cyan"
                   >
                     <svg
                       width="16"
@@ -400,50 +410,89 @@ export default function AdminBookingsPage() {
                             </button>
 
                             {/* Passenger list */}
-                            {tripOpen && (
-                              <div className="px-5 pb-3 pl-12">
-                                {trip.bookings.length === 0 ? (
-                                  <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-gray-400 py-3">
-                                    Sin pasajeros en este viaje
-                                  </p>
-                                ) : (
-                                  <div className="flex flex-col">
-                                    <div className="grid grid-cols-[1fr_1fr_80px_100px_40px] gap-2 py-2 border-b border-slate-100">
-                                      <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Pasajero</span>
-                                      <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Email</span>
-                                      <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Asiento</span>
-                                      <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Estado</span>
-                                      <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Código</span>
-                                    </div>
-                                    {trip.bookings.map((b) => {
-                                      const bs = STATUS_STYLES[b.status] ?? STATUS_STYLES.confirmed;
-                                      return (
-                                        <div
-                                          key={b.id}
-                                          className="grid grid-cols-[1fr_1fr_80px_100px_40px] gap-2 py-2.5 border-b border-slate-50 items-center hover:bg-[#fafbfc] transition-colors"
-                                        >
-                                          <span className="font-['Poppins',sans-serif] font-medium text-[13px] text-brand-navy">
-                                            {b.passenger_name}
-                                          </span>
-                                          <span className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted truncate">
-                                            {b.passenger_email}
-                                          </span>
-                                          <span className="font-['Poppins',sans-serif] font-bold text-[13px] text-brand-navy bg-slate-100 inline-block px-2.5 py-0.5 rounded-md text-center w-fit">
-                                            {b.seat?.seat_code ?? '—'}
-                                          </span>
-                                          <span className={`inline-block font-['Poppins',sans-serif] font-semibold text-[10px] px-2 py-0.5 rounded-full text-center w-fit ${bs.pill}`}>
-                                            {bs.label}
-                                          </span>
-                                          <span className="font-['Poppins',sans-serif] font-normal text-[10px] text-brand-muted tabular-nums">
-                                            {b.qr_code?.split('-').pop() ?? '—'}
-                                          </span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
+                            <div className={`grid transition-all duration-300 ease-in-out ${tripOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
+                              <div className="overflow-hidden">
+                                <div className="px-4 sm:px-5 pb-3 sm:pl-12">
+                                  {trip.bookings.length === 0 ? (
+                                    <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-gray-400 py-3">
+                                      Sin pasajeros en este viaje
+                                    </p>
+                                  ) : (
+                                    <>
+                                      {/* Desktop grid headers */}
+                                      <div className="hidden sm:grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_70px_85px_45px] gap-2 py-2 border-b border-slate-100 items-center">
+                                        <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Pasajero</span>
+                                        <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Cédula</span>
+                                        <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Asiento</span>
+                                        <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Estado</span>
+                                        <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-muted uppercase tracking-wider">Código</span>
+                                      </div>
+                                      {/* Desktop grid rows + Mobile cards */}
+                                      {trip.bookings.map((b, idx) => {
+                                        const bs = STATUS_STYLES[b.status] ?? STATUS_STYLES.confirmed;
+                                        return (
+                                          <div
+                                            key={b.id}
+                                            style={{ animationDelay: `${idx * 30}ms` }}
+                                            className="animate-[fadeSlideIn_0.3s_ease-out_both]"
+                                          >
+                                            {/* Desktop row */}
+                                            <div
+                                              onClick={() => router.push(`/admin/bookings/${b.id}`)}
+                                              className="hidden sm:grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_70px_85px_45px] gap-2 py-2.5 border-b border-slate-50 items-center hover:bg-slate-50 transition-colors cursor-pointer"
+                                            >
+                                              <span className="font-['Poppins',sans-serif] font-medium text-[13px] text-brand-navy truncate">
+                                                {b.passenger_name}
+                                              </span>
+                                              <span className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted">
+                                                {b.passenger_cedula ?? '—'}
+                                              </span>
+                                              <span className="font-['Poppins',sans-serif] font-bold text-[13px] text-brand-navy bg-slate-100 inline-block px-2.5 py-0.5 rounded-md text-center w-fit">
+                                                {b.seat?.seat_code ?? '—'}
+                                              </span>
+                                              <span className={`inline-block font-['Poppins',sans-serif] font-semibold text-[10px] px-2 py-0.5 rounded-full text-center w-fit ${bs.pill}`}>
+                                                {bs.label}
+                                              </span>
+                                              <span className="font-['Poppins',sans-serif] font-normal text-[10px] text-brand-muted tabular-nums">
+                                                {b.qr_code?.split('-').pop() ?? '—'}
+                                              </span>
+                                            </div>
+
+                                            {/* Mobile card */}
+                                            <div
+                                              onClick={() => router.push(`/admin/bookings/${b.id}`)}
+                                              className="sm:hidden bg-white rounded-xl p-3.5 mb-2 border border-slate-100 shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
+                                            >
+                                              <div className="flex items-start justify-between gap-2 mb-2">
+                                                <div className="min-w-0 flex-1">
+                                                  <p className="font-['Poppins',sans-serif] font-semibold text-[13px] text-brand-navy truncate">
+                                                    {b.passenger_name}
+                                                  </p>
+                                                  <p className="font-['Poppins',sans-serif] font-normal text-[11px] text-brand-muted mt-0.5">
+                                                    {b.passenger_cedula ?? '—'}
+                                                  </p>
+                                                </div>
+                                                <span className={`shrink-0 inline-block font-['Poppins',sans-serif] font-semibold text-[10px] px-2 py-0.5 rounded-full ${bs.pill}`}>
+                                                  {bs.label}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center gap-3">
+                                                <div className="font-['Poppins',sans-serif] font-bold text-[13px] text-brand-navy bg-slate-100 inline-block px-2.5 py-0.5 rounded-md">
+                                                  {b.seat?.seat_code ?? '—'}
+                                                </div>
+                                                <span className="font-['Poppins',sans-serif] font-normal text-[10px] text-brand-muted tabular-nums">
+                                                  {b.qr_code?.split('-').pop() ?? '—'}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}
@@ -455,6 +504,5 @@ export default function AdminBookingsPage() {
           </div>
         )}
       </div>
-    </div>
   );
 }

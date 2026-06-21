@@ -7,6 +7,7 @@ import { usePathname } from 'next/navigation';
 const NAV_ITEMS = [
   { href: '/admin', label: 'Panel', icon: '📊' },
   { href: '/admin/bookings', label: 'Pasajeros', icon: '👥' },
+  { href: '/admin/scan', label: 'Escáner QR', icon: '📷' },
   { href: '/admin/trips', label: 'Viajes', icon: '📋' },
   { href: '/admin/routes', label: 'Rutas', icon: '🗺️' },
 ];
@@ -19,7 +20,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen flex">
       {/* Mobile hamburger trigger — visible only on small screens */}
       <button
-        className="lg:hidden fixed top-3 left-3 z-50 p-2 rounded-lg bg-brand-dark"
+        className={`lg:hidden fixed top-3 left-3 z-50 p-3 rounded-xl bg-brand-dark shadow-lg shadow-black/20 transition-opacity duration-150 ${
+          drawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}
         onClick={() => setDrawerOpen(true)}
         aria-label="Abrir menú admin"
       >
@@ -58,7 +61,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white font-bold text-lg font-['Montserrat',sans-serif]">
             N
           </div>
-          <div className="mt-2 px-2 py-0.5 rounded bg-[rgba(8,142,184,0.2)]">
+          <div className="mt-2 px-2 py-0.5 rounded bg-[rgba(0,212,255,0.2)]">
             <span className="font-['Poppins',sans-serif] font-semibold text-[10px] text-brand-cyan uppercase tracking-wider">
               Panel Admin
             </span>
@@ -93,7 +96,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="px-6 py-6 border-t border-white/10">
           <Link
             href="/"
-            className="inline-flex items-center gap-1.5 font-['Poppins',sans-serif] font-normal text-xs text-white/40"
+            className="inline-flex items-center gap-1.5 font-['Poppins',sans-serif] font-medium text-xs text-white/60 hover:text-white"
             onClick={() => setDrawerOpen(false)}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -105,7 +108,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Content */}
-      <main className="flex-1 lg:ml-[220px] min-h-screen bg-slate-100">
+      <main className="flex-1 lg:ml-[220px] min-h-screen bg-slate-100 pt-14 lg:pt-0">
         {children}
       </main>
     </div>

@@ -192,18 +192,18 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-100">
-        <div className="max-w-7xl mx-auto py-8 px-6">
+      <div className="min-h-screen bg-slate-100 pt-16">
+        <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6">
           <div className="flex flex-col lg:flex-row gap-8 items-start justify-center animate-pulse">
-            <div className="flex flex-col items-center gap-6">
-              <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
+            <div className="flex flex-col items-center gap-6 w-full max-w-[360px] mx-auto">
+              <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.07)] w-full">
                 <div className="bg-brand-dark rounded-[20px] p-4">
                   <div className="flex justify-center mb-4">
                     <div className="w-20 h-10 bg-slate-600 rounded-t-2xl" />
                   </div>
                   <div className="space-y-2">
                     {Array.from({ length: 8 }).map((_, i) => (
-                      <div key={i} className="flex gap-8 items-center">
+                      <div key={i} className="flex gap-8 items-center justify-center">
                         <div className="flex gap-1">
                           {Array.from({ length: 3 }).map((_, j) => (
                             <div key={j} className="w-10 h-10 rounded-xl bg-slate-500" />
@@ -239,16 +239,15 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
   const isNotLoggedIn = !authLoading && !userId;
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <div className="max-w-7xl mx-auto py-8 px-6">
-        <div className="pt-12">
+    <div className="min-h-screen bg-slate-100 pt-16">
+      <div className="max-w-7xl mx-auto py-4 sm:py-6 px-4 sm:px-6">
           {/* Not logged in alert (spec: only if not authenticated) */}
           {isNotLoggedIn && (
-            <div className="bg-amber-50 border border-amber-300 rounded-xl py-3 px-4 flex items-center gap-2.5 mb-6">
-              <span className="text-base">⚠️</span>
-              <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-amber-800">
+            <div className="bg-amber-50 border border-amber-300 rounded-xl py-3 px-3.5 sm:px-4 flex items-start sm:items-center gap-2.5 mb-6">
+              <span className="text-base shrink-0 mt-0.5 sm:mt-0" aria-hidden>⚠️</span>
+              <p className="font-['Poppins',sans-serif] font-normal text-[12px] sm:text-[13px] text-amber-800">
                 Necesitas{' '}
-                <Link href="/login" className="text-brand-cyan font-semibold no-underline">
+                <Link href="/login" className="text-brand-cyan font-semibold no-underline whitespace-nowrap">
                   iniciar sesión
                 </Link>{' '}
                 para seleccionar y reservar asientos
@@ -257,7 +256,7 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 lg:gap-8 items-start">
-            <div className="flex flex-col items-center gap-4 min-w-0">
+            <div className="flex flex-col items-center gap-4 min-w-0 w-full">
               <SeatLegend />
               <BusLayout
                 seats={seats}
@@ -276,7 +275,6 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
                 onReleaseLocks={releaseLocks}
               />
             </aside>
-          </div>
         </div>
       </div>
     </div>

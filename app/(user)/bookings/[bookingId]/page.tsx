@@ -40,8 +40,8 @@ export default async function BookingDetailPage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-brand-surface to-white">
-      <main className="pt-20 max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <div className="min-h-screen bg-gradient-to-b from-brand-surface to-white pt-16">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <QRTicket bookings={bookings} />
       </main>
     </div>
