@@ -4,18 +4,18 @@ export function SeatLegend() {
     { label: "Seleccionado", color: "#f59e0b" },
     { label: "Reservado", color: "#374151" },
     { label: "Bloqueado", color: "#7c3aed" },
-    { label: "Guía", color: "#1e3a5f" }, // <-- Color azul marino para hacer match con el asiento
+    { label: "Guía", color: "#166534" },
   ];
 
   return (
-    <div className="w-full flex flex-wrap gap-4 items-center justify-center">
+    <div className="w-full flex flex-wrap gap-x-4 gap-y-2 items-center justify-center">
       {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-3">
+        <div key={item.label} className="flex items-center gap-2">
           <div
-            className="w-2.5 h-2.5 rounded-full"
+            className="w-2.5 h-2.5 rounded-full shrink-0"
             style={{ background: item.color }}
           />
-          <span className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
+          <span className="font-['Poppins',sans-serif] font-normal text-[12px] sm:text-[13px] text-brand-muted whitespace-nowrap">
             {item.label}
           </span>
         </div>

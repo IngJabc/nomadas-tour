@@ -33,11 +33,11 @@ export default async function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <main className="pt-20 max-w-[1100px] mx-auto px-6 py-8">
-        <div className="flex items-start gap-3 mb-6">
-          <div className="w-1 h-7 bg-brand-cyan" />
-          <h2 className="font-['Montserrat',sans-serif] font-extrabold text-[28px] text-brand-navy">Viajes disponibles</h2>
+    <div className="min-h-screen bg-slate-100 pt-16">
+      <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        <div className="flex items-start gap-3 mb-5 sm:mb-6">
+          <div className="w-1 h-6 sm:h-7 bg-brand-cyan shrink-0" />
+          <h2 className="font-['Montserrat',sans-serif] font-extrabold text-[22px] sm:text-[28px] text-brand-navy">Viajes disponibles</h2>
         </div>
 
         {!trips || trips.length === 0 ? (

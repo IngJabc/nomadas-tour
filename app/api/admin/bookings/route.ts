@@ -42,6 +42,7 @@ export async function GET(request: Request) {
       seat_id: string;
       passenger_name: string;
       passenger_email: string;
+      passenger_cedula: string;
       qr_code: string;
       status: string;
       created_at: string;
@@ -62,6 +63,7 @@ export async function GET(request: Request) {
       result = result.filter((b) =>
         b.passenger_name?.toLowerCase().includes(q) ||
         b.passenger_email?.toLowerCase().includes(q) ||
+        b.passenger_cedula?.toLowerCase().includes(q) ||
         b.trip?.route?.origin?.toLowerCase().includes(q) ||
         b.trip?.route?.destination?.toLowerCase().includes(q) ||
         b.seat?.seat_code?.toLowerCase().includes(q) ||

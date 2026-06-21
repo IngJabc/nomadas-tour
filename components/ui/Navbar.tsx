@@ -15,6 +15,15 @@ export function Navbar() {
   const supabase = createClient();
 
   useEffect(() => {
+    if (open) {
+      document.body.classList.add('no-scroll');
+    } else {
+      document.body.classList.remove('no-scroll');
+    }
+    return () => document.body.classList.remove('no-scroll');
+  }, [open]);
+
+  useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
 
     const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
@@ -34,6 +43,7 @@ export function Navbar() {
   if (pathname.startsWith("/admin")) return null;
 
   const handleSignOut = async () => {
+    setOpen(false);
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
@@ -41,7 +51,7 @@ export function Navbar() {
 
   return (
     <header
-      className="sticky top-0 z-50 w-full bg-brand-navy h-16"
+      className="fixed top-0 z-50 w-full bg-brand-navy h-16"
       style={{
         boxShadow: scrolled ? "0 2px 12px rgba(0,0,0,0.4)" : "none",
       }}
@@ -126,7 +136,7 @@ export function Navbar() {
             aria-label="Abrir menú"
             aria-expanded={open}
             onClick={() => setOpen((s) => !s)}
-            className="p-2 inline-flex items-center justify-center rounded-md text-white"
+            className="p-3 inline-flex items-center justify-center rounded-md text-white"
           >
             <svg
               className="w-6 h-6"

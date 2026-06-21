@@ -39,7 +39,7 @@ export function AuthNav() {
           )}
           <Link
             href="/dashboard"
-            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-cyan-light transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
+            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-blue transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
           >
             Mis reservas
           </Link>
@@ -64,7 +64,7 @@ export function AuthNav() {
           </Link>
           <Link
             href="/register"
-            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-cyan-light transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
+            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-blue transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
           >
             Registrarse
           </Link>

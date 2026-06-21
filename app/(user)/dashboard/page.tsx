@@ -14,6 +14,7 @@ interface BookingGroup {
   pricePerSeat: number;
   seatCodes: string[];
   bookingIds: string[];
+  seatIds: string[];
   hasCancelled: boolean;
 }
 
@@ -32,12 +33,14 @@ function groupBookings(bookings: any[]): BookingGroup[] {
         pricePerSeat: b.trip.price ?? 0,
         seatCodes: [],
         bookingIds: [],
+        seatIds: [],
         hasCancelled: false,
       });
     }
     const group = map.get(key)!;
     group.seatCodes.push(b.seat?.seat_code ?? '—');
     group.bookingIds.push(b.id);
+    group.seatIds.push(b.seat?.id ?? '');
     if (b.status === 'cancelled') group.hasCancelled = true;
   }
   return Array.from(map.values());
@@ -75,23 +78,23 @@ export default async function DashboardPage() {
   const groups = groupBookings(bookings ?? []);
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <main className="pt-20 max-w-[1100px] mx-auto py-8 px-6">
+    <div className="min-h-screen bg-slate-100 pt-16">
+      <main className="max-w-[1100px] mx-auto py-4 sm:py-6 px-4 sm:px-6">
         {/* Header */}
-        <div className="flex items-center gap-3 mb-1">
-          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[26px] text-brand-navy">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
+          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[22px] sm:text-[26px] text-brand-navy">
             Hola, {userName} &#x1f44b;
           </h1>
           {isAdmin && (
             <Link
               href="/admin"
-              className="font-['Poppins',sans-serif] font-semibold text-[11px] text-brand-cyan bg-brand-cyan/10 px-2.5 py-0.5 rounded-full no-underline uppercase tracking-wider"
+              className="self-start sm:self-auto font-['Poppins',sans-serif] font-semibold text-[11px] text-brand-cyan bg-brand-cyan/10 px-2.5 py-0.5 rounded-full no-underline uppercase tracking-wider"
             >
               Panel Admin &rarr;
             </Link>
           )}
         </div>
-        <p className="mb-8 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
+        <p className="mb-6 sm:mb-8 font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
           Aquí están todas tus reservas
         </p>
 
@@ -99,16 +102,16 @@ export default async function DashboardPage() {
           /* Empty state */
           <div className="mx-auto text-center bg-white rounded-[20px] p-12 max-w-[480px] shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <svg className="mx-auto mb-6" width="160" height="100" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-              <rect x="30" y="35" width="100" height="40" rx="8" fill="#088eb8" opacity="0.15" />
-              <rect x="40" y="42" width="12" height="8" rx="2" fill="#088eb8" opacity="0.4" />
-              <rect x="58" y="42" width="12" height="8" rx="2" fill="#088eb8" opacity="0.4" />
-              <rect x="76" y="42" width="12" height="8" rx="2" fill="#088eb8" opacity="0.4" />
-              <rect x="94" y="42" width="12" height="8" rx="2" fill="#088eb8" opacity="0.4" />
-              <circle cx="50" cy="80" r="6" fill="#0c142d" opacity="0.2" />
-              <circle cx="110" cy="80" r="6" fill="#0c142d" opacity="0.2" />
-              <circle cx="80" cy="70" r="4" fill="#088eb8" opacity="0.5" />
-              <path d="M40 30h80v8H40z" fill="#088eb8" opacity="0.08" />
-              <path d="M20 40l8-10h104l8 10" stroke="#088eb8" strokeWidth="1.5" fill="none" opacity="0.15" />
+              <rect x="30" y="35" width="100" height="40" rx="8" fill="#00D4FF" opacity="0.15" />
+              <rect x="40" y="42" width="12" height="8" rx="2" fill="#00D4FF" opacity="0.4" />
+              <rect x="58" y="42" width="12" height="8" rx="2" fill="#00D4FF" opacity="0.4" />
+              <rect x="76" y="42" width="12" height="8" rx="2" fill="#00D4FF" opacity="0.4" />
+              <rect x="94" y="42" width="12" height="8" rx="2" fill="#00D4FF" opacity="0.4" />
+              <circle cx="50" cy="80" r="6" fill="#000024" opacity="0.2" />
+              <circle cx="110" cy="80" r="6" fill="#000024" opacity="0.2" />
+              <circle cx="80" cy="70" r="4" fill="#00D4FF" opacity="0.5" />
+              <path d="M40 30h80v8H40z" fill="#00D4FF" opacity="0.08" />
+              <path d="M20 40l8-10h104l8 10" stroke="#00D4FF" strokeWidth="1.5" fill="none" opacity="0.15" />
             </svg>
             <h2 className="font-['Montserrat',sans-serif] font-bold text-xl text-brand-navy">
               Aún no tienes reservas
@@ -141,7 +144,7 @@ export default async function DashboardPage() {
                       background: group.hasCancelled ? '#ef4444' : 'var(--color-brand-cyan)',
                     }}
                   />
-                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4 py-5 px-6">
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4 py-4 sm:py-5 px-4 sm:px-6">
                     {/* Left zone */}
                     <div className="w-full sm:flex-1">
                       <span
@@ -182,7 +185,7 @@ export default async function DashboardPage() {
                             >
                               Ver detalles &rarr;
                             </Link>
-                            <CancelBookingButton />
+                            <CancelBookingButton bookingIds={group.bookingIds} seatIds={group.seatIds} />
                           </>
                         )}
                       </div>
