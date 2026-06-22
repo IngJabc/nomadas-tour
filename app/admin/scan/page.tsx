@@ -96,7 +96,6 @@ export default function ScanPage() {
       if (cancelled) return false;
       try {
         const scanner = new Html5Qrcode('qr-reader-container');
-        scannerRef.current = scanner;
 
         const scanHandler = (decodedText: string, result: Html5QrcodeResult) => {
           onScanSuccessRef.current?.(decodedText, result);
@@ -109,6 +108,9 @@ export default function ScanPage() {
           () => {},
         );
 
+        // Only assign ref after successful start so cleanup never calls stop() on a failed scanner
+        scannerRef.current = scanner;
+
         if (!cancelled) {
           setCameraReady(true);
           setInitializingCamera(false);
@@ -116,6 +118,7 @@ export default function ScanPage() {
         }
         return false;
       } catch {
+        setInitializingCamera(false);
         return false;
       }
     };
@@ -193,13 +196,16 @@ export default function ScanPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'boarded' }),
       });
-      if (!res.ok) throw new Error('Error al confirmar');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error ?? 'Error al confirmar');
+      }
       setSuccessMsg('Abordaje confirmado correctamente');
       setShowConfetti(true);
       setBooking((prev) => prev ? { ...prev, status: 'boarded' } : null);
       setTimeout(() => setShowConfetti(false), 2500);
-    } catch {
-      setLookupError('Error al confirmar abordaje');
+    } catch (err) {
+      setLookupError(err instanceof Error ? err.message : 'Error al confirmar abordaje');
     } finally {
       setUpdating(false);
     }
@@ -417,37 +423,41 @@ export default function ScanPage() {
             </div>
           )}
 
-          {/* Scanner view */}
-          {scanning && cameraReady && !cameraError && (
+          {/* Scanner view — container always rendered when scanning so html5-qrcode finds it before start() */}
+          {scanning && !cameraError && (
             <div>
               <div className="relative w-full max-w-sm mx-auto">
                 <div
                   id="qr-reader-container"
                   className="w-full rounded-xl overflow-hidden"
                 />
-                {/* Scanning line overlay */}
-                <div className="absolute inset-x-0 top-0 h-full pointer-events-none overflow-hidden rounded-xl">
-                  <motion.div
-                    className="absolute left-[10%] right-[10%] h-[2px] bg-brand-cyan shadow-[0_0_8px_rgba(0,212,255,0.7)]"
-                    animate={{ top: ['5%', '95%'] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                  />
-                  <div className="absolute inset-0 border-[3px] border-brand-cyan/30 rounded-xl" />
-                  <div className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] border-brand-cyan rounded-tl-lg" />
-                  <div className="absolute top-0 right-0 w-6 h-6 border-t-[3px] border-r-[3px] border-brand-cyan rounded-tr-lg" />
-                  <div className="absolute bottom-0 left-0 w-6 h-6 border-b-[3px] border-l-[3px] border-brand-cyan rounded-bl-lg" />
-                  <div className="absolute bottom-0 right-0 w-6 h-6 border-b-[3px] border-r-[3px] border-brand-cyan rounded-br-lg" />
+                {/* Scanning line overlay — only when camera is streaming */}
+                {cameraReady && (
+                  <div className="absolute inset-x-0 top-0 h-full pointer-events-none overflow-hidden rounded-xl">
+                    <motion.div
+                      className="absolute left-[10%] right-[10%] h-[2px] bg-brand-cyan shadow-[0_0_8px_rgba(0,212,255,0.7)]"
+                      animate={{ top: ['5%', '95%'] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                    />
+                    <div className="absolute inset-0 border-[3px] border-brand-cyan/30 rounded-xl" />
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] border-brand-cyan rounded-tl-lg" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-[3px] border-r-[3px] border-brand-cyan rounded-tr-lg" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-[3px] border-l-[3px] border-brand-cyan rounded-bl-lg" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-[3px] border-r-[3px] border-brand-cyan rounded-br-lg" />
+                  </div>
+                )}
+              </div>
+              {cameraReady && (
+                <div className="flex justify-center mt-4">
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="px-4 py-2 rounded-xl bg-red-50 text-red-500 font-['Poppins',sans-serif] font-semibold text-xs border-none cursor-pointer hover:bg-red-100 transition-colors"
+                  >
+                    Detener cámara
+                  </button>
                 </div>
-              </div>
-              <div className="flex justify-center mt-4">
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="px-4 py-2 rounded-xl bg-red-50 text-red-500 font-['Poppins',sans-serif] font-semibold text-xs border-none cursor-pointer hover:bg-red-100 transition-colors"
-                >
-                  Detener cámara
-                </button>
-              </div>
+              )}
             </div>
           )}
 

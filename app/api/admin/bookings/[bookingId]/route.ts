@@ -31,9 +31,10 @@ export async function GET(
     }
 
     return NextResponse.json(booking);
-  } catch {
+  } catch (e) {
+    console.error('Error GET booking:', e);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { error: e instanceof Error ? e.message : 'Error interno del servidor' },
       { status: 500 },
     );
   }
@@ -135,9 +136,10 @@ export async function PATCH(
     }
 
     return NextResponse.json(data);
-  } catch {
+  } catch (e) {
+    console.error('Error PATCH booking:', e);
     return NextResponse.json(
-      { error: 'Error interno del servidor' },
+      { error: e instanceof Error ? e.message : 'Error interno del servidor' },
       { status: 500 },
     );
   }
