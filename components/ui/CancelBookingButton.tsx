@@ -3,13 +3,15 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { request } from '@/lib/api';
 
 interface Props {
-  bookingIds: string[];
-  seatIds: string[];
+  tripId: string;
+  transactionId: string;
+  reservationIds: string[];
 }
 
-export function CancelBookingButton({ bookingIds, seatIds }: Props) {
+export function CancelBookingButton({ tripId, transactionId, reservationIds }: Props) {
   const router = useRouter();
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,17 +21,10 @@ export function CancelBookingButton({ bookingIds, seatIds }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/bookings/cancel', {
+      await request('/reservations/cancel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingIds, seatIds }),
+        body: JSON.stringify({ trip_id: tripId, transaction_id: transactionId }),
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Error al cancelar' }));
-        throw new Error(err.error || 'Error al cancelar');
-      }
-
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cancelar');
@@ -38,7 +33,7 @@ export function CancelBookingButton({ bookingIds, seatIds }: Props) {
     }
   };
 
-  const label = bookingIds.length > 1 ? `Cancelar reserva (${bookingIds.length} asientos)` : 'Cancelar reserva';
+  const label = reservationIds.length > 1 ? `Cancelar reserva (${reservationIds.length} asientos)` : 'Cancelar reserva';
 
   return (
     <>
@@ -59,8 +54,8 @@ export function CancelBookingButton({ bookingIds, seatIds }: Props) {
         open={modalOpen}
         title="Cancelar reserva"
         message={
-          bookingIds.length > 1
-            ? `¿Estás seguro de cancelar estos ${bookingIds.length} asientos? Los asientos quedarán disponibles para otros pasajeros.`
+          reservationIds.length > 1
+            ? `¿Estás seguro de cancelar estos ${reservationIds.length} asientos? Los asientos quedarán disponibles para otros pasajeros.`
             : '¿Estás seguro de cancelar esta reserva? El asiento quedará disponible para otros pasajeros.'
         }
         confirmLabel="Cancelar reserva"

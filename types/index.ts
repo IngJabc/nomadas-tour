@@ -1,22 +1,19 @@
-export type SeatStatus = 'available' | 'reserved' | 'locked' | 'blocked';
+export type SeatStatus = 'available' | 'locked' | 'reserved' | 'blocked' | 'guide' | 'boarded';
 
 export interface Route {
   id: string;
   origin: string;
   destination: string;
-  duration_minutes: number;
-  created_at: string;
+  created_by: string;
 }
 
 export interface Trip {
   id: string;
   route_id: string;
-  departure_at: string;
-  price: number;
+  departure_time: string;
+  capacity: number;
+  vehicle_type: 'bus' | 'kia';
   status: 'active' | 'cancelled' | 'completed';
-  total_seats: number;
-  decks: number;
-  route?: Route;
 }
 
 export interface Seat {
@@ -29,28 +26,40 @@ export interface Seat {
   updated_at: string;
 }
 
-export interface Booking {
+export interface TripAgencyAllocation {
   id: string;
-  user_id: string;
   trip_id: string;
-  seat_id: string;
-  passenger_name: string;
-  passenger_email: string;
+  agency_id: string;
+  allocated_seats: number;
+  reserved_seats: number;
+}
+
+export interface Reservation {
+  id: string;
+  trip_id: string;
+  agency_id: string;
+  user_id: string;
+  transaction_id: string;
+  customer_name: string;
+  passenger_cedula: string;
+  phone: string | null;
+  seat_code: string;
+  status: 'confirmed' | 'cancelled' | 'boarded';
   qr_code: string;
-  status: 'confirmed' | 'cancelled';
   created_at: string;
-  seat?: Seat;
-  trip?: Trip & { route: Route };
+}
+
+export interface Agency {
+  id: string;
+  name: string;
+  subdomain: string;
+  email: string | null;
+  phone: string | null;
+  status: 'active' | 'inactive';
 }
 
 export interface BusRow {
   left: (string | null)[];
   right: (string | null)[];
-}
-
-export interface BusLayout {
-  totalSeats: number;
-  guideSeats: string[];
-  rows: BusRow[];
-  frontLeft: string;
+  isDoor?: boolean;
 }

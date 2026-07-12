@@ -1,43 +1,19 @@
 'use client';
 
 import { QRCode } from 'react-qr-code';
-import { Booking } from '@/types';
-import { formatDateTime, formatPrice } from '@/lib/utils';
+import { Reservation } from '@/types';
+import { formatDateTime } from '@/lib/utils';
 
 interface QRTicketProps {
-  bookings: Booking[];
+  reservations: Reservation[];
 }
 
-function generateQRContent(booking: Booking, seatCodes: string[]): string {
-  const origin = booking.trip?.route?.origin ?? '';
-  const destination = booking.trip?.route?.destination ?? '';
-  const departure = booking.trip?.departure_at ?? '';
-  const price = Number(booking.trip?.price ?? 0);
-  const total = seatCodes.length * price;
-  const d = departure ? new Date(departure) : null;
-  const departFormatted = d
-    ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
-    : '';
-  return [
-    `NOMADAS TOUR`,
-    `Codigo: ${booking.qr_code}`,
-    `Pasajero: ${booking.passenger_name}`,
-    `Cedula: ${booking.passenger_email}`,
-    `Ruta: ${origin} - ${destination}`,
-    `Salida: ${departFormatted}`,
-    `Asientos: ${seatCodes.join(', ')}`,
-    `Total: ${(isNaN(total) ? 0 : total).toFixed(2).replace('.', ',')} EUR`,
-  ].join('\n');
-}
-
-export function QRTicket({ bookings }: QRTicketProps) {
-  const first = bookings[0];
+export function QRTicket({ reservations }: QRTicketProps) {
+  const first = reservations[0];
   if (!first) return null;
 
-  const seatCodes = [...new Set(bookings.map((b) => b.seat?.seat_code).filter((s): s is string => !!s))];
-  const seatCount = seatCodes.length;
-  const totalPrice = first.trip?.price ? seatCount * Number(first.trip.price) : 0;
-  const qrValue = generateQRContent(first, seatCodes);
+  const seatCodes = [...new Set(reservations.map((r) => r.seat_code).filter((s): s is string => !!s))];
+  const qrValue = first.qr_code;
 
   return (
     <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200/60 w-full max-w-sm mx-auto overflow-hidden">
@@ -49,9 +25,9 @@ export function QRTicket({ bookings }: QRTicketProps) {
             </svg>
           </div>
           <h3 className="font-bold text-base sm:text-lg text-brand-navy tracking-tight">
-            {first.trip?.route?.origin ?? '?'} → {first.trip?.route?.destination ?? '?'}
+            Boleto de viaje
           </h3>
-          <p className="text-xs sm:text-sm text-brand-muted">{first.trip ? formatDateTime(first.trip.departure_at) : 'Boleto de viaje'}</p>
+          <p className="text-xs sm:text-sm text-brand-muted">Presenta este código QR al abordar</p>
         </div>
 
         <div className="flex justify-center mb-5 sm:mb-6">
@@ -67,26 +43,12 @@ export function QRTicket({ bookings }: QRTicketProps) {
           </div>
           <div className="flex justify-between py-3">
             <span className="text-sm text-brand-muted">Pasajero</span>
-            <span className="text-sm font-medium text-brand-navy">{first.passenger_name}</span>
+            <span className="text-sm font-medium text-brand-navy">{first.customer_name}</span>
           </div>
           <div className="flex justify-between py-3">
             <span className="text-sm text-brand-muted">Cédula</span>
-            <span className="text-sm font-medium text-brand-navy">{first.passenger_email}</span>
+            <span className="text-sm font-medium text-brand-navy">{first.passenger_cedula}</span>
           </div>
-          {first.trip && (
-            <>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-brand-muted">Ruta</span>
-                <span className="text-sm font-medium text-brand-navy text-right">
-                  {first.trip.route?.origin} → {first.trip.route?.destination}
-                </span>
-              </div>
-              <div className="flex justify-between py-3">
-                <span className="text-sm text-brand-muted">Salida</span>
-                <span className="text-sm font-medium text-brand-navy">{formatDateTime(first.trip.departure_at)}</span>
-              </div>
-            </>
-          )}
           <div className="flex justify-between py-3">
             <span className="text-sm text-brand-muted">Asientos</span>
             <div className="flex flex-wrap gap-1.5 justify-end max-w-[200px]">
@@ -112,10 +74,6 @@ export function QRTicket({ bookings }: QRTicketProps) {
                 ))
               )}
             </div>
-          </div>
-          <div className="flex justify-between py-3">
-            <span className="text-sm text-brand-muted">Total</span>
-            <span className="text-sm font-bold text-brand-cyan">{formatPrice(totalPrice)}</span>
           </div>
           <div className="flex justify-between py-3">
             <span className="text-sm text-brand-muted">Estado</span>

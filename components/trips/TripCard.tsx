@@ -1,13 +1,11 @@
 "use client";
 
 import Link from 'next/link';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 
 function availabilityColor(percent: number) {
-  if (percent > 0.5) return '#059669';
-  if (percent > 0) return '#d97706';
-  return '#ef4444';
+  if (percent > 0.5) return 'var(--color-brand-cyan)';
+  if (percent > 0) return 'var(--color-warning, #f59e0b)';
+  return 'var(--color-danger, #ef4444)';
 }
 
 interface TripCardProps {
@@ -17,15 +15,23 @@ interface TripCardProps {
   departure_at: string;
   duration_minutes: number;
   total_seats: number;
-  price: number;
   available_seats: number;
 }
 
 export function TripCard({ trip }: { trip: TripCardProps }) {
-  const { id, origin, destination, departure_at, duration_minutes, price, total_seats, available_seats } = trip;
+  const { id, origin, destination, departure_at, duration_minutes, total_seats, available_seats } = trip;
   const date = new Date(departure_at);
-  const day = format(date, 'EEE d MMM', { locale: es });
-  const time = format(date, 'hh:mm a', { locale: es });
+  const days = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  const day = days[date.getUTCDay()];
+  const month = months[date.getUTCMonth()];
+  const dayNum = date.getUTCDate();
+  const hours = date.getUTCHours();
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 || 12;
+  const dayStr = `${day} ${dayNum} ${month}`;
+  const timeStr = `${h12}:${minutes} ${ampm}`;
   const percent = total_seats > 0 ? available_seats / total_seats : 0;
   const isSoldOut = available_seats === 0;
   const isLowStock = available_seats > 0 && available_seats <= 5;
@@ -36,7 +42,7 @@ export function TripCard({ trip }: { trip: TripCardProps }) {
         isSoldOut ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-1 hover:scale-[1.01] hover:shadow-2xl'
       }`}
       style={{
-        borderLeftColor: isSoldOut ? '#ef4444' : isLowStock ? '#f59e0b' : 'var(--color-brand-cyan)',
+        borderLeftColor: isSoldOut ? 'var(--color-danger, #ef4444)' : isLowStock ? 'var(--color-warning, #f59e0b)' : 'var(--color-brand-cyan)',
       }}
     >
       <div className="w-full sm:flex-1 p-4 sm:p-6 flex items-start gap-3 sm:gap-4">
@@ -52,7 +58,7 @@ export function TripCard({ trip }: { trip: TripCardProps }) {
                   {origin} → {destination}
                 </div>
                 <div className="text-brand-muted font-['Poppins',sans-serif] text-[12px] sm:text-[13px]">
-                  {day} · {time}
+                  {day} · {timeStr}
                 </div>
               </div>
             </div>
@@ -64,8 +70,8 @@ export function TripCard({ trip }: { trip: TripCardProps }) {
                 <span
                   className="inline-flex items-center px-2 py-1 rounded-full font-semibold text-[10px] sm:text-[11px]"
                   style={{
-                    background: isSoldOut ? '#fef2f2' : '#fffbeb',
-                    color: isSoldOut ? '#ef4444' : '#92400e',
+                    background: isSoldOut ? 'var(--color-danger-bg, #fef2f2)' : 'var(--color-warning-bg, #fffbeb)',
+                    color: isSoldOut ? 'var(--color-danger, #ef4444)' : 'var(--color-warning-text, #92400e)',
                   }}
                 >
                   {isSoldOut ? 'Agotado' : 'Pocos asientos'}
@@ -93,12 +99,6 @@ export function TripCard({ trip }: { trip: TripCardProps }) {
       </div>
 
       <div className="w-full sm:w-56 px-4 sm:px-6 pb-4 sm:pb-6 sm:pt-6 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 sm:gap-2">
-        <div className="flex sm:flex-col items-baseline sm:items-end gap-1 sm:gap-0">
-          <div className={`font-['Montserrat',sans-serif] text-[22px] sm:text-[26px] font-extrabold text-brand-cyan ${isSoldOut ? '' : 'group-hover:scale-105 transition-transform'}`}>
-            {price.toFixed(2).replace('.', ',')}
-          </div>
-          <div className="text-[11px] sm:text-xs text-brand-muted ml-1 sm:ml-0">€ por asiento</div>
-        </div>
         <div className="sm:w-full sm:mt-2">
           <button
             disabled={isSoldOut}

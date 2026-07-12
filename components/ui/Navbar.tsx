@@ -39,8 +39,8 @@ export function Navbar() {
     };
   }, [supabase]);
 
-  // Hide navbar on admin pages (admin has its own sidebar layout)
-  if (pathname.startsWith("/admin")) return null;
+  // Hide navbar on admin and agency pages (they have their own sidebar layout)
+  if (pathname.startsWith("/admin") || pathname.startsWith("/agency")) return null;
 
   const handleSignOut = async () => {
     setOpen(false);
@@ -85,7 +85,7 @@ export function Navbar() {
           >
             Viajes
           </Link>
-          {user?.user_metadata?.role === "admin" && (
+          {user?.user_metadata?.role === "superadmin" && (
             <Link
               href="/admin"
               className="text-white text-sm opacity-75 hover:opacity-100 transition-opacity duration-150"
@@ -213,7 +213,7 @@ export function Navbar() {
           >
             Viajes
           </Link>
-          {user?.user_metadata?.role === "admin" && (
+          {user?.user_metadata?.role === "superadmin" && (
             <Link
               href="/admin"
               onClick={() => setOpen(false)}

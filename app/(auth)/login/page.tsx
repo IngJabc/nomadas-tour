@@ -22,13 +22,17 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (signInError) throw signInError;
-      router.push("/dashboard");
+
+      const role = data.user?.user_metadata?.role;
+      if (role === 'superadmin') router.push('/admin');
+      else if (role === 'agency') router.push('/agency');
+      else router.push('/dashboard');
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
