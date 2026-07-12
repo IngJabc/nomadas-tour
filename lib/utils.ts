@@ -1,14 +1,13 @@
 import { format } from 'date-fns';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-export function formatDateTime(dateString: string): string {
-  return format(new Date(dateString), 'dd/MM/yyyy HH:mm');
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
 }
 
-export function formatPrice(price: number): string {
-  return new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(price);
+export function formatDateTime(dateString: string): string {
+  return format(new Date(dateString), "dd/MM/yyyy '\u00B7' HH:mm");
 }
 
 export function generateQRCode(): string {
@@ -18,8 +17,4 @@ export function generateQRCode(): string {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return `CAMPING-${Date.now()}-${result}`;
-}
-
-export function cn(...classes: (string | boolean | undefined | null)[]): string {
-  return classes.filter(Boolean).join(' ');
 }

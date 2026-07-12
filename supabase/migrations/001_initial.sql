@@ -12,7 +12,6 @@ CREATE TABLE trips (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   route_id UUID REFERENCES routes(id) ON DELETE CASCADE,
   departure_at TIMESTAMPTZ NOT NULL,
-  price NUMERIC(10,2) NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'cancelled', 'completed')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -7,28 +7,22 @@ import { format } from "date-fns";
 import { QRCode } from "react-qr-code";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
-type BookingDetail = {
+type ReservationDetail = {
   id: string;
-  user_id: string;
-  trip_id: string;
-  seat_id: string;
-  passenger_name: string;
-  passenger_email: string;
+  customer_name: string;
   passenger_cedula: string;
+  seat_code: string;
   qr_code: string;
   status: string;
+  transaction_id: string;
   created_at: string;
-  seat: { seat_code: string } | null;
-  trip: {
+  trips: {
     id: string;
-    departure_at: string;
-    price: number;
-    total_seats: number;
+    departure_time: string;
     status: string;
-    route: {
+    routes: {
       origin: string;
       destination: string;
-      duration_minutes: number;
     } | null;
   } | null;
 };
@@ -44,39 +38,44 @@ export default function BookingDetailPage() {
   const router = useRouter();
   const bookingId = params.bookingId as string;
 
-  const [booking, setBooking] = useState<BookingDetail | null>(null);
+  const [reservation, setReservation] = useState<ReservationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   useEffect(() => {
-    const fetchBooking = async () => {
+    const fetchReservation = async () => {
       try {
-        const res = await fetch(`/api/admin/bookings/${bookingId}`);
-        if (!res.ok) throw new Error("No se encontró la reserva");
-        const data = await res.json();
-        setBooking(data);
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data } = await supabase
+          .from('reservations')
+          .select('*, trips(*, routes(*))')
+          .eq('transaction_id', bookingId)
+          .single();
+        if (!data) throw new Error("No se encontró la reserva");
+        setReservation(data as any);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Error al cargar");
       } finally {
         setLoading(false);
       }
     };
-    fetchBooking();
+    fetchReservation();
   }, [bookingId]);
 
   const handleStatusChange = async (newStatus: string) => {
     setUpdating(true);
     try {
-      const res = await fetch(`/api/admin/bookings/${bookingId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      if (!res.ok) throw new Error("Error al actualizar");
-      const data = await res.json();
-      setBooking(data);
+      const { createClient } = await import('@/lib/supabase/client');
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from('reservations')
+        .update({ status: newStatus })
+        .eq('id', bookingId);
+      if (updateError) throw updateError;
+      setReservation((prev) => prev ? { ...prev, status: newStatus } : null);
     } catch {
       setError("Error al cambiar estado");
     } finally {
@@ -92,7 +91,7 @@ export default function BookingDetailPage() {
     );
   }
 
-  if (error || !booking) {
+  if (error || !reservation) {
     return (
       <div className="bg-slate-100 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -112,33 +111,22 @@ export default function BookingDetailPage() {
     );
   }
 
-  const bs = STATUS_STYLES[booking.status] ?? STATUS_STYLES.confirmed;
-  const qrValue = booking.qr_code;
-  const seatCode = booking.seat?.seat_code ?? "—";
-  const routeOrigin = booking.trip?.route?.origin ?? "—";
-  const routeDest = booking.trip?.route?.destination ?? "—";
-  const departure = booking.trip?.departure_at
-    ? format(new Date(booking.trip.departure_at), "dd/MM/yyyy HH:mm")
+  const bs = STATUS_STYLES[reservation.status] ?? STATUS_STYLES.confirmed;
+  const qrValue = reservation.qr_code;
+  const seatCode = reservation.seat_code ?? "—";
+  const routeOrigin = reservation.trips?.routes?.origin ?? "—";
+  const routeDest = reservation.trips?.routes?.destination ?? "—";
+  const departure = reservation.trips?.departure_time
+    ? format(new Date(reservation.trips.departure_time), "dd/MM/yyyy HH:mm")
     : "—";
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      {/* Breadcrumb */}
       <div className="mb-6">
         <p className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted">
-          <Link
-            href="/admin"
-            className="text-brand-cyan no-underline hover:underline"
-          >
-            Admin
-          </Link>
+          <Link href="/admin" className="text-brand-cyan no-underline hover:underline">Admin</Link>
           {" / "}
-          <Link
-            href="/admin/bookings"
-            className="text-brand-cyan no-underline hover:underline"
-          >
-            Pasajeros
-          </Link>
+          <Link href="/admin/bookings" className="text-brand-cyan no-underline hover:underline">Pasajeros</Link>
           {" / Detalle"}
         </p>
         <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[22px] sm:text-2xl text-brand-navy mt-1">
@@ -147,9 +135,7 @@ export default function BookingDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Passenger info card */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Info card */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
@@ -157,14 +143,13 @@ export default function BookingDetailPage() {
                 Información del pasajero
               </h2>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
                   Nombre completo
                 </label>
                 <p className="font-['Poppins',sans-serif] font-semibold text-[15px] text-brand-navy">
-                  {booking.passenger_name}
+                  {reservation.customer_name}
                 </p>
               </div>
               <div>
@@ -172,23 +157,20 @@ export default function BookingDetailPage() {
                   Cédula / Identificación
                 </label>
                 <p className="font-['Poppins',sans-serif] font-semibold text-[15px] text-brand-navy">
-                  {booking.passenger_cedula ?? "—"}
+                  {reservation.passenger_cedula ?? "—"}
                 </p>
               </div>
               <div>
                 <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
                   Estado
                 </label>
-                <span
-                  className={`inline-block font-['Poppins',sans-serif] font-semibold text-[11px] px-3 py-1 rounded-full ${bs.pill}`}
-                >
+                <span className={`inline-block font-['Poppins',sans-serif] font-semibold text-[11px] px-3 py-1 rounded-full ${bs.pill}`}>
                   {bs.label}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Trip info card */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
@@ -196,7 +178,6 @@ export default function BookingDetailPage() {
                 Información del viaje
               </h2>
             </div>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
@@ -210,45 +191,25 @@ export default function BookingDetailPage() {
                 <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
                   Salida
                 </label>
-                <p className="font-['Poppins',sans-serif] font-normal text-[14px] text-brand-navy">
-                  {departure}
-                </p>
+                <p className="font-['Poppins',sans-serif] font-normal text-[14px] text-brand-navy">{departure}</p>
               </div>
               <div>
                 <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
                   Asiento
                 </label>
-                <p className="font-['Poppins',sans-serif] font-bold text-[18px] text-brand-navy bg-slate-100 inline-block px-3 py-1 rounded-lg">
-                  {seatCode}
-                </p>
+                <p className="font-['Poppins',sans-serif] font-bold text-[18px] text-brand-navy bg-slate-100 inline-block px-3 py-1 rounded-lg">{seatCode}</p>
               </div>
-              <div>
-                <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
-                  Precio
-                </label>
-                <p className="font-['Poppins',sans-serif] font-semibold text-[15px] text-brand-cyan">
-                  {booking.trip?.price
-                    ? new Intl.NumberFormat("es-ES", {
-                        style: "currency",
-                        currency: "EUR",
-                        minimumFractionDigits: 2,
-                      }).format(booking.trip.price)
-                    : "—"}
-                </p>
-              </div>
+
             </div>
           </div>
 
-          {/* Actions */}
           <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
-              <h2 className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">
-                Acciones
-              </h2>
+              <h2 className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">Acciones</h2>
             </div>
             <div className="flex flex-wrap gap-3">
-              {booking.status === "confirmed" ? (
+              {reservation.status === "confirmed" ? (
                 <>
                   <button
                     type="button"
@@ -260,12 +221,7 @@ export default function BookingDetailPage() {
                       <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500" />
                     ) : (
                       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path
-                          d="M4 4l8 8M12 4l-8 8"
-                          stroke="#ef4444"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                        />
+                        <path d="M4 4l8 8M12 4l-8 8" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
                       </svg>
                     )}
                     Cancelar reserva
@@ -294,13 +250,7 @@ export default function BookingDetailPage() {
                     <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600" />
                   ) : (
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path
-                        d="M3 8l3 3 7-7"
-                        stroke="#059669"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                      <path d="M3 8l3 3 7-7" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}
                   Reactivar reserva
@@ -310,23 +260,17 @@ export default function BookingDetailPage() {
           </div>
         </div>
 
-        {/* QR Code sidebar */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)] sticky top-20">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
-              <h2 className="font-['Montserrat',sans-serif] font-bold text-sm text-brand-navy">
-                Código QR
-              </h2>
+              <h2 className="font-['Montserrat',sans-serif] font-bold text-sm text-brand-navy">Código QR</h2>
             </div>
-
             <div className="flex flex-col items-center gap-3">
               <div className="bg-white p-3 rounded-xl border border-slate-200">
                 <QRCode value={qrValue} size={160} />
               </div>
-              <p className="font-['Poppins',sans-serif] font-normal text-[11px] text-brand-muted text-center break-all">
-                {qrValue}
-              </p>
+              <p className="font-['Poppins',sans-serif] font-normal text-[11px] text-brand-muted text-center break-all">{qrValue}</p>
             </div>
           </div>
         </div>

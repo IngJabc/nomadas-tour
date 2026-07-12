@@ -1,30 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { formatPrice, formatDateTime, cn, generateQRCode } from '@/lib/utils';
-
-describe('formatPrice', () => {
-  it('formats integer price in EUR', () => {
-    expect(formatPrice(50)).toBe('50,00 €');
-  });
-
-  it('formats price with decimals', () => {
-    expect(formatPrice(25.5)).toBe('25,50 €');
-  });
-
-  it('formats zero', () => {
-    expect(formatPrice(0)).toBe('0,00 €');
-  });
-
-  it('formats large price', () => {
-    const result = formatPrice(1234.56);
-    expect(result).toContain('€');
-    expect(result).toContain('1234');
-  });
-});
+import { formatDateTime, cn, generateQRCode } from '@/lib/utils';
 
 describe('formatDateTime', () => {
   it('formats ISO date string correctly', () => {
     const result = formatDateTime('2026-06-19T14:30:00Z');
-    expect(result).toBe('19/06/2026 14:30');
+    expect(result).toBe('19/06/2026 \u00B7 14:30');
   });
 
   it('handles different timezone offset', () => {

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { useRealtimeSeats } from '@/hooks/useRealtimeSeats';
 import { BusLayout } from '@/components/bus/BusLayout';
@@ -13,13 +12,12 @@ import { Seat } from '@/types';
 
 interface TripClientProps {
   tripId: string;
-  price: number;
-  totalSeats: number;
+  vehicleType: "bus" | "kia";
   origin?: string;
   destination?: string;
 }
 
-export function TripClient({ tripId, price, totalSeats, origin, destination }: TripClientProps) {
+export function TripClient({ tripId, vehicleType, origin, destination }: TripClientProps) {
   const { seats, loading } = useRealtimeSeats(tripId);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -27,7 +25,6 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
   const myLocalLocks = useRef<Set<string>>(new Set());
   const selectedSeatsRef = useRef<Seat[]>([]);
   const clearedSeatsRef = useRef<Set<string>>(new Set());
-  const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
@@ -262,14 +259,13 @@ export function TripClient({ tripId, price, totalSeats, origin, destination }: T
                 seats={seats}
                 selectedSeats={selectedSeats}
                 onToggleSeat={toggleSeat}
-                totalSeats={totalSeats}
+                vehicleType={vehicleType}
               />
             </div>
             <aside className="lg:sticky lg:top-20 self-start w-full">
               <BookingPanel
                 selectedSeats={selectedSeats}
                 tripId={tripId}
-                price={price}
                 onSuccess={handleSuccess}
                 onClear={handleClear}
                 onReleaseLocks={releaseLocks}

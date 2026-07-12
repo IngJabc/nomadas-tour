@@ -1,142 +1,197 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { Calendar, Route, Building2, Mail, ArrowRight, Users, Ticket, UserCheck } from 'lucide-react';
+import { adminApi } from '@/lib/api';
+import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
+import { getGreeting } from '@/lib/utils/greeting';
+import { Topbar } from '@/components/layout/Topbar';
+import { SectionTitle } from '@/components/ui/SectionTitle';
+import { StatCard } from '@/components/ui/StatCard';
+import { Card } from '@/components/ui/Card';
+import { ActivityWidget } from '@/components/dashboard/ActivityWidget';
+import { Timeline } from '@/components/dashboard/Timeline';
+import { ReservationChart } from '@/components/dashboard/charts/ReservationChart';
+import { OccupancyChart } from '@/components/dashboard/charts/OccupancyChart';
 
-export default async function AdminDashboardPage() {
-  const supabase = await createServerSupabaseClient();
-  const { data: userData } = await supabase.auth.getUser();
+interface DashboardData {
+  total_agencies: number;
+  active_agencies: number;
+  total_trips: number;
+  active_trips: number;
+  total_routes: number;
+  total_reservations: number;
+  today_reservations: number;
+  pending_boarding_passengers: number;
+  upcoming_trips: {
+    id: string;
+    departure_time: string;
+    route: { origin: string; destination: string } | null;
+    capacity: number;
+    available_seats: number;
+    reservation_count: number;
+  }[];
+  recent_activity: {
+    type: 'trip_created' | 'reservation_created' | 'boarding';
+    label: string;
+    timestamp: string;
+  }[];
+  reservations_by_date: { date: string; count: number }[];
+  occupancy_by_trip: {
+    trip_id: string;
+    label: string;
+    departure: string;
+    total: number;
+    reserved: number;
+    occupancy_pct: number;
+  }[];
+}
 
-  if (!userData.user) {
-    redirect('/login');
-  }
+const QUICK_ACTIONS = [
+  {
+    href: '/admin/trips',
+    title: 'Gestión de viajes',
+    desc: 'Crear, editar y eliminar viajes',
+    icon: Calendar,
+  },
+  {
+    href: '/admin/routes',
+    title: 'Gestión de rutas',
+    desc: 'Administrar rutas disponibles',
+    icon: Route,
+  },
+  {
+    href: '/admin/agencies',
+    title: 'Agencias',
+    desc: 'Gestionar agencias y subdominios',
+    icon: Building2,
+  },
+  {
+    href: '/admin/invitations',
+    title: 'Invitaciones',
+    desc: 'Invitar agencias al panel',
+    icon: Mail,
+  },
+];
 
-  const role = userData.user?.user_metadata?.role ?? 'user';
-  if (role !== 'admin') {
-    redirect('/dashboard');
-  }
+export default function AdminDashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
-  const { count: tripsCount } = await supabase
-    .from('trips')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'active');
+  const fetchDashboard = useCallback(async () => {
+    try {
+      const dashboard = await adminApi.getDashboard();
+      setData(dashboard);
+      setInitialized(true);
+    } catch (err) {
+      console.error('[AdminDashboard] Error fetching dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const { count: bookingsCount } = await supabase
-    .from('bookings')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'confirmed');
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-  const { count: routesCount } = await supabase
-    .from('routes')
-    .select('*', { count: 'exact', head: true });
+  // Realtime: al cambiar asientos, refrescar dashboard completo desde backend
+  useEffect(() => {
+    if (!initialized || !data) return;
+
+    const tripIds = (data.upcoming_trips || []).map((t) => t.id);
+
+    const cleanupSeats = tripIds.length
+      ? subscribeToTripSeats(tripIds, () => {
+          fetchDashboard();
+        })
+      : () => {};
+
+    return () => {
+      cleanupSeats();
+    };
+  }, [initialized]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Breadcrumb + Title */}
-        <div className="mb-6 sm:mb-8">
-          <p className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted">
-            <Link href="/admin" className="text-brand-cyan no-underline hover:underline">Admin</Link>
-            {' / Panel'}
-          </p>
-          <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[22px] sm:text-2xl text-brand-navy">
-            Panel de Administración
-          </h1>
+    <>
+      <Topbar
+        greeting={`${getGreeting()}, Administrador`}
+        subtext="Panel de Administración — Nómadas Tour"
+      />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <SectionTitle>Acciones rápidas</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-10">
+          {QUICK_ACTIONS.map((action) => {
+            const Icon = action.icon;
+            return (
+              <Link key={action.href} href={action.href} className="no-underline group">
+                <Card hover borderLeft borderColor="var(--color-brand-cyan)">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-[var(--color-brand-navy)]">
+                      <Icon className="w-6 h-6 text-[var(--color-brand-cyan)]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h2 className="font-[family-name:var(--font-body)] font-semibold text-[17px] text-[var(--color-brand-navy)]">
+                        {action.title}
+                      </h2>
+                      <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[var(--color-brand-muted)]">
+                        {action.desc}
+                      </p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-[var(--color-brand-muted)] group-hover:text-[var(--color-brand-cyan)] transition-colors shrink-0" />
+                  </div>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
 
-        {/* Metrics cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[rgba(0,212,255,0.1)]">
-                <svg className="w-5 h-5 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <p className="font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">
-                Viajes activos
-              </p>
-            </div>
-            <p className="font-['Montserrat',sans-serif] font-extrabold text-4xl text-brand-navy leading-none">
-              {tripsCount ?? 0}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[rgba(0,212,255,0.1)]">
-                <svg className="w-5 h-5 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">
-                Reservas confirmadas
-              </p>
-            </div>
-            <p className="font-['Montserrat',sans-serif] font-extrabold text-4xl text-brand-navy leading-none">
-              {bookingsCount ?? 0}
-            </p>
-          </div>
-
-          <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[rgba(0,212,255,0.1)]">
-                <svg className="w-5 h-5 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                </svg>
-              </div>
-              <p className="font-['Poppins',sans-serif] font-semibold text-xs text-brand-muted uppercase tracking-wider">
-                Rutas
-              </p>
-            </div>
-            <p className="font-['Montserrat',sans-serif] font-extrabold text-4xl text-brand-navy leading-none">
-              {routesCount ?? 0}
-            </p>
-          </div>
+        <SectionTitle>Resumen del sistema</SectionTitle>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
+          <StatCard
+            icon={<Calendar className="w-5 h-5" />}
+            label="Viajes activos"
+            value={loading ? '—' : (data?.active_trips ?? 0)}
+            loading={loading}
+          />
+          <StatCard
+            icon={<Building2 className="w-5 h-5" />}
+            label="Agencias activas"
+            value={loading ? '—' : (data?.active_agencies ?? 0)}
+            loading={loading}
+            iconBg="bg-[rgba(245,158,11,0.1)]"
+            iconColor="text-[#f59e0b]"
+          />
+          <StatCard
+            icon={<Ticket className="w-5 h-5" />}
+            label="Reservas hoy"
+            value={loading ? '—' : (data?.today_reservations ?? 0)}
+            loading={loading}
+            iconBg="bg-[rgba(16,185,129,0.1)]"
+            iconColor="text-[#10b981]"
+          />
+          <StatCard
+            icon={<UserCheck className="w-5 h-5" />}
+            label="Pendientes boarding"
+            value={loading ? '—' : (data?.pending_boarding_passengers ?? 0)}
+            loading={loading}
+            iconBg="bg-[rgba(239,68,68,0.1)]"
+            iconColor="text-[#ef4444]"
+          />
         </div>
 
-        {/* Quick links */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-          <Link
-            href="/admin/trips"
-            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.07)] border-l-4 border-l-brand-cyan no-underline"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-brand-navy">
-                <svg className="w-6 h-6 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="font-['Poppins',sans-serif] font-semibold text-[17px] text-brand-navy">
-                  Gestión de viajes
-                </h2>
-                <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
-                  Crear, editar y eliminar viajes
-                </p>
-              </div>
-            </div>
-          </Link>
-
-          <Link
-            href="/admin/routes"
-            className="block bg-white rounded-2xl p-6 transition-all duration-200 hover:-translate-y-0.5 shadow-[0_2px_8px_rgba(0,0,0,0.07)] border-l-4 border-l-brand-cyan no-underline"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-brand-navy">
-                <svg className="w-6 h-6 text-brand-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
-                </svg>
-              </div>
-              <div>
-                <h2 className="font-['Poppins',sans-serif] font-semibold text-[17px] text-brand-navy">
-                  Gestión de rutas
-                </h2>
-                <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
-                  Administrar rutas disponibles
-                </p>
-              </div>
-            </div>
-          </Link>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+          <Timeline items={data?.upcoming_trips ?? []} loading={loading} />
+          <ActivityWidget activities={data?.recent_activity ?? []} loading={loading} />
         </div>
-      </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+          <ReservationChart data={data?.reservations_by_date ?? []} loading={loading} />
+          <OccupancyChart data={data?.occupancy_by_trip ?? []} loading={loading} />
+        </div>
+      </main>
+    </>
   );
 }

@@ -15,34 +15,34 @@ export default async function BookingDetailPage({
     redirect('/login');
   }
 
-  const { data: booking } = await supabase
-    .from('bookings')
-    .select('*, seat:seats(*), trip:trips(*, route:routes(*))')
-    .eq('id', bookingId)
+  const { data: reservation } = await supabase
+    .from('reservations')
+    .select('*, trips(departure_time)')
+    .eq('transaction_id', bookingId)
     .single();
 
-  if (!booking || booking.user_id !== userData.user.id) {
+  if (!reservation || reservation.user_id !== userData.user.id) {
     notFound();
   }
 
-  let bookings: typeof booking[] = [booking];
+  let reservations: typeof reservation[] = [reservation];
 
-  if (booking.qr_code) {
+  if (reservation.qr_code) {
     const { data: grouped } = await supabase
-      .from('bookings')
-      .select('*, seat:seats(*), trip:trips(*, route:routes(*))')
-      .eq('qr_code', booking.qr_code)
+      .from('reservations')
+      .select('*, trips(departure_time)')
+      .eq('qr_code', reservation.qr_code)
       .eq('user_id', userData.user.id);
 
     if (grouped && grouped.length > 1) {
-      bookings = grouped;
+      reservations = grouped;
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-brand-surface to-white pt-16">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <QRTicket bookings={bookings} />
+        <QRTicket reservations={reservations} />
       </main>
     </div>
   );

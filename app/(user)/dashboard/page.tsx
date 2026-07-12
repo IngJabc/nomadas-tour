@@ -1,9 +1,9 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
 import { CancelBookingButton } from '@/components/ui/CancelBookingButton';
+import { customerApi } from '@/lib/api';
 
 interface BookingGroup {
   key: string;
@@ -11,37 +11,37 @@ interface BookingGroup {
   origin: string;
   destination: string;
   departureAt: string;
-  pricePerSeat: number;
   seatCodes: string[];
-  bookingIds: string[];
-  seatIds: string[];
+  reservationIds: string[];
+  transactionId: string;
   hasCancelled: boolean;
+  qrCode: string;
 }
 
-function groupBookings(bookings: any[]): BookingGroup[] {
+function groupReservations(reservations: any[]): BookingGroup[] {
   const map = new Map<string, BookingGroup>();
-  for (const b of bookings) {
-    if (!b.trip) continue;
-    const key = b.qr_code || b.id;
+  for (const r of reservations) {
+    if (!r.trips) continue;
+    const key = r.transaction_id || r.id;
     if (!map.has(key)) {
       map.set(key, {
         key,
-        tripId: b.trip.id,
-        origin: b.trip.route?.origin ?? '?',
-        destination: b.trip.route?.destination ?? '?',
-        departureAt: b.trip.departure_at,
-        pricePerSeat: b.trip.price ?? 0,
+        tripId: r.trips.id,
+        origin: r.trips.routes?.origin ?? '?',
+        destination: r.trips.routes?.destination ?? '?',
+        departureAt: r.trips.departure_time,
+
         seatCodes: [],
-        bookingIds: [],
-        seatIds: [],
+        reservationIds: [],
+        transactionId: r.transaction_id || '',
         hasCancelled: false,
+        qrCode: r.qr_code,
       });
     }
     const group = map.get(key)!;
-    group.seatCodes.push(b.seat?.seat_code ?? '—');
-    group.bookingIds.push(b.id);
-    group.seatIds.push(b.seat?.id ?? '');
-    if (b.status === 'cancelled') group.hasCancelled = true;
+    group.seatCodes.push(r.seat_code);
+    group.reservationIds.push(r.id);
+    if (r.status === 'cancelled') group.hasCancelled = true;
   }
   return Array.from(map.values());
 }
@@ -55,37 +55,68 @@ function statusBadge(hasCancelled: boolean) {
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return format(d, "EEE d MMM yyyy '·' hh:mm a", { locale: es });
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = days[d.getUTCDay()];
+  const month = months[d.getUTCMonth()];
+  const date = d.getUTCDate();
+  const year = d.getUTCFullYear();
+  const hours = d.getUTCHours();
+  const minutes = String(d.getUTCMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 || 12;
+  return `${day} ${date} ${month} ${year} · ${h12}:${minutes} ${ampm}`;
 }
 
-export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient();
-  const { data: userData } = await supabase.auth.getUser();
+export default function DashboardPage() {
+  const [groups, setGroups] = useState<BookingGroup[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [userName, setUserName] = useState('');
+  const [isSuperadmin, setIsSuperadmin] = useState(false);
 
-  if (!userData.user) {
-    redirect('/login');
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData.user) {
+          window.location.href = '/login';
+          return;
+        }
+
+        setUserName(userData.user.user_metadata?.full_name || userData.user.email || '');
+
+        const role = userData.user.user_metadata?.role || '';
+        setIsSuperadmin(role === 'superadmin');
+
+        const reservations = await customerApi.getMyReservations();
+        setGroups(groupReservations(reservations || []));
+      } catch {
+        setGroups([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-100 pt-16 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-navy" />
+      </div>
+    );
   }
-
-  const { data: bookings } = await supabase
-    .from('bookings')
-    .select('*, seat:seats(*), trip:trips(*, route:routes(*))')
-    .eq('user_id', userData.user.id)
-    .order('created_at', { ascending: false });
-
-  const userName = userData.user.user_metadata?.full_name ?? userData.user.email ?? '';
-  const isAdmin = userData.user.user_metadata?.role === 'admin';
-
-  const groups = groupBookings(bookings ?? []);
 
   return (
     <div className="min-h-screen bg-slate-100 pt-16">
       <main className="max-w-[1100px] mx-auto py-4 sm:py-6 px-4 sm:px-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
           <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[22px] sm:text-[26px] text-brand-navy">
-            Hola, {userName} &#x1f44b;
+            Hola, {userName}
           </h1>
-          {isAdmin && (
+          {isSuperadmin && (
             <Link
               href="/admin"
               className="self-start sm:self-auto font-['Poppins',sans-serif] font-semibold text-[11px] text-brand-cyan bg-brand-cyan/10 px-2.5 py-0.5 rounded-full no-underline uppercase tracking-wider"
@@ -99,7 +130,6 @@ export default async function DashboardPage() {
         </p>
 
         {groups.length === 0 ? (
-          /* Empty state */
           <div className="mx-auto text-center bg-white rounded-[20px] p-12 max-w-[480px] shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
             <svg className="mx-auto mb-6" width="160" height="100" viewBox="0 0 160 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
               <rect x="30" y="35" width="100" height="40" rx="8" fill="#00D4FF" opacity="0.15" />
@@ -130,14 +160,11 @@ export default async function DashboardPage() {
           <div className="flex flex-col gap-4">
             {groups.map((group) => {
               const badge = statusBadge(group.hasCancelled);
-              const totalPrice = group.pricePerSeat * group.seatCodes.length;
-              const firstId = group.bookingIds[0];
               return (
                 <div
-                  key={group.tripId}
+                  key={group.key}
                   className="relative bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.07)]"
                 >
-                  {/* Top status strip */}
                   <div
                     className="h-1 rounded-t-2xl"
                     style={{
@@ -145,14 +172,10 @@ export default async function DashboardPage() {
                     }}
                   />
                   <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-4 py-4 sm:py-5 px-4 sm:px-6">
-                    {/* Left zone */}
                     <div className="w-full sm:flex-1">
                       <span
                         className="inline-block mb-2 font-['Poppins',sans-serif] font-semibold text-[11px] px-2.5 py-0.5 rounded-full"
-                        style={{
-                          background: badge.bg,
-                          color: badge.text,
-                        }}
+                        style={{ background: badge.bg, color: badge.text }}
                       >
                         {badge.label}
                       </span>
@@ -166,27 +189,20 @@ export default async function DashboardPage() {
                         Asientos: {group.seatCodes.join(', ')}
                       </p>
                     </div>
-                    {/* Right zone */}
                     <div className="flex sm:flex-col items-start sm:items-end gap-2 sm:gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
-                      <div className="text-right">
-                        <div className="font-['Montserrat',sans-serif] font-extrabold text-[22px] text-brand-cyan">
-                          {totalPrice.toFixed(2).replace('.', ',')} €
-                        </div>
-                        <div className="font-['Poppins',sans-serif] font-normal text-[11px] text-brand-muted">
-                          Total pagado
-                        </div>
-                      </div>
                       <div className="flex gap-3 sm:flex-col sm:items-end">
+                        <Link
+                          href={`/bookings/${group.transactionId}`}
+                          className="font-['Poppins',sans-serif] font-semibold text-[12px] text-brand-cyan bg-cyan-50 px-3 py-2 rounded-lg no-underline transition-colors duration-200 hover:bg-cyan-100 text-center"
+                        >
+                          Ver boleto
+                        </Link>
                         {!group.hasCancelled && (
-                          <>
-                            <Link
-                              href={`/bookings/${firstId}`}
-                              className="font-['Poppins',sans-serif] font-semibold text-[13px] text-brand-cyan hover:underline"
-                            >
-                              Ver detalles &rarr;
-                            </Link>
-                            <CancelBookingButton bookingIds={group.bookingIds} seatIds={group.seatIds} />
-                          </>
+                          <CancelBookingButton
+                            tripId={group.tripId}
+                            transactionId={group.transactionId}
+                            reservationIds={group.reservationIds}
+                          />
                         )}
                       </div>
                     </div>

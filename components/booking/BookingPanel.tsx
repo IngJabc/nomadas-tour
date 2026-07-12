@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import QRCode from 'react-qr-code';
 import { Seat } from '@/types';
-import { formatPrice } from '@/lib/utils';
+import { customerApi } from '@/lib/api';
 
 interface BookingPanelProps {
   selectedSeats: Seat[];
   tripId: string;
-  price: number;
   onSuccess: (bookingIds: string[]) => void;
   onClear: () => void;
   onReleaseLocks?: (seatIds: string[]) => Promise<void>;
@@ -18,21 +18,20 @@ interface BookingPanelProps {
 export function BookingPanel({
   selectedSeats,
   tripId,
-  price,
   onSuccess,
   onClear,
   onReleaseLocks,
 }: BookingPanelProps) {
   const [passengerName, setPassengerName] = useState('');
   const [passengerCedula, setPassengerCedula] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
-  const [lastBookingIds, setLastBookingIds] = useState<string[] | null>(null);
+  const [lastTransactionId, setLastTransactionId] = useState<string | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [lastSeatCodes, setLastSeatCodes] = useState<string[] | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
-
-  const total = selectedSeats.length * price;
 
   const handleConfirm = async () => {
     if (!passengerName.trim() || !passengerCedula.trim()) {
@@ -55,47 +54,27 @@ export function BookingPanel({
     setError(null);
 
     try {
-      const bookingIds: string[] = [];
-      const groupKey = Math.random().toString(36).substring(2, 10).toUpperCase();
-      setLastSeatCodes(selectedSeats.map((s) => s.seat_code));
+      const seatCodes = selectedSeats.map((s) => s.seat_code);
+      setLastSeatCodes(seatCodes);
 
-      for (const seat of selectedSeats) {
-        const res = await fetch('/api/bookings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            trip_id: tripId,
-            seat_id: seat.id,
-            passenger_name: passengerName.trim(),
-            passenger_cedula: passengerCedula.trim(),
-            qr_code: groupKey,
-          }),
-        });
+      const result = await customerApi.createReservation({
+        trip_id: tripId,
+        customer_name: passengerName.trim(),
+        passenger_cedula: passengerCedula.trim(),
+        phone: phone.trim() || undefined,
+        seat_codes: seatCodes,
+      });
 
-        const data = await res.json();
-
-        if (!res.ok) {
-          const remainingSeats = selectedSeats
-            .filter((s) => s.seat_code !== seat.seat_code)
-            .map((s) => s.id);
-          if (remainingSeats.length > 0 && onReleaseLocks) {
-            await onReleaseLocks(remainingSeats);
-          }
-          throw new Error(
-            `Asiento ${seat.seat_code}: ${data.error || 'Error al confirmar reserva'}`,
-          );
-        }
-
-        if (data.booking?.id) {
-          bookingIds.push(data.booking.id);
-        }
-      }
-
-      setLastBookingIds(bookingIds);
+      setLastTransactionId(result.transaction_id);
+      setQrDataUrl(result.qr_data_url);
       setConfirmed(true);
-      onSuccess(bookingIds);
+      const reservationIds = result.reservations.map((r: any) => r.id);
+      onSuccess(reservationIds);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al confirmar reserva');
+      if (onReleaseLocks) {
+        await onReleaseLocks(selectedSeats.map((s) => s.id));
+      }
     } finally {
       setLoading(false);
     }
@@ -139,31 +118,30 @@ export function BookingPanel({
                 <span className="font-['Poppins',sans-serif] font-semibold text-[13px] text-brand-navy">
                   Asiento {code}
                 </span>
-                <span className="ml-auto font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
-                  {formatPrice(price)}
-                </span>
               </div>
             ))}
           </div>
 
-          <div className="h-px bg-slate-100 my-3" />
-
-          <div className="flex items-center justify-between mb-5">
-            <span className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">
-              Total pagado
-            </span>
-            <span className="font-['Montserrat',sans-serif] font-extrabold text-[22px] text-brand-cyan">
-              {formatPrice(((lastSeatCodes ? lastSeatCodes.length : (lastBookingIds ? lastBookingIds.length : selectedSeats.length)) * price) || 0)}
-            </span>
-          </div>
+          {qrDataUrl && (
+            <div className="flex flex-col items-center mb-5">
+              <div className="bg-white p-3 rounded-xl border border-slate-200">
+                <img src={qrDataUrl} alt="QR de reserva" className="w-36 h-36" />
+              </div>
+              {lastTransactionId && (
+                <p className="mt-2 font-['Poppins',sans-serif] font-normal text-[11px] text-brand-muted break-all max-w-[200px]">
+                  Código: {lastTransactionId.slice(0, 8).toUpperCase()}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-2.5">
-            {lastBookingIds && lastBookingIds[0] && (
+            {lastTransactionId && (
               <Link
-                href={`/bookings/${lastBookingIds[0]}`}
-                className="w-full sm:flex-1 px-3.5 py-3 sm:py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
+                href={`/bookings/${lastTransactionId}`}
+                className="w-full sm:flex-1 px-5 py-3 bg-brand-navy text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center hover:bg-brand-blue"
               >
-                Ver boleto
+                Ver mi boleto
               </Link>
             )}
             <Link
@@ -172,7 +150,7 @@ export function BookingPanel({
               onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-brand-blue)'; }}
               onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-brand-cyan)'; }}
             >
-              Ver mis reservas
+              Mis reservas
             </Link>
           </div>
         </motion.div>
@@ -211,7 +189,6 @@ export function BookingPanel({
           className="bg-white rounded-2xl p-6"
           style={{ boxShadow: '0 4px 16px rgba(0,0,0,0.08)' }}
         >
-          {/* Error banner */}
           <AnimatePresence>
             {error && (
               <motion.div
@@ -222,7 +199,7 @@ export function BookingPanel({
                 className="mb-4 bg-red-50 border border-red-500 rounded-xl px-3.5 py-2.5"
               >
                 <p className="font-['Poppins',sans-serif] font-normal text-[13px] text-red-500">
-                  No se pudo completar la reserva. Inténtalo de nuevo.
+                  {error}
                 </p>
               </motion.div>
             )}
@@ -235,7 +212,6 @@ export function BookingPanel({
             </h3>
           </div>
 
-          {/* Selected seats list */}
           <div className="space-y-2 mb-4">
             {selectedSeats.map((s) => (
               <div key={s.seat_code} className="flex items-center justify-between py-1">
@@ -250,28 +226,11 @@ export function BookingPanel({
                     Asiento {s.seat_code}
                   </span>
                 </div>
-                <span className="font-['Poppins',sans-serif] font-semibold text-[13px] text-brand-navy">
-                  {formatPrice(price)}
-                </span>
-              </div>
-            ))}
-          </div>
+                </div>
+              ))}
+            </div>
 
-          {/* Separator */}
-          <div className="h-px bg-slate-100 my-3" />
-
-          {/* Total */}
-          <div className="flex items-center justify-between mb-5">
-            <span className="font-['Poppins',sans-serif] font-semibold text-sm text-brand-navy">
-              Total
-            </span>
-            <span className="font-['Montserrat',sans-serif] font-extrabold text-[22px] text-brand-cyan">
-              {formatPrice(total)}
-            </span>
-          </div>
-
-          {/* Passenger form */}
-          <div className="space-y-3 mb-4">
+            <div className="space-y-3 mb-4">
             <div>
               <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
                 Nombre del pasajero
@@ -315,9 +274,29 @@ export function BookingPanel({
                 }}
               />
             </div>
+            <div>
+              <label className="block mb-1 font-['Poppins',sans-serif] font-medium text-xs text-brand-muted uppercase tracking-wider">
+                Teléfono (opcional)
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 15))}
+                placeholder="Ej. 8095551234"
+                className="w-full border-[1.5px] border-gray-200 rounded-xl px-3.5 py-2.5 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none"
+                style={{ transition: 'border-color 200ms, box-shadow 200ms' }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-brand-cyan)';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(0,212,255,0.15)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              />
+            </div>
           </div>
 
-          {/* Actions */}
           <motion.div
             key={`shake-${shakeKey}`}
             animate={error ? { x: [0, -4, 4, -4, 4, 0] } : undefined}
@@ -331,7 +310,7 @@ export function BookingPanel({
               className="w-full sm:flex-1 px-4 py-3 sm:py-2.5 bg-slate-100 text-brand-navy font-['Poppins',sans-serif] font-semibold text-sm rounded-xl border-none transition-colors duration-200"
               style={{ cursor: loading ? 'not-allowed' : 'pointer' }}
               onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = '#e2e8f0'; }}
-              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = '#f1f5f9'; }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.background = 'var(--color-page-bg)'; }}
             >
               Cancelar
             </button>

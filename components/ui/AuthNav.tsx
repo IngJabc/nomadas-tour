@@ -29,7 +29,7 @@ export function AuthNav() {
     <div className="flex gap-2 sm:gap-3 items-center">
       {user ? (
         <>
-          {user.user_metadata?.role === 'admin' && (
+          {user.user_metadata?.role === 'superadmin' && (
             <Link
               href="/admin"
               className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-amber-300 hover:text-amber-200 transition-colors whitespace-nowrap"
