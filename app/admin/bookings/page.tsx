@@ -4,12 +4,11 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { Search, Users, UserCheck, UserX, Route, ChevronRight, ArrowRight, Plus } from 'lucide-react';
+import { Search, Users, UserCheck, UserX, Route, ChevronRight, ArrowRight, Plus, X } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 
@@ -107,9 +106,11 @@ export default function AdminBookingsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set());
   const [expandedTrips, setExpandedTrips] = useState<Set<string>>(new Set());
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const data = await adminApi.listReservations();
       setReservations(data);
@@ -117,6 +118,7 @@ export default function AdminBookingsPage() {
     } catch {
       setReservations([]);
       setFiltered([]);
+      setFetchError('No se pudieron cargar las reservas. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -215,18 +217,8 @@ export default function AdminBookingsPage() {
         />
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="flex-1">
-          <Input
-            label="Buscar"
-            leftIcon={<Search className="w-4 h-4" />}
-            type="text"
-            placeholder="Pasajero, cédula, asiento, QR..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
+        <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0">
           {[['', 'Todas'], ['confirmed', 'Confirmadas'], ['boarded', 'Abordados'], ['cancelled', 'Canceladas']].map(([s, label]) => {
             const active = statusFilter === s;
             return (
@@ -234,10 +226,10 @@ export default function AdminBookingsPage() {
                 key={s}
                 type="button"
                 onClick={() => setStatusFilter(s)}
-                className={`px-4 py-2.5 rounded-xl font-[family-name:var(--font-body)] font-semibold text-[13px] whitespace-nowrap cursor-pointer transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-[family-name:var(--font-body)] font-semibold transition-colors cursor-pointer ${
                   active
-                    ? 'border-[1.5px] border-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.08)] text-[var(--color-brand-cyan)]'
-                    : 'border-[1.5px] border-[#e5e7eb] bg-[var(--color-brand-surface)] text-[var(--color-brand-muted)]'
+                    ? 'bg-[var(--color-brand-cyan)] text-white'
+                    : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
                 }`}
               >
                 {label}
@@ -245,15 +237,49 @@ export default function AdminBookingsPage() {
             );
           })}
         </div>
+
+        <div className="relative flex-1 sm:max-w-xs">
+          <input
+            type="text"
+            placeholder="Buscar pasajero, cédula, asiento, QR..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs font-[family-name:var(--font-body)] text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+          />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
+      {fetchError && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2]">
+          <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">{fetchError}</p>
+          <Button variant="secondary" size="sm" onClick={fetchData}>
+            Reintentar
+          </Button>
+        </div>
+      )}
+
       {loading ? (
-        <div className="space-y-4">
+        <div className="flex flex-col gap-1.5">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-[var(--color-brand-surface)] rounded-2xl p-6 animate-pulse border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-              <div className="h-5 w-48 bg-slate-200 rounded mb-3" />
-              <div className="h-4 w-32 bg-[var(--color-page-bg)] rounded mb-2" />
-              <div className="h-4 w-64 bg-[var(--color-page-bg)] rounded" />
+            <div key={i} className="bg-[var(--color-brand-surface)] rounded-2xl overflow-hidden border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] animate-pulse">
+              <div className="flex items-center gap-3 px-4 sm:px-5 py-4 border-l-4 border-l-[var(--color-brand-cyan)]">
+                <div className="w-4 h-4 bg-slate-200 rounded shrink-0" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-4 bg-slate-200 rounded w-1/2" />
+                  <div className="h-3 bg-slate-200 rounded w-1/3" />
+                </div>
+                <div className="h-7 bg-slate-200 rounded-full w-20" />
+              </div>
             </div>
           ))}
         </div>

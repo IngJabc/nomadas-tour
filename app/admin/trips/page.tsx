@@ -254,7 +254,7 @@ export default function AdminTripsPage() {
 
   if (initialLoad) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => <CardSkeleton key={i} />)}
@@ -413,9 +413,9 @@ export default function AdminTripsPage() {
           <AnimatePresence mode="wait">
             <motion.div
               key={page + '-' + statusFilter + '-' + routeFilter + '-' + agencyFilter + '-' + searchFilter + '-' + dateFilter}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
             >
