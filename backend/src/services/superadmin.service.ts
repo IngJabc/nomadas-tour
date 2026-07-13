@@ -680,9 +680,12 @@ export class SuperadminService {
         if (s.status === 'available') seatMap[s.trip_id].available++;
       }
 
+      const now = new Date();
       upcoming = upcomingTrips.map(t => {
         const tripId = t.id;
         const seats = seatMap[tripId] || { total: t.capacity || 0, available: 0 };
+        const diffMs = new Date(t.departure_time).getTime() - now.getTime();
+        const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         return {
           id: tripId,
           departure_time: t.departure_time,
@@ -690,6 +693,7 @@ export class SuperadminService {
           capacity: seats.total,
           available_seats: seats.available,
           reservation_count: countMap[tripId] || 0,
+          days_until_departure: daysUntil,
         };
       });
     }

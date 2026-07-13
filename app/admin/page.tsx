@@ -31,6 +31,7 @@ interface DashboardData {
     capacity: number;
     available_seats: number;
     reservation_count: number;
+    days_until_departure: number;
   }[];
   recent_activity: {
     type: 'trip_created' | 'reservation_created' | 'boarding';
