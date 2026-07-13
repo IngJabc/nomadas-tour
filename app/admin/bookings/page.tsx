@@ -1,10 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { Search, Users, UserCheck, UserX, Route, ChevronRight, ArrowRight, Plus, X } from 'lucide-react';
+import { Search, Users, UserCheck, UserX, Route, ChevronRight, ArrowRight, X } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { StatCard } from '@/components/ui/StatCard';
@@ -172,17 +171,7 @@ export default function AdminBookingsPage() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <PageHeader
-        title="Pasajeros y reservas"
-        action={
-          <Link href="/admin/trips" className="no-underline">
-            <Button>
-              <Plus className="w-4 h-4" />
-              Nuevo viaje
-            </Button>
-          </Link>
-        }
-      />
+      <PageHeader title="Pasajeros y reservas" />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
         <StatCard
@@ -218,7 +207,7 @@ export default function AdminBookingsPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-        <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0">
+        <div className="flex items-center gap-1 sm:gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto">
           {[['', 'Todas'], ['confirmed', 'Confirmadas'], ['boarded', 'Abordados'], ['cancelled', 'Canceladas']].map(([s, label]) => {
             const active = statusFilter === s;
             return (
@@ -226,7 +215,7 @@ export default function AdminBookingsPage() {
                 key={s}
                 type="button"
                 onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-[family-name:var(--font-body)] font-semibold transition-colors cursor-pointer ${
+                className={`flex-1 sm:flex-none px-1.5 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold transition-colors cursor-pointer ${
                   active
                     ? 'bg-[var(--color-brand-cyan)] text-white'
                     : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
@@ -238,13 +227,13 @@ export default function AdminBookingsPage() {
           })}
         </div>
 
-        <div className="relative flex-1 sm:max-w-xs">
+        <div className="relative flex-1 w-full">
           <input
             type="text"
             placeholder="Buscar pasajero, cédula, asiento, QR..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs font-[family-name:var(--font-body)] text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+            className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
           />
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
           {search && (

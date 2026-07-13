@@ -67,7 +67,7 @@ export function StepIndicator({ currentStep }: StepIndicatorProps) {
               </div>
               <span
                 className={`
-                  font-[family-name:var(--font-body)] text-xs font-semibold
+                  hidden sm:inline font-[family-name:var(--font-body)] text-xs font-semibold
                   transition-colors duration-200
                   ${isCurrent ? 'text-[var(--color-brand-navy)]' : ''}
                   ${isCompleted ? 'text-[var(--color-brand-cyan)]' : ''}

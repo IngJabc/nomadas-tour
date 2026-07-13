@@ -115,7 +115,7 @@ export function TripBuilderModal({ open, mode, tripId, onClose, onSuccess }: Tri
             <div className="shrink-0 h-px bg-[rgba(0,0,0,0.06)] mx-6" />
 
             {/* Body */}
-            <div className="flex-1 overflow-hidden px-6 py-5">
+            <div className="flex-1 overflow-y-auto px-6 py-5">
               {loading ? (
                 <div className="py-8">
                   <CardSkeleton />

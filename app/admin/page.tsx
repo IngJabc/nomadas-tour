@@ -1,19 +1,28 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { Calendar, Route, Building2, Mail, ArrowRight, Users, Ticket, UserCheck } from 'lucide-react';
-import { adminApi } from '@/lib/api';
-import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
-import { getGreeting } from '@/lib/utils/greeting';
-import { Topbar } from '@/components/layout/Topbar';
-import { SectionTitle } from '@/components/ui/SectionTitle';
-import { StatCard } from '@/components/ui/StatCard';
-import { Card } from '@/components/ui/Card';
-import { ActivityWidget } from '@/components/dashboard/ActivityWidget';
-import { Timeline } from '@/components/dashboard/Timeline';
-import { ReservationChart } from '@/components/dashboard/charts/ReservationChart';
-import { OccupancyChart } from '@/components/dashboard/charts/OccupancyChart';
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import {
+  Calendar,
+  Route,
+  Building2,
+  Mail,
+  ArrowRight,
+  Users,
+  Ticket,
+  UserCheck,
+} from "lucide-react";
+import { adminApi } from "@/lib/api";
+import { subscribeToTripSeats } from "@/lib/realtime/subscriptions";
+import { getGreeting } from "@/lib/utils/greeting";
+import { Topbar } from "@/components/layout/Topbar";
+import { SectionTitle } from "@/components/ui/SectionTitle";
+import { StatCard } from "@/components/ui/StatCard";
+import { Card } from "@/components/ui/Card";
+import { ActivityWidget } from "@/components/dashboard/ActivityWidget";
+import { Timeline } from "@/components/dashboard/Timeline";
+import { ReservationChart } from "@/components/dashboard/charts/ReservationChart";
+import { OccupancyChart } from "@/components/dashboard/charts/OccupancyChart";
 
 interface DashboardData {
   total_agencies: number;
@@ -34,7 +43,7 @@ interface DashboardData {
     days_until_departure: number;
   }[];
   recent_activity: {
-    type: 'trip_created' | 'reservation_created' | 'boarding';
+    type: "trip_created" | "reservation_created" | "boarding";
     label: string;
     timestamp: string;
   }[];
@@ -51,27 +60,27 @@ interface DashboardData {
 
 const QUICK_ACTIONS = [
   {
-    href: '/admin/trips',
-    title: 'Gestión de viajes',
-    desc: 'Crear, editar y eliminar viajes',
+    href: "/admin/trips",
+    title: "Gestión de viajes",
+    desc: "Crear, editar y eliminar viajes",
     icon: Calendar,
   },
   {
-    href: '/admin/routes',
-    title: 'Gestión de rutas',
-    desc: 'Administrar rutas disponibles',
+    href: "/admin/routes",
+    title: "Gestión de rutas",
+    desc: "Administrar rutas disponibles",
     icon: Route,
   },
   {
-    href: '/admin/agencies',
-    title: 'Agencias',
-    desc: 'Gestionar agencias y subdominios',
+    href: "/admin/agencies",
+    title: "Agencias",
+    desc: "Gestionar agencias y subdominios",
     icon: Building2,
   },
   {
-    href: '/admin/invitations',
-    title: 'Invitaciones',
-    desc: 'Invitar agencias al panel',
+    href: "/admin/invitations",
+    title: "Invitaciones",
+    desc: "Invitar agencias al panel",
     icon: Mail,
   },
 ];
@@ -87,7 +96,7 @@ export default function AdminDashboardPage() {
       setData(dashboard);
       setInitialized(true);
     } catch (err) {
-      console.error('[AdminDashboard] Error fetching dashboard data:', err);
+      console.error("[AdminDashboard] Error fetching dashboard data:", err);
     } finally {
       setLoading(false);
     }
@@ -118,7 +127,7 @@ export default function AdminDashboardPage() {
     <>
       <Topbar
         greeting={`${getGreeting()}, Administrador`}
-        subtext="Panel de Administración — Nómadas Tour"
+        subtext="Panel de Administración — NomadApp"
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -127,7 +136,11 @@ export default function AdminDashboardPage() {
           {QUICK_ACTIONS.map((action) => {
             const Icon = action.icon;
             return (
-              <Link key={action.href} href={action.href} className="no-underline group">
+              <Link
+                key={action.href}
+                href={action.href}
+                className="no-underline group"
+              >
                 <Card hover borderLeft borderColor="var(--color-brand-cyan)">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-[var(--color-brand-navy)]">
@@ -154,13 +167,13 @@ export default function AdminDashboardPage() {
           <StatCard
             icon={<Calendar className="w-5 h-5" />}
             label="Viajes activos"
-            value={loading ? '—' : (data?.active_trips ?? 0)}
+            value={loading ? "—" : data?.active_trips ?? 0}
             loading={loading}
           />
           <StatCard
             icon={<Building2 className="w-5 h-5" />}
             label="Agencias activas"
-            value={loading ? '—' : (data?.active_agencies ?? 0)}
+            value={loading ? "—" : data?.active_agencies ?? 0}
             loading={loading}
             iconBg="bg-[rgba(245,158,11,0.1)]"
             iconColor="text-[#f59e0b]"
@@ -168,7 +181,7 @@ export default function AdminDashboardPage() {
           <StatCard
             icon={<Ticket className="w-5 h-5" />}
             label="Reservas hoy"
-            value={loading ? '—' : (data?.today_reservations ?? 0)}
+            value={loading ? "—" : data?.today_reservations ?? 0}
             loading={loading}
             iconBg="bg-[rgba(16,185,129,0.1)]"
             iconColor="text-[#10b981]"
@@ -176,7 +189,7 @@ export default function AdminDashboardPage() {
           <StatCard
             icon={<UserCheck className="w-5 h-5" />}
             label="Pendientes boarding"
-            value={loading ? '—' : (data?.pending_boarding_passengers ?? 0)}
+            value={loading ? "—" : data?.pending_boarding_passengers ?? 0}
             loading={loading}
             iconBg="bg-[rgba(239,68,68,0.1)]"
             iconColor="text-[#ef4444]"
@@ -185,12 +198,21 @@ export default function AdminDashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
           <Timeline items={data?.upcoming_trips ?? []} loading={loading} />
-          <ActivityWidget activities={data?.recent_activity ?? []} loading={loading} />
+          <ActivityWidget
+            activities={data?.recent_activity ?? []}
+            loading={loading}
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-          <ReservationChart data={data?.reservations_by_date ?? []} loading={loading} />
-          <OccupancyChart data={data?.occupancy_by_trip ?? []} loading={loading} />
+          <ReservationChart
+            data={data?.reservations_by_date ?? []}
+            loading={loading}
+          />
+          <OccupancyChart
+            data={data?.occupancy_by_trip ?? []}
+            loading={loading}
+          />
         </div>
       </main>
     </>

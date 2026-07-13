@@ -31,7 +31,7 @@ export function PageHeader({ title, breadcrumbs, action, className }: PageHeader
         ))}
       </p>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-row flex-wrap items-center justify-between gap-3">
         <h1 className="font-[family-name:var(--font-heading)] font-extrabold text-[22px] sm:text-2xl text-[var(--color-brand-navy)]">
           {title}
         </h1>

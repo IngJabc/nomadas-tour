@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Building2, Plus, CheckCircle, XCircle, Copy } from 'lucide-react';
+import { Building2, Plus, CheckCircle, XCircle, Copy, Search, X } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -29,8 +29,16 @@ export default function AdminAgenciesPage() {
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteAgency, setDeleteAgency] = useState<any | null>(null);
+  const [searchInput, setSearchInput] = useState('');
   const [newAgencyLink, setNewAgencyLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const filteredAgencies = searchInput.trim()
+    ? agencies.filter((a) =>
+        a.name.toLowerCase().includes(searchInput.toLowerCase()) ||
+        (a.email && a.email.toLowerCase().includes(searchInput.toLowerCase()))
+      )
+    : agencies;
 
   const fetchData = async () => {
     try {
@@ -136,52 +144,84 @@ export default function AdminAgenciesPage() {
           action={{ label: 'Crear primera agencia', onClick: openCreate }}
         />
       ) : (
-        <div className="bg-[var(--color-brand-surface)] rounded-2xl overflow-hidden border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[#f8fafc]">
-                  <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Nombre</th>
-                  <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Subdominio</th>
-                  <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Estado</th>
-                  <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agencies.map((agency: any) => {
-                  const s = STATUS_STYLES[agency.status] ?? STATUS_STYLES.active;
-                  return (
-                    <tr key={agency.id} className="hover:bg-[#f8fafc] transition-colors border-b border-[rgba(0,0,0,0.06)]">
-                      <td className="px-5 py-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)] whitespace-nowrap">{agency.name}</td>
-                      <td className="px-5 py-4 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-muted)] whitespace-nowrap">{agency.subdomain}</td>
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <Badge variant={s.variant} size="sm">{s.label}</Badge>
-                      </td>
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => openEdit(agency)}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            variant={agency.status === 'inactive' ? 'secondary' : 'destructive'}
-                            size="sm"
-                            onClick={() => setDeleteAgency(agency)}
-                          >
-                            {agency.status === 'inactive' ? 'Activar' : 'Desactivar'}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Search filter */}
+          <div className="mb-6">
+            <div className="relative w-full max-w-xl">
+              <input
+                type="text"
+                placeholder="Buscar agencia por nombre o correo..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+              />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
+              {searchInput && (
+                <button
+                  type="button"
+                  onClick={() => setSearchInput('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+
+          {filteredAgencies.length === 0 ? (
+            <EmptyState
+              icon={<Building2 className="w-8 h-8" />}
+              message="No se encontraron agencias con ese criterio de búsqueda"
+            />
+          ) : (
+            <div className="bg-[var(--color-brand-surface)] rounded-2xl overflow-hidden border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-[#f8fafc]">
+                      <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Nombre</th>
+                      <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Subdominio</th>
+                      <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Estado</th>
+                      <th className="text-left px-5 py-3 font-[family-name:var(--font-body)] font-semibold text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredAgencies.map((agency: any) => {
+                      const s = STATUS_STYLES[agency.status] ?? STATUS_STYLES.active;
+                      return (
+                        <tr key={agency.id} className="hover:bg-[#f8fafc] transition-colors border-b border-[rgba(0,0,0,0.06)]">
+                          <td className="px-5 py-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)] whitespace-nowrap">{agency.name}</td>
+                          <td className="px-5 py-4 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-muted)] whitespace-nowrap">{agency.subdomain}</td>
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <Badge variant={s.variant} size="sm">{s.label}</Badge>
+                          </td>
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="flex gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => openEdit(agency)}
+                              >
+                                Editar
+                              </Button>
+                              <Button
+                                variant={agency.status === 'inactive' ? 'secondary' : 'destructive'}
+                                size="sm"
+                                onClick={() => setDeleteAgency(agency)}
+                              >
+                                {agency.status === 'inactive' ? 'Activar' : 'Desactivar'}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Create/Edit Modal */}
