@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { ClipboardList, QrCode, ArrowRight, Calendar, Users, UserCheck, Ticket, Bus } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
-import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
+import { subscribeToTripSeats, subscribeToReservations, subscribeToTrips, subscribeToBoardingLogs, subscribeToTripAgencies } from '@/lib/realtime/subscriptions';
 import { getGreeting } from '@/lib/utils/greeting';
 import { Topbar } from '@/components/layout/Topbar';
 import { SectionTitle } from '@/components/ui/SectionTitle';
@@ -28,9 +28,10 @@ interface AgencyDashboardData {
     capacity: number;
     available_seats: number;
     reservation_count: number;
+    days_until_departure: number;
   }[];
   recent_activity: {
-    type: 'reservation_created' | 'boarding';
+    type: 'reservation_created' | 'boarding' | 'trip_assigned';
     label: string;
     timestamp: string;
   }[];
@@ -106,6 +107,34 @@ export default function AgencyDashboardPage() {
 
     return () => {
       cleanupSeats();
+    };
+  }, [initialized]);
+
+  // Realtime: cambios en reservas, viajes, boarding y asignaciones
+  useEffect(() => {
+    if (!initialized) return;
+
+    const cleanupReservations = subscribeToReservations(() => {
+      fetchDashboard();
+    });
+
+    const cleanupTrips = subscribeToTrips(() => {
+      fetchDashboard();
+    });
+
+    const cleanupBoarding = subscribeToBoardingLogs(() => {
+      fetchDashboard();
+    });
+
+    const cleanupTripAgencies = subscribeToTripAgencies(() => {
+      fetchDashboard();
+    });
+
+    return () => {
+      cleanupReservations();
+      cleanupTrips();
+      cleanupBoarding();
+      cleanupTripAgencies();
     };
   }, [initialized]);
 

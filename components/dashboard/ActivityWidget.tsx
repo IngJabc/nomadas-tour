@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Plus, UserCheck, Ticket, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Plus, UserCheck, Ticket, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 const PAGE_SIZE = 4;
 
 interface ActivityItem {
-  type: 'trip_created' | 'reservation_created' | 'boarding';
+  type: 'trip_created' | 'trip_assigned' | 'reservation_created' | 'boarding';
   label: string;
   timestamp: string;
   description?: string;
@@ -25,6 +25,7 @@ interface ActivityWidgetProps {
 function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
   const cfg = {
     trip_created: { icon: Plus, bg: 'bg-[rgba(0,212,255,0.1)]', color: 'text-[var(--color-brand-cyan)]' },
+    trip_assigned: { icon: Calendar, bg: 'bg-[rgba(139,92,246,0.1)]', color: 'text-[#8b5cf6]' },
     reservation_created: { icon: Ticket, bg: 'bg-[rgba(245,158,11,0.1)]', color: 'text-[#f59e0b]' },
     boarding: { icon: UserCheck, bg: 'bg-[rgba(16,185,129,0.1)]', color: 'text-[#10b981]' },
   }[type];
@@ -67,8 +68,8 @@ export function ActivityWidget({ activities, loading }: ActivityWidgetProps) {
   };
 
   return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between mb-4">
+    <Card className="p-5 h-[500px]">
+      <div className="flex items-center justify-between mb-4 shrink-0">
         <h3 className="font-[family-name:var(--font-body)] font-semibold text-[15px] text-[var(--color-brand-navy)] flex items-center gap-2">
           <Clock className="w-4 h-4 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
           Actividad reciente
@@ -100,7 +101,7 @@ export function ActivityWidget({ activities, loading }: ActivityWidgetProps) {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="flex items-center gap-3">
+            <div key={i} className="flex items-center gap-3 h-[104px]">
               <Skeleton className="w-8 h-8 rounded-lg" />
               <div className="flex-1">
                 <Skeleton className="h-3 w-3/4 mb-1" />
@@ -110,10 +111,12 @@ export function ActivityWidget({ activities, loading }: ActivityWidgetProps) {
           ))}
         </div>
       ) : activities.length === 0 ? (
-        <EmptyState
-          icon={<Clock className="w-8 h-8" />}
-          message="No hay actividad reciente"
-        />
+        <div className="flex items-center justify-center min-h-[416px]">
+          <EmptyState
+            icon={<Clock className="w-8 h-8" />}
+            message="No hay actividad reciente"
+          />
+        </div>
       ) : (
         <div className="relative overflow-hidden">
           <AnimatePresence mode="wait" custom={direction}>
@@ -129,32 +132,34 @@ export function ActivityWidget({ activities, loading }: ActivityWidgetProps) {
               animate="center"
               exit="exit"
               transition={{ duration: 0.18, ease: 'easeInOut' }}
-              className="space-y-1"
+              className="flex flex-col"
             >
               {displayed.map((item, i) => (
                 <div
                   key={start + i}
-                  className="flex items-center gap-3 py-2.5 border-b border-[rgba(0,0,0,0.04)] last:border-0"
+                  className="flex items-center gap-3 border-b border-[rgba(0,0,0,0.04)] last:border-0 h-[104px]"
                 >
                   <ActivityIcon type={item.type} />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[var(--color-brand-navy)] truncate">
-                      {item.label}
-                    </p>
-                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] flex items-center gap-1.5">
-                      <span>{timeAgo(item.timestamp)}</span>
-                      {item.actor && (
-                        <>
-                          <span className="w-1 h-1 rounded-full bg-[#d1d5db]" />
-                          <span>{item.actor}</span>
-                        </>
-                      )}
-                    </p>
-                    {item.description && (
-                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] mt-0.5">
-                        {item.description}
+                  <div className="flex-1 min-w-0 flex items-center">
+                    <div>
+                      <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[var(--color-brand-navy)] truncate">
+                        {item.label}
                       </p>
-                    )}
+                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] flex items-center gap-1.5">
+                        <span>{timeAgo(item.timestamp)}</span>
+                        {item.actor && (
+                          <>
+                            <span className="w-1 h-1 rounded-full bg-[#d1d5db]" />
+                            <span>{item.actor}</span>
+                          </>
+                        )}
+                      </p>
+                      {item.description && (
+                        <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] mt-0.5">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
               ))}

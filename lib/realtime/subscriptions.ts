@@ -194,3 +194,31 @@ export function subscribeToBoardingLogs(
     supabase.removeChannel(channel);
   };
 }
+
+/** Suscribirse a asignaciones de viajes (trip_agencies INSERT) */
+export function subscribeToTripAgencies(
+  onInsert: (ta: Record<string, any>) => void,
+): CleanupFn {
+  const supabase = createClient();
+
+  const channel = supabase
+    .channel('trip_agencies:all')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'trip_agencies',
+      },
+      (payload: RealtimePostgresChangesPayload<any>) => {
+        if (payload.new) {
+          onInsert(payload.new);
+        }
+      },
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

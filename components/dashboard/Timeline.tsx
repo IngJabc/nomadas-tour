@@ -17,6 +17,7 @@ interface TimelineItem {
   capacity: number;
   available_seats: number;
   reservation_count: number;
+  days_until_departure: number;
 }
 
 interface TimelineProps {
@@ -57,7 +58,7 @@ export function Timeline({ items, loading }: TimelineProps) {
   };
 
   return (
-    <Card className="p-5">
+    <Card className="p-5 h-[500px]">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-[family-name:var(--font-body)] font-semibold text-[15px] text-[var(--color-brand-navy)] flex items-center gap-2">
           <Calendar className="w-4 h-4 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
@@ -106,7 +107,6 @@ export function Timeline({ items, loading }: TimelineProps) {
         />
       ) : (
         <div className="relative overflow-hidden">
-          <div className="absolute left-[27px] top-2 bottom-2 w-px bg-slate-200" />
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={safePage}
@@ -131,7 +131,7 @@ export function Timeline({ items, loading }: TimelineProps) {
                   const isLast = i === displayed.length - 1;
 
                   return (
-                    <div key={item.id} className={`flex gap-4 ${!isLast ? 'pb-5' : ''}`}>
+                      <div key={item.id} className={`flex gap-4 ${!isLast ? 'pb-5' : ''}`}>
                       <div className="flex flex-col items-center shrink-0">
                         <div className="w-[54px] text-center">
                           <p className="font-[family-name:var(--font-heading)] font-extrabold text-[11px] text-[var(--color-brand-navy)] leading-tight uppercase">
@@ -144,6 +144,21 @@ export function Timeline({ items, loading }: TimelineProps) {
                         {!isLast && <div className="w-px flex-1 bg-slate-200 mt-2" />}
                       </div>
                       <div className="flex-1 min-w-0 pb-2">
+                        {item.days_until_departure <= 1 ? (
+                          <div className="mb-1.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fef2f2] text-[#ef4444] font-[family-name:var(--font-body)] font-semibold text-[10px] leading-tight">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
+                              Sale pronto
+                            </span>
+                          </div>
+                        ) : item.days_until_departure <= 3 ? (
+                          <div className="mb-1.5">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fffbeb] text-[#92400e] font-[family-name:var(--font-body)] font-semibold text-[10px] leading-tight">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#f59e0b]" />
+                              Próximo
+                            </span>
+                          </div>
+                        ) : null}
                         <div className="flex items-center gap-2 mb-1">
                           <MapPin className="w-3.5 h-3.5 text-[var(--color-brand-muted)] shrink-0" strokeWidth={1.75} />
                           <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)] truncate">

@@ -889,7 +889,7 @@ export class ReservationService {
       .eq('status', 'active')
       .gte('departure_time', new Date().toISOString())
       .order('departure_time')
-      .limit(5);
+      .limit(10);
 
     let upcoming: any[] = [];
     if (upcomingTrips && upcomingTrips.length > 0) {
@@ -917,8 +917,11 @@ export class ReservationService {
         if (s.status === 'available') seatMap[s.trip_id].available++;
       }
 
+      const now = new Date();
       upcoming = upcomingTrips.map(t => {
         const seats = seatMap[t.id] || { total: t.capacity || 0, available: 0 };
+        const diffMs = new Date(t.departure_time).getTime() - now.getTime();
+        const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         return {
           id: t.id,
           departure_time: t.departure_time,
@@ -926,13 +929,14 @@ export class ReservationService {
           capacity: seats.total,
           available_seats: seats.available,
           reservation_count: countMap[t.id] || 0,
+          days_until_departure: daysUntil,
         };
       });
     }
 
     // Recent agency activity
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const [{ data: recentReservations }, { data: recentBoardings }] = await Promise.all([
+    const [{ data: recentReservations }, { data: recentBoardings }, { data: recentAssignments }] = await Promise.all([
       supabaseAdmin
         .from('reservations')
         .select('id, created_at, booker_name, trips!inner(routes(origin, destination))')
@@ -949,6 +953,19 @@ export class ReservationService {
             trips(departure_time, routes(origin, destination))
           )
         `)
+        .gte('created_at', thirtyDaysAgo)
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabaseAdmin
+        .from('trip_agencies')
+        .select(`
+          created_at,
+          trips!inner(
+            departure_time,
+            routes(origin, destination)
+          )
+        `)
+        .eq('agency_id', agencyId)
         .gte('created_at', thirtyDaysAgo)
         .order('created_at', { ascending: false })
         .limit(10),
@@ -1011,6 +1028,18 @@ export class ReservationService {
           timestamp: b.created_at,
         });
       }
+    }
+    for (const ta of recentAssignments || []) {
+      const trip = (ta as any).trips;
+      const route = trip?.routes;
+      activity.push({
+        type: 'trip_assigned',
+        label: `Viaje asignado: ${route?.origin || '?'} → ${route?.destination || '?'}`,
+        description: new Date(trip?.departure_time).toLocaleDateString('es-ES', {
+          day: 'numeric', month: 'short', year: 'numeric',
+        }),
+        timestamp: (ta as any).created_at,
+      });
     }
     activity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     const recentActivity = activity.slice(0, 10);
