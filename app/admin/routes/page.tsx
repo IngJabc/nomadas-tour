@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Route, Plus } from 'lucide-react';
+import { Route, Plus, Search, X } from 'lucide-react';
 import { adminApi } from '@/lib/api';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -20,6 +20,7 @@ export default function AdminRoutesPage() {
   const [destination, setDestination] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
 
   const fetchRoutes = async () => {
     try {
@@ -35,6 +36,13 @@ export default function AdminRoutesPage() {
   useEffect(() => {
     fetchRoutes();
   }, []);
+
+  const filteredRoutes = searchInput.trim()
+    ? routes.filter((r) =>
+        r.origin.toLowerCase().includes(searchInput.toLowerCase()) ||
+        r.destination.toLowerCase().includes(searchInput.toLowerCase())
+      )
+    : routes;
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,11 +131,39 @@ export default function AdminRoutesPage() {
         </form>
       </div>
 
+      {/* Search filter */}
+      <div className="mb-6">
+        <div className="relative w-full">
+          <input
+            type="text"
+            placeholder="Buscar ruta por origen o destino..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+          />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
+          {searchInput && (
+            <button
+              type="button"
+              onClick={() => setSearchInput('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Table */}
       {routes.length === 0 ? (
         <EmptyState
           icon={<Route className="w-8 h-8" />}
           message="No hay rutas registradas"
+        />
+      ) : filteredRoutes.length === 0 ? (
+        <EmptyState
+          icon={<Route className="w-8 h-8" />}
+          message="No se encontraron rutas con ese criterio de búsqueda"
         />
       ) : (
         <div className="bg-[var(--color-brand-surface)] rounded-2xl overflow-hidden border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
@@ -141,7 +177,7 @@ export default function AdminRoutesPage() {
                 </tr>
               </thead>
               <tbody>
-                {routes.map((route) => (
+                {filteredRoutes.map((route) => (
                   <tr key={route.id} className="hover:bg-slate-50 transition-colors border-b border-slate-100">
                     <td className="px-3 sm:px-5 py-3 sm:py-4 font-[family-name:var(--font-body)] font-normal text-[12px] sm:text-sm text-[var(--color-brand-navy)] whitespace-nowrap">{route.origin}</td>
                     <td className="px-3 sm:px-5 py-3 sm:py-4 font-[family-name:var(--font-body)] font-normal text-[12px] sm:text-sm text-[var(--color-brand-navy)] whitespace-nowrap">{route.destination}</td>

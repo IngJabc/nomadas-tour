@@ -276,87 +276,93 @@ export default function AdminTripsPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-6">
-        <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0">
-          {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => handleStatusChange(opt.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-[family-name:var(--font-body)] font-semibold transition-colors ${
-                statusFilter === opt.value
-                  ? 'bg-[var(--color-brand-cyan)] text-white'
-                  : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+      <div className="flex flex-col gap-3 mb-6">
+        {/* Row 1: Status centered */}
+        <div className="flex justify-center">
+          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto">
+            {STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleStatusChange(opt.value)}
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold transition-colors ${
+                  statusFilter === opt.value
+                    ? 'bg-[var(--color-brand-cyan)] text-white'
+                    : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <div className="relative flex-1 sm:max-w-xs">
-          <input
-            type="text"
-            placeholder="Buscar destino o agencia..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs font-[family-name:var(--font-body)] text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
-          />
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
-          {searchFilter && (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+        {/* Row 2: Search, Route, Agency, Date */}
+        <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="relative w-full sm:w-auto min-w-0">
+            <input
+              type="text"
+              placeholder="Buscar destino o agencia..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+            />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
+            {searchFilter && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
-        <select
-          value={routeFilter}
-          onChange={(e) => handleRouteChange(e.target.value)}
-          className="w-full sm:w-auto h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
-        >
-          <option value="">Ruta</option>
-          {routes.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.destination}
-            </option>
-          ))}
-        </select>
+          <select
+            value={routeFilter}
+            onChange={(e) => handleRouteChange(e.target.value)}
+            className="w-full sm:w-auto h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+          >
+            <option value="">Ruta</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.destination}
+              </option>
+            ))}
+          </select>
 
-        <select
-          value={agencyFilter}
-          onChange={(e) => handleAgencyChange(e.target.value)}
-          className="w-full sm:w-auto h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
-        >
-          <option value="">Agencia</option>
-          {agencies.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
+          <select
+            value={agencyFilter}
+            onChange={(e) => handleAgencyChange(e.target.value)}
+            className="w-full sm:w-auto h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+          >
+            <option value="">Agencia</option>
+            {agencies.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
 
-        <div className="relative w-full sm:w-auto sm:shrink-0">
-          <input
-            type="date"
-            value={dateFilter}
-            onChange={(e) => handleDateChange(e.target.value)}
-            className="h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
-          />
-          {dateFilter && (
-            <button
-              type="button"
-              onClick={clearDate}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div className="relative w-full sm:w-auto sm:shrink-0">
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
+            />
+            {dateFilter && (
+              <button
+                type="button"
+                onClick={clearDate}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

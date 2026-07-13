@@ -33,7 +33,7 @@ export function VehicleStep({ selectedType, onSelect }: VehicleStepProps) {
             type="button"
             onClick={() => onSelect(vehicle.type)}
             className={cn(
-              'relative flex flex-col items-center gap-3 p-6 rounded-2xl border-2 text-center transition-all duration-200 cursor-pointer',
+              'relative flex flex-col items-center gap-2 sm:gap-3 p-4 sm:p-6 rounded-2xl border-2 text-center transition-all duration-200 cursor-pointer',
               isSelected
                 ? 'border-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.06)] shadow-[0_0_0_3px_rgba(0,212,255,0.15)]'
                 : 'border-[rgba(0,0,0,0.06)] bg-[var(--color-brand-surface)] hover:border-[var(--color-brand-cyan)] hover:shadow-[0_6px_24px_rgba(0,212,255,0.12)] hover:-translate-y-0.5',
@@ -48,14 +48,14 @@ export function VehicleStep({ selectedType, onSelect }: VehicleStepProps) {
             )}
             <div
               className={cn(
-                'w-16 h-16 rounded-xl flex items-center justify-center transition-colors duration-200',
+                'w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center transition-colors duration-200',
                 isSelected ? 'bg-[var(--color-brand-cyan)]' : 'bg-[var(--color-brand-navy)]',
               )}
             >
-              <Icon className={cn('w-8 h-8', isSelected ? 'text-white' : 'text-[var(--color-brand-cyan)]')} />
+              <Icon className={cn('w-7 h-7 sm:w-8 sm:h-8', isSelected ? 'text-white' : 'text-[var(--color-brand-cyan)]')} />
             </div>
             <div>
-              <p className="font-[family-name:var(--font-heading)] font-bold text-[18px] text-[var(--color-brand-navy)]">
+              <p className="font-[family-name:var(--font-heading)] font-bold text-[16px] sm:text-[18px] text-[var(--color-brand-navy)]">
                 {vehicle.label}
               </p>
               <div className="flex items-center justify-center gap-1.5 mt-1">

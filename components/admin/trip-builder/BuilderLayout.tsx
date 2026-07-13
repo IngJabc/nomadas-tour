@@ -125,7 +125,7 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
   const isValid = canProceed();
 
   return (
-    <div className="flex flex-col min-h-0 h-full">
+    <div className="flex flex-col">
       <div className="mb-6">
         <StepIndicator currentStep={state.currentStep} />
       </div>

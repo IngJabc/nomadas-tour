@@ -1,18 +1,33 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
-import { ClipboardList, QrCode, ArrowRight, Calendar, Users, UserCheck, Ticket, Bus } from 'lucide-react';
-import { agencyApi } from '@/lib/api';
-import { subscribeToTripSeats, subscribeToReservations, subscribeToTrips, subscribeToBoardingLogs, subscribeToTripAgencies } from '@/lib/realtime/subscriptions';
-import { getGreeting } from '@/lib/utils/greeting';
-import { Topbar } from '@/components/layout/Topbar';
-import { SectionTitle } from '@/components/ui/SectionTitle';
-import { StatCard } from '@/components/ui/StatCard';
-import { Card } from '@/components/ui/Card';
-import { ActivityWidget } from '@/components/dashboard/ActivityWidget';
-import { Timeline } from '@/components/dashboard/Timeline';
-import { OccupancyChart } from '@/components/dashboard/charts/OccupancyChart';
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import {
+  ClipboardList,
+  QrCode,
+  ArrowRight,
+  Calendar,
+  Users,
+  UserCheck,
+  Ticket,
+  Bus,
+} from "lucide-react";
+import { agencyApi } from "@/lib/api";
+import {
+  subscribeToTripSeats,
+  subscribeToReservations,
+  subscribeToTrips,
+  subscribeToBoardingLogs,
+  subscribeToTripAgencies,
+} from "@/lib/realtime/subscriptions";
+import { getGreeting } from "@/lib/utils/greeting";
+import { Topbar } from "@/components/layout/Topbar";
+import { SectionTitle } from "@/components/ui/SectionTitle";
+import { StatCard } from "@/components/ui/StatCard";
+import { Card } from "@/components/ui/Card";
+import { ActivityWidget } from "@/components/dashboard/ActivityWidget";
+import { Timeline } from "@/components/dashboard/Timeline";
+import { OccupancyChart } from "@/components/dashboard/charts/OccupancyChart";
 
 interface AgencyDashboardData {
   agency_name?: string;
@@ -31,7 +46,7 @@ interface AgencyDashboardData {
     days_until_departure: number;
   }[];
   recent_activity: {
-    type: 'reservation_created' | 'boarding' | 'trip_assigned';
+    type: "reservation_created" | "boarding" | "trip_assigned";
     label: string;
     timestamp: string;
   }[];
@@ -47,27 +62,27 @@ interface AgencyDashboardData {
 
 const QUICK_ACTIONS = [
   {
-    href: '/agency/reservations/new',
-    title: 'Nueva reserva',
-    desc: 'Crea una reserva para un viaje asignado',
+    href: "/agency/reservations/new",
+    title: "Nueva reserva",
+    desc: "Crea una reserva para un viaje asignado",
     icon: Ticket,
   },
   {
-    href: '/agency/reservations',
-    title: 'Ver reservas',
-    desc: 'Consulta y gestiona las reservas de tu agencia',
+    href: "/agency/reservations",
+    title: "Ver reservas",
+    desc: "Consulta y gestiona las reservas de tu agencia",
     icon: ClipboardList,
   },
   {
-    href: '/agency/scan',
-    title: 'Escanear QR',
-    desc: 'Aborda pasajeros con el escáner QR',
+    href: "/agency/scan",
+    title: "Escanear QR",
+    desc: "Aborda pasajeros con el escáner QR",
     icon: QrCode,
   },
   {
-    href: '/agency/trips',
-    title: 'Mis viajes',
-    desc: 'Visualiza los viajes asignados a tu agencia',
+    href: "/agency/trips",
+    title: "Mis viajes",
+    desc: "Visualiza los viajes asignados a tu agencia",
     icon: Bus,
   },
 ];
@@ -141,8 +156,8 @@ export default function AgencyDashboardPage() {
   return (
     <>
       <Topbar
-        greeting={`${getGreeting()}, ${data?.agency_name ?? 'Agencia'}`}
-        subtext="Panel de Agencia — Nómadas Tour"
+        greeting={`${getGreeting()}, ${data?.agency_name ?? "Agencia"}`}
+        subtext="Panel de Agencia — NomadApp"
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -151,7 +166,11 @@ export default function AgencyDashboardPage() {
           {QUICK_ACTIONS.map((action) => {
             const Icon = action.icon;
             return (
-              <Link key={action.href} href={action.href} className="no-underline group">
+              <Link
+                key={action.href}
+                href={action.href}
+                className="no-underline group"
+              >
                 <Card hover borderLeft borderColor="var(--color-brand-cyan)">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-[var(--color-brand-navy)]">
@@ -178,13 +197,13 @@ export default function AgencyDashboardPage() {
           <StatCard
             icon={<Calendar className="w-5 h-5" />}
             label="Viajes activos"
-            value={loading ? '—' : (data?.active_trips ?? 0)}
+            value={loading ? "—" : data?.active_trips ?? 0}
             loading={loading}
           />
           <StatCard
             icon={<Ticket className="w-5 h-5" />}
             label="Reservas hoy"
-            value={loading ? '—' : (data?.today_reservations ?? 0)}
+            value={loading ? "—" : data?.today_reservations ?? 0}
             loading={loading}
             iconBg="bg-[rgba(245,158,11,0.1)]"
             iconColor="text-[#f59e0b]"
@@ -192,7 +211,7 @@ export default function AgencyDashboardPage() {
           <StatCard
             icon={<Users className="w-5 h-5" />}
             label="Reservas totales"
-            value={loading ? '—' : (data?.total_reservations ?? 0)}
+            value={loading ? "—" : data?.total_reservations ?? 0}
             loading={loading}
             iconBg="bg-[rgba(16,185,129,0.1)]"
             iconColor="text-[#10b981]"
@@ -200,7 +219,7 @@ export default function AgencyDashboardPage() {
           <StatCard
             icon={<UserCheck className="w-5 h-5" />}
             label="Pendientes abordar"
-            value={loading ? '—' : (data?.pending_boarding_passengers ?? 0)}
+            value={loading ? "—" : data?.pending_boarding_passengers ?? 0}
             loading={loading}
             iconBg="bg-[rgba(239,68,68,0.1)]"
             iconColor="text-[#ef4444]"
@@ -209,11 +228,17 @@ export default function AgencyDashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
           <Timeline items={data?.upcoming_trips ?? []} loading={loading} />
-          <ActivityWidget activities={data?.recent_activity ?? []} loading={loading} />
+          <ActivityWidget
+            activities={data?.recent_activity ?? []}
+            loading={loading}
+          />
         </div>
 
         <div className="mb-10">
-          <OccupancyChart data={data?.occupancy_by_trip ?? []} loading={loading} />
+          <OccupancyChart
+            data={data?.occupancy_by_trip ?? []}
+            loading={loading}
+          />
         </div>
       </main>
     </>
