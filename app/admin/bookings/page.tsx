@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -279,20 +279,35 @@ export default function AdminBookingsPage() {
     doFetch({ status: value || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
   };
 
-  const handleSearch = () => {
-    setSearchFilter(searchInput);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchWithSearch = useCallback((value: string) => {
+    setSearchFilter(value);
     resetAccordion();
     setLoading(true);
-    doFetch({ status: statusFilter || undefined, search: searchInput || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
+    doFetch({ status: statusFilter || undefined, search: value || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
+  }, [doFetch, statusFilter, routeFilter, agencyFilter, dateFilter, tripFilter, resetAccordion]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => fetchWithSearch(value), 300);
+  };
+
+  const handleSearchImmediate = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    fetchWithSearch(searchInput);
   };
 
   const clearSearch = () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearchInput('');
-    setSearchFilter('');
-    resetAccordion();
-    setLoading(true);
-    doFetch({ status: statusFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
+    fetchWithSearch('');
   };
+
+  useEffect(() => {
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, []);
 
   const handleRouteChange = (value: string) => {
     setRouteFilter(value);
@@ -459,8 +474,8 @@ export default function AdminBookingsPage() {
               type="text"
               placeholder="Buscar pasajero, cédula, asiento, QR..."
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearchImmediate()}
               className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all duration-200"
             />
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
