@@ -129,9 +129,18 @@ export class SuperadminController {
     }
   }
 
-  async deleteRoute(req: Request, res: Response, next: NextFunction) {
+  async deactivateRoute(req: Request, res: Response, next: NextFunction) {
     try {
-      await superadminService.deleteRoute(req.params.id as string);
+      await superadminService.deactivateRoute(req.params.id as string);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async activateRoute(req: Request, res: Response, next: NextFunction) {
+    try {
+      await superadminService.activateRoute(req.params.id as string);
       res.status(204).send();
     } catch (error) {
       next(error);

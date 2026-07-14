@@ -45,12 +45,6 @@ export function subscribeToTripSeats(
   const filter = `trip_id=in.(${tripIds.join(',')})`;
   const channelName = `seats:trip_id=in.(${tripIds.join(',')})`;
 
-  console.log('[Realtime] subscribeToTripSeats — creating channel', {
-    tripIds,
-    filter,
-    channelName,
-  });
-
   const channel = supabase
     .channel(channelName)
     .on(
@@ -62,34 +56,14 @@ export function subscribeToTripSeats(
         filter,
       },
       (payload: RealtimePostgresChangesPayload<any>) => {
-        console.log('[Realtime] subscribeToTripSeats — event received', {
-          eventType: payload.eventType,
-          new: JSON.parse(JSON.stringify(payload.new)),
-          old: JSON.parse(JSON.stringify(payload.old)),
-        });
-
         if (payload.new && payload.new.seat_code) {
-          console.log('[Realtime] subscribeToTripSeats — guard PASSED, calling onSeatUpdate', {
-            seat_code: payload.new.seat_code,
-          });
           onSeatUpdate(payload.new);
-        } else {
-          console.log('[Realtime] subscribeToTripSeats — guard BLOCKED (no seat_code in payload.new)', {
-            eventType: payload.eventType,
-            hasNew: !!payload.new,
-          });
         }
       },
     )
-    .subscribe((status) => {
-      console.log('[Realtime] subscribeToTripSeats — subscribe status', {
-        status,
-        channelName,
-      });
-    });
+    .subscribe();
 
   return () => {
-    console.log('[Realtime] subscribeToTripSeats — cleanup', { channelName });
     supabase.removeChannel(channel);
   };
 }

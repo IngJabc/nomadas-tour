@@ -16,13 +16,14 @@ interface RouteStepProps {
 }
 
 export function RouteStep({ routes, selectedRouteId, onSelect }: RouteStepProps) {
+  const activeRoutes = routes.filter((r) => r.status === 'active');
   const selectedRoute = routes.find((r) => r.id === selectedRouteId);
 
-  if (routes.length === 0) {
+  if (activeRoutes.length === 0) {
     return (
       <EmptyState
         icon={<MapPin className="w-8 h-8" />}
-        message="No hay rutas disponibles. Crea una ruta primero."
+        message="No hay rutas activas disponibles. Crea una ruta primero."
       />
     );
   }
@@ -36,7 +37,7 @@ export function RouteStep({ routes, selectedRouteId, onSelect }: RouteStepProps)
           className={inputClass}
         >
           <option value="">Seleccione una ruta</option>
-          {routes.map((route) => (
+          {activeRoutes.map((route) => (
             <option key={route.id} value={route.id}>
               {route.origin} → {route.destination}
             </option>

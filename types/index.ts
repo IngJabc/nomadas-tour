@@ -4,6 +4,7 @@ export interface Route {
   id: string;
   origin: string;
   destination: string;
+  status: 'active' | 'inactive';
   created_by: string;
 }
 

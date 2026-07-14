@@ -119,8 +119,10 @@ export const adminApi = {
     request<any>('/admin/routes', { method: 'POST', body: JSON.stringify(data) }),
   updateRoute: (id: string, data: { origin?: string; destination?: string }) =>
     request<any>(`/admin/routes/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteRoute: (id: string) =>
-    request<void>(`/admin/routes/${id}`, { method: 'DELETE' }),
+  deactivateRoute: (id: string) =>
+    request<void>(`/admin/routes/${id}/deactivate`, { method: 'PATCH' }),
+  activateRoute: (id: string) =>
+    request<void>(`/admin/routes/${id}/activate`, { method: 'PATCH' }),
   listTrips: (params?: { page?: number; limit?: number }) =>
     request<any>('/admin/trips', { params: params as any }),
   getTrip: (id: string) => request<any>(`/admin/trips/${id}`),

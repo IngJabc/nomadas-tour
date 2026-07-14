@@ -37,8 +37,11 @@ router.post("/routes", (req, res, next) =>
 router.patch("/routes/:id", (req, res, next) =>
   superadminController.updateRoute(req, res, next)
 );
-router.delete("/routes/:id", (req, res, next) =>
-  superadminController.deleteRoute(req, res, next)
+router.patch("/routes/:id/deactivate", (req, res, next) =>
+  superadminController.deactivateRoute(req, res, next)
+);
+router.patch("/routes/:id/activate", (req, res, next) =>
+  superadminController.activateRoute(req, res, next)
 );
 
 // Trips

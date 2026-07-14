@@ -1,5 +1,6 @@
 'use client';
 
+import { forwardRef, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bus, MapPin, Calendar } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
@@ -26,37 +27,52 @@ interface TripCardProps {
     agencies: { id: string; name: string; reservation_count: number }[];
   };
   onEdit: (id: string) => void;
-  onComplete: (id: string) => void;
-  onCancel: (id: string) => void;
-  onPostpone: (trip: any, newDate: string) => void;
-  onDelete: (id: string) => void;
+  onAction: (tripId: string, action: string, anchorRect: DOMRect) => void;
   actionLoading: string | null;
   canComplete: boolean;
   canCancelPostpone: boolean;
 }
 
-export function TripCard({
-  trip,
-  onEdit,
-  onComplete,
-  onCancel,
-  onPostpone,
-  onDelete,
-  actionLoading,
-  canComplete: canDoComplete,
-  canCancelPostpone: canDoCancelPostpone,
-}: TripCardProps) {
+export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripCard(
+  {
+    trip,
+    onEdit,
+    onAction,
+    actionLoading,
+    canComplete: canDoComplete,
+    canCancelPostpone: canDoCancelPostpone,
+  },
+  ref,
+) {
   const router = useRouter();
+  const cardRef = useRef<HTMLDivElement>(null);
 
-  const handleViewDetail = () => {
-    router.push(`/admin/trips/${trip.id}`);
-  };
+  const captureRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      (cardRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    },
+    [ref],
+  );
+
+  const wrappedOnAction = useCallback(
+    (tripId: string, action: string) => {
+      if (action === 'view') {
+        router.push(`/admin/trips/${tripId}`);
+        return;
+      }
+      const rect = cardRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0);
+      onAction(tripId, action, rect);
+    },
+    [onAction, router],
+  );
 
   return (
-    <Card hover className="relative flex flex-col gap-5 h-full">
+    <Card ref={captureRef} hover className="relative flex flex-col gap-5 h-full">
       <div
         className="cursor-pointer flex-1 flex flex-col gap-5"
-        onClick={handleViewDetail}
+        onClick={() => wrappedOnAction(trip.id, 'view')}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -104,15 +120,11 @@ export function TripCard({
       <TripActions
         trip={trip}
         onEdit={() => onEdit(trip.id)}
-        onComplete={() => onComplete(trip.id)}
-        onCancel={() => onCancel(trip.id)}
-        onPostpone={(newDate: string) => onPostpone(trip, newDate)}
-        onDelete={() => onDelete(trip.id)}
-        onViewDetail={handleViewDetail}
+        onAction={wrappedOnAction}
         actionLoading={actionLoading === trip.id}
         canComplete={canDoComplete}
         canCancelPostpone={canDoCancelPostpone}
       />
     </Card>
   );
-}
+});

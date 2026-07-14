@@ -163,27 +163,55 @@ export class SuperadminService {
     return data;
   }
 
-  async deleteRoute(id: string) {
+  async deactivateRoute(id: string) {
     const { data: existing } = await supabaseAdmin
       .from('routes')
-      .select('id')
+      .select('id, status')
       .eq('id', id)
       .single();
 
     if (!existing) throw new NotFoundError('Route not found');
 
-    const { count } = await supabaseAdmin
+    if (existing.status === 'inactive') {
+      throw new ValidationError('La ruta ya está inactiva.');
+    }
+
+    const { data: trips } = await supabaseAdmin
       .from('trips')
-      .select('*', { count: 'exact', head: true })
+      .select('id, status')
       .eq('route_id', id);
 
-    if (count && count > 0) {
-      throw new ForbiddenError('No puedes eliminar esta ruta porque tiene viajes asociados.');
+    if (trips && trips.length > 0) {
+      const activeTrips = trips.filter(t => t.status === 'active');
+      if (activeTrips.length > 0) {
+        throw new ForbiddenError('No puedes desactivar esta ruta porque tiene viajes activos. Cancela o completa los viajes primero.');
+      }
     }
 
     const { error } = await supabaseAdmin
       .from('routes')
-      .delete()
+      .update({ status: 'inactive' })
+      .eq('id', id);
+
+    if (error) throw new ValidationError(error.message);
+  }
+
+  async activateRoute(id: string) {
+    const { data: existing } = await supabaseAdmin
+      .from('routes')
+      .select('id, status')
+      .eq('id', id)
+      .single();
+
+    if (!existing) throw new NotFoundError('Route not found');
+
+    if (existing.status === 'active') {
+      throw new ValidationError('La ruta ya está activa.');
+    }
+
+    const { error } = await supabaseAdmin
+      .from('routes')
+      .update({ status: 'active' })
       .eq('id', id);
 
     if (error) throw new ValidationError(error.message);
@@ -231,11 +259,12 @@ export class SuperadminService {
 
     const { data: route } = await supabaseAdmin
       .from('routes')
-      .select('id')
+      .select('id, status')
       .eq('id', routeId)
       .single();
 
     if (!route) throw new NotFoundError('Route not found');
+    if (route.status === 'inactive') throw new ValidationError('No se puede crear un viaje con una ruta inactiva. Activa la ruta primero.');
 
     const { data: trip, error: tripError } = await supabaseAdmin
       .from('trips')

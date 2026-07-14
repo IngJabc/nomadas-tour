@@ -1,23 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 let modalCount = 0;
-
-interface ModalProps {
-  open: boolean;
-  onClose: () => void;
-  title?: string;
-  titleId?: string;
-  description?: string;
-  descriptionId?: string;
-  children: React.ReactNode;
-  className?: string;
-  size?: 'sm' | 'md' | 'lg';
-}
 
 function getFocusable(container: HTMLElement | null) {
   if (!container) return [] as HTMLElement[];
@@ -31,22 +19,25 @@ function getScrollbarWidth() {
   return window.innerWidth - document.documentElement.clientWidth;
 }
 
-const sizeStyles = {
-  sm: 'max-w-sm',
-  md: 'max-w-2xl',
-  lg: 'max-w-4xl',
-};
+interface ContextualModalProps {
+  open: boolean;
+  onClose: () => void;
+  anchorRect: DOMRect | null;
+  titleId?: string;
+  descriptionId?: string;
+  children: React.ReactNode;
+  className?: string;
+}
 
-export function Modal({
+export function ContextualModal({
   open,
   onClose,
+  anchorRect,
   titleId,
-  description,
   descriptionId,
   children,
   className,
-  size = 'md',
-}: ModalProps) {
+}: ContextualModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
@@ -76,7 +67,7 @@ export function Modal({
         }
       }
     },
-    [onClose]
+    [onClose],
   );
 
   useEffect(() => {
@@ -108,53 +99,62 @@ export function Modal({
     };
   }, [open]);
 
-  const generatedTitleId = titleId || undefined;
-  const generatedDescriptionId =
-    descriptionId || (description ? 'modal-description' : undefined);
-
   if (!portalNode) return null;
 
   return createPortal(
     <AnimatePresence>
-      {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={(e) => e.stopPropagation()}
-        >
+      {open && anchorRect && (
+        <div className="fixed inset-0 z-50" onClick={onClose}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-black/40"
-            onClick={onClose}
+            className="absolute rounded-2xl bg-black/40"
+            style={{
+              top: anchorRect.top,
+              left: anchorRect.left,
+              width: anchorRect.width,
+              height: anchorRect.height,
+            }}
           />
-          <motion.div
-            ref={dialogRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={generatedTitleId}
-            aria-describedby={generatedDescriptionId}
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className={cn(
-              'relative bg-white rounded-2xl shadow-xl border border-slate-200/60 w-full flex flex-col',
-              sizeStyles[size],
-              className
-            )}
+          <div
+            style={{
+              position: 'fixed',
+              top: anchorRect.top,
+              left: anchorRect.left,
+              width: anchorRect.width,
+              height: anchorRect.height,
+            }}
+            className="flex items-center justify-center z-10 pointer-events-none"
           >
-            {children}
-          </motion.div>
+            <motion.div
+              ref={dialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={titleId}
+              aria-describedby={descriptionId}
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              className={cn(
+                'bg-white rounded-2xl shadow-xl border border-slate-200/60 w-full max-w-sm max-h-[80vh] overflow-y-auto flex flex-col pointer-events-auto',
+                className,
+              )}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {children}
+            </motion.div>
+          </div>
         </div>
       )}
     </AnimatePresence>,
-    portalNode
+    portalNode,
   );
 }
 
-export function ModalHeader({
+export function ContextualModalHeader({
   children,
   className,
 }: {
@@ -165,7 +165,7 @@ export function ModalHeader({
     <div
       className={cn(
         'flex items-center justify-between shrink-0 px-6 pt-6 pb-4',
-        className
+        className,
       )}
     >
       {children}
@@ -173,15 +173,7 @@ export function ModalHeader({
   );
 }
 
-export function ModalDivider({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn('shrink-0 h-px bg-[rgba(0,0,0,0.06)] mx-6', className)}
-    />
-  );
-}
-
-export function ModalBody({
+export function ContextualModalBody({
   children,
   className,
 }: {
@@ -195,7 +187,7 @@ export function ModalBody({
   );
 }
 
-export function ModalFooter({
+export function ContextualModalFooter({
   children,
   className,
 }: {
@@ -206,7 +198,7 @@ export function ModalFooter({
     <div
       className={cn(
         'shrink-0 flex items-center gap-3 px-6 py-4 border-t border-[rgba(0,0,0,0.06)]',
-        className
+        className,
       )}
     >
       {children}
