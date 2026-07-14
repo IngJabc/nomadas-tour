@@ -1,21 +1,34 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { format } from "date-fns";
+import { Building2, Bus, MapPin, Calendar, Clock, ArrowLeft } from "lucide-react";
 import { QRCode } from "react-qr-code";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { SectionTitle } from "@/components/ui/SectionTitle";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { adminApi } from "@/lib/api";
+
+type Passenger = {
+  id: string;
+  name: string;
+  document: string;
+  seat_id: string;
+  boarded: boolean;
+  seats: { seat_code: string } | null;
+};
 
 type ReservationDetail = {
   id: string;
-  customer_name: string;
-  passenger_cedula: string;
-  seat_code: string;
   qr_code: string;
   status: string;
-  transaction_id: string;
   created_at: string;
+  booker_name: string;
+  booker_document: string;
+  agencies: { id: string; name: string } | null;
   trips: {
     id: string;
     departure_time: string;
@@ -25,37 +38,55 @@ type ReservationDetail = {
       destination: string;
     } | null;
   } | null;
+  reservation_passengers: Passenger[] | null;
 };
 
-const STATUS_STYLES: Record<string, { label: string; pill: string }> = {
-  confirmed: { label: "Confirmada", pill: "bg-emerald-50 text-emerald-600" },
-  cancelled: { label: "Cancelada", pill: "bg-red-50 text-red-500" },
-  boarded: { label: "Abordado", pill: "bg-blue-50 text-blue-600" },
+const STATUS_BADGE: Record<string, { label: string; variant: "confirmed" | "cancelled" | "boarded" | "inactive" }> = {
+  confirmed: { label: "Confirmada", variant: "confirmed" },
+  cancelled: { label: "Cancelada", variant: "cancelled" },
+  boarded: { label: "Abordado", variant: "boarded" },
 };
+
+const TRIP_STATUS: Record<string, { label: string; variant: "active" | "completed" | "cancelled" | "warning" }> = {
+  active: { label: "Activo", variant: "active" },
+  completed: { label: "Completado", variant: "completed" },
+  cancelled: { label: "Cancelado", variant: "cancelled" },
+  postponed: { label: "Pospuesto", variant: "warning" },
+};
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  return `${formatDate(iso)} - ${formatTime(iso)}`;
+}
 
 export default function BookingDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const bookingId = params.bookingId as string;
 
   const [reservation, setReservation] = useState<ReservationDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchReservation = async () => {
       try {
-        const { createClient } = await import('@/lib/supabase/client');
-        const supabase = createClient();
-        const { data } = await supabase
-          .from('reservations')
-          .select('*, trips(*, routes(*))')
-          .eq('transaction_id', bookingId)
-          .single();
-        if (!data) throw new Error("No se encontró la reserva");
-        setReservation(data as any);
+        const data = await adminApi.getReservation(bookingId);
+        setReservation(data as ReservationDetail);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Error al cargar");
       } finally {
@@ -65,216 +96,220 @@ export default function BookingDetailPage() {
     fetchReservation();
   }, [bookingId]);
 
-  const handleStatusChange = async (newStatus: string) => {
-    setUpdating(true);
-    try {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-      const { error: updateError } = await supabase
-        .from('reservations')
-        .update({ status: newStatus })
-        .eq('id', bookingId);
-      if (updateError) throw updateError;
-      setReservation((prev) => prev ? { ...prev, status: newStatus } : null);
-    } catch {
-      setError("Error al cambiar estado");
-    } finally {
-      setUpdating(false);
-    }
-  };
-
   if (loading) {
     return (
-      <div className="bg-slate-100 min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-navy" />
-      </div>
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <CardSkeleton />
+      </main>
     );
   }
 
   if (error || !reservation) {
     return (
-      <div className="bg-slate-100 min-h-screen">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          <div className="bg-white rounded-2xl p-8 text-center shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
-            <p className="font-['Poppins',sans-serif] font-normal text-sm text-red-500 mb-3">
-              {error ?? "Reserva no encontrada"}
-            </p>
-            <Link
-              href="/admin/bookings"
-              className="inline-block px-5 py-2.5 rounded-xl bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm no-underline hover:bg-brand-blue transition-colors"
-            >
-              Volver a pasajeros
-            </Link>
-          </div>
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <PageHeader title="Reserva no encontrada" />
+        <div className="p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2] font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+          {error ?? "La reserva no existe o no está disponible"}
         </div>
-      </div>
+        <div className="mt-4">
+          <Link
+            href="/admin/bookings"
+            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Volver a pasajeros
+          </Link>
+        </div>
+      </main>
     );
   }
 
-  const bs = STATUS_STYLES[reservation.status] ?? STATUS_STYLES.confirmed;
-  const qrValue = reservation.qr_code;
-  const seatCode = reservation.seat_code ?? "—";
-  const routeOrigin = reservation.trips?.routes?.origin ?? "—";
-  const routeDest = reservation.trips?.routes?.destination ?? "—";
-  const departure = reservation.trips?.departure_time
-    ? format(new Date(reservation.trips.departure_time), "dd/MM/yyyy HH:mm")
-    : "—";
+  const sb = STATUS_BADGE[reservation.status] ?? STATUS_BADGE.confirmed;
+  const trip = reservation.trips;
+  const route = trip?.routes;
+  const passengers = (reservation.reservation_passengers ?? []).slice().sort((a, b) => {
+    const ac = a.seats?.seat_code;
+    const bc = b.seats?.seat_code;
+    if (ac && bc) return ac.localeCompare(bc, undefined, { numeric: true });
+    if (ac) return -1;
+    if (bc) return 1;
+    return 0;
+  });
+  const tripSb = trip ? TRIP_STATUS[trip.status] ?? TRIP_STATUS.active : null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <div className="mb-6">
-        <p className="font-['Poppins',sans-serif] font-normal text-xs text-brand-muted">
-          <Link href="/admin" className="text-brand-cyan no-underline hover:underline">Admin</Link>
-          {" / "}
-          <Link href="/admin/bookings" className="text-brand-cyan no-underline hover:underline">Pasajeros</Link>
-          {" / Detalle"}
-        </p>
-        <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[22px] sm:text-2xl text-brand-navy mt-1">
-          Detalle del pasajero
-        </h1>
+    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="mb-4">
+        <Link
+          href="/admin/bookings"
+          className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Volver a pasajeros
+        </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
-              <h2 className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">
-                Información del pasajero
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
-                  Nombre completo
-                </label>
-                <p className="font-['Poppins',sans-serif] font-semibold text-[15px] text-brand-navy">
-                  {reservation.customer_name}
-                </p>
-              </div>
-              <div>
-                <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
-                  Cédula / Identificación
-                </label>
-                <p className="font-['Poppins',sans-serif] font-semibold text-[15px] text-brand-navy">
-                  {reservation.passenger_cedula ?? "—"}
-                </p>
-              </div>
-              <div>
-                <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
-                  Estado
-                </label>
-                <span className={`inline-block font-['Poppins',sans-serif] font-semibold text-[11px] px-3 py-1 rounded-full ${bs.pill}`}>
-                  {bs.label}
-                </span>
-              </div>
-            </div>
-          </div>
+      <PageHeader
+        title="Detalle de reserva"
+        action={<Badge variant={sb.variant} size="md">{sb.label}</Badge>}
+      />
 
-          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
-              <h2 className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">
-                Información del viaje
-              </h2>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
-                  Ruta
-                </label>
-                <p className="font-['Poppins',sans-serif] font-semibold text-[15px] text-brand-navy">
-                  {routeOrigin} → {routeDest}
-                </p>
-              </div>
-              <div>
-                <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
-                  Salida
-                </label>
-                <p className="font-['Poppins',sans-serif] font-normal text-[14px] text-brand-navy">{departure}</p>
-              </div>
-              <div>
-                <label className="block font-['Poppins',sans-serif] font-medium text-[11px] text-brand-muted uppercase tracking-wider mb-1">
-                  Asiento
-                </label>
-                <p className="font-['Poppins',sans-serif] font-bold text-[18px] text-brand-navy bg-slate-100 inline-block px-3 py-1 rounded-lg">{seatCode}</p>
-              </div>
-
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)]">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
-              <h2 className="font-['Montserrat',sans-serif] font-bold text-base text-brand-navy">Acciones</h2>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              {reservation.status === "confirmed" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setCancelModalOpen(true)}
-                    disabled={updating}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-50 text-red-500 font-['Poppins',sans-serif] font-semibold text-sm border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-red-100 transition-colors"
-                  >
-                    {updating ? (
-                      <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-500" />
-                    ) : (
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 4l8 8M12 4l-8 8" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" />
-                      </svg>
-                    )}
-                    Cancelar reserva
-                  </button>
-                  <ConfirmModal
-                    open={cancelModalOpen}
-                    title="Cancelar reserva"
-                    message="¿Estás seguro de cancelar esta reserva? El asiento quedará disponible para otros pasajeros."
-                    confirmLabel="Cancelar reserva"
-                    cancelLabel="Volver"
-                    onConfirm={() => {
-                      setCancelModalOpen(false);
-                      handleStatusChange("cancelled");
-                    }}
-                    onCancel={() => setCancelModalOpen(false)}
-                  />
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => handleStatusChange("confirmed")}
-                  disabled={updating}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 font-['Poppins',sans-serif] font-semibold text-sm border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-100 transition-colors"
-                >
-                  {updating ? (
-                    <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600" />
-                  ) : (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                      <path d="M3 8l3 3 7-7" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                  Reactivar reserva
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-2xl p-5 sm:p-6 shadow-[0_2px_8px_rgba(0,0,0,0.07)] sticky top-20">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-1 h-[18px] bg-brand-cyan rounded-sm" />
-              <h2 className="font-['Montserrat',sans-serif] font-bold text-sm text-brand-navy">Código QR</h2>
-            </div>
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Mobile: QR first */}
+        <div className="block lg:hidden order-1">
+          <Card>
+            <SectionTitle as="h3" className="mb-4">Código QR</SectionTitle>
             <div className="flex flex-col items-center gap-3">
-              <div className="bg-white p-3 rounded-xl border border-slate-200">
-                <QRCode value={qrValue} size={160} />
+              <div className="bg-white p-3 rounded-xl border border-[rgba(0,0,0,0.06)]">
+                <QRCode value={reservation.qr_code} size={160} />
               </div>
-              <p className="font-['Poppins',sans-serif] font-normal text-[11px] text-brand-muted text-center break-all">{qrValue}</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] text-center break-all">
+                {reservation.qr_code}
+              </p>
             </div>
+          </Card>
+        </div>
+
+        {/* Left column: info + passengers */}
+        <div className="flex-1 min-w-0 space-y-6 order-2 lg:order-1">
+          {/* Reservation Info */}
+          <Card>
+            <SectionTitle as="h3" className="mb-4">Información de reserva</SectionTitle>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {reservation.agencies && (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                    <Building2 className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                  </div>
+                  <div>
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Agencia</p>
+                    <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                      {reservation.agencies.name}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                  <MapPin className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                </div>
+                <div>
+                  <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Destino</p>
+                  <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                    {route?.destination ?? "—"}
+                  </p>
+                </div>
+              </div>
+
+              {trip && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                      <Calendar className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                    </div>
+                    <div>
+                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Fecha</p>
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                        {formatDate(trip.departure_time)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                      <Clock className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                    </div>
+                    <div>
+                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Hora</p>
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                        {formatTime(trip.departure_time)}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {tripSb && (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                    <Bus className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                  </div>
+                  <div>
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Viaje</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                        {tripSb.label}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                  <Calendar className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                </div>
+                <div>
+                  <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Creada</p>
+                  <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                    {formatDateTime(reservation.created_at)}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Passengers */}
+          <Card>
+            <SectionTitle as="h3" className="mb-4">Pasajeros ({passengers.length})</SectionTitle>
+            {passengers.length === 0 ? (
+              <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
+                No hay pasajeros registrados
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {passengers.map((p) => (
+                  <div
+                    key={p.id}
+                    className="p-3 rounded-xl border border-[rgba(0,0,0,0.06)] bg-[var(--color-brand-surface)]"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="font-[family-name:var(--font-heading)] font-bold text-[16px] text-[var(--color-brand-navy)]">
+                        {p.seats?.seat_code ?? "—"}
+                      </span>
+                       <Badge variant={p.boarded ? "boarded" : "confirmed"} size="xs">{p.boarded ? "Abordado" : "Confirmado"}</Badge>
+                    </div>
+                    <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)]">
+                      {p.name}
+                    </p>
+                    <p className="font-[family-name:var(--font-body)] text-[12px] text-[var(--color-brand-muted)]">
+                      {p.document}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Desktop: QR sticky right column */}
+        <div className="hidden lg:block w-full lg:w-[400px] xl:w-[420px] shrink-0 order-2">
+          <div className="sticky top-24">
+            <Card>
+              <SectionTitle as="h3" className="mb-4">Código QR</SectionTitle>
+              <div className="flex flex-col items-center gap-3">
+                <div className="bg-white p-3 rounded-xl border border-[rgba(0,0,0,0.06)]">
+                  <QRCode value={reservation.qr_code} size={160} />
+                </div>
+                <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] text-center break-all">
+                  {reservation.qr_code}
+                </p>
+              </div>
+            </Card>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -239,18 +239,20 @@ export class ReservationController {
     }
   }
 
-  // Superadmin: all reservations
+  // Superadmin: all reservations (paginated)
   async getAllReservations(req: Request, res: Response, next: NextFunction) {
     try {
-      const filters = {
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
+      const result = await reservationService.getAllReservations({
+        page,
+        limit,
+        status: req.query.status as string | undefined,
+        search: req.query.search as string | undefined,
         agency_id: req.query.agency_id as string | undefined,
         trip_id: req.query.trip_id as string | undefined,
-        status: req.query.status as string | undefined,
-      };
-      const reservations = await reservationService.getAllReservations(
-        Object.values(filters).some(Boolean) ? filters : undefined,
-      );
-      res.json(reservations);
+      });
+      res.json(result);
     } catch (error) {
       next(error);
     }
@@ -402,6 +404,46 @@ export class ReservationController {
   async releaseExpiredLocks(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await reservationService.releaseExpiredLocks();
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Superadmin: reservation detail
+  async getReservation(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const reservation = await reservationService.getReservationById(id);
+      res.json(reservation);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Superadmin: update reservation status
+  async updateReservationStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      const id = req.params.id as string;
+      const { status } = z.object({ status: z.string().min(1) }).parse(req.body);
+      const result = await reservationService.updateReservationStatus(id, status);
+      res.json(result);
+    } catch (error) {
+      next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
+    }
+  }
+
+  // Superadmin: passenger explorer tree (Route → Trip → Passengers)
+  async getPassengerTree(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await reservationService.getPassengerTree({
+        status: req.query.status as string | undefined,
+        route_id: req.query.route_id as string | undefined,
+        trip_id: req.query.trip_id as string | undefined,
+        agency_id: req.query.agency_id as string | undefined,
+        date: req.query.date as string | undefined,
+        search: req.query.search as string | undefined,
+      });
       res.json(result);
     } catch (error) {
       next(error);

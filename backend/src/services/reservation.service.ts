@@ -812,41 +812,128 @@ export class ReservationService {
     };
   }
 
-  // Superadmin queries
-  async getAllReservations(filters?: { agency_id?: string; trip_id?: string; status?: string }) {
-    let query = supabaseAdmin
+  // Superadmin: paginated reservations list with search and agency info
+  async getAllReservations(params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    search?: string;
+    agency_id?: string;
+    trip_id?: string;
+  } = {}) {
+    const page = Math.max(1, params.page || 1);
+    const limit = Math.min(100, Math.max(1, params.limit || 20));
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Resolve search text to matching reservation IDs
+    let matchedIds: string[] | null = null;
+    if (params.search) {
+      const q = params.search;
+      const reservationIds = new Set<string>();
+
+      // Search by reservation-level fields
+      const { data: byName } = await supabaseAdmin
+        .from('reservations')
+        .select('id')
+        .or(`customer_name.ilike.%${q}%,passenger_cedula.ilike.%${q}%,qr_code.ilike.%${q}%,seat_code.ilike.%${q}%`);
+      (byName || []).forEach((r: any) => reservationIds.add(r.id));
+
+      // Search by passenger name/document in reservation_passengers
+      const { data: byPassenger } = await supabaseAdmin
+        .from('reservation_passengers')
+        .select('reservation_id')
+        .or(`name.ilike.%${q}%,document.ilike.%${q}%`);
+      (byPassenger || []).forEach((p: any) => reservationIds.add(p.reservation_id));
+
+      // Search by agency name
+      const { data: matchingAgencies } = await supabaseAdmin
+        .from('agencies')
+        .select('id')
+        .ilike('name', `%${q}%`);
+      if (matchingAgencies && matchingAgencies.length > 0) {
+        const agencyIds = matchingAgencies.map((a: any) => a.id);
+        const { data: byAgency } = await supabaseAdmin
+          .from('reservations')
+          .select('id')
+          .in('agency_id', agencyIds);
+        (byAgency || []).forEach((r: any) => reservationIds.add(r.id));
+      }
+
+      matchedIds = [...reservationIds];
+      if (matchedIds.length === 0) {
+        return { data: [], pagination: { page, limit, total: 0, totalPages: 0 } };
+      }
+    }
+
+    // Build count query
+    let countQuery = supabaseAdmin
       .from('reservations')
-      .select('*, trips(departure_time, routes(origin, destination)), reservation_passengers(*, seats(seat_code))');
+      .select('*', { count: 'exact', head: true });
+    if (params.status) countQuery = countQuery.eq('status', params.status);
+    if (params.agency_id) countQuery = countQuery.eq('agency_id', params.agency_id);
+    if (params.trip_id) countQuery = countQuery.eq('trip_id', params.trip_id);
+    if (matchedIds) countQuery = countQuery.in('id', matchedIds);
+    const { count: total } = await countQuery;
 
-    if (filters?.agency_id) query = query.eq('agency_id', filters.agency_id);
-    if (filters?.trip_id) query = query.eq('trip_id', filters.trip_id);
-    if (filters?.status) query = query.eq('status', filters.status);
+    // Build data query
+    let dataQuery = supabaseAdmin
+      .from('reservations')
+      .select('*, trips(departure_time, routes(origin, destination)), agencies(id, name), reservation_passengers(*, seats(seat_code))')
+      .order('created_at', { ascending: false })
+      .range(from, to);
+    if (params.status) dataQuery = dataQuery.eq('status', params.status);
+    if (params.agency_id) dataQuery = dataQuery.eq('agency_id', params.agency_id);
+    if (params.trip_id) dataQuery = dataQuery.eq('trip_id', params.trip_id);
+    if (matchedIds) dataQuery = dataQuery.in('id', matchedIds);
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await dataQuery;
 
     if (error) throw new ValidationError(error.message);
 
-    // Flatten: create one row per passenger for agency reservations
+    // Flatten: one row per passenger for agency reservations
     const flattened: any[] = [];
     for (const r of data || []) {
       const rAny = r as any;
+      const agency = rAny.agencies;
+      const base = {
+        id: rAny.id,
+        transaction_id: rAny.transaction_id,
+        trip_id: rAny.trip_id,
+        agency_id: rAny.agency_id,
+        agency_name: agency?.name || null,
+        status: rAny.status,
+        qr_code: rAny.qr_code,
+        created_at: rAny.created_at,
+        trips: rAny.trips,
+        booker_name: rAny.booker_name,
+      };
       if (rAny.reservation_passengers && rAny.reservation_passengers.length > 0) {
         for (const p of rAny.reservation_passengers) {
           flattened.push({
-            ...rAny,
+            ...base,
+            row_id: `${rAny.id}-${p.id}`,
+            passenger_id: p.id,
             customer_name: p.name || rAny.booker_name,
             passenger_cedula: p.document || '',
             seat_code: p.seats?.seat_code || '',
             passenger_status: p.status,
-            reservation_passengers: undefined,
           });
         }
       } else {
-        flattened.push(rAny);
+        flattened.push({
+          ...base,
+          row_id: rAny.id,
+          passenger_id: null,
+          customer_name: rAny.customer_name || rAny.booker_name,
+          passenger_cedula: rAny.passenger_cedula || '',
+          seat_code: rAny.seat_code || '',
+        });
       }
     }
 
-    return flattened;
+    const totalPages = Math.ceil((total || 0) / limit);
+    return { data: flattened, pagination: { page, limit, total: total || 0, totalPages } };
   }
 
   // ---- Agency Dashboard ----
@@ -1239,6 +1326,401 @@ export class ReservationService {
 
     if (error) throw new ValidationError(error.message);
     return { released: (data || []).length };
+  }
+
+  // ─── Superadmin: single reservation detail ──────────────────────────────
+
+  async getReservationById(id: string) {
+    const { data, error } = await supabaseAdmin
+      .from('reservations')
+      .select('*, trips(*, routes(*)), agencies(id, name), reservation_passengers(*, seats(seat_code))')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) throw new NotFoundError('Reservation not found');
+
+    const r = data as any;
+    const passengers = r.reservation_passengers || [];
+
+    return {
+      id: r.id,
+      booker_name: r.booker_name,
+      booker_document: r.booker_document,
+      qr_code: r.qr_code,
+      status: r.status,
+      created_at: r.created_at,
+      agency_id: r.agency_id,
+      trip_id: r.trip_id,
+      agencies: r.agencies ?? null,
+      trips: r.trips ?? null,
+      reservation_passengers: passengers,
+    };
+  }
+
+  async updateReservationStatus(id: string, status: string) {
+    const validStatuses = ['confirmed', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      throw new ValidationError(`Invalid status: ${status}. Must be one of: ${validStatuses.join(', ')}`);
+    }
+
+    const { data: reservation, error: findError } = await supabaseAdmin
+      .from('reservations')
+      .select('*, reservation_passengers(seat_id)')
+      .eq('id', id)
+      .single();
+
+    if (findError || !reservation) throw new NotFoundError('Reservation not found');
+
+    if (status === 'confirmed' && reservation.status !== 'cancelled') {
+      throw new ValidationError('Only cancelled reservations can be reactivated');
+    }
+
+    if (status === 'cancelled' && reservation.status !== 'confirmed') {
+      throw new ValidationError('Only confirmed reservations can be cancelled');
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from('reservations')
+      .update({ status })
+      .eq('id', id);
+
+    if (updateError) throw new ValidationError(updateError.message);
+
+    if (status === 'cancelled') {
+      const seatIds = ((reservation as any).reservation_passengers || []).map((p: any) => p.seat_id);
+      if (seatIds.length > 0) {
+        const { error: unlockError } = await supabaseAdmin
+          .from('seats')
+          .update({ status: 'available', updated_at: new Date().toISOString() })
+          .eq('trip_id', reservation.trip_id)
+          .in('id', seatIds);
+
+        if (unlockError) throw new ValidationError(unlockError.message);
+      }
+    }
+
+    return { id, status };
+  }
+
+  // ─── Passenger Explorer Tree ───────────────────────────────────────────
+  // New endpoint for /admin/bookings: returns Route → Trip → Passengers tree.
+  // No pagination. Each trip appears complete.
+
+  async getPassengerTree(params: {
+    status?: string;
+    route_id?: string;
+    trip_id?: string;
+    agency_id?: string;
+    date?: string;
+    search?: string;
+  } = {}) {
+    // 1. Resolve trip-level filters (route_id, date) → trip_ids
+    let tripFilterIds: string[] | null = null;
+    if (params.route_id || params.date) {
+      let tripQ = supabaseAdmin.from('trips').select('id');
+      if (params.route_id) tripQ = tripQ.eq('route_id', params.route_id);
+      if (params.date) {
+        tripQ = tripQ
+          .gte('departure_time', `${params.date}T00:00:00Z`)
+          .lte('departure_time', `${params.date}T23:59:59.999Z`);
+      }
+      const { data: trips } = await tripQ;
+      tripFilterIds = (trips || []).map((t: any) => t.id);
+      if (tripFilterIds.length === 0) return [];
+    }
+
+    // 2. Resolve search → trip_ids
+    let searchTripIds: string[] | null = null;
+    if (params.search) {
+      searchTripIds = await this._resolveSearchTripIds(params.search);
+      if (searchTripIds.length === 0) return [];
+    }
+
+    // 3. Intersect trip filters
+    let effectiveTripIds: string[] | null = null;
+    if (tripFilterIds && searchTripIds) {
+      const searchSet = new Set(searchTripIds);
+      effectiveTripIds = tripFilterIds.filter((id) => searchSet.has(id));
+    } else {
+      effectiveTripIds = tripFilterIds || searchTripIds;
+    }
+    if (params.trip_id) {
+      effectiveTripIds = effectiveTripIds
+        ? effectiveTripIds.filter((id) => id === params.trip_id)
+        : [params.trip_id];
+    }
+
+    // 4. Query reservations with all joins
+    let query = supabaseAdmin
+      .from('reservations')
+      .select(
+        `id, trip_id, agency_id, booker_name, booker_document, qr_code, status, created_at,
+         agencies(id, name),
+         trips(id, departure_time, status, capacity, vehicle_type, route_id, routes(id, origin, destination)),
+         reservation_passengers(id, name, document, phone, boarded, boarded_at, seat_id, seats(seat_code))`
+      )
+      .order('created_at', { ascending: false });
+
+    if (params.status) query = query.eq('status', params.status);
+    if (params.agency_id) query = query.eq('agency_id', params.agency_id);
+    if (effectiveTripIds) query = query.in('trip_id', effectiveTripIds);
+
+    const { data, error } = await query;
+    if (error) throw new ValidationError(error.message);
+
+    return this._buildPassengerTree(data || []);
+  }
+
+  // ─── Search resolution ─────────────────────────────────────────────────
+  // Resolves free-text search to a set of matching trip_ids.
+
+  private async _resolveSearchTripIds(q: string): Promise<string[]> {
+    const tripIds = new Set<string>();
+
+    const [
+      routeMatches,
+      passengerMatches,
+      agencyMatches,
+      qrMatches,
+      seatMatches,
+      bookerMatches,
+    ] = await Promise.all([
+      supabaseAdmin
+        .from('routes')
+        .select('id')
+        .or(`origin.ilike.%${q}%,destination.ilike.%${q}%`),
+      supabaseAdmin
+        .from('reservation_passengers')
+        .select('reservation_id')
+        .or(`name.ilike.%${q}%,document.ilike.%${q}%`),
+      supabaseAdmin
+        .from('agencies')
+        .select('id')
+        .ilike('name', `%${q}%`),
+      supabaseAdmin
+        .from('reservations')
+        .select('trip_id')
+        .ilike('qr_code', `%${q}%`),
+      supabaseAdmin
+        .from('seats')
+        .select('id')
+        .ilike('seat_code', `%${q}%`),
+      supabaseAdmin
+        .from('reservations')
+        .select('trip_id')
+        .or(`booker_name.ilike.%${q}%,booker_document.ilike.%${q}%`),
+    ]);
+
+    // Routes → trips
+    if (routeMatches.data && routeMatches.data.length > 0) {
+      const routeIds = routeMatches.data.map((r: any) => r.id);
+      const { data: trips } = await supabaseAdmin
+        .from('trips')
+        .select('id')
+        .in('route_id', routeIds);
+      (trips || []).forEach((t: any) => tripIds.add(t.id));
+    }
+
+    // Passengers → reservations → trips
+    if (passengerMatches.data && passengerMatches.data.length > 0) {
+      const resIds = passengerMatches.data.map((p: any) => p.reservation_id);
+      const { data: reservations } = await supabaseAdmin
+        .from('reservations')
+        .select('trip_id')
+        .in('id', resIds);
+      (reservations || []).forEach((r: any) => tripIds.add(r.trip_id));
+    }
+
+    // Agencies → reservations → trips
+    if (agencyMatches.data && agencyMatches.data.length > 0) {
+      const agencyIds = agencyMatches.data.map((a: any) => a.id);
+      const { data: reservations } = await supabaseAdmin
+        .from('reservations')
+        .select('trip_id')
+        .in('agency_id', agencyIds);
+      (reservations || []).forEach((r: any) => tripIds.add(r.trip_id));
+    }
+
+    // QR → trips
+    (qrMatches.data || []).forEach((r: any) => tripIds.add(r.trip_id));
+
+    // Seat code → passengers → reservations → trips
+    if (seatMatches.data && seatMatches.data.length > 0) {
+      const seatIds = seatMatches.data.map((s: any) => s.id);
+      const { data: rpMatches } = await supabaseAdmin
+        .from('reservation_passengers')
+        .select('reservation_id')
+        .in('seat_id', seatIds);
+      if (rpMatches && rpMatches.length > 0) {
+        const resIds = rpMatches.map((p: any) => p.reservation_id);
+        const { data: reservations } = await supabaseAdmin
+          .from('reservations')
+          .select('trip_id')
+          .in('id', resIds);
+        (reservations || []).forEach((r: any) => tripIds.add(r.trip_id));
+      }
+    }
+
+    // Booker → trips
+    (bookerMatches.data || []).forEach((r: any) => tripIds.add(r.trip_id));
+
+    return [...tripIds];
+  }
+
+  // ─── Tree builder ──────────────────────────────────────────────────────
+  // Transforms flat reservation rows into:
+  // Route → Trip → { stats, reservations[] → passengers[] }
+
+  private _buildPassengerTree(reservations: any[]) {
+    const routeMap = new Map<
+      string,
+      {
+        routeId: string;
+        origin: string;
+        destination: string;
+        trips: Map<
+          string,
+          {
+            tripId: string;
+            departureTime: string;
+            status: string;
+            capacity: number | null;
+            reservations: Map<
+              string,
+              {
+                reservationId: string;
+                status: string;
+                qrCode: string;
+                agency: { id: string; name: string } | null;
+                passengers: any[];
+              }
+            >;
+          }
+        >;
+      }
+    >();
+
+    for (const r of reservations) {
+      const trip = r.trips;
+      const route = trip?.routes;
+      if (!trip || !route) continue;
+
+      // Ensure route group
+      if (!routeMap.has(route.id)) {
+        routeMap.set(route.id, {
+          routeId: route.id,
+          origin: route.origin,
+          destination: route.destination,
+          trips: new Map(),
+        });
+      }
+      const routeGroup = routeMap.get(route.id)!;
+
+      // Ensure trip group
+      if (!routeGroup.trips.has(trip.id)) {
+        routeGroup.trips.set(trip.id, {
+          tripId: trip.id,
+          departureTime: trip.departure_time,
+          status: trip.status,
+          capacity: trip.capacity ?? null,
+          reservations: new Map(),
+        });
+      }
+      const tripGroup = routeGroup.trips.get(trip.id)!;
+
+      // Ensure reservation group
+      if (!tripGroup.reservations.has(r.id)) {
+        const agency = r.agencies;
+        tripGroup.reservations.set(r.id, {
+          reservationId: r.id,
+          status: r.status,
+          qrCode: r.qr_code,
+          agency: agency ? { id: agency.id, name: agency.name } : null,
+          passengers: [],
+        });
+      }
+      const resGroup = tripGroup.reservations.get(r.id)!;
+
+      // Add passengers
+      if (r.reservation_passengers && r.reservation_passengers.length > 0) {
+        for (const p of r.reservation_passengers) {
+          resGroup.passengers.push({
+            rowId: p.id,
+            passengerId: p.id,
+            name: p.name,
+            document: p.document,
+            seatCode: p.seats?.seat_code || null,
+            boarded: p.boarded,
+          });
+        }
+      } else {
+        // Legacy: reservation without passengers — use booker info
+        resGroup.passengers.push({
+          rowId: `legacy-${r.id}`,
+          passengerId: null,
+          name: r.booker_name,
+          document: r.booker_document,
+          seatCode: null,
+          boarded: false,
+        });
+      }
+    }
+
+    // Convert maps to sorted arrays and compute stats
+    const groups = [];
+    for (const [, rg] of routeMap) {
+      const trips = [];
+      for (const [, tg] of rg.trips) {
+        // Sort passengers by seat code within each reservation
+        for (const [, res] of tg.reservations) {
+          res.passengers.sort((a: any, b: any) =>
+            (a.seatCode || '').localeCompare(b.seatCode || '')
+          );
+        }
+
+        // Compute trip stats
+        const allPassengers: any[] = [];
+        let cancelled = 0;
+        let boarded = 0;
+        for (const [, res] of tg.reservations) {
+          if (res.status === 'cancelled') cancelled += res.passengers.length;
+          for (const p of res.passengers) {
+            if (p.boarded) boarded++;
+            allPassengers.push(p);
+          }
+        }
+
+        trips.push({
+          tripId: tg.tripId,
+          departureTime: tg.departureTime,
+          status: tg.status,
+          capacity: tg.capacity,
+          stats: {
+            reservations: tg.reservations.size,
+            passengers: allPassengers.length,
+            boarded,
+            cancelled,
+          },
+          reservations: [...tg.reservations.values()],
+        });
+      }
+
+      trips.sort(
+        (a, b) =>
+          new Date(b.departureTime).getTime() -
+          new Date(a.departureTime).getTime()
+      );
+
+      groups.push({
+        routeId: rg.routeId,
+        origin: rg.origin,
+        destination: rg.destination,
+        trips,
+      });
+    }
+
+    groups.sort((a, b) => a.origin.localeCompare(b.origin));
+    return groups;
   }
 }
 
