@@ -50,3 +50,18 @@ Siempre con CTA.
 ## Importante
 
 No diseñar interfaces tipo admin panel genérico.
+
+UI Reference:
+admin/trips
+
+Todos los nuevos módulos administrativos deben reutilizar:
+
+- PageHeader
+- Card
+- Modal
+- SectionTitle
+- Filter patterns
+- Empty states
+- Skeletons
+- Toast handling
+- Design tokens

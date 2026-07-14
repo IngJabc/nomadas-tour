@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { CardSkeleton } from '@/components/ui/Skeleton';
+import { SectionTitle } from '@/components/ui/SectionTitle';
 import { BusLayout } from '@/components/bus/BusLayout';
 import { useTripRealtime } from '@/hooks/useTripRealtime';
 
@@ -38,14 +39,6 @@ function formatDateTime(iso: string) {
   };
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="font-[family-name:var(--font-heading)] font-bold text-[16px] text-[var(--color-brand-navy)] border-l-4 border-[var(--color-brand-cyan)] pl-3 mb-4">
-      {children}
-    </h3>
-  );
-}
-
 export default function AdminTripDetailPage() {
   const params = useParams();
   const tripId = params.tripId as string;
@@ -54,7 +47,7 @@ export default function AdminTripDetailPage() {
 
   if (loading) {
     return (
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <CardSkeleton />
       </main>
     );
@@ -62,7 +55,7 @@ export default function AdminTripDetailPage() {
 
   if (error || !trip) {
     return (
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <PageHeader
           title="Viaje no encontrado"
         />
@@ -88,7 +81,7 @@ export default function AdminTripDetailPage() {
   }
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <div className="mb-4">
         <Link
           href="/admin/trips"
@@ -162,7 +155,7 @@ export default function AdminTripDetailPage() {
 
           {/* Metrics KPIs */}
           <Card>
-            <SectionTitle>Ocupación</SectionTitle>
+            <SectionTitle as="h3" className="mb-4">Ocupación</SectionTitle>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="text-center p-3 rounded-xl bg-[rgba(0,212,255,0.08)]">
                 <p className="font-[family-name:var(--font-body)] font-normal text-[10px] text-[var(--color-brand-muted)] uppercase tracking-wide mb-1">Disponibles</p>
@@ -193,7 +186,7 @@ export default function AdminTripDetailPage() {
 
           {/* Agencies */}
           <Card>
-            <SectionTitle>Agencias</SectionTitle>
+            <SectionTitle as="h3" className="mb-4">Agencias</SectionTitle>
             {agencies.length === 0 ? (
               <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
                 No hay agencias asignadas
@@ -224,7 +217,7 @@ export default function AdminTripDetailPage() {
 
           {/* Passenger List */}
           <Card>
-            <SectionTitle>Pasajeros ({passengers.length})</SectionTitle>
+            <SectionTitle as="h3" className="mb-4">Pasajeros ({passengers.length})</SectionTitle>
             {passengers.length === 0 ? (
               <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
                 No hay pasajeros registrados
@@ -276,7 +269,7 @@ export default function AdminTripDetailPage() {
         <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0">
           <div className="sticky top-24">
             <Card>
-              <SectionTitle>Mapa de asientos</SectionTitle>
+              <SectionTitle as="h3" className="mb-4">Mapa de asientos</SectionTitle>
               <BusLayout
                 seats={effectiveSeats}
                 selectedSeats={[]}

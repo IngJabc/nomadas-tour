@@ -25,7 +25,7 @@ export function TripAgencies({ agencies }: TripAgenciesProps) {
           {agencies.length} {agencies.length === 1 ? 'agencia' : 'agencias'}
         </span>
       </div>
-      <div className="flex flex-col gap-0.5 ml-5">
+      <div className="flex flex-col gap-0.5 ml-6">
         {visible.map((a) => (
           <span
             key={a.id}
