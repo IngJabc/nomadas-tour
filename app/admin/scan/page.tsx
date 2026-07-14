@@ -72,7 +72,8 @@ export default function ScanPage() {
     setSuccessMsg(null);
 
     try {
-      const reservations = await adminApi.listReservations({ status: 'confirmed' });
+      const data = await adminApi.listReservations({ status: 'confirmed', search: qrCode, limit: 100 });
+      const reservations = data.data || [];
       const found = reservations.find((r: any) => r.qr_code === qrCode);
       if (!found) {
         setLookupError('Reserva no encontrada');

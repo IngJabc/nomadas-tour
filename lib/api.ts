@@ -139,8 +139,13 @@ export const adminApi = {
   deleteTrip: (id: string) => request<void>(`/admin/trips/${id}`, { method: 'DELETE' }),
   updateTripStatus: (id: string, status: string) =>
     request<any>(`/admin/trips/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-  listReservations: (filters?: { agency_id?: string; trip_id?: string; status?: string }) =>
-    request<any[]>('/admin/reservations', { params: filters as any }),
+  listReservations: (params?: { page?: number; limit?: number; status?: string; search?: string; agency_id?: string; trip_id?: string }) =>
+    request<any>('/admin/reservations', { params: params as any }),
+  getPassengerTree: (params?: { status?: string; route_id?: string; trip_id?: string; agency_id?: string; date?: string; search?: string }) =>
+    request<any>('/admin/reservations/tree', { params: params as any }),
+  getReservation: (id: string) => request<any>(`/admin/reservations/${id}`),
+  updateReservationStatus: (id: string, status: string) =>
+    request<any>(`/admin/reservations/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   createInvitation: () =>
     request<any>('/admin/invitations', { method: 'POST' }),
   listInvitations: () =>
