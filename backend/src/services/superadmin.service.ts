@@ -64,13 +64,54 @@ export class SuperadminService {
 
   // ---- Routes ----
   async listRoutes() {
-    const { data, error } = await supabaseAdmin
+    const { data: routes, error } = await supabaseAdmin
       .from('routes')
       .select('*')
       .order('origin');
 
     if (error) throw new ValidationError(error.message);
-    return data;
+    if (!routes || routes.length === 0) return [];
+
+    const routeIds = routes.map((r: any) => r.id);
+
+    const { data: trips } = await supabaseAdmin
+      .from('trips')
+      .select('id, route_id')
+      .in('route_id', routeIds);
+
+    const tripCountByRoute: Record<string, number> = {};
+    const allTripIds: string[] = [];
+    for (const t of trips || []) {
+      tripCountByRoute[t.route_id] = (tripCountByRoute[t.route_id] || 0) + 1;
+      allTripIds.push(t.id);
+    }
+
+    let reservationCountByTrip: Record<string, number> = {};
+    if (allTripIds.length > 0) {
+      const { data: reservations } = await supabaseAdmin
+        .from('reservations')
+        .select('trip_id')
+        .in('trip_id', allTripIds)
+        .in('status', ['confirmed', 'partial', 'completed', 'boarded']);
+      for (const r of reservations || []) {
+        reservationCountByTrip[r.trip_id] = (reservationCountByTrip[r.trip_id] || 0) + 1;
+      }
+    }
+
+    const tripIdsByRoute: Record<string, string[]> = {};
+    for (const t of trips || []) {
+      if (!tripIdsByRoute[t.route_id]) tripIdsByRoute[t.route_id] = [];
+      tripIdsByRoute[t.route_id].push(t.id);
+    }
+
+    return routes.map((route: any) => {
+      const routeTripIds = tripIdsByRoute[route.id] || [];
+      const tripCount = routeTripIds.length;
+      const reservationCount = routeTripIds.reduce(
+        (sum, tid) => sum + (reservationCountByTrip[tid] || 0), 0
+      );
+      return { ...route, tripCount, reservationCount };
+    });
   }
 
   async createRoute(origin: string, destination: string) {
@@ -85,6 +126,32 @@ export class SuperadminService {
   }
 
   async updateRoute(id: string, updates: { origin?: string; destination?: string }) {
+    const { data: existing } = await supabaseAdmin
+      .from('routes')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) throw new NotFoundError('Route not found');
+
+    const { data: trips } = await supabaseAdmin
+      .from('trips')
+      .select('id')
+      .eq('route_id', id);
+
+    if (trips && trips.length > 0) {
+      const tripIds = trips.map(t => t.id);
+      const { count } = await supabaseAdmin
+        .from('reservations')
+        .select('*', { count: 'exact', head: true })
+        .in('trip_id', tripIds)
+        .in('status', ['confirmed', 'partial', 'completed', 'boarded']);
+
+      if (count && count > 0) {
+        throw new ForbiddenError('No puedes editar esta ruta porque tiene reservas asociadas.');
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('routes')
       .update(updates)
@@ -93,11 +160,27 @@ export class SuperadminService {
       .single();
 
     if (error) throw new ValidationError(error.message);
-    if (!data) throw new NotFoundError('Route not found');
     return data;
   }
 
   async deleteRoute(id: string) {
+    const { data: existing } = await supabaseAdmin
+      .from('routes')
+      .select('id')
+      .eq('id', id)
+      .single();
+
+    if (!existing) throw new NotFoundError('Route not found');
+
+    const { count } = await supabaseAdmin
+      .from('trips')
+      .select('*', { count: 'exact', head: true })
+      .eq('route_id', id);
+
+    if (count && count > 0) {
+      throw new ForbiddenError('No puedes eliminar esta ruta porque tiene viajes asociados.');
+    }
+
     const { error } = await supabaseAdmin
       .from('routes')
       .delete()
