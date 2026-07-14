@@ -368,7 +368,7 @@ export default function AdminTripsPage() {
       </div>
 
       {/* Pagination top-right (like Gmail) */}
-      {!filterLoading && trips.length > 0 && pagination.totalPages > 1 && (
+      {trips.length > 0 && pagination.totalPages > 1 && (
         <div className="flex items-center justify-end gap-1 mb-4">
           <button
             type="button"

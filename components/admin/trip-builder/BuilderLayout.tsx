@@ -125,44 +125,45 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
   const isValid = canProceed();
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-x-hidden">
       <div className="mb-6">
         <StepIndicator currentStep={state.currentStep} />
       </div>
 
-      <AnimatePresence mode="wait" custom={direction}>
-        <motion.div
-          key={`label-${state.currentStep}`}
-          custom={direction}
-          variants={stepVariants}
-          initial="enter"
-          animate="center"
-          exit="exit"
-          transition={{ duration: 0.18, ease: 'easeInOut' }}
-          className="flex items-center gap-3 mb-5"
-        >
-          <div className="w-1 h-[18px] bg-[var(--color-brand-cyan)] rounded-sm shrink-0" />
-          <h2 className="font-[family-name:var(--font-heading)] font-bold text-[18px] text-[var(--color-brand-navy)]">
-            {STEP_LABELS[state.currentStep]}
-          </h2>
-        </motion.div>
-      </AnimatePresence>
+      <div className="min-h-11">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={`label-${state.currentStep}`}
+            custom={direction}
+            variants={stepVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            className="flex items-center gap-3 mb-5"
+          >
+            <div className="w-1 h-[18px] bg-[var(--color-brand-cyan)] rounded-sm shrink-0" />
+            <h2 className="font-[family-name:var(--font-heading)] font-bold text-[18px] text-[var(--color-brand-navy)]">
+              {STEP_LABELS[state.currentStep]}
+            </h2>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       <div className="h-[380px] overflow-hidden flex flex-col">
-        <motion.div layout="position" transition={{ duration: 0.25, ease: 'easeInOut' }} className="flex-1">
-          <Card className="h-full flex flex-col items-center justify-center">
-            <AnimatePresence mode="wait" custom={direction}>
-              <motion.div
-                key={state.currentStep}
-                custom={direction}
-                variants={stepVariants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="w-full"
-              >
-                <div className="mx-auto w-full max-w-lg">
+        <Card className="flex-1 relative flex items-center justify-center">
+          <AnimatePresence mode="wait" custom={direction}>
+            <motion.div
+              key={state.currentStep}
+              custom={direction}
+              variants={stepVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="w-full flex flex-col items-center justify-center"
+            >
+              <div className="mx-auto w-full max-w-lg">
                   {state.currentStep === 0 && (
                     <RouteStep
                       routes={routes}
@@ -195,42 +196,43 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
                 </div>
               </motion.div>
             </AnimatePresence>
-          </Card>
-        </motion.div>
 
-        <AnimatePresence mode="wait">
-          {navError && (
-            <motion.div
-              key="nav-error"
-              variants={errorVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="flex items-center gap-2 p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
-            >
-              <AlertCircle className="w-4 h-4 text-[#ef4444] shrink-0" />
-              <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">{navError}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          <div className="absolute bottom-0 left-0 right-0 px-6 pb-5 space-y-2">
+            <AnimatePresence>
+              {navError && (
+                <motion.div
+                  key="nav-error"
+                  variants={errorVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="flex items-center gap-2 p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
+                >
+                  <AlertCircle className="w-4 h-4 text-[#ef4444] shrink-0" />
+                  <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">{navError}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-        <AnimatePresence mode="wait">
-          {submitError && (
-            <motion.div
-              key="submit-error"
-              variants={errorVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="flex items-center gap-2 p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
-            >
-              <AlertCircle className="w-4 h-4 text-[#ef4444] shrink-0" />
-              <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">{submitError}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            <AnimatePresence>
+              {submitError && (
+                <motion.div
+                  key="submit-error"
+                  variants={errorVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  className="flex items-center gap-2 p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
+                >
+                  <AlertCircle className="w-4 h-4 text-[#ef4444] shrink-0" />
+                  <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">{submitError}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </Card>
       </div>
 
       <motion.div
