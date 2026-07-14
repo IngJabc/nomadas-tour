@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { Plus, Calendar, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { Plus, Calendar, Search, X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -12,6 +12,7 @@ import { CardSkeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { TripCard } from '@/components/admin/trips/TripCard';
 import { TripBuilderModal } from '@/components/admin/trip-builder/TripBuilderModal';
+import { ContextualModal } from '@/components/ui/ContextualModal';
 import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
 import { adminApi } from '@/lib/api';
 import type { Route } from '@/types';
@@ -43,8 +44,11 @@ function syncUrl(page: number, status: string, routeId: string, agencyId: string
   window.history.replaceState(null, '', `/admin/trips?${params.toString()}`);
 }
 
+type ModalAction = 'complete' | 'cancel' | 'delete' | 'postpone';
+
 export default function AdminTripsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const [trips, setTrips] = useState<any[]>([]);
   const [pagination, setPagination] = useState({ page: 1, limit: 6, total: 0, totalPages: 1 });
@@ -67,6 +71,14 @@ export default function AdminTripsPage() {
   const [dateFilter, setDateFilter] = useState(searchParams.get('departure_date') || '');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const page = parseInt(searchParams.get('page') || '1');
+
+  // Contextual modal
+  const [activeModal, setActiveModal] = useState<{
+    tripId: string;
+    action: ModalAction;
+    anchorRect: DOMRect;
+  } | null>(null);
+  const [postponeDate, setPostponeDate] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -151,57 +163,58 @@ export default function AdminTripsPage() {
     doFetch(page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter);
   }, [doFetch, page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter]);
 
-  const handleDelete = async (tripId: string) => {
+  const handleAction = useCallback((tripId: string, action: string, anchorRect: DOMRect) => {
+    if (action === 'view') {
+      router.push(`/admin/trips/${tripId}`);
+      return;
+    }
+
+    if (action === 'complete' || action === 'cancel' || action === 'delete' || action === 'postpone') {
+      setPostponeDate('');
+      setActiveModal({ tripId, action, anchorRect });
+    }
+  }, [router]);
+
+  const handleModalConfirm = async () => {
+    if (!activeModal) return;
+    const { tripId, action } = activeModal;
+
+    if (action === 'postpone' && !postponeDate) return;
+
     setActionLoading(tripId);
     try {
-      await adminApi.deleteTrip(tripId);
-      setTrips((prev) => prev.filter((t: any) => t.id !== tripId));
+      if (action === 'complete') {
+        await adminApi.updateTripStatus(tripId, 'completed');
+        setTrips((prev) => prev.map((t: any) => t.id === tripId ? { ...t, status: 'completed' } : t));
+        toast.success('Viaje completado');
+      } else if (action === 'cancel') {
+        await adminApi.updateTripStatus(tripId, 'cancelled');
+        setTrips((prev) => prev.map((t: any) => t.id === tripId ? { ...t, status: 'cancelled' } : t));
+        toast.success('Viaje cancelado');
+      } else if (action === 'delete') {
+        await adminApi.deleteTrip(tripId);
+        setTrips((prev) => prev.filter((t: any) => t.id !== tripId));
+        toast.success('Viaje eliminado');
+      } else if (action === 'postpone') {
+        const trip = trips.find((t: any) => t.id === tripId);
+        if (trip) {
+          const data = {
+            route_id: trip.route_id,
+            departure_time: postponeDate,
+            vehicle_type: trip.vehicle_type ?? 'bus',
+            agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),
+          };
+          await adminApi.updateTrip(tripId, data);
+          doFetch(page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter);
+          toast.success('Viaje pospuesto');
+        }
+      }
     } catch {
-      toast.error('No se pudo eliminar el viaje');
+      toast.error('No se pudo completar la acción');
     } finally {
       setActionLoading(null);
-    }
-  };
-
-  const handleComplete = async (tripId: string) => {
-    setActionLoading(tripId);
-    try {
-      await adminApi.updateTripStatus(tripId, 'completed');
-      setTrips((prev) => prev.map((t: any) => t.id === tripId ? { ...t, status: 'completed' } : t));
-    } catch {
-      toast.error('No se pudo completar el viaje');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handleCancel = async (tripId: string) => {
-    setActionLoading(tripId);
-    try {
-      await adminApi.updateTripStatus(tripId, 'cancelled');
-      setTrips((prev) => prev.map((t: any) => t.id === tripId ? { ...t, status: 'cancelled' } : t));
-    } catch {
-      toast.error('No se pudo cancelar el viaje');
-    } finally {
-      setActionLoading(null);
-    }
-  };
-
-  const handlePostponeInline = async (trip: any, newDate: string) => {
-    setActionLoading(trip.id);
-    try {
-      const data = {
-        route_id: trip.route_id,
-        departure_time: newDate,
-        vehicle_type: trip.vehicle_type ?? 'bus',
-        agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),
-      };
-      await adminApi.updateTrip(trip.id, data);
-      doFetch(page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter);
-    } catch {
-      // ignore
-    } finally {
-      setActionLoading(null);
+      setActiveModal(null);
+      setPostponeDate('');
     }
   };
 
@@ -269,6 +282,8 @@ export default function AdminTripsPage() {
 
   const isActive = (t: any) => t.status === 'active';
 
+  const modalTrip = activeModal ? trips.find((t: any) => t.id === activeModal.tripId) : null;
+
   if (initialLoad) {
     return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -315,7 +330,7 @@ export default function AdminTripsPage() {
         </div>
 
         {/* Row 2: Search, Route, Agency, Date */}
-        <motion.div layout className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
           <div className="relative flex-1 min-w-0 basis-full sm:basis-[200px]">
             <input
               type="text"
@@ -383,12 +398,7 @@ export default function AdminTripsPage() {
 
           <AnimatePresence>
             {(statusFilter || searchFilter || routeFilter || agencyFilter || dateFilter) && (
-              <motion.button
-                layout
-                initial={{ opacity: 0, width: 0, scaleX: 0 }}
-                animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
-                exit={{ opacity: 0, width: 0, scaleX: 0 }}
-                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+              <button
                 type="button"
                 onClick={() => {
                   setSearchInput('');
@@ -399,14 +409,14 @@ export default function AdminTripsPage() {
                   setDateFilter('');
                   doFetch(1, '', '', '', '', '');
                 }}
-                className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
+                className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium"
               >
                 <X className="w-3.5 h-3.5" />
                 Limpiar
-              </motion.button>
+              </button>
             )}
           </AnimatePresence>
-        </motion.div>
+        </div>
       </div>
 
       {/* Pagination top-right (like Gmail) */}
@@ -462,26 +472,15 @@ export default function AdminTripsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
           {trips.map((trip) => (
-            <motion.div
+            <TripCard
               key={trip.id}
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <TripCard
-                trip={trip}
-                onEdit={handleEdit}
-                onComplete={handleComplete}
-                onCancel={handleCancel}
-                onPostpone={handlePostponeInline}
-                onDelete={handleDelete}
-                actionLoading={actionLoading}
-                canComplete={isActive(trip) && canComplete(trip.departure_time)}
-                canCancelPostpone={isActive(trip) && canCancelOrPostpone(trip.departure_time)}
-              />
-            </motion.div>
+              trip={trip}
+              onEdit={handleEdit}
+              onAction={handleAction}
+              actionLoading={actionLoading}
+              canComplete={isActive(trip) && canComplete(trip.departure_time)}
+              canCancelPostpone={isActive(trip) && canCancelOrPostpone(trip.departure_time)}
+            />
           ))}
         </div>
       )}
@@ -493,6 +492,107 @@ export default function AdminTripsPage() {
         onClose={handleBuilderClose}
         onSuccess={handleBuilderSuccess}
       />
+
+      {/* Contextual Modal for trip actions */}
+      {activeModal && (
+        <ContextualModal
+          open={!!activeModal}
+          onClose={() => { setActiveModal(null); setPostponeDate(''); }}
+          anchorRect={activeModal.anchorRect}
+        >
+          <div className="p-6">
+            {activeModal.action === 'complete' && (
+              <>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 bg-[rgba(0,212,255,0.1)]">
+                  <CheckCircle className="w-5 h-5 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
+                </div>
+                <p className="text-lg font-bold text-[var(--color-brand-navy)] text-center mb-2">Completar viaje</p>
+                <p className="text-sm text-[var(--color-brand-muted)] text-center mb-6">
+                  {modalTrip ? `¿Deseas marcar el viaje a ${modalTrip.route?.destination} como completado?` : '¿Deseas marcar este viaje como completado?'}
+                  Esta acción no podrá deshacerse.
+                </p>
+              </>
+            )}
+
+            {activeModal.action === 'cancel' && (
+              <>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 bg-red-50">
+                  <AlertTriangle className="w-5 h-5 text-red-400" strokeWidth={1.75} />
+                </div>
+                <p className="text-lg font-bold text-[var(--color-brand-navy)] text-center mb-2">Cancelar viaje</p>
+                <p className="text-sm text-[var(--color-brand-muted)] text-center mb-6">
+                  {modalTrip ? `¿Estás seguro de cancelar el viaje a ${modalTrip.route?.destination}?` : '¿Estás seguro de cancelar este viaje?'}
+                  Esta acción no se puede deshacer.
+                </p>
+              </>
+            )}
+
+            {activeModal.action === 'delete' && (
+              <>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 bg-red-50">
+                  <AlertTriangle className="w-5 h-5 text-red-400" strokeWidth={1.75} />
+                </div>
+                <p className="text-lg font-bold text-[var(--color-brand-navy)] text-center mb-2">Eliminar viaje</p>
+                <p className="text-sm text-[var(--color-brand-muted)] text-center mb-6">
+                  {modalTrip ? `¿Estás seguro de eliminar el viaje a ${modalTrip.route?.destination}?` : '¿Estás seguro de eliminar este viaje?'}
+                  Esta acción no se puede deshacer.
+                </p>
+              </>
+            )}
+
+            {activeModal.action === 'postpone' && (
+              <>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 bg-[#fffbeb]">
+                  <Calendar className="w-5 h-5 text-[#f59e0b]" strokeWidth={1.75} />
+                </div>
+                <p className="text-lg font-bold text-[var(--color-brand-navy)] text-center mb-2">Posponer viaje</p>
+                <p className="text-sm text-[var(--color-brand-muted)] text-center mb-4">
+                  {modalTrip ? `Selecciona la nueva fecha para el viaje a ${modalTrip.route?.destination}.` : 'Selecciona la nueva fecha y hora de salida.'}
+                </p>
+                <input
+                  type="datetime-local"
+                  value={postponeDate}
+                  onChange={(e) => setPostponeDate(e.target.value)}
+                  className="w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3 py-2.5 text-sm font-[family-name:var(--font-body)] text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] mb-6"
+                />
+              </>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setActiveModal(null); setPostponeDate(''); }}
+                disabled={actionLoading === activeModal.tripId}
+                className="flex-1 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-muted)] bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleModalConfirm}
+                disabled={actionLoading === activeModal.tripId || (activeModal.action === 'postpone' && !postponeDate)}
+                className={`flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-md disabled:opacity-40 ${
+                  activeModal.action === 'cancel' || activeModal.action === 'delete'
+                    ? 'bg-red-400 hover:bg-red-500'
+                    : activeModal.action === 'postpone'
+                    ? 'bg-[#f59e0b] hover:bg-[#d97706]'
+                    : 'bg-[var(--color-brand-cyan)] hover:bg-[var(--color-brand-blue)]'
+                }`}
+              >
+                {actionLoading === activeModal.tripId
+                  ? 'Cargando...'
+                  : activeModal.action === 'complete'
+                  ? 'Confirmar'
+                  : activeModal.action === 'cancel'
+                  ? 'Cancelar viaje'
+                  : activeModal.action === 'delete'
+                  ? 'Eliminar'
+                  : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </ContextualModal>
+      )}
     </div>
   );
 }

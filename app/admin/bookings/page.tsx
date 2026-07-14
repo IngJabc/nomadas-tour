@@ -468,7 +468,7 @@ export default function AdminBookingsPage() {
         </div>
 
         {/* Row 2: Search + filters in one row */}
-        <motion.div layout className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
           <div className="relative flex-1 min-w-0 basis-full sm:basis-[200px]">
             <input
               type="text"
@@ -553,7 +553,6 @@ export default function AdminBookingsPage() {
           <AnimatePresence>
             {(statusFilter || searchFilter || routeFilter || agencyFilter || dateFilter || tripFilter) && (
               <motion.button
-                layout
                 initial={{ opacity: 0, width: 0, scaleX: 0 }}
                 animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
                 exit={{ opacity: 0, width: 0, scaleX: 0 }}
@@ -577,7 +576,7 @@ export default function AdminBookingsPage() {
               </motion.button>
             )}
           </AnimatePresence>
-        </motion.div>
+        </div>
       </motion.div>
 
       {/* Content */}

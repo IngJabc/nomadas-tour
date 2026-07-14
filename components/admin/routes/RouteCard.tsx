@@ -1,6 +1,6 @@
 'use client';
 
-import { MapPin, Pencil, Trash2, AlertTriangle, Lock } from 'lucide-react';
+import { MapPin, Pencil, Power, PowerOff, AlertTriangle, Lock } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -10,6 +10,7 @@ export interface RouteData {
   id: string;
   origin: string;
   destination: string;
+  status: 'active' | 'inactive';
   tripCount: number;
   reservationCount: number;
 }
@@ -17,15 +18,17 @@ export interface RouteData {
 interface RouteCardProps {
   route: RouteData;
   onEdit: (route: RouteData) => void;
-  onDelete: (route: RouteData) => void;
+  onDeactivate: (route: RouteData) => void;
+  onActivate: (route: RouteData) => void;
 }
 
-export function RouteCard({ route, onEdit, onDelete }: RouteCardProps) {
+export function RouteCard({ route, onEdit, onDeactivate, onActivate }: RouteCardProps) {
   const hasTrips = route.tripCount > 0;
   const hasReservations = route.reservationCount > 0;
+  const isActive = route.status === 'active';
 
   const editDisabled = hasReservations;
-  const deleteDisabled = hasTrips;
+  const deactivateDisabled = hasTrips && isActive;
 
   return (
     <Card hover className="flex flex-col gap-4 h-full">
@@ -37,7 +40,13 @@ export function RouteCard({ route, onEdit, onDelete }: RouteCardProps) {
           <h3 className="font-[family-name:var(--font-heading)] font-bold text-[17px] text-[var(--color-brand-navy)] leading-tight">
             {route.destination}
           </h3>
+          <p className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)] mt-0.5">
+            Desde {route.origin}
+          </p>
           <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <Badge variant={isActive ? (hasTrips ? 'info' : 'inactive') : 'inactive'} size="xs">
+              {isActive ? 'Activa' : 'Inactiva'}
+            </Badge>
             <Badge variant={hasTrips ? 'info' : 'inactive'} size="xs">
               {route.tripCount} {route.tripCount === 1 ? 'viaje' : 'viajes'}
             </Badge>
@@ -74,26 +83,37 @@ export function RouteCard({ route, onEdit, onDelete }: RouteCardProps) {
           </Button>
         )}
 
-        {deleteDisabled ? (
-          <Tooltip content="No puedes eliminar esta ruta porque tiene viajes asociados.">
+        {isActive ? (
+          deactivateDisabled ? (
+            <Tooltip content="No puedes desactivar esta ruta porque tiene viajes activos. Cancela o completa los viajes primero.">
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled
+                title="No puedes desactivar esta ruta porque tiene viajes activos."
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Desactivar
+              </Button>
+            </Tooltip>
+          ) : (
             <Button
               variant="destructive"
               size="sm"
-              disabled
-              title="No puedes eliminar esta ruta porque tiene viajes asociados."
+              onClick={() => onDeactivate(route)}
             >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              Eliminar
+              <PowerOff className="w-3.5 h-3.5" />
+              Desactivar
             </Button>
-          </Tooltip>
+          )
         ) : (
           <Button
-            variant="destructive"
+            variant="secondary"
             size="sm"
-            onClick={() => onDelete(route)}
+            onClick={() => onActivate(route)}
           >
-            <Trash2 className="w-3.5 h-3.5" />
-            Eliminar
+            <Power className="w-3.5 h-3.5" />
+            Activar
           </Button>
         )}
       </div>

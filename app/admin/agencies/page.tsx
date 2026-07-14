@@ -227,7 +227,7 @@ export default function AdminAgenciesPage() {
       {/* Create/Edit Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setModalOpen(false)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setModalOpen(false)} />
           <div className="relative bg-[var(--color-brand-surface)] rounded-2xl shadow-xl border border-[rgba(0,0,0,0.06)] p-6 w-full max-w-md">
             <h3 className="font-[family-name:var(--font-heading)] font-bold text-lg text-[var(--color-brand-navy)] mb-4">
               {editAgency ? 'Editar agencia' : 'Nueva agencia'}
@@ -298,7 +298,7 @@ export default function AdminAgenciesPage() {
       {/* Invitation link modal */}
       {newAgencyLink && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setNewAgencyLink(null)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setNewAgencyLink(null)} />
           <div className="relative bg-[var(--color-brand-surface)] rounded-2xl shadow-xl border border-[rgba(0,0,0,0.06)] p-6 w-full max-w-md">
             <h3 className="font-[family-name:var(--font-heading)] font-bold text-lg text-[var(--color-brand-navy)] mb-2">
               Agencia creada
@@ -332,7 +332,7 @@ export default function AdminAgenciesPage() {
       {/* Confirm delete modal */}
       {deleteAgency && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDeleteAgency(null)} />
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDeleteAgency(null)} />
           <div className="relative bg-[var(--color-brand-surface)] rounded-2xl shadow-xl border border-[rgba(0,0,0,0.06)] p-6 w-full max-w-sm text-center">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 ${
               deleteAgency.status === 'inactive' ? 'bg-emerald-50' : 'bg-[#fef2f2]'

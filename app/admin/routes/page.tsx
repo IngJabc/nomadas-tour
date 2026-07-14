@@ -41,8 +41,8 @@ export default function AdminRoutesPage() {
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
   const [editingRoute, setEditingRoute] = useState<RouteData | null>(null);
 
-  const [deleteTarget, setDeleteTarget] = useState<RouteData | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState<RouteData | null>(null);
+  const [deactivateLoading, setDeactivateLoading] = useState(false);
 
   const doFetch = useCallback(async () => {
     try {
@@ -118,26 +118,36 @@ export default function AdminRoutesPage() {
     await doFetch();
   };
 
-  const handleOpenDelete = (route: RouteData) => {
+  const handleOpenDeactivate = (route: RouteData) => {
     if (route.tripCount > 0) {
-      toast.error('No puedes eliminar esta ruta porque tiene viajes asociados.');
+      toast.error('No puedes desactivar esta ruta porque tiene viajes activos. Cancela o completa los viajes primero.');
       return;
     }
-    setDeleteTarget(route);
+    setDeactivateTarget(route);
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleteLoading(true);
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setDeactivateLoading(true);
     try {
-      await adminApi.deleteRoute(deleteTarget.id);
-      toast.success('Ruta eliminada');
-      setDeleteTarget(null);
+      await adminApi.deactivateRoute(deactivateTarget.id);
+      toast.success('Ruta desactivada');
+      setDeactivateTarget(null);
       await doFetch();
     } catch {
-      toast.error('No se pudo eliminar la ruta');
+      toast.error('No se pudo desactivar la ruta');
     } finally {
-      setDeleteLoading(false);
+      setDeactivateLoading(false);
+    }
+  };
+
+  const handleActivate = async (route: RouteData) => {
+    try {
+      await adminApi.activateRoute(route.id);
+      toast.success('Ruta activada');
+      await doFetch();
+    } catch {
+      toast.error('No se pudo activar la ruta');
     }
   };
 
@@ -182,7 +192,7 @@ export default function AdminRoutesPage() {
         <div className="relative w-full sm:w-96">
           <input
             type="text"
-            placeholder="Buscar por destino..."
+            placeholder="Buscar por destino u origen..."
             value={searchInput}
             onChange={(e) => handleChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleEnter()}
@@ -253,7 +263,8 @@ export default function AdminRoutesPage() {
               <RouteCard
                 route={route}
                 onEdit={handleOpenEdit}
-                onDelete={handleOpenDelete}
+                onDeactivate={handleOpenDeactivate}
+                onActivate={handleActivate}
               />
             </motion.div>
           ))}
@@ -269,17 +280,17 @@ export default function AdminRoutesPage() {
         onSubmit={handleFormSubmit}
       />
 
-      {/* Delete Confirmation */}
+      {/* Deactivate Confirmation */}
       <ConfirmModal
-        open={deleteTarget !== null}
-        title="Eliminar ruta"
-        message={`¿Estás seguro de eliminar la ruta "${deleteTarget?.destination}"? Esta acción no se puede deshacer.`}
-        confirmLabel="Eliminar"
+        open={deactivateTarget !== null}
+        title="Desactivar ruta"
+        message={`¿Estás seguro de desactivar la ruta "${deactivateTarget?.destination}"? Esta ruta dejará de aparecer en la selección de viajes nuevos.`}
+        confirmLabel="Desactivar"
         cancelLabel="Cancelar"
         variant="danger"
-        loading={deleteLoading}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setDeleteTarget(null)}
+        loading={deactivateLoading}
+        onConfirm={handleConfirmDeactivate}
+        onCancel={() => setDeactivateTarget(null)}
       />
     </div>
   );
