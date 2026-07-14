@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Plus, Calendar, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -255,7 +255,7 @@ export default function AdminTripsPage() {
 
   if (initialLoad) {
     return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => <CardSkeleton key={i} />)}
@@ -265,7 +265,7 @@ export default function AdminTripsPage() {
   }
 
   return (
-      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <PageHeader
         title="Viajes"
         action={
@@ -299,8 +299,8 @@ export default function AdminTripsPage() {
         </div>
 
         {/* Row 2: Search, Route, Agency, Date */}
-        <div className="flex flex-col sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="relative w-full sm:w-auto min-w-0">
+        <motion.div layout className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+          <div className="relative flex-1 min-w-0 basis-full sm:basis-[200px]">
             <input
               type="text"
               placeholder="Buscar destino o agencia..."
@@ -324,7 +324,7 @@ export default function AdminTripsPage() {
           <select
             value={routeFilter}
             onChange={(e) => handleRouteChange(e.target.value)}
-            className={`w-full sm:w-auto h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${routeFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
+            className={`w-full sm:w-44 sm:shrink-0 h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${routeFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
           >
             <option value="">Ruta</option>
             {routes.map((r) => (
@@ -337,7 +337,7 @@ export default function AdminTripsPage() {
           <select
             value={agencyFilter}
             onChange={(e) => handleAgencyChange(e.target.value)}
-            className={`w-full sm:w-auto h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${agencyFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
+            className={`w-full sm:w-44 sm:shrink-0 h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${agencyFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
           >
             <option value="">Agencia</option>
             {agencies.map((a) => (
@@ -347,7 +347,7 @@ export default function AdminTripsPage() {
             ))}
           </select>
 
-          <div className="relative w-full sm:w-auto sm:shrink-0">
+          <div className="relative w-full sm:w-44 sm:shrink-0">
             <input
               type="date"
               value={dateFilter}
@@ -364,7 +364,33 @@ export default function AdminTripsPage() {
               </button>
             )}
           </div>
-        </div>
+
+          <AnimatePresence>
+            {(statusFilter || searchFilter || routeFilter || agencyFilter || dateFilter) && (
+              <motion.button
+                layout
+                initial={{ opacity: 0, width: 0, scaleX: 0 }}
+                animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
+                exit={{ opacity: 0, width: 0, scaleX: 0 }}
+                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  setSearchFilter('');
+                  setStatusFilter('');
+                  setRouteFilter('');
+                  setAgencyFilter('');
+                  setDateFilter('');
+                  doFetch(1, '', '', '', '', '');
+                }}
+                className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
+              >
+                <X className="w-3.5 h-3.5" />
+                Limpiar
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
 
       {/* Pagination top-right (like Gmail) */}

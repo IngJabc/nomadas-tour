@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { cn } from '@/lib/utils';
-import { X, Menu, LogOut, ArrowLeft, type LucideIcon } from 'lucide-react';
+import { useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { X, Menu, LogOut, ArrowLeft, type LucideIcon } from "lucide-react";
 
 interface NavItem {
   href: string;
@@ -16,7 +16,6 @@ interface SidebarProps {
   navItems: NavItem[];
   brandLabel: string;
   onLogout: () => void;
-  backLink?: { href: string; label: string };
   basePath: string;
 }
 
@@ -24,7 +23,7 @@ export function Sidebar({
   navItems,
   brandLabel,
   onLogout,
-  backLink = { href: '/', label: 'Volver al sitio' },
+
   basePath,
 }: SidebarProps) {
   const pathname = usePathname();
@@ -40,10 +39,10 @@ export function Sidebar({
       {/* Mobile hamburger */}
       <button
         className={cn(
-          'lg:hidden fixed top-3 left-3 z-50 p-3 rounded-xl',
-          'bg-[var(--color-brand-dark)] shadow-lg shadow-black/20',
-          'transition-opacity duration-150',
-          drawerOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          "lg:hidden fixed top-3 left-3 z-50 p-3 rounded-xl",
+          "bg-[var(--color-brand-dark)] shadow-lg shadow-black/20",
+          "transition-opacity duration-150",
+          drawerOpen ? "opacity-0 pointer-events-none" : "opacity-100"
         )}
         onClick={() => setDrawerOpen(true)}
         aria-label="Abrir menú"
@@ -62,11 +61,11 @@ export function Sidebar({
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 w-[220px] flex flex-col',
-          'bg-[var(--color-brand-dark)]',
-          'transform transition-transform duration-200',
-          drawerOpen ? 'translate-x-0' : '-translate-x-full',
-          'lg:translate-x-0 lg:fixed'
+          "fixed inset-y-0 left-0 z-40 w-[220px] flex flex-col",
+          "bg-[var(--color-brand-dark)]",
+          "transform transition-transform duration-200",
+          drawerOpen ? "translate-x-0" : "-translate-x-full",
+          "lg:translate-x-0 lg:fixed"
         )}
       >
         {/* Close button mobile */}
@@ -101,11 +100,11 @@ export function Sidebar({
                 href={item.href}
                 onClick={() => setDrawerOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-4 py-2.5 text-sm rounded-r-lg transition-colors',
-                  'font-[family-name:var(--font-body)] font-medium border-l-[3px] border-solid',
+                  "flex items-center gap-3 px-4 py-2.5 text-sm rounded-r-lg transition-colors",
+                  "font-[family-name:var(--font-body)] font-medium border-l-[3px] border-solid",
                   active
-                    ? 'bg-white/10 text-white border-l-[var(--color-brand-cyan)]'
-                    : 'bg-transparent text-white/65 hover:bg-white/5 hover:text-white border-l-transparent'
+                    ? "bg-white/10 text-white border-l-[var(--color-brand-cyan)]"
+                    : "bg-transparent text-white/65 hover:bg-white/5 hover:text-white border-l-transparent"
                 )}
               >
                 <Icon className="w-5 h-5 shrink-0" strokeWidth={1.5} />
@@ -116,23 +115,15 @@ export function Sidebar({
         </nav>
 
         {/* Footer */}
-        <div className="px-6 py-6 border-t border-white/10 flex flex-col gap-3">
-          <Link
-            href={backLink.href}
-            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] font-medium text-xs text-white/60 hover:text-white"
-            onClick={() => setDrawerOpen(false)}
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            {backLink.label}
-          </Link>
+        <div className="px-6 py-6 border-t border-white/10 flex flex-col gap-3 ">
           <button
             onClick={() => {
               setDrawerOpen(false);
               onLogout();
             }}
-            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] font-medium text-xs text-red-400 hover:text-red-300 transition-colors"
+            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] font-medium text-xs text-red-400 hover:text-red-300 transition-colors cursor-pointer"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-3.5 h-3.5 " />
             Cerrar sesión
           </button>
         </div>
