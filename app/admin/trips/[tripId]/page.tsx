@@ -47,7 +47,7 @@ export default function AdminTripDetailPage() {
 
   if (loading) {
     return (
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <CardSkeleton />
       </main>
     );
@@ -55,7 +55,7 @@ export default function AdminTripDetailPage() {
 
   if (error || !trip) {
     return (
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <PageHeader
           title="Viaje no encontrado"
         />
@@ -81,7 +81,7 @@ export default function AdminTripDetailPage() {
   }
 
   return (
-    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <div className="mb-4">
         <Link
           href="/admin/trips"

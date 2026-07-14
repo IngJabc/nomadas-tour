@@ -98,7 +98,7 @@ export default function BookingDetailPage() {
 
   if (loading) {
     return (
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <CardSkeleton />
       </main>
     );
@@ -106,7 +106,7 @@ export default function BookingDetailPage() {
 
   if (error || !reservation) {
     return (
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <PageHeader title="Reserva no encontrada" />
         <div className="p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2] font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
           {error ?? "La reserva no existe o no está disponible"}
@@ -138,7 +138,7 @@ export default function BookingDetailPage() {
   const tripSb = trip ? TRIP_STATUS[trip.status] ?? TRIP_STATUS.active : null;
 
   return (
-    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <div className="mb-4">
         <Link
           href="/admin/bookings"

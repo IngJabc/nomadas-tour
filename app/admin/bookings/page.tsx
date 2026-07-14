@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -61,6 +61,9 @@ type RouteGroup = {
   destination: string;
   trips: TripGroup[];
 };
+
+interface RouteOption { id: string; origin: string; destination: string; }
+interface AgencyOption { id: string; name: string; }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -197,16 +200,38 @@ export default function AdminBookingsPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
+  const [routeFilter, setRouteFilter] = useState('');
+  const [agencyFilter, setAgencyFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
+  const [tripFilter, setTripFilter] = useState('');
+
+  const [routes, setRoutes] = useState<RouteOption[]>([]);
+  const [agencies, setAgencies] = useState<AgencyOption[]>([]);
 
   const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set());
   const [expandedTrips, setExpandedTrips] = useState<Set<string>>(new Set());
 
-  const doFetch = useCallback(async (status: string, search: string) => {
+  // Derive trip options from tree based on selected route
+  const tripOptions = useMemo(() => {
+    const source = routeFilter
+      ? tree.filter((r) => r.routeId === routeFilter)
+      : tree;
+    return source.flatMap((r) =>
+      r.trips.map((t) => ({
+        tripId: t.tripId,
+        departureTime: t.departureTime,
+        destination: r.destination,
+      }))
+    );
+  }, [tree, routeFilter]);
+
+  const doFetch = useCallback(async (raw: Record<string, string | undefined>) => {
     try {
       setFetchError(null);
       const params: Record<string, string> = {};
-      if (status) params.status = status;
-      if (search) params.search = search;
+      for (const [k, v] of Object.entries(raw)) {
+        if (v) params[k] = v;
+      }
       const data = await adminApi.getPassengerTree(params);
       setTree(data || []);
     } catch {
@@ -215,33 +240,94 @@ export default function AdminBookingsPage() {
     }
   }, []);
 
+  // Build params from all filter states
+  const buildParams = useCallback(() => {
+    const p: Record<string, string> = {};
+    if (statusFilter) p.status = statusFilter;
+    if (searchFilter) p.search = searchFilter;
+    if (routeFilter) p.route_id = routeFilter;
+    if (agencyFilter) p.agency_id = agencyFilter;
+    if (dateFilter) p.date = dateFilter;
+    if (tripFilter) p.trip_id = tripFilter;
+    return p;
+  }, [statusFilter, searchFilter, routeFilter, agencyFilter, dateFilter, tripFilter]);
+
+  const resetAccordion = () => {
+    setExpandedRoutes(new Set());
+    setExpandedTrips(new Set());
+  };
+
+  const refetch = useCallback(async () => {
+    setLoading(true);
+    await doFetch(buildParams());
+    setLoading(false);
+  }, [doFetch, buildParams]);
+
+  // Initial fetch + load filter option lists
   useEffect(() => {
-    doFetch('', '').finally(() => setLoading(false));
+    Promise.all([
+      doFetch({}),
+      adminApi.listRoutes().then(setRoutes).catch(() => {}),
+      adminApi.listAgencies().then(setAgencies).catch(() => {}),
+    ]).finally(() => setLoading(false));
   }, [doFetch]);
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);
-    setExpandedRoutes(new Set());
-    setExpandedTrips(new Set());
+    resetAccordion();
     setLoading(true);
-    doFetch(value, searchFilter).finally(() => setLoading(false));
+    doFetch({ status: value || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
   };
 
   const handleSearch = () => {
     setSearchFilter(searchInput);
-    setExpandedRoutes(new Set());
-    setExpandedTrips(new Set());
+    resetAccordion();
     setLoading(true);
-    doFetch(statusFilter, searchInput).finally(() => setLoading(false));
+    doFetch({ status: statusFilter || undefined, search: searchInput || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
   };
 
   const clearSearch = () => {
     setSearchInput('');
     setSearchFilter('');
-    setExpandedRoutes(new Set());
-    setExpandedTrips(new Set());
+    resetAccordion();
     setLoading(true);
-    doFetch(statusFilter, '').finally(() => setLoading(false));
+    doFetch({ status: statusFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
+  };
+
+  const handleRouteChange = (value: string) => {
+    setRouteFilter(value);
+    setTripFilter('');
+    resetAccordion();
+    setLoading(true);
+    doFetch({ status: statusFilter || undefined, search: searchFilter || undefined, route_id: value || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined }).finally(() => setLoading(false));
+  };
+
+  const handleAgencyChange = (value: string) => {
+    setAgencyFilter(value);
+    resetAccordion();
+    setLoading(true);
+    doFetch({ status: statusFilter || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: value || undefined, date: dateFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
+  };
+
+  const handleDateChange = (value: string) => {
+    setDateFilter(value);
+    resetAccordion();
+    setLoading(true);
+    doFetch({ status: statusFilter || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: value || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
+  };
+
+  const clearDate = () => {
+    setDateFilter('');
+    resetAccordion();
+    setLoading(true);
+    doFetch({ status: statusFilter || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
+  };
+
+  const handleTripChange = (value: string) => {
+    setTripFilter(value);
+    resetAccordion();
+    setLoading(true);
+    doFetch({ status: statusFilter || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: dateFilter || undefined, trip_id: value || undefined }).finally(() => setLoading(false));
   };
 
   const toggleRoute = (key: string) => {
@@ -270,7 +356,7 @@ export default function AdminBookingsPage() {
 
   if (loading && tree.length === 0) {
     return (
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <PageHeader title="Pasajeros" />
         <motion.div
           className="flex flex-col gap-3"
@@ -301,7 +387,7 @@ export default function AdminBookingsPage() {
 
   if (fetchError && tree.length === 0) {
     return (
-      <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <PageHeader title="Pasajeros" />
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -317,7 +403,7 @@ export default function AdminBookingsPage() {
           transition={{ delay: 0.1, duration: 0.2 }}
           className="mt-4"
         >
-          <Button variant="secondary" onClick={() => doFetch(statusFilter, searchFilter)}>
+          <Button variant="secondary" onClick={() => doFetch(buildParams())}>
             Reintentar
           </Button>
         </motion.div>
@@ -328,7 +414,7 @@ export default function AdminBookingsPage() {
   // ─── Main render ────────────────────────────────────────────────────────
 
   return (
-    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <motion.div
         variants={pageFade}
         initial="hidden"
@@ -346,15 +432,15 @@ export default function AdminBookingsPage() {
         animate="visible"
         transition={{ duration: 0.25, delay: 0.05 }}
       >
-        {/* Status tabs */}
-        <div className="flex justify-center">
-          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto">
+        {/* Row 1: Status tabs */}
+        <div className="flex justify-center min-w-0">
+          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto overflow-x-auto min-w-0">
             {STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => handleStatusChange(opt.value)}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-all duration-200 ${
+                className={`shrink-0 sm:shrink px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-all duration-200 ${
                   statusFilter === opt.value
                     ? 'bg-[var(--color-brand-cyan)] text-white shadow-sm'
                     : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] hover:bg-[rgba(0,0,0,0.03)]'
@@ -366,27 +452,117 @@ export default function AdminBookingsPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:w-96">
-          <input
-            type="text"
-            placeholder="Buscar pasajero, cédula, asiento, QR, agencia, ruta..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all duration-200"
-          />
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
-          {searchFilter && (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors duration-150"
+        {/* Row 2: Search + filters in one row */}
+        <motion.div layout className="flex flex-col sm:flex-row sm:flex-wrap gap-3">
+          <div className="relative flex-1 min-w-0 basis-full sm:basis-[200px]">
+            <input
+              type="text"
+              placeholder="Buscar pasajero, cédula, asiento, QR..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all duration-200"
+            />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
+            {searchFilter && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors duration-150"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="relative w-full sm:w-44 sm:shrink-0">
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
+            />
+            {dateFilter && (
+              <button
+                type="button"
+                onClick={clearDate}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <select
+            value={agencyFilter}
+            onChange={(e) => handleAgencyChange(e.target.value)}
+            className={`w-full sm:w-44 sm:shrink-0 h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${agencyFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
+          >
+            <option value="">Agencias</option>
+            {agencies.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={routeFilter}
+            onChange={(e) => handleRouteChange(e.target.value)}
+            className={`w-full sm:w-44 sm:shrink-0 h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${routeFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
+          >
+            <option value="">Rutas</option>
+            {routes.map((r) => (
+              <option key={r.id} value={r.id}>{r.destination}</option>
+            ))}
+          </select>
+
+          {tripOptions.length > 0 && (
+            <select
+              value={tripFilter}
+              onChange={(e) => handleTripChange(e.target.value)}
+              className={`w-full sm:w-44 sm:shrink-0 h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${tripFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
             >
-              <X className="w-3.5 h-3.5" />
-            </button>
+              <option value="">Viajes</option>
+              {tripOptions.map((t) => {
+                const dt = new Date(t.departureTime);
+                const dateStr = dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+                const timeStr = dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                return (
+                  <option key={t.tripId} value={t.tripId}>
+                    {t.destination} — {dateStr} {timeStr}
+                  </option>
+                );
+              })}
+            </select>
           )}
-        </div>
+
+          <AnimatePresence>
+            {(statusFilter || searchFilter || routeFilter || agencyFilter || dateFilter || tripFilter) && (
+              <motion.button
+                layout
+                initial={{ opacity: 0, width: 0, scaleX: 0 }}
+                animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
+                exit={{ opacity: 0, width: 0, scaleX: 0 }}
+                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+                type="button"
+                onClick={() => {
+                  setSearchInput('');
+                  setSearchFilter('');
+                  setStatusFilter('');
+                  setRouteFilter('');
+                  setAgencyFilter('');
+                  setDateFilter('');
+                  setTripFilter('');
+                  resetAccordion();
+                  doFetch({});
+                }}
+                className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
+              >
+                <X className="w-3.5 h-3.5" />
+                Limpiar
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </motion.div>
 
       {/* Content */}
@@ -399,13 +575,13 @@ export default function AdminBookingsPage() {
           <EmptyState
             icon={<Users className="w-8 h-8" />}
             message={
-              searchFilter || statusFilter
+              searchFilter || statusFilter || routeFilter || agencyFilter || dateFilter || tripFilter
                 ? 'No hay resultados con esos filtros'
                 : 'Aún no hay pasajeros registrados'
             }
             action={
-              searchFilter || statusFilter
-                ? { label: 'Limpiar filtros', onClick: () => { setSearchInput(''); setSearchFilter(''); setStatusFilter(''); doFetch('', ''); } }
+              searchFilter || statusFilter || routeFilter || agencyFilter || dateFilter || tripFilter
+                ? { label: 'Limpiar filtros', onClick: () => { setSearchInput(''); setSearchFilter(''); setStatusFilter(''); setRouteFilter(''); setAgencyFilter(''); setDateFilter(''); setTripFilter(''); resetAccordion(); doFetch({}); } }
                 : undefined
             }
           />
@@ -565,14 +741,14 @@ export default function AdminBookingsPage() {
                                                 <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)] truncate">
                                                   {p.name}
                                                 </p>
-                                                <div className="flex items-center gap-2 mt-0.5">
-                                                  <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)] truncate">
+                                                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 mt-0.5">
+                                                  <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
                                                     {p.document || '—'}
                                                   </span>
                                                   {res.agency && (
                                                     <>
-                                                      <span className="text-[var(--color-brand-muted)]">·</span>
-                                                      <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)] truncate">
+                                                      <span className="hidden sm:inline text-[var(--color-brand-muted)]">·</span>
+                                                      <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
                                                         {res.agency.name}
                                                       </span>
                                                     </>
