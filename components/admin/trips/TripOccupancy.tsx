@@ -25,7 +25,7 @@ export function TripOccupancy({ total, available, reserved, boarded, className }
         />
         <div
           className="h-full bg-[#f59e0b] transition-all duration-300"
-          style={{ width: `${reservedPct - boardedPct}%` }}
+          style={{ width: `${Math.max(0, reservedPct - boardedPct)}%` }}
         />
       </div>
       <div className="flex items-center justify-between">

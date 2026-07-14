@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Plus, Calendar, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -156,7 +157,7 @@ export default function AdminTripsPage() {
       await adminApi.deleteTrip(tripId);
       setTrips((prev) => prev.filter((t: any) => t.id !== tripId));
     } catch {
-      // ignore
+      toast.error('No se pudo eliminar el viaje');
     } finally {
       setActionLoading(null);
     }
@@ -168,7 +169,7 @@ export default function AdminTripsPage() {
       await adminApi.updateTripStatus(tripId, 'completed');
       setTrips((prev) => prev.map((t: any) => t.id === tripId ? { ...t, status: 'completed' } : t));
     } catch {
-      // ignore
+      toast.error('No se pudo completar el viaje');
     } finally {
       setActionLoading(null);
     }
@@ -180,7 +181,7 @@ export default function AdminTripsPage() {
       await adminApi.updateTripStatus(tripId, 'cancelled');
       setTrips((prev) => prev.map((t: any) => t.id === tripId ? { ...t, status: 'cancelled' } : t));
     } catch {
-      // ignore
+      toast.error('No se pudo cancelar el viaje');
     } finally {
       setActionLoading(null);
     }
@@ -254,18 +255,18 @@ export default function AdminTripsPage() {
 
   if (initialLoad) {
     return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <CardSkeleton key={i} />)}
+          {[1, 2, 3, 4, 5, 6].map((i) => <CardSkeleton key={i} />)}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <PageHeader
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <PageHeader
         title="Viajes"
         action={
           <Button onClick={() => { setBuilderMode('create'); setBuilderOpen(true); }}>
@@ -285,11 +286,11 @@ export default function AdminTripsPage() {
                 key={opt.value}
                 type="button"
                 onClick={() => handleStatusChange(opt.value)}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold transition-colors ${
-                  statusFilter === opt.value
-                    ? 'bg-[var(--color-brand-cyan)] text-white'
-                    : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
-                }`}
+                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors ${
+                   statusFilter === opt.value
+                     ? 'bg-[var(--color-brand-cyan)] text-white'
+                     : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
+                 }`}
               >
                 {opt.label}
               </button>
@@ -306,7 +307,7 @@ export default function AdminTripsPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+              className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)]"
             />
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
             {searchFilter && (
@@ -323,7 +324,7 @@ export default function AdminTripsPage() {
           <select
             value={routeFilter}
             onChange={(e) => handleRouteChange(e.target.value)}
-            className="w-full sm:w-auto h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+            className={`w-full sm:w-auto h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${routeFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
           >
             <option value="">Ruta</option>
             {routes.map((r) => (
@@ -336,7 +337,7 @@ export default function AdminTripsPage() {
           <select
             value={agencyFilter}
             onChange={(e) => handleAgencyChange(e.target.value)}
-            className="w-full sm:w-auto h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)]"
+            className={`w-full sm:w-auto h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] ${agencyFilter ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'}`}
           >
             <option value="">Agencia</option>
             {agencies.map((a) => (
@@ -351,7 +352,7 @@ export default function AdminTripsPage() {
               type="date"
               value={dateFilter}
               onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full h-9 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
+              className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
             />
             {dateFilter && (
               <button
@@ -371,6 +372,7 @@ export default function AdminTripsPage() {
         <div className="flex items-center justify-end gap-1 mb-4">
           <button
             type="button"
+            aria-label="Página anterior"
             onClick={() => handlePageChange(pagination.page - 1)}
             disabled={pagination.page <= 1}
             className="w-7 h-7 flex items-center justify-center rounded-lg bg-transparent border-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-[var(--color-brand-muted)] hover:bg-slate-100 hover:text-[var(--color-brand-navy)] transition-colors"
@@ -383,6 +385,7 @@ export default function AdminTripsPage() {
           </span>
           <button
             type="button"
+            aria-label="Página siguiente"
             onClick={() => handlePageChange(pagination.page + 1)}
             disabled={pagination.page >= pagination.totalPages}
             className="w-7 h-7 flex items-center justify-center rounded-lg bg-transparent border-none cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-[var(--color-brand-muted)] hover:bg-slate-100 hover:text-[var(--color-brand-navy)] transition-colors"
@@ -415,33 +418,30 @@ export default function AdminTripsPage() {
           }}
         />
       ) : (
-        <>
-          <AnimatePresence mode="wait">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {trips.map((trip) => (
             <motion.div
-              key={page + '-' + statusFilter + '-' + routeFilter + '-' + agencyFilter + '-' + searchFilter + '-' + dateFilter}
+              key={trip.id}
+              layout
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
+              transition={{ duration: 0.15 }}
             >
-              {trips.map((trip) => (
-                <TripCard
-                  key={trip.id}
-                  trip={trip}
-                  onEdit={handleEdit}
-                  onComplete={handleComplete}
-                  onCancel={handleCancel}
-                  onPostpone={handlePostponeInline}
-                  onDelete={handleDelete}
-                  actionLoading={actionLoading}
-                  canComplete={isActive(trip) && canComplete(trip.departure_time)}
-                  canCancelPostpone={isActive(trip) && canCancelOrPostpone(trip.departure_time)}
-                />
-              ))}
+              <TripCard
+                trip={trip}
+                onEdit={handleEdit}
+                onComplete={handleComplete}
+                onCancel={handleCancel}
+                onPostpone={handlePostponeInline}
+                onDelete={handleDelete}
+                actionLoading={actionLoading}
+                canComplete={isActive(trip) && canComplete(trip.departure_time)}
+                canCancelPostpone={isActive(trip) && canCancelOrPostpone(trip.departure_time)}
+              />
             </motion.div>
-          </AnimatePresence>
-        </>
+          ))}
+        </div>
       )}
 
       <TripBuilderModal
