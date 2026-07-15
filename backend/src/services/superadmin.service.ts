@@ -6,13 +6,58 @@ import { generateToken } from '../utils/token.js';
 export class SuperadminService {
   // ---- Agencies ----
   async listAgencies() {
-    const { data, error } = await supabaseAdmin
+    const { data: agencies, error } = await supabaseAdmin
       .from('agencies')
       .select('*')
       .order('name');
 
     if (error) throw new ValidationError(error.message);
-    return data;
+    if (!agencies || agencies.length === 0) return [];
+
+    const agencyIds = agencies.map((a: any) => a.id);
+
+    // Get trip count per agency via trip_agencies junction
+    const { data: tripLinks } = await supabaseAdmin
+      .from('trip_agencies')
+      .select('agency_id, trip_id')
+      .in('agency_id', agencyIds);
+
+    const tripCountByAgency: Record<string, number> = {};
+    const allTripIds: string[] = [];
+    for (const tl of tripLinks || []) {
+      tripCountByAgency[tl.agency_id] = (tripCountByAgency[tl.agency_id] || 0) + 1;
+      allTripIds.push(tl.trip_id);
+    }
+
+    // Get reservation count per trip for these agencies
+    let reservationCountByTrip: Record<string, number> = {};
+    if (allTripIds.length > 0) {
+      const { data: reservations } = await supabaseAdmin
+        .from('reservations')
+        .select('trip_id, agency_id')
+        .in('trip_id', [...new Set(allTripIds)])
+        .in('status', ['confirmed', 'partial', 'completed', 'boarded']);
+      for (const r of reservations || []) {
+        reservationCountByTrip[`${r.trip_id}:${r.agency_id}`] =
+          (reservationCountByTrip[`${r.trip_id}:${r.agency_id}`] || 0) + 1;
+      }
+    }
+
+    // Aggregate reservation count per agency
+    const reservationCountByAgency: Record<string, number> = {};
+    for (const tl of tripLinks || []) {
+      const key = `${tl.trip_id}:${tl.agency_id}`;
+      if (reservationCountByTrip[key]) {
+        reservationCountByAgency[tl.agency_id] =
+          (reservationCountByAgency[tl.agency_id] || 0) + reservationCountByTrip[key];
+      }
+    }
+
+    return agencies.map((agency: any) => ({
+      ...agency,
+      tripCount: tripCountByAgency[agency.id] || 0,
+      reservationCount: reservationCountByAgency[agency.id] || 0,
+    }));
   }
 
   async getAgency(id: string) {
@@ -704,17 +749,6 @@ export class SuperadminService {
 
     if (updateError) throw new ValidationError(updateError.message);
     return { id, status };
-  }
-
-  // ---- Invitations ----
-  async listInvitations() {
-    const { data, error } = await supabaseAdmin
-      .from('agency_invitations')
-      .select('*')
-      .order('expires_at', { ascending: false });
-
-    if (error) throw new ValidationError(error.message);
-    return data;
   }
 
   // ---- Dashboard KPIs ----

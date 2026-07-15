@@ -78,9 +78,4 @@ router.patch("/reservations/:id/status", (req, res, next) =>
   reservationController.updateReservationStatus(req, res, next)
 );
 
-// Invitations
-router.get("/invitations", (req, res, next) =>
-  superadminController.listInvitations(req, res, next)
-);
-
 export default router;

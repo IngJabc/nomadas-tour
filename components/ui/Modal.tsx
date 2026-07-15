@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { useEffect, useRef, useCallback, useState } from "react";
+import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 let modalCount = 0;
 
@@ -16,7 +16,7 @@ interface ModalProps {
   descriptionId?: string;
   children: React.ReactNode;
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
+  size?: "sm" | "md" | "lg";
 }
 
 function getFocusable(container: HTMLElement | null) {
@@ -24,7 +24,7 @@ function getFocusable(container: HTMLElement | null) {
   const nodes = container.querySelectorAll<HTMLElement>(
     'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
   );
-  return Array.from(nodes).filter((n) => !n.hasAttribute('disabled'));
+  return Array.from(nodes).filter((n) => !n.hasAttribute("disabled"));
 }
 
 function getScrollbarWidth() {
@@ -32,9 +32,9 @@ function getScrollbarWidth() {
 }
 
 const sizeStyles = {
-  sm: 'max-w-sm',
-  md: 'max-w-2xl',
-  lg: 'max-w-4xl',
+  sm: "max-w-sm",
+  md: "max-w-2xl",
+  lg: "max-w-4xl",
 };
 
 export function Modal({
@@ -45,7 +45,7 @@ export function Modal({
   descriptionId,
   children,
   className,
-  size = 'md',
+  size = "md",
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
@@ -57,12 +57,12 @@ export function Modal({
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         e.preventDefault();
         onClose();
         return;
       }
-      if (e.key === 'Tab') {
+      if (e.key === "Tab") {
         const focusableEls = getFocusable(dialogRef.current);
         if (focusableEls.length === 0) return;
         const first = focusableEls[0];
@@ -84,9 +84,9 @@ export function Modal({
     previouslyFocused.current = document.activeElement as HTMLElement | null;
     const focusable = getFocusable(dialogRef.current);
     if (focusable.length) focusable[0].focus();
-    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown);
       previouslyFocused.current?.focus();
     };
   }, [open, handleKeyDown]);
@@ -96,21 +96,21 @@ export function Modal({
     modalCount++;
     if (modalCount === 1) {
       document.body.style.paddingRight = `${getScrollbarWidth()}px`;
-      document.body.classList.add('no-scroll');
+      document.body.classList.add("no-scroll");
     }
     return () => {
       modalCount--;
       if (modalCount <= 0) {
         modalCount = 0;
-        document.body.classList.remove('no-scroll');
-        document.body.style.paddingRight = '';
+        document.body.classList.remove("no-scroll");
+        document.body.style.paddingRight = "";
       }
     };
   }, [open]);
 
   const generatedTitleId = titleId || undefined;
   const generatedDescriptionId =
-    descriptionId || (description ? 'modal-description' : undefined);
+    descriptionId || (description ? "modal-description" : undefined);
 
   if (!portalNode) return null;
 
@@ -138,9 +138,9 @@ export function Modal({
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
             className={cn(
-              'relative bg-white rounded-2xl shadow-xl border border-slate-200/60 w-full flex flex-col',
+              "relative bg-white rounded-2xl shadow-xl border border-slate-200/60 w-full flex flex-col",
               sizeStyles[size],
               className
             )}
@@ -164,7 +164,7 @@ export function ModalHeader({
   return (
     <div
       className={cn(
-        'flex items-center justify-between shrink-0 px-6 pt-6 pb-4',
+        "flex items-center justify-between shrink-0 px-6 pt-6 pb-4",
         className
       )}
     >
@@ -176,7 +176,7 @@ export function ModalHeader({
 export function ModalDivider({ className }: { className?: string }) {
   return (
     <div
-      className={cn('shrink-0 h-px bg-[rgba(0,0,0,0.06)] mx-6', className)}
+      className={cn("shrink-0 h-px bg-[rgba(0,0,0,0.06)] mx-6", className)}
     />
   );
 }
@@ -189,7 +189,7 @@ export function ModalBody({
   className?: string;
 }) {
   return (
-    <div className={cn('flex-1 overflow-y-auto px-6 py-5', className)}>
+    <div className={cn("flex-1 overflow-y-auto px-6 py-5", className)}>
       {children}
     </div>
   );
@@ -205,7 +205,7 @@ export function ModalFooter({
   return (
     <div
       className={cn(
-        'shrink-0 flex items-center gap-3 px-6 py-4 border-t border-[rgba(0,0,0,0.06)]',
+        "shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-[rgba(0,0,0,0.06)]",
         className
       )}
     >

@@ -56,7 +56,9 @@ export interface Agency {
   subdomain: string;
   email: string | null;
   phone: string | null;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'pending';
+  tripCount?: number;
+  reservationCount?: number;
 }
 
 export interface BusRow {
