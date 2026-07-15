@@ -1,150 +1,147 @@
 'use client';
 
-import { User } from 'lucide-react';
-import { Seat } from '@/types';
+import { PassengerData } from '@/types';
+import { Input } from '@/components/ui/Input';
+import { Button } from '@/components/ui/Button';
 
-interface PassengerData {
-  seat_id: string;
-  seat_code: string;
-  name: string;
-  document: string;
-  phone: string;
+const LETTER_RE = /[^a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s\-']/g;
+const PHONE_RE = /[^\d+]/g;
+
+function filterName(v: string): string {
+  return v.replace(LETTER_RE, '');
+}
+
+function filterDigits(v: string): string {
+  return v.replace(/\D/g, '');
+}
+
+function filterPhone(v: string): string {
+  const clean = v.replace(PHONE_RE, '');
+  const plusIndex = clean.indexOf('+');
+  if (plusIndex > 0) return '+' + clean.replace(/\+/g, '').slice(0, 12);
+  return clean.replace(/(?<=.)\+/g, '').slice(0, 13);
 }
 
 interface PassengerFormProps {
-  selectedSeats: Seat[];
+  passengers: PassengerData[];
+  onUpdate: (seatId: string, field: keyof PassengerData, value: string) => void;
+  onNext: () => void;
+  errors: Record<string, string>;
   bookerName: string;
   bookerDocument: string;
-  onBookerChange: (name: string, document: string) => void;
-  passengers: PassengerData[];
-  onPassengerChange: (index: number, field: keyof PassengerData, value: string) => void;
-  errors: Record<string, string>;
+  onBookerNameChange: (v: string) => void;
+  onBookerDocumentChange: (v: string) => void;
+  bookerErrors: { name?: string; document?: string };
 }
 
 export function PassengerForm({
-  selectedSeats,
+  passengers,
+  onUpdate,
+  onNext,
+  errors,
   bookerName,
   bookerDocument,
-  onBookerChange,
-  passengers,
-  onPassengerChange,
-  errors,
+  onBookerNameChange,
+  onBookerDocumentChange,
+  bookerErrors,
 }: PassengerFormProps) {
   return (
     <div className="space-y-6">
-      {/* Booker info */}
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-1 h-[18px] bg-[var(--color-brand-cyan)] rounded-sm" />
-          <h3 className="font-[family-name:var(--font-heading)] font-bold text-base text-[var(--color-brand-navy)]">
-            Datos del comprador
+      <div className="space-y-4">
+        <div className="border-l-4 border-[var(--color-brand-cyan)] pl-3">
+          <h3 className="font-[family-name:var(--font-heading)] text-base font-bold text-[var(--color-brand-navy)]">
+            Datos del Reservante
           </h3>
         </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block mb-1 font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">
-              Nombre completo <span className="text-[#ef4444]">*</span>
-            </label>
-            <input
-              type="text"
-              value={bookerName}
-              onChange={(e) => onBookerChange(e.target.value, bookerDocument)}
-              placeholder="Ej. María García"
-              className="w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-[var(--color-brand-surface)] outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all"
-            />
-            {errors.bookerName && (
-              <p className="mt-1 font-[family-name:var(--font-body)] font-normal text-[12px] text-[#ef4444]">{errors.bookerName}</p>
-            )}
-          </div>
-          <div>
-            <label className="block mb-1 font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">
-              Documento <span className="text-[#ef4444]">*</span>
-            </label>
-            <input
-              type="text"
-              value={bookerDocument}
-              onChange={(e) => onBookerChange(bookerName, e.target.value.replace(/\D/g, '').slice(0, 15))}
-              placeholder="Ej. 12345678"
-              className="w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-[var(--color-brand-surface)] outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all"
-            />
-            {errors.bookerDocument && (
-              <p className="mt-1 font-[family-name:var(--font-body)] font-normal text-[12px] text-[#ef4444]">{errors.bookerDocument}</p>
-            )}
-          </div>
+          <Input
+            label="Nombre"
+            placeholder="Nombre completo"
+            value={bookerName}
+            onChange={(e) => onBookerNameChange(filterName(e.target.value))}
+            error={bookerErrors.name}
+            autoComplete="name"
+            enterKeyHint="next"
+          />
+          <Input
+            label="Documento"
+            placeholder="Cédula o pasaporte"
+            value={bookerDocument}
+            onChange={(e) => onBookerDocumentChange(filterDigits(e.target.value))}
+            error={bookerErrors.document}
+            inputMode="numeric"
+            autoComplete="off"
+            enterKeyHint="next"
+            maxLength={8}
+          />
         </div>
       </div>
 
-      {/* Passengers per seat */}
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-1 h-[18px] bg-[var(--color-brand-cyan)] rounded-sm" />
-          <h3 className="font-[family-name:var(--font-heading)] font-bold text-base text-[var(--color-brand-navy)]">
-            Pasajeros ({selectedSeats.length})
+      <div className="space-y-4">
+        <div className="border-l-4 border-[var(--color-brand-cyan)] pl-3">
+          <h3 className="font-[family-name:var(--font-heading)] text-base font-bold text-[var(--color-brand-navy)]">
+            Datos de Pasajeros ({passengers.length})
           </h3>
         </div>
 
-        <div className="space-y-4">
-          {selectedSeats.map((seat, index) => {
-            const p = passengers[index];
-            const nameErr = errors[`passenger_${index}_name`];
-            const docErr = errors[`passenger_${index}_document`];
-            return (
-              <div
-                key={seat.id}
-                className="bg-[var(--color-page-bg)] rounded-xl p-4 border border-[rgba(0,0,0,0.06)]"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center bg-[rgba(0,212,255,0.1)]">
-                    <User className="w-3.5 h-3.5 text-[var(--color-brand-cyan)]" />
-                  </div>
-                  <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)]">
-                    Asiento {seat.seat_code}
-                  </span>
+        <div className="space-y-3">
+          {passengers.map((passenger, i) => (
+            <div
+              key={passenger.seat_id}
+              className="bg-white border border-[rgba(0,0,0,0.06)] rounded-2xl p-4"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-[var(--color-brand-cyan)] text-white flex items-center justify-center text-xs font-bold font-[family-name:var(--font-body)]">
+                  {passenger.seat_code}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block mb-1 font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">
-                      Nombre <span className="text-[#ef4444]">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={p.name}
-                      onChange={(e) => onPassengerChange(index, 'name', e.target.value)}
-                      placeholder="Nombre del pasajero"
-                      className="w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all"
-                    />
-                    {nameErr && <p className="mt-1 font-[family-name:var(--font-body)] font-normal text-[12px] text-[#ef4444]">{nameErr}</p>}
-                  </div>
-                  <div>
-                    <label className="block mb-1 font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">
-                      Documento <span className="text-[#ef4444]">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={p.document}
-                      onChange={(e) => onPassengerChange(index, 'document', e.target.value.replace(/\D/g, '').slice(0, 15))}
-                      placeholder="Cédula / Pasaporte"
-                      className="w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all"
-                    />
-                    {docErr && <p className="mt-1 font-[family-name:var(--font-body)] font-normal text-[12px] text-[#ef4444]">{docErr}</p>}
-                  </div>
-                  <div className="sm:col-span-2">
-                    <label className="block mb-1 font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)] uppercase tracking-wider">
-                      Teléfono (opcional)
-                    </label>
-                    <input
-                      type="tel"
-                      value={p.phone}
-                      onChange={(e) => onPassengerChange(index, 'phone', e.target.value.replace(/\D/g, '').slice(0, 15))}
-                      placeholder="Ej. 8095551234"
-                      className="w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all"
-                    />
-                  </div>
-                </div>
+                <span className="font-[family-name:var(--font-body)] text-sm font-semibold text-[var(--color-brand-navy)]">
+                  Asiento {passenger.seat_code}
+                </span>
               </div>
-            );
-          })}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Input
+                  label="Nombre"
+                  placeholder="Nombre completo"
+                  value={passenger.name}
+                  onChange={(e) => onUpdate(passenger.seat_id, 'name', filterName(e.target.value))}
+                  error={errors[`${passenger.seat_id}_name`]}
+                  autoComplete="name"
+                  enterKeyHint="next"
+                />
+                <Input
+                  label="Documento"
+                  placeholder="Cédula o pasaporte"
+                  value={passenger.document}
+                  onChange={(e) => onUpdate(passenger.seat_id, 'document', filterDigits(e.target.value))}
+                  error={errors[`${passenger.seat_id}_document`]}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  enterKeyHint="next"
+                  maxLength={8}
+                />
+                <Input
+                  label="Teléfono"
+                  placeholder="04xx-xxxxxxx"
+                  value={passenger.phone || ''}
+                  onChange={(e) => onUpdate(passenger.seat_id, 'phone', filterPhone(e.target.value))}
+                  error={errors[`${passenger.seat_id}_phone`]}
+                  inputMode="tel"
+                  autoComplete="tel"
+                  enterKeyHint={i === passengers.length - 1 ? 'done' : 'next'}
+                  maxLength={13}
+                />
+              </div>
+            </div>
+          ))}
         </div>
+      </div>
+
+      <div className="flex justify-end pt-2">
+        <Button variant="primary" onClick={onNext}>
+          Continuar
+        </Button>
       </div>
     </div>
   );

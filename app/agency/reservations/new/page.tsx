@@ -1,799 +1,1016 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useCallback, useRef, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Ticket, CheckCircle2, X } from 'lucide-react';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { agencyApi } from '@/lib/api';
-import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
-import { Seat } from '@/types';
-import { BusLayout } from '@/components/bus/BusLayout';
-import { PassengerForm } from '@/components/booking/PassengerForm';
-import { ReservationSummary } from '@/components/booking/ReservationSummary';
-import { CardSkeleton } from '@/components/ui/Skeleton';
-import { EmptyState } from '@/components/ui/EmptyState';
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  Suspense,
+} from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Ticket,
+  CheckCircle2,
+  AlertTriangle,
+  Calendar,
+  Clock,
+  Bus as BusIcon,
+} from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { agencyApi } from "@/lib/api";
+import { subscribeToTripSeats } from "@/lib/realtime/subscriptions";
+import {
+  Seat,
+  PassengerData,
+  AgencyTripListItem,
+  ReservationOrigin,
+} from "@/types";
+import { useReservationWizard } from "@/hooks/useReservationWizard";
+import { useSeatLocking } from "@/hooks/useSeatLocking";
+import { useReservationSubmit } from "@/hooks/useReservationSubmit";
+import { validateForm } from "@/lib/reservations/validateForm";
+import { BusLayout } from "@/components/bus/BusLayout";
+import { PassengerForm } from "@/components/booking/PassengerForm";
+import { ReservationSummary } from "@/components/booking/ReservationSummary";
+import { CardSkeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Button } from "@/components/ui/Button";
+import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
-type Step = 'select_trip' | 'select_seats' | 'passenger_form' | 'summary' | 'success';
+// ─── Toast hook ──────────────────────────────────────────────────────
+function useToasts() {
+  const [toasts, setToasts] = useState<
+    { id: number; message: string; type: "error" | "info" }[]
+  >([]);
+  const toastIdRef = useRef(0);
 
-interface PassengerData {
-  seat_id: string;
-  seat_code: string;
-  name: string;
-  document: string;
-  phone: string;
+  const addToast = useCallback((message: string, type: "error" | "info") => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+      4000
+    );
+  }, []);
+
+  return { toasts, addToast };
 }
 
-type Toast = { id: number; message: string; type: 'error' | 'info' };
-
-function validateForm(
-  step: Step,
-  trip: any | null,
-  selectedSeats: Seat[],
-  bookerName: string,
-  bookerDocument: string,
-  passengers: PassengerData[],
-): Record<string, string> {
-  const errors: Record<string, string> = {};
-  if (step === 'passenger_form' || step === 'summary') {
-    if (!bookerName.trim()) errors.bookerName = 'El nombre del comprador es obligatorio';
-    if (!bookerDocument.trim()) errors.bookerDocument = 'El documento es obligatorio';
-    selectedSeats.forEach((seat, i) => {
-      const p = passengers[i];
-      if (!p || !p.name.trim()) errors[`passenger_${i}_name`] = 'Nombre requerido';
-      if (!p || !p.document.trim()) errors[`passenger_${i}_document`] = 'Documento requerido';
-    });
-  }
-  if (step === 'summary' && Object.keys(errors).length === 0) {
-    if (!trip) errors._form = 'Viaje no encontrado';
-    if (selectedSeats.length === 0) errors._form = 'Selecciona al menos un asiento';
-  }
-  return errors;
-}
-
-let toastId = 0;
-
+// ─── Page wrapper ────────────────────────────────────────────────────
 export default function NewAgencyReservationPage() {
   return (
-    <Suspense fallback={
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <CardSkeleton />
-      </main>
-    }>
+    <Suspense
+      fallback={
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <CardSkeleton />
+        </main>
+      }
+    >
       <NewReservationContent />
     </Suspense>
   );
 }
 
+// ─── Main content ────────────────────────────────────────────────────
 function NewReservationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isDeepLinkInitial = searchParams?.has('trip') ?? false;
+  const isDeepLink = searchParams?.has("trip") ?? false;
+  const tripIdParam = searchParams?.get("trip") ?? null;
+  const origin: ReservationOrigin =
+    searchParams?.get("source") === "trips"
+      ? "agency_trips"
+      : "new_reservation";
 
-  const [step, setStep] = useState<Step>(isDeepLinkInitial ? 'select_seats' : 'select_trip');
-  const [isDeepLinkFlow, setIsDeepLinkFlow] = useState(isDeepLinkInitial);
-
-  const [trips, setTrips] = useState<any[]>([]);
-  const [tripsLoading, setTripsLoading] = useState(true);
-  const [tripsError, setTripsError] = useState<string | null>(null);
-
-  const [selectedTrip, setSelectedTrip] = useState<any | null>(null);
-  const [tripLoading, setTripLoading] = useState(isDeepLinkInitial);
-
-  const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
-  const [seatsMap, setSeatsMap] = useState<Record<string, Seat>>({});
-
-  const [bookerName, setBookerName] = useState('');
-  const [bookerDocument, setBookerDocument] = useState('');
-
-  const [passengers, setPassengers] = useState<PassengerData[]>([]);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    reservation: any;
-    passengers: any[];
-    qr_code: string;
-    qr_data_url: string;
-  } | null>(null);
-
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  // ─── Auth ─────────────────────────────────────────────────────────
   const [userId, setUserId] = useState<string | null>(null);
-  const [deepLinkError, setDeepLinkError] = useState(false);
 
-  const tripIdRef = useRef<string | null>(null);
-  const selectedSeatsRef = useRef<Seat[]>([]);
-  const userIdRef = useRef<string | null>(null);
-  const channelRef = useRef<any>(null);
-  const tokenRef = useRef<string | null>(null);
-
-  selectedSeatsRef.current = selectedSeats;
-  userIdRef.current = userId;
-
-  const addToast = useCallback((message: string, type: 'error' | 'info') => {
-    const id = ++toastId;
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
-  }, []);
-
-  const doUnlockAll = useCallback(async (tripId: string) => {
-    if (!tripId) return;
-    try {
-      await agencyApi.unlockAllSeats(tripId);
-    } catch { }
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      const tid = tripIdRef.current;
-      if (tid) { doUnlockAll(tid); }
-      if (channelRef.current) { channelRef.current.unsubscribe(); }
-    };
-  }, [doUnlockAll]);
-
-  // Store auth token for unload handler
   useEffect(() => {
     (async () => {
       try {
-        const { createClient } = await import('@/lib/supabase/client');
+        const { createClient } = await import("@/lib/supabase/client");
         const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        tokenRef.current = session?.access_token ?? null;
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         setUserId(session?.user?.id ?? null);
-      } catch { }
+      } catch {
+        /* silent */
+      }
     })();
   }, []);
 
-  // beforeunload / pagehide / visibilitychange
+  // ─── beforeunload — only show dialog if user has locked seats ──────
+  const selectedSeatsCountRef = useRef(0);
+
   useEffect(() => {
-    const handleUnload = () => {
-      const tid = tripIdRef.current;
-      const token = tokenRef.current;
-      if (tid && token) {
-        try {
-          fetch(
-            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'}/agency/seats/unlock-all`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ trip_id: tid }),
-              keepalive: true,
-            },
-          );
-        } catch { }
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (selectedSeatsCountRef.current > 0) {
+        e.preventDefault();
       }
     };
-    const handleVisibility = () => {
-      if (document.visibilityState === 'hidden') handleUnload();
-    };
-    window.addEventListener('beforeunload', handleUnload);
-    window.addEventListener('pagehide', handleUnload);
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-      window.removeEventListener('pagehide', handleUnload);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, []);
 
-  // Load trips
+  // ─── Hooks ────────────────────────────────────────────────────────
+  const wizard = useReservationWizard({ isDeepLink, origin });
+  const { toasts, addToast } = useToasts();
+  const locking = useSeatLocking({ userId, onSeatLost: (seatCode) => {
+    addToast(`El asiento ${seatCode} ya no está disponible`, "info");
+  }});
+
+  // Keep ref in sync for beforeunload event handler
   useEffect(() => {
-    async function load() {
-      try {
-        const data = await agencyApi.listTrips();
-        setTrips(data || []);
-      } catch (err) {
-        setTripsError(err instanceof Error ? err.message : 'Error al cargar viajes');
-      } finally {
-        setTripsLoading(false);
-      }
+    selectedSeatsCountRef.current = locking.selectedSeats.length;
+  }, [locking.selectedSeats.length]);
+
+  const [bookerName, setBookerName] = useState("");
+  const [bookerDocument, setBookerDocument] = useState("");
+  const [passengers, setPassengers] = useState<PassengerData[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const onSuccess = useCallback(() => {
+    locking.unlockAllCurrent();
+    wizard.goToSuccess();
+  }, [locking, wizard]);
+
+  const submit = useReservationSubmit({
+    trip: locking.selectedTrip,
+    selectedSeats: locking.selectedSeats,
+    bookerName,
+    bookerDocument,
+    passengers,
+    onSuccess,
+  });
+
+  // ─── Load trips list ──────────────────────────────────────────────
+  const [trips, setTrips] = useState<AgencyTripListItem[]>([]);
+  const [tripsLoading, setTripsLoading] = useState(true);
+  const [tripsError, setTripsError] = useState<string | null>(null);
+
+  const loadTripsList = useCallback(async () => {
+    setTripsLoading(true);
+    setTripsError(null);
+    try {
+      const data = await agencyApi.listTrips();
+      setTrips(data || []);
+    } catch (err) {
+      setTripsError(
+        err instanceof Error ? err.message : "Error al cargar viajes"
+      );
+    } finally {
+      setTripsLoading(false);
     }
-    load();
   }, []);
 
-  // Realtime: actualizar disponibilidad en selector de viajes
   useEffect(() => {
-    if (step !== 'select_trip' || trips.length === 0) return;
+    loadTripsList();
+  }, [loadTripsList]);
 
-    const tripIds = trips.map((t: any) => t.id);
+  // ─── Realtime: trips list seat counts ──────────────────────────────
+  useEffect(() => {
+    if (wizard.step !== "select_trip" || trips.length === 0) return;
 
-    const cleanup = subscribeToTripSeats(tripIds, (seat) => {
+    const tripIds = trips.map((t) => t.id);
+    const debounceTimerRef: { current: ReturnType<typeof setTimeout> | null } =
+      { current: null };
+    const pendingTripIds = new Set<string>();
+
+    const flush = async () => {
+      if (pendingTripIds.size === 0) return;
+      const idsToFetch = Array.from(pendingTripIds);
+      pendingTripIds.clear();
+
+      for (const tripId of idsToFetch) {
+        try {
+          const fresh = await agencyApi.getTrip(tripId);
+          const seats = fresh.seats ?? [];
+          const available_seats = seats.filter(
+            (s: Seat) => s.status === "available"
+          ).length;
+          const reserved_seats = seats.filter(
+            (s: Seat) => s.status === "reserved" || s.status === "boarded"
+          ).length;
+
+          setTrips((prev) => {
+            const idx = prev.findIndex((t) => t.id === tripId);
+            if (idx === -1) return prev;
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], available_seats, reserved_seats };
+            return updated;
+          });
+        } catch {
+          /* silent */
+        }
+      }
+    };
+
+    const handleSeatUpdate = (seat: any) => {
       const tripId = seat.trip_id as string;
       if (!tripId) return;
+      pendingTripIds.add(tripId);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(flush, 500);
+    };
 
-      agencyApi.getTrip(tripId).then((fresh) => {
-        const seats = fresh.seats ?? [];
-        const available_seats = seats.filter((s: any) => s.status === 'available').length;
-        const reserved_seats = seats.filter((s: any) => s.status === 'reserved' || s.status === 'boarded').length;
-
-        setTrips((prev) => {
-          const idx = prev.findIndex((t: any) => t.id === tripId);
-          if (idx === -1) return prev;
-          const updated = [...prev];
-          updated[idx] = { ...updated[idx], available_seats, reserved_seats };
-          return updated;
-        });
-      }).catch(() => {});
-    });
-
+    const cleanup = subscribeToTripSeats(tripIds, handleSeatUpdate);
     return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       cleanup();
     };
-  }, [step, trips.length]);
+  }, [wizard.step, trips.length]);
 
-  // Load trip with seats
-  const loadTrip = useCallback(async (tripId: string) => {
-    // Unlock previous trip seats
-    const prevId = tripIdRef.current;
-    if (prevId && prevId !== tripId) {
-      await doUnlockAll(prevId);
-    }
-    if (channelRef.current) { channelRef.current.unsubscribe(); channelRef.current = null; }
+  // ─── Deep link ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!tripIdParam) return;
+    locking.loadDeepLinkTrip(tripIdParam).then((ok) => {
+      if (ok) wizard.goToSeats();
+    });
+  }, [tripIdParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    setTripLoading(true);
-    setSelectedSeats([]);
-    setBookerName('');
-    setBookerDocument('');
+  // ─── Step transitions ─────────────────────────────────────────────
+  const handleBackFromSeats = useCallback(async () => {
+    await locking.unlockAllCurrent();
+    locking.resetSeats();
+    wizard.goBackFromSeats();
+  }, [locking, wizard]);
+
+  const handleSelectTrip = useCallback(
+    async (tripId: string) => {
+      await locking.loadTrip(tripId);
+      wizard.goToSeats();
+    },
+    [locking, wizard]
+  );
+
+  const handleProceedToForm = useCallback(() => {
+    if (locking.selectedSeats.length === 0) return;
+    const sorted = [...locking.selectedSeats].sort((a, b) => {
+      return (
+        parseInt(a.seat_code.slice(1), 10) - parseInt(b.seat_code.slice(1), 10)
+      );
+    });
+    // Initialize passengers for sorted seats
+    setPassengers(
+      sorted.map((s) => ({
+        seat_id: s.id,
+        seat_code: s.seat_code,
+        name: "",
+        document: "",
+        phone: "",
+      }))
+    );
+    setErrors({});
+    wizard.goToPassengerForm();
+  }, [locking.selectedSeats, wizard]);
+
+  const handleProceedToSummary = useCallback(() => {
+    const err = validateForm(
+      "passenger_form",
+      locking.selectedTrip,
+      locking.selectedSeats,
+      bookerName,
+      bookerDocument,
+      passengers
+    );
+    setErrors(err);
+    if (Object.keys(err).length > 0) return;
+    wizard.goToSummary();
+  }, [
+    locking.selectedTrip,
+    locking.selectedSeats,
+    bookerName,
+    bookerDocument,
+    passengers,
+    wizard,
+  ]);
+
+  const handleConfirm = useCallback(async () => {
+    const err = validateForm(
+      "summary",
+      locking.selectedTrip,
+      locking.selectedSeats,
+      bookerName,
+      bookerDocument,
+      passengers
+    );
+    setErrors(err);
+    if (Object.keys(err).length > 0) return;
+    await submit.submit();
+  }, [
+    locking.selectedTrip,
+    locking.selectedSeats,
+    bookerName,
+    bookerDocument,
+    passengers,
+    submit,
+  ]);
+
+  const handleReset = useCallback(() => {
+    setBookerName("");
+    setBookerDocument("");
     setPassengers([]);
     setErrors({});
-    try {
-      const trip = await agencyApi.getTrip(tripId);
-      setSelectedTrip(trip);
-      const map: Record<string, Seat> = {};
-      (trip.seats || []).forEach((s: Seat) => { map[s.seat_code] = s; });
-      setSeatsMap(map);
-      tripIdRef.current = tripId;
-      setStep('select_seats');
-    } catch (err) {
-      setTripsError(err instanceof Error ? err.message : 'Error al cargar el viaje');
-    } finally {
-      setTripLoading(false);
-    }
-  }, [doUnlockAll]);
+    submit.resetResult();
+    submit.clearError();
+    locking.resetSeats();
+    wizard.resetWizard();
+  }, [submit, locking, wizard]);
 
-  // Deep link: auto-load trip from ?trip= param
-  const loadDeepLinkTrip = useCallback(async (tripId: string) => {
-    const prevId = tripIdRef.current;
-    if (prevId && prevId !== tripId) {
-      await doUnlockAll(prevId);
-    }
-    if (channelRef.current) { channelRef.current.unsubscribe(); channelRef.current = null; }
+  const handleBookerNameChange = useCallback((v: string) => setBookerName(v), []);
+  const handleBookerDocumentChange = useCallback((v: string) => setBookerDocument(v), []);
 
-    setTripLoading(true);
-    try {
-      const trip = await agencyApi.getTrip(tripId);
-      if (!trip || trip.status === 'completed') {
-        setDeepLinkError(true);
-        return;
-      }
-      setSelectedTrip(trip);
-      const map: Record<string, Seat> = {};
-      (trip.seats || []).forEach((s: Seat) => { map[s.seat_code] = s; });
-      setSeatsMap(map);
-      tripIdRef.current = tripId;
-      setStep('select_seats');
-    } catch {
-      setDeepLinkError(true);
-    } finally {
-      setTripLoading(false);
-    }
-  }, [doUnlockAll]);
-
-  const tripIdParam = searchParams?.get('trip') ?? null;
-
-  useEffect(() => {
-    if (tripIdParam) {
-      loadDeepLinkTrip(tripIdParam);
-    }
-  }, [loadDeepLinkTrip, tripIdParam]);
-
-  // Realtime subscription for seats
-  useEffect(() => {
-    if (!tripIdRef.current || step !== 'select_seats') return;
-    const tripId = tripIdRef.current;
-
-    const setupChannel = async () => {
-      const { createClient } = await import('@/lib/supabase/client');
-      const supabase = createClient();
-
-      if (channelRef.current) { channelRef.current.unsubscribe(); }
-
-      const channel = supabase
-        .channel(`seats-${tripId}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'seats', filter: `trip_id=eq.${tripId}` },
-          (payload) => {
-            const newSeat = payload.new as any;
-            if (!newSeat || !newSeat.seat_code) return;
-            const currentUserId = userIdRef.current;
-            setSeatsMap((prev) => {
-              const existing = prev[newSeat.seat_code];
-              if (!existing) return prev;
-
-              if (newSeat.status === 'locked' && newSeat.locked_by !== existing.locked_by && newSeat.locked_by !== currentUserId) {
-                setSelectedSeats((sel) => sel.filter((s) => s.id !== newSeat.id));
-              }
-
-              return { ...prev, [newSeat.seat_code]: { ...existing, ...newSeat } };
-            });
-          }
-        )
-        .subscribe();
-
-      channelRef.current = channel;
-    };
-
-    setupChannel();
-
-    return () => {
-      if (channelRef.current) { channelRef.current.unsubscribe(); channelRef.current = null; }
-    };
-  }, [step, selectedTrip?.id]);
-
-
-
-  const handleToggleSeat = async (seat: Seat) => {
-    if (seat.status === 'reserved') return;
-    if (seat.status === 'locked' && seat.locked_by !== userId) return;
-
-    const exists = selectedSeats.some((s) => s.id === seat.id);
-    if (exists) {
-      try {
-        await agencyApi.unlockSeat(selectedTrip!.id, seat.id);
-        setSelectedSeats((prev) => prev.filter((s) => s.id !== seat.id));
-      } catch {
-        addToast('No se pudo liberar el asiento', 'error');
-      }
-    } else {
-      try {
-        await agencyApi.lockSeat(selectedTrip!.id, seat.id);
-        setSelectedSeats((prev) => [...prev, seat]);
-      } catch {
-        addToast('Asiento ocupado por otro usuario', 'error');
-      }
-    }
-  };
-
-  const handleProceedToForm = () => {
-    if (selectedSeats.length === 0) return;
-    const sorted = [...selectedSeats].sort((a, b) => {
-      const numA = parseInt(a.seat_code.slice(1), 10);
-      const numB = parseInt(b.seat_code.slice(1), 10);
-      return numA - numB;
-    });
-    setSelectedSeats(sorted);
-    const initial = sorted.map((s) => ({
-      seat_id: s.id,
-      seat_code: s.seat_code,
-      name: '',
-      document: '',
-      phone: '',
-    }));
-    setPassengers(initial);
-    setErrors({});
-    setStep('passenger_form');
-  };
-
-  const handleBookerChange = (name: string, document: string) => {
-    setBookerName(name);
-    setBookerDocument(document);
-  };
-
-  const handlePassengerChange = (index: number, field: keyof PassengerData, value: string) => {
-    setPassengers((prev) => {
-      const next = [...prev];
-      next[index] = { ...next[index], [field]: value };
-      return next;
-    });
-  };
-
-  const handleProceedToSummary = () => {
-    const err = validateForm('passenger_form', selectedTrip, selectedSeats, bookerName, bookerDocument, passengers);
-    setErrors(err);
-    if (Object.keys(err).length > 0) return;
-    setStep('summary');
-  };
-
-  const handleConfirm = async () => {
-    const err = validateForm('summary', selectedTrip, selectedSeats, bookerName, bookerDocument, passengers);
-    setErrors(err);
-    if (Object.keys(err).length > 0) return;
-
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      const payload = {
-        trip_id: selectedTrip!.id,
-        booker_name: bookerName.trim(),
-        booker_document: bookerDocument.trim(),
-        booker_phone: '',
-        passengers: selectedSeats.map((s) => {
-          const p = passengers.find((p) => p.seat_id === s.id)!;
-          return {
-            seat_id: s.id,
-            name: p.name.trim(),
-            document: p.document.trim(),
-            phone: p.phone.trim() || undefined,
-          };
-        }),
-      };
-      const res = await agencyApi.createReservation(payload);
-      setResult(res);
-      setStep('success');
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Error al crear la reserva');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  // Clean up locks after success
-  useEffect(() => {
-    if (step === 'success' && tripIdRef.current) {
-      tripIdRef.current = null;
-    }
-  }, [step]);
-
-  const renderSelectTrip = () => (
-    <div>
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-1 h-[22px] bg-[var(--color-brand-cyan)] rounded-sm" />
-        <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)]">
-          Nueva reserva
-        </h2>
-      </div>
-
-      {tripsLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => <CardSkeleton key={i} />)}
-        </div>
-      ) : tripsError ? (
-        <div className="p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2] font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
-          {tripsError}
-        </div>
-      ) : (
-        (() => {
-          const availableTrips = trips.filter((t: any) => t.status === 'active' && t.available_seats > 0);
-          if (availableTrips.length === 0) {
-            return (
-              <EmptyState
-                icon={<Ticket className="w-8 h-8" />}
-                message={trips.length === 0 ? 'No hay viajes disponibles para tu agencia' : 'No hay viajes activos con asientos disponibles'}
-                action={{ label: 'Regresar', onClick: () => router.push('/agency') }}
-              />
-            );
-          }
-          return (
-        <div className="space-y-3">
-          {availableTrips.map((trip: any) => (
-              <button
-                key={trip.id}
-                type="button"
-                onClick={() => loadTrip(trip.id)}
-                className="w-full text-left bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] cursor-pointer transition-all duration-200 hover:shadow-[0_6px_24px_rgba(0,212,255,0.12)] hover:-translate-y-0.5"
-              >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-[family-name:var(--font-heading)] font-bold text-base text-[var(--color-brand-navy)]">
-                      {trip.route?.origin ?? 'Origen'} → {trip.route?.destination ?? 'Destino'}
-                    </p>
-                    <p className="font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-muted)] mt-1">
-                      {trip.departure_time
-                        ? format(new Date(trip.departure_time), "d 'de' MMMM yyyy, HH:mm", { locale: es })
-                        : ''}
-                    </p>
-                  </div>
-                  <div className="shrink-0 flex items-center gap-4">
-                    <div className="text-right">
-                      <p className="font-[family-name:var(--font-body)] font-bold text-lg text-[var(--color-brand-cyan)]">
-                        {trip.available_seats}
-                      </p>
-                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] whitespace-nowrap">
-                        disponibles
-                      </p>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-[var(--color-brand-muted)]" />
-                  </div>
-                </div>
-              </button>
-            ))}
-        </div>
+  const handlePassengerUpdate = useCallback(
+    (seatId: string, field: keyof PassengerData, value: string) => {
+      setPassengers((prev) =>
+        prev.map((p) => (p.seat_id === seatId ? { ...p, [field]: value } : p))
       );
-      })()
-      )}
-    </div>
+    },
+    []
   );
 
-  const renderSelectSeats = () => (
-    <div>
-      {!isDeepLinkFlow && (
-        <button
-          type="button"
-          onClick={async () => {
-            if (tripIdRef.current) await doUnlockAll(tripIdRef.current);
-            setStep('select_trip');
-          }}
-          className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Volver a viajes
-        </button>
-      )}
+  const handleEditPassengers = useCallback(() => {
+    wizard.goToPassengerEntry();
+  }, [wizard]);
 
-      {tripLoading ? (
-        <div className="flex items-center justify-center py-20">
-          <svg className="animate-spin h-8 w-8 text-[var(--color-brand-cyan)]" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        </div>
-      ) : !selectedTrip ? (
-        <div className="p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2] font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
-          No se pudo cargar el viaje
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-1 h-[18px] bg-[var(--color-brand-cyan)] rounded-sm" />
-            <div>
-              <h2 className="font-[family-name:var(--font-heading)] font-bold text-base text-[var(--color-brand-navy)]">
-                {selectedTrip.routes?.origin ?? ''} → {selectedTrip.routes?.destination ?? ''}
-              </h2>
-              <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[var(--color-brand-muted)]">
-                {selectedTrip.departure_time
-                  ? format(new Date(selectedTrip.departure_time), "d 'de' MMMM, HH:mm", { locale: es })
-                  : ''}
-              </p>
-            </div>
-          </div>
-
-          <BusLayout
-            seats={seatsMap}
-            selectedSeats={selectedSeats}
-            onToggleSeat={handleToggleSeat}
-            vehicleType={selectedTrip.vehicle_type ?? 'bus'}
-            userId={userId}
-          />
-
-          <div className="flex items-center justify-between mt-6">
-            <div>
-              <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)]">
-                {selectedSeats.length} asiento{selectedSeats.length !== 1 ? 's' : ''} seleccionado{selectedSeats.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={handleProceedToForm}
-              disabled={selectedSeats.length === 0}
-              className="px-6 py-2.5 bg-[var(--color-brand-cyan)] text-white font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl border-none cursor-pointer transition-all duration-200 hover:bg-[var(--color-brand-blue)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              Continuar
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+  const handleToggleSeat = useCallback(
+    (seat: Seat) => {
+      locking.toggleSeat(seat, addToast);
+    },
+    [locking, addToast]
   );
 
-  const renderPassengerForm = () => (
-    <div>
-      <button
-        type="button"
-        onClick={() => setStep('select_seats')}
-        className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver a asientos
-      </button>
+  // ─── Auto-revert when all seats lost on later steps ────────────────
+  useEffect(() => {
+    if (
+      (wizard.step === "passenger_form" || wizard.step === "summary") &&
+      locking.selectedSeats.length === 0
+    ) {
+      addToast(
+        "Tus asientos expiraron. Selecciona nuevamente.",
+        "info"
+      );
+      wizard.goToSeatSelection();
+    }
+  }, [wizard.step, locking.selectedSeats.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-      <PassengerForm
-        selectedSeats={selectedSeats}
-        bookerName={bookerName}
-        bookerDocument={bookerDocument}
-        onBookerChange={handleBookerChange}
-        passengers={passengers}
-        onPassengerChange={handlePassengerChange}
-        errors={errors}
-      />
-
-      <div className="flex justify-end mt-6">
-        <button
-          type="button"
-          onClick={handleProceedToSummary}
-          className="px-6 py-2.5 bg-[var(--color-brand-cyan)] text-white font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl border-none cursor-pointer transition-all duration-200 hover:bg-[var(--color-brand-blue)] flex items-center gap-2"
-        >
-          Revisar reserva
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
+  // ─── Derived state ────────────────────────────────────────────────
+  const availableTrips = useMemo(
+    () => trips.filter((t) => t.status === "active" && t.available_seats > 0),
+    [trips]
   );
 
-  const renderSummary = () => (
-    <div>
-      <button
-        type="button"
-        onClick={() => setStep('passenger_form')}
-        className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        Volver a datos
-      </button>
-
-      <ReservationSummary
-        trip={selectedTrip}
-        selectedSeats={selectedSeats}
-        passengers={passengers}
-        bookerName={bookerName}
-        bookerDocument={bookerDocument}
-        onConfirm={handleConfirm}
-        loading={submitting}
-        error={submitError}
-      />
-    </div>
-  );
-
-  const renderSuccess = () => (
-    <div className="flex flex-col items-center text-center py-8">
-      <div className="w-16 h-16 rounded-full bg-[#ecfdf5] flex items-center justify-center mb-4">
-        <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
-      </div>
-
-      <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)] mb-2">
-        Reserva confirmada
-      </h2>
-      <p className="font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-muted)] mb-6 max-w-sm">
-        {selectedTrip?.routes?.origin ?? ''} → {selectedTrip?.routes?.destination ?? ''}
-        <br />
-        {selectedTrip?.departure_time
-          ? format(new Date(selectedTrip.departure_time), "d 'de' MMMM yyyy, HH:mm", { locale: es })
-          : ''}
-      </p>
-
-      {result?.qr_data_url && (
-        <div className="bg-white rounded-2xl p-4 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] mb-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={result.qr_data_url}
-            alt="Código QR de la reserva"
-            className="w-48 h-48"
-          />
-        </div>
-      )}
-
-      <div className="bg-[var(--color-page-bg)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] w-full max-w-sm mb-6">
-        <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)] mb-3">
-          Pasajeros
-        </p>
-        <div className="space-y-2">
-          {passengers.map((p, i) => (
-            <div key={p.seat_id} className="flex items-center gap-3 text-sm">
-              <span className="font-[family-name:var(--font-body)] font-bold text-[13px] text-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.1)] px-2 py-0.5 rounded-md min-w-[36px] text-center">
-                {p.seat_code}
-              </span>
-              <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)]">{p.name}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={() => router.push('/agency/reservations')}
-          className="px-6 py-2.5 bg-[#f1f5f9] text-[var(--color-brand-navy)] font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl border-none cursor-pointer transition-all duration-200 hover:bg-[#e2e8f0]"
-        >
-          Ver reservas
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setStep('select_trip');
-            setSelectedTrip(null);
-            setSelectedSeats([]);
-            setBookerName('');
-            setBookerDocument('');
-            setPassengers([]);
-            setErrors({});
-            setSubmitError(null);
-            setResult(null);
-          }}
-          className="px-6 py-2.5 bg-[var(--color-brand-cyan)] text-white font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl border-none cursor-pointer transition-all duration-200 hover:bg-[var(--color-brand-blue)]"
-        >
-          Nueva reserva
-        </button>
-      </div>
-    </div>
-  );
+  // ═════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════════════════
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      {/* Toasts */}
       {toasts.length > 0 && (
         <div className="fixed top-4 right-4 z-50 space-y-2">
           {toasts.map((t) => (
             <div
               key={t.id}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg font-[family-name:var(--font-body)] font-medium text-sm text-white ${
-                t.type === 'error' ? 'bg-[#ef4444]' : 'bg-[var(--color-brand-navy)]'
+                t.type === "error"
+                  ? "bg-[#ef4444]"
+                  : "bg-[var(--color-brand-navy)]"
               }`}
             >
               <span>{t.message}</span>
-              <button
-                type="button"
-                onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-                className="ml-1 p-0.5 rounded hover:bg-white/20"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
             </div>
           ))}
         </div>
       )}
 
-      {deepLinkError && (
-        <div className="flex items-center justify-center py-20">
-          <EmptyState
-            icon={<Ticket className="w-8 h-8" />}
-            message="Este viaje ya no está disponible. El viaje ya no existe, fue finalizado o no pertenece a tu agencia."
-            action={{ label: 'Volver a Mis Viajes', href: '/agency/trips' }}
-          />
-        </div>
+      {/* Deep link error */}
+      {locking.deepLinkError && (
+        <motion.div
+          variants={pageFade}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.25 }}
+        >
+          <div className="flex flex-col items-center gap-4 py-12">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2]">
+              <AlertTriangle
+                className="w-5 h-5 text-[#ef4444] shrink-0"
+                strokeWidth={1.75}
+              />
+              <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+                Este viaje ya no está disponible.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => router.push("/agency/trips")}
+            >
+              Volver a Mis Viajes
+            </Button>
+          </div>
+        </motion.div>
       )}
 
-      {!deepLinkError && step !== 'success' && (
-        <div className="flex items-center gap-1.5 mb-8">
-          {[
-            { key: 'select_trip', label: 'Viaje' },
-            { key: 'select_seats', label: 'Asientos' },
-            { key: 'passenger_form', label: 'Pasajeros' },
-            { key: 'summary', label: 'Resumen' },
-          ].map((s, i) => {
-            const steps = ['select_trip', 'select_seats', 'passenger_form', 'summary'];
-            const currentIdx = steps.indexOf(step);
-            const stepIdx = steps.indexOf(s.key);
-            const done = stepIdx < currentIdx;
-            const active = step === s.key;
-            return (
-              <div key={s.key} className="flex items-center gap-1.5">
-                <span
-                  className={`flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold font-[family-name:var(--font-body)] transition-all ${
-                    done
-                      ? 'bg-[var(--color-brand-cyan)] text-white'
-                      : active
-                      ? 'bg-[var(--color-brand-cyan)] text-white'
-                      : 'bg-[#e5e7eb] text-[var(--color-brand-muted)]'
-                  }`}
+      {/* Stepper */}
+      {!locking.deepLinkError && wizard.step !== "success" && (
+        <motion.div
+          variants={pageFade}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.2 }}
+          className="w-full mb-8"
+        >
+          <div className="flex items-center w-full">
+            {wizard.stepDefs.map((s, i) => {
+              const done = i < wizard.currentStepIdx;
+              const active = wizard.step === s.key;
+              return (
+                <div
+                  key={s.key}
+                  className="flex items-center flex-1 last:flex-none"
                 >
-                  {i + 1}
-                </span>
-                <span
-                  className={`font-[family-name:var(--font-body)] font-medium text-xs ${
-                    active || done ? 'text-[var(--color-brand-navy)]' : 'text-[var(--color-brand-muted)]'
-                  } hidden sm:inline`}
-                >
-                  {s.label}
-                </span>
-                {i < 3 && (
-                  <div className={`w-5 h-px mx-1 ${stepIdx < currentIdx ? 'bg-[var(--color-brand-cyan)]' : 'bg-[#e5e7eb]'}`} />
+                  <span
+                    className={`flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold font-[family-name:var(--font-body)] transition-all duration-200 shrink-0 ${
+                      done || active
+                        ? "bg-[var(--color-brand-cyan)] text-white"
+                        : "bg-[#e5e7eb] text-[var(--color-brand-muted)]"
+                    }`}
+                  >
+                    {i + 1}
+                  </span>
+                  <span
+                    className={`font-[family-name:var(--font-body)] font-medium text-xs transition-colors duration-200 ml-1.5 whitespace-nowrap ${
+                      active || done
+                        ? "text-[var(--color-brand-navy)]"
+                        : "text-[var(--color-brand-muted)]"
+                    } hidden sm:inline`}
+                  >
+                    {s.label}
+                  </span>
+                  {i < 3 && (
+                    <div
+                      className={`flex-1 h-px mx-2 transition-colors duration-200 ${
+                        i < wizard.currentStepIdx
+                          ? "bg-[var(--color-brand-cyan)]"
+                          : "bg-[#e5e7eb]"
+                      }`}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Main content card */}
+      {!locking.deepLinkError && (
+        <motion.div
+          variants={pageFade}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.25, delay: 0.1 }}
+          className="bg-[var(--color-brand-surface)] rounded-2xl p-6 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+        >
+          <AnimatePresence mode="wait">
+            {/* ─── select_trip ──────────────────────────────────────────── */}
+            {wizard.step === "select_trip" && (
+              <motion.div
+                key="select_trip"
+                variants={pageFade}
+                initial="hidden"
+                animate="visible"
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-1 h-[22px] bg-[var(--color-brand-cyan)] rounded-sm" />
+                  <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)]">
+                    Nueva reserva
+                  </h2>
+                </div>
+
+                {tripsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <CardSkeleton key={i} />
+                    ))}
+                  </div>
+                ) : tripsError ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2]">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle
+                          className="w-5 h-5 text-[#ef4444] shrink-0"
+                          strokeWidth={1.75}
+                        />
+                        <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+                          {tripsError}
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={loadTripsList}
+                      >
+                        Reintentar
+                      </Button>
+                    </div>
+                  </motion.div>
+                ) : availableTrips.length === 0 ? (
+                  <EmptyState
+                    icon={<Ticket className="w-8 h-8" />}
+                    message={
+                      trips.length === 0
+                        ? "No hay viajes disponibles para tu agencia"
+                        : "No hay viajes activos con asientos disponibles"
+                    }
+                    action={{
+                      label: "Regresar",
+                      onClick: () => router.push("/agency"),
+                    }}
+                  />
+                ) : (
+                  <motion.div
+                    className="space-y-3"
+                    variants={staggerContainer}
+                    initial="hidden"
+                    animate="visible"
+                  >
+                    {availableTrips.map((trip) => (
+                      <motion.div key={trip.id} variants={staggerItem}>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectTrip(trip.id)}
+                          className="w-full text-left bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] cursor-pointer transition-all duration-200 hover:shadow-[0_6px_24px_rgba(0,212,255,0.12)] hover:-translate-y-0.5"
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-[family-name:var(--font-heading)] font-bold text-base text-[var(--color-brand-navy)]">
+                                {trip.route?.destination ?? "Destino"}
+                              </p>
+                              <p className="font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-muted)] mt-1">
+                                {trip.departure_time
+                                  ? format(
+                                      new Date(trip.departure_time),
+                                      "d 'de' MMMM yyyy, h:mm a",
+                                      { locale: es }
+                                    )
+                                  : ""}
+                              </p>
+                            </div>
+                            <div className="shrink-0 flex items-center gap-4">
+                              <div className="text-right">
+                                <p className="font-[family-name:var(--font-body)] font-bold text-lg text-[var(--color-brand-cyan)]">
+                                  {trip.available_seats}
+                                </p>
+                                <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] whitespace-nowrap">
+                                  disponibles
+                                </p>
+                              </div>
+                              <ArrowRight className="w-5 h-5 text-[var(--color-brand-muted)]" />
+                            </div>
+                          </div>
+                        </button>
+                      </motion.div>
+                    ))}
+                  </motion.div>
                 )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+              </motion.div>
+            )}
 
-      {!deepLinkError && (
-        <div className="bg-[var(--color-brand-surface)] rounded-2xl p-6 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-          {step === 'select_trip' && renderSelectTrip()}
-          {step === 'select_seats' && renderSelectSeats()}
-          {step === 'passenger_form' && renderPassengerForm()}
-          {step === 'summary' && renderSummary()}
-          {step === 'success' && renderSuccess()}
-        </div>
+            {/* ─── select_seats ────────────────────────────────────────── */}
+            {wizard.step === "select_seats" && (
+              <motion.div
+                key="select_seats"
+                variants={pageFade}
+                initial="hidden"
+                animate="visible"
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <button
+                  type="button"
+                  onClick={handleBackFromSeats}
+                  className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  {wizard.origin === "agency_trips"
+                    ? "Volver a Mis Viajes"
+                    : "Volver a viajes"}
+                </button>
+
+                {locking.tripLoading ? (
+                  <div className="flex flex-col lg:flex-row gap-6">
+                    <div className="lg:w-[300px] shrink-0 space-y-3 bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)]">
+                      <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-slate-200 rounded-lg animate-pulse" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-3 w-16 bg-slate-200 rounded animate-pulse" />
+                          <div className="h-4 w-24 bg-slate-200 rounded animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-slate-200 rounded-lg animate-pulse" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-3 w-16 bg-slate-200 rounded animate-pulse" />
+                          <div className="h-4 w-20 bg-slate-200 rounded animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-slate-200 rounded-lg animate-pulse" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-3 w-16 bg-slate-200 rounded animate-pulse" />
+                          <div className="h-4 w-20 bg-slate-200 rounded animate-pulse" />
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-slate-200 rounded-lg animate-pulse" />
+                        <div className="space-y-1.5 flex-1">
+                          <div className="h-3 w-20 bg-slate-200 rounded animate-pulse" />
+                          <div className="h-5 w-10 bg-slate-200 rounded animate-pulse" />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex-1 flex justify-center">
+                      <div className="w-[310px] h-[420px] bg-slate-100 rounded-[40px] animate-pulse" />
+                    </div>
+                  </div>
+                ) : !locking.selectedTrip ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2]">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle
+                          className="w-5 h-5 text-[#ef4444] shrink-0"
+                          strokeWidth={1.75}
+                        />
+                        <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+                          No se pudo cargar el viaje
+                        </p>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleBackFromSeats}
+                      >
+                        Volver
+                      </Button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <>
+                    <div className="flex flex-col lg:flex-row gap-6">
+                      {/* Left — Trip info */}
+                      <motion.div
+                        initial={{ opacity: 0, x: -12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.25 }}
+                        className="lg:w-[300px] shrink-0 self-start bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                      >
+                        <p className="font-[family-name:var(--font-heading)] font-bold text-[13px] text-[var(--color-brand-navy)] uppercase tracking-wider mb-4 border-l-4 border-[var(--color-brand-cyan)] pl-3">
+                          Resumen del viaje
+                        </p>
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[rgba(0,212,255,0.1)] shrink-0">
+                              <ArrowRight className="w-4 h-4 text-[var(--color-brand-cyan)]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider">
+                                Destino
+                              </p>
+                              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)] truncate">
+                                {locking.selectedTrip.routes?.destination ??
+                                  "—"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[rgba(0,212,255,0.1)] shrink-0">
+                              <Calendar className="w-4 h-4 text-[var(--color-brand-cyan)]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider">
+                                Salida
+                              </p>
+                              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                                {locking.selectedTrip.departure_time
+                                  ? `${format(
+                                      new Date(
+                                        locking.selectedTrip.departure_time
+                                      ),
+                                      "d 'de' MMMM",
+                                      { locale: es }
+                                    )}`
+                                  : "—"}
+                              </p>
+                              <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
+                                {locking.selectedTrip.departure_time
+                                  ? format(
+                                      new Date(
+                                        locking.selectedTrip.departure_time
+                                      ),
+                                       "h:mm a",
+                                      { locale: es }
+                                    )
+                                  : ""}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[rgba(0,212,255,0.1)] shrink-0">
+                              <BusIcon className="w-4 h-4 text-[var(--color-brand-cyan)]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider">
+                                Vehículo
+                              </p>
+                              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                                {locking.selectedTrip.vehicle_type === "bus"
+                                  ? "Autobús"
+                                  : "KIA"}
+                              </p>
+                              <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
+                                {locking.selectedTrip.seats?.length ?? 0}{" "}
+                                asientos
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[rgba(0,212,255,0.1)] shrink-0">
+                              <Ticket className="w-4 h-4 text-[var(--color-brand-cyan)]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider">
+                                Disponibles
+                              </p>
+                              <p className="font-[family-name:var(--font-heading)] font-bold text-[18px] text-[var(--color-brand-cyan)]">
+                                {(() => {
+                                  const seats =
+                                    locking.selectedTrip.seats ?? [];
+                                  return seats.filter(
+                                    (s: Seat) => s.status === "available"
+                                  ).length;
+                                })()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
+
+                      {/* Right — Bus layout */}
+                      <motion.div
+                        initial={{ opacity: 0, x: 12 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.25, delay: 0.05 }}
+                        className="flex-1 flex flex-col items-center"
+                      >
+                        <BusLayout
+                          seats={locking.seatsMap}
+                          selectedSeats={locking.selectedSeats}
+                          onToggleSeat={handleToggleSeat}
+                          vehicleType={
+                            locking.selectedTrip.vehicle_type ?? "bus"
+                          }
+                          userId={userId}
+                        />
+                      </motion.div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between mt-6">
+                      <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)]">
+                        {locking.selectedSeats.length} asiento
+                        {locking.selectedSeats.length !== 1 ? "s" : ""}{" "}
+                        seleccionado
+                        {locking.selectedSeats.length !== 1 ? "s" : ""}
+                      </span>
+                      <Button
+                        variant="primary"
+                        onClick={handleProceedToForm}
+                        disabled={locking.selectedSeats.length === 0}
+                      >
+                        Continuar
+                        <ArrowRight className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            )}
+
+            {/* ─── passenger_form ──────────────────────────────────────── */}
+            {wizard.step === "passenger_form" && (
+              <motion.div
+                key="passenger_form"
+                variants={pageFade}
+                initial="hidden"
+                animate="visible"
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => wizard.goToSeatSelection()}
+                  className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Volver a asientos
+                </button>
+
+                <PassengerForm
+                  passengers={passengers}
+                  onUpdate={handlePassengerUpdate}
+                  onNext={handleProceedToSummary}
+                  errors={errors}
+                  bookerName={bookerName}
+                  bookerDocument={bookerDocument}
+                  onBookerNameChange={handleBookerNameChange}
+                  onBookerDocumentChange={handleBookerDocumentChange}
+                  bookerErrors={{
+                    name: errors["booker_name"],
+                    document: errors["booker_document"],
+                  }}
+                />
+              </motion.div>
+            )}
+
+            {/* ─── summary ─────────────────────────────────────────────── */}
+            {wizard.step === "summary" && (
+              <motion.div
+                key="summary"
+                variants={pageFade}
+                initial="hidden"
+                animate="visible"
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => wizard.goToPassengerEntry()}
+                  className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Volver a pasajeros
+                </button>
+
+                <ReservationSummary
+                  trip={locking.selectedTrip}
+                  selectedSeats={locking.selectedSeats}
+                  passengers={passengers}
+                  bookerName={bookerName}
+                  bookerDocument={bookerDocument}
+                  onConfirm={handleConfirm}
+                  submitting={submit.submitting}
+                  submitError={submit.submitError}
+                  onEditPassengers={handleEditPassengers}
+                />
+              </motion.div>
+            )}
+
+            {/* ─── success ─────────────────────────────────────────────── */}
+            {wizard.step === "success" && (
+              <motion.div
+                key="success"
+                variants={pageFade}
+                initial="hidden"
+                animate="visible"
+                transition={{ duration: 0.3 }}
+                className="flex flex-col items-center text-center py-8"
+              >
+                <div className="w-16 h-16 rounded-full bg-[#ecfdf5] flex items-center justify-center mb-4">
+                  <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
+                </div>
+
+                <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)] mb-2">
+                  Reserva confirmada
+                </h2>
+
+                {submit.result?.reservation?.id && (
+                  <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] mb-4 tracking-wider uppercase">
+                    Código: {submit.result.reservation.id.slice(0, 8).toUpperCase()}
+                  </p>
+                )}
+
+                <div className="bg-[var(--color-page-bg)] rounded-2xl p-4 border border-[rgba(0,0,0,0.06)] w-full max-w-sm mb-5">
+                  <div className="grid grid-cols-2 gap-3 text-center">
+                    <div>
+                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Destino</p>
+                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                        {locking.selectedTrip?.routes?.destination ?? "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Salida</p>
+                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                        {locking.selectedTrip?.departure_time
+                          ? format(
+                              new Date(locking.selectedTrip.departure_time),
+                              "d MMM, h:mm a",
+                              { locale: es }
+                            )
+                          : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Vehículo</p>
+                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                        {locking.selectedTrip?.vehicle_type === "bus" ? "Autobús" : "KIA"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Asientos</p>
+                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                        {passengers.length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {submit.result?.qr_data_url ? (
+                  <div className="bg-white rounded-2xl p-4 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] mb-5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={submit.result.qr_data_url}
+                      alt="Código QR de la reserva"
+                      className="w-44 h-44 sm:w-48 sm:h-48 max-w-full"
+                    />
+                  </div>
+                ) : (
+                  <div className="bg-[#fffbeb] border border-[#fef3c7] rounded-xl p-4 mb-5 max-w-sm">
+                    <p className="font-[family-name:var(--font-body)] text-sm text-[#92400e]">
+                      La reserva fue creada correctamente, pero no pudimos generar el código QR. Puedes consultarla en{" "}
+                      <span className="font-semibold">Mis Reservas</span>.
+                    </p>
+                  </div>
+                )}
+
+                <div className="bg-[var(--color-page-bg)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] w-full max-w-sm mb-6">
+                  <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)] mb-3">
+                    Pasajeros
+                  </p>
+                  <div className="space-y-2">
+                    {passengers.map((p) => (
+                      <div
+                        key={p.seat_id}
+                        className="flex items-center justify-between py-2 border-b border-[rgba(0,0,0,0.06)] last:border-0"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-[family-name:var(--font-body)] font-bold text-[13px] text-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.1)] px-2 py-0.5 rounded-md min-w-[36px] text-center">
+                            {p.seat_code}
+                          </span>
+                          <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)]">
+                            {p.name || "Sin nombre"}
+                          </span>
+                        </div>
+                        <span className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
+                          {p.document || ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                  <Button
+                    variant="secondary"
+                    onClick={() => router.push("/agency/reservations")}
+                    className="flex-1"
+                  >
+                    Ver reservas
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleReset}
+                    className="flex-1"
+                  >
+                    Nueva reserva
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       )}
     </main>
   );

@@ -1,5 +1,7 @@
 export type SeatStatus = 'available' | 'locked' | 'reserved' | 'blocked' | 'guide' | 'boarded';
 
+export type ReservationOrigin = 'new_reservation' | 'agency_trips';
+
 export interface Route {
   id: string;
   origin: string;
@@ -15,6 +17,20 @@ export interface Trip {
   capacity: number;
   vehicle_type: 'bus' | 'kia';
   status: 'active' | 'cancelled' | 'completed';
+  route?: Route | null;
+  routes?: Route | null;
+  seats?: Seat[];
+}
+
+export interface AgencyTripListItem {
+  id: string;
+  route: { origin: string; destination: string } | null;
+  departure_time: string;
+  vehicle_type: 'bus' | 'kia';
+  status: string;
+  total_seats: number;
+  available_seats: number;
+  reserved_seats: number;
 }
 
 export interface Seat {
@@ -48,6 +64,29 @@ export interface Reservation {
   status: 'confirmed' | 'cancelled' | 'boarded';
   qr_code: string;
   created_at: string;
+}
+
+export interface ReservationPayload {
+  trip_id: string;
+  booker_name: string;
+  booker_document: string;
+  booker_phone?: string;
+  passengers: { seat_id: string; name: string; document: string; phone?: string }[];
+}
+
+export interface ReservationResult {
+  reservation: Reservation;
+  passengers: { id: string; seat_code: string; name: string; document: string }[];
+  qr_code: string;
+  qr_data_url: string;
+}
+
+export interface PassengerData {
+  seat_id: string;
+  seat_code: string;
+  name: string;
+  document: string;
+  phone: string;
 }
 
 export interface Agency {

@@ -1,19 +1,28 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { format } from 'date-fns';
-import { Html5Qrcode } from 'html5-qrcode';
-import type { Html5QrcodeResult } from 'html5-qrcode';
-import { AnimatePresence, motion } from 'framer-motion';
-import { Camera, RotateCcw, CheckCircle, AlertCircle, XCircle, QrCode, Search, UserCheck } from 'lucide-react';
-import { agencyApi } from '@/lib/api';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Input } from '@/components/ui/Input';
-import { SectionTitle } from '@/components/ui/SectionTitle';
-import { Spinner } from '@/components/ui/Spinner';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { format } from "date-fns";
+import { Html5Qrcode } from "html5-qrcode";
+import type { Html5QrcodeResult } from "html5-qrcode";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Camera,
+  RotateCcw,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  QrCode,
+  Search,
+  UserCheck,
+} from "lucide-react";
+import { agencyApi } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
+import { Input } from "@/components/ui/Input";
+import { SectionTitle } from "@/components/ui/SectionTitle";
+import { Spinner } from "@/components/ui/Spinner";
 
 type PassengerInfo = {
   id: string;
@@ -35,12 +44,16 @@ type ScanLookupResult = {
   passengers: PassengerInfo[];
 };
 
-function computeBadge(passengers: PassengerInfo[]): { label: string; variant: 'confirmed' | 'boarded' | 'cancelled' } {
-  const allBoarded = passengers.length > 0 && passengers.every(p => p.boarded);
-  const someBoarded = passengers.some(p => p.boarded);
-  if (allBoarded) return { label: 'Completado', variant: 'boarded' };
-  if (someBoarded) return { label: 'Parcial', variant: 'confirmed' };
-  return { label: 'Confirmada', variant: 'confirmed' };
+function computeBadge(passengers: PassengerInfo[]): {
+  label: string;
+  variant: "confirmed" | "boarded" | "cancelled";
+} {
+  const allBoarded =
+    passengers.length > 0 && passengers.every((p) => p.boarded);
+  const someBoarded = passengers.some((p) => p.boarded);
+  if (allBoarded) return { label: "Completado", variant: "boarded" };
+  if (someBoarded) return { label: "Parcial", variant: "confirmed" };
+  return { label: "Confirmada", variant: "confirmed" };
 }
 
 function SuccessAnimation({ showConfetti }: { showConfetti: boolean }) {
@@ -59,7 +72,7 @@ function SuccessAnimation({ showConfetti }: { showConfetti: boolean }) {
             initial={{ scale: 0 }}
             animate={{ scale: [0, 1.2, 1], rotate: [0, 10, -10, 0] }}
             exit={{ scale: 0, opacity: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
           >
             <CheckCircle size={44} stroke="white" strokeWidth={3} />
           </motion.div>
@@ -67,7 +80,14 @@ function SuccessAnimation({ showConfetti }: { showConfetti: boolean }) {
             <motion.div
               key={i}
               className="absolute w-3 h-3 rounded-full"
-              style={{ background: ['var(--color-brand-cyan)', '#10b981', '#f59e0b', 'var(--color-brand-blue)'][i % 4] }}
+              style={{
+                background: [
+                  "var(--color-brand-cyan)",
+                  "#10b981",
+                  "#f59e0b",
+                  "var(--color-brand-blue)",
+                ][i % 4],
+              }}
               initial={{ x: 0, y: 0, scale: 1, opacity: 1 }}
               animate={{
                 x: Math.cos((i * 30 * Math.PI) / 180) * 140,
@@ -76,7 +96,7 @@ function SuccessAnimation({ showConfetti }: { showConfetti: boolean }) {
                 opacity: 0,
               }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.9, ease: 'easeOut' }}
+              transition={{ duration: 0.9, ease: "easeOut" }}
             />
           ))}
         </motion.div>
@@ -87,7 +107,9 @@ function SuccessAnimation({ showConfetti }: { showConfetti: boolean }) {
 
 export default function AgencyScanPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const onScanSuccessRef = useRef<((decodedText: string, result: Html5QrcodeResult) => void) | null>(null!);
+  const onScanSuccessRef = useRef<
+    ((decodedText: string, result: Html5QrcodeResult) => void) | null
+  >(null!);
   const [scanning, setScanning] = useState(false);
   const [initializingCamera, setInitializingCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
@@ -100,11 +122,15 @@ export default function AgencyScanPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [manualQrValue, setManualQrValue] = useState('');
+  const [manualQrValue, setManualQrValue] = useState("");
 
   const stopCamera = useCallback(async () => {
     if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch { /* ignore */ }
+      try {
+        await scannerRef.current.stop();
+      } catch {
+        /* ignore */
+      }
       scannerRef.current = null;
     }
     setScanning(false);
@@ -121,23 +147,26 @@ export default function AgencyScanPage() {
     try {
       const result = await agencyApi.lookupPassengerByQR(qrCode);
       if (!result.passengers || result.passengers.length === 0) {
-        setLookupError('Reserva sin pasajeros');
+        setLookupError("Reserva sin pasajeros");
         setScanResult(null);
         return;
       }
       setScanResult(result);
     } catch (err: any) {
-      setLookupError(err?.message || 'Error al buscar reserva');
+      setLookupError(err?.message || "Error al buscar reserva");
       setScanResult(null);
     } finally {
       setLoadingBooking(false);
     }
   }, []);
 
-  const onScanSuccess = useCallback(async (decodedText: string, _result: Html5QrcodeResult) => {
-    await stopCamera();
-    await lookupByQR(decodedText);
-  }, [stopCamera, lookupByQR]);
+  const onScanSuccess = useCallback(
+    async (decodedText: string, _result: Html5QrcodeResult) => {
+      await stopCamera();
+      await lookupByQR(decodedText);
+    },
+    [stopCamera, lookupByQR]
+  );
 
   useEffect(() => {
     onScanSuccessRef.current = onScanSuccess;
@@ -154,15 +183,18 @@ export default function AgencyScanPage() {
     const startWithFacing = async (facingMode: string): Promise<boolean> => {
       if (cancelled) return false;
       try {
-        const scanner = new Html5Qrcode('qr-reader-container');
-        const scanHandler = (decodedText: string, result: Html5QrcodeResult) => {
+        const scanner = new Html5Qrcode("qr-reader-container");
+        const scanHandler = (
+          decodedText: string,
+          result: Html5QrcodeResult
+        ) => {
           onScanSuccessRef.current?.(decodedText, result);
         };
         await scanner.start(
           { facingMode },
           { fps: 10, qrbox: { width: 250, height: 250 } },
           scanHandler,
-          () => {},
+          () => {}
         );
         scannerRef.current = scanner;
         if (!cancelled) {
@@ -178,14 +210,16 @@ export default function AgencyScanPage() {
     };
 
     (async () => {
-      const envOk = await startWithFacing('environment');
+      const envOk = await startWithFacing("environment");
       if (cancelled) return;
       if (!envOk) {
         setCameraFacingError(true);
-        const userOk = await startWithFacing('user');
+        const userOk = await startWithFacing("user");
         if (cancelled) return;
         if (!userOk) {
-          setCameraError('No se pudo acceder a la cámara. Verifica los permisos.');
+          setCameraError(
+            "No se pudo acceder a la cámara. Verifica los permisos."
+          );
           setCameraReady(false);
           setInitializingCamera(false);
           setScanning(false);
@@ -210,7 +244,7 @@ export default function AgencyScanPage() {
     setLookupError(null);
     setSuccessMsg(null);
     setShowConfetti(false);
-    setManualQrValue('');
+    setManualQrValue("");
     setScanning(true);
   };
 
@@ -221,38 +255,47 @@ export default function AgencyScanPage() {
     await lookupByQR(qr);
   };
 
-  const handleToggleBoarding = useCallback(async (passengerId: string, currentlyBoarded: boolean) => {
-    setTogglingIds((prev) => new Set(prev).add(passengerId));
-    setLookupError(null);
-    setSuccessMsg(null);
-    try {
-      await agencyApi.toggleBoarding(passengerId, !currentlyBoarded);
-      setScanResult((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          passengers: prev.passengers.map((p) =>
-            p.id === passengerId
-              ? { ...p, boarded: !currentlyBoarded, boarded_at: !currentlyBoarded ? new Date().toISOString() : null }
-              : p,
-          ),
-        };
-      });
-      if (!currentlyBoarded) {
-        setSuccessMsg('Abordaje confirmado');
-      } else {
-        setSuccessMsg('Abordaje cancelado');
+  const handleToggleBoarding = useCallback(
+    async (passengerId: string, currentlyBoarded: boolean) => {
+      setTogglingIds((prev) => new Set(prev).add(passengerId));
+      setLookupError(null);
+      setSuccessMsg(null);
+      try {
+        await agencyApi.toggleBoarding(passengerId, !currentlyBoarded);
+        setScanResult((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            passengers: prev.passengers.map((p) =>
+              p.id === passengerId
+                ? {
+                    ...p,
+                    boarded: !currentlyBoarded,
+                    boarded_at: !currentlyBoarded
+                      ? new Date().toISOString()
+                      : null,
+                  }
+                : p
+            ),
+          };
+        });
+        if (!currentlyBoarded) {
+          setSuccessMsg("Abordaje confirmado");
+        } else {
+          setSuccessMsg("Abordaje cancelado");
+        }
+      } catch (err: any) {
+        setLookupError(err?.message || "Error al actualizar abordaje");
+      } finally {
+        setTogglingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(passengerId);
+          return next;
+        });
       }
-    } catch (err: any) {
-      setLookupError(err?.message || 'Error al actualizar abordaje');
-    } finally {
-      setTogglingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(passengerId);
-        return next;
-      });
-    }
-  }, []);
+    },
+    []
+  );
 
   const handleBulkBoarding = useCallback(async () => {
     const unboarded = scanResult?.passengers.filter((p) => !p.boarded) ?? [];
@@ -263,20 +306,20 @@ export default function AgencyScanPage() {
     try {
       const now = new Date().toISOString();
       await Promise.all(
-        unboarded.map((p) => agencyApi.toggleBoarding(p.id, true)),
+        unboarded.map((p) => agencyApi.toggleBoarding(p.id, true))
       );
       setScanResult((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           passengers: prev.passengers.map((p) =>
-            p.boarded ? p : { ...p, boarded: true, boarded_at: now },
+            p.boarded ? p : { ...p, boarded: true, boarded_at: now }
           ),
         };
       });
       setSuccessMsg(`${unboarded.length} pasajero(s) abordado(s)`);
     } catch (err: any) {
-      setLookupError(err?.message || 'Error al abordar pasajeros');
+      setLookupError(err?.message || "Error al abordar pasajeros");
     } finally {
       setBulkLoading(false);
     }
@@ -288,7 +331,7 @@ export default function AgencyScanPage() {
     setSuccessMsg(null);
     setCameraError(null);
     setShowConfetti(false);
-    setManualQrValue('');
+    setManualQrValue("");
     setScanning(true);
   };
 
@@ -304,11 +347,7 @@ export default function AgencyScanPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <SuccessAnimation showConfetti={showConfetti} />
 
-      <PageHeader
-        title="Escáner de abordaje"
-        breadcrumbs={[{ label: 'Agencia', href: '/agency' }]}
-        className="mb-0"
-      />
+      <PageHeader title="Escáner de abordaje" className="mb-0" />
       <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[var(--color-brand-muted)] mb-6">
         Escanea el código QR del pasajero para confirmar su abordaje
       </p>
@@ -316,7 +355,9 @@ export default function AgencyScanPage() {
       <div className="grid grid-cols-1 gap-6">
         <Card>
           <div className="flex items-center gap-3 mb-4">
-            <SectionTitle>{scanning ? 'Enfoca el código QR del pasajero' : 'Escáner'}</SectionTitle>
+            <SectionTitle>
+              {scanning ? "Enfoca el código QR del pasajero" : "Escáner"}
+            </SectionTitle>
             {cameraReady && (
               <span className="ml-auto inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] font-semibold text-[10px] text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -345,14 +386,18 @@ export default function AgencyScanPage() {
             </div>
           )}
 
-              {cameraError && (
+          {cameraError && (
             <div className="py-6 text-center">
               <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <XCircle className="w-6 h-6 text-red-500" />
               </div>
-              <p className="font-[family-name:var(--font-body)] font-normal text-sm text-red-500 mb-3">{cameraError}</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-sm text-red-500 mb-3">
+                {cameraError}
+              </p>
               <div className="flex gap-3 justify-center flex-wrap">
-                <Button onClick={handleRetryCamera} size="sm">Reintentar cámara</Button>
+                <Button onClick={handleRetryCamera} size="sm">
+                  Reintentar cámara
+                </Button>
               </div>
             </div>
           )}
@@ -360,13 +405,20 @@ export default function AgencyScanPage() {
           {scanning && !cameraError && (
             <div>
               <div className="relative w-full max-w-sm mx-auto">
-                <div id="qr-reader-container" className="w-full rounded-xl overflow-hidden" />
+                <div
+                  id="qr-reader-container"
+                  className="w-full rounded-xl overflow-hidden"
+                />
                 {cameraReady && (
                   <div className="absolute inset-x-0 top-0 h-full pointer-events-none overflow-hidden rounded-xl">
                     <motion.div
                       className="absolute left-[10%] right-[10%] h-[2px] bg-[var(--color-brand-cyan)] shadow-[0_0_8px_rgba(0,212,255,0.7)]"
-                      animate={{ top: ['5%', '95%'] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                      animate={{ top: ["5%", "95%"] }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
                     />
                     <div className="absolute inset-0 border-[3px] border-[var(--color-brand-cyan)]/30 rounded-xl" />
                     <div className="absolute top-0 left-0 w-6 h-6 border-t-[3px] border-l-[3px] border-[var(--color-brand-cyan)] rounded-tl-lg" />
@@ -397,7 +449,9 @@ export default function AgencyScanPage() {
               <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <XCircle className="w-6 h-6 text-red-500" />
               </div>
-              <p className="font-[family-name:var(--font-body)] font-normal text-sm text-red-500 mb-4">{lookupError}</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-sm text-red-500 mb-4">
+                {lookupError}
+              </p>
               <div className="flex gap-3 justify-center flex-wrap">
                 <Button onClick={handleReset}>Escanear otro</Button>
               </div>
@@ -415,11 +469,17 @@ export default function AgencyScanPage() {
                 placeholder="Pega el código aquí"
                 value={manualQrValue}
                 onChange={(e) => setManualQrValue(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleManualLookup(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleManualLookup();
+                }}
                 leftIcon={<QrCode className="w-4 h-4 text-[#6b7280]" />}
               />
             </div>
-            <Button className="mt-[22px]" onClick={handleManualLookup} disabled={!manualQrValue.trim() || loadingBooking}>
+            <Button
+              className="mt-[22px]"
+              onClick={handleManualLookup}
+              disabled={!manualQrValue.trim() || loadingBooking}
+            >
               <Search className="w-4 h-4" />
             </Button>
           </div>
@@ -430,31 +490,43 @@ export default function AgencyScanPage() {
             <div className="flex items-center justify-between gap-3 mb-4">
               <SectionTitle>Reserva encontrada</SectionTitle>
               {badge && (
-                <Badge variant={badge.variant} size="md">{badge.label}</Badge>
+                <Badge variant={badge.variant} size="md">
+                  {badge.label}
+                </Badge>
               )}
             </div>
 
             {successMsg && (
               <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2">
                 <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-emerald-700">{successMsg}</span>
+                <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-emerald-700">
+                  {successMsg}
+                </span>
               </div>
             )}
 
             <div className="mb-5 space-y-3">
               <div>
-                <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">Ruta</label>
+                <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+                  Ruta
+                </label>
                 <p className="font-[family-name:var(--font-body)] font-semibold text-[15px] text-[var(--color-brand-navy)]">
-                  {scanResult.route?.origin ?? '—'} → {scanResult.route?.destination ?? '—'}
+                  {scanResult.route?.origin ?? "—"} →{" "}
+                  {scanResult.route?.destination ?? "—"}
                 </p>
                 <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
                   {scanResult.departure_time
-                    ? format(new Date(scanResult.departure_time), 'dd/MM/yyyy HH:mm')
-                    : ''}
+                    ? format(
+                        new Date(scanResult.departure_time),
+                        "dd/MM/yyyy HH:mm"
+                      )
+                    : ""}
                 </p>
               </div>
               <div>
-                <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">Reservado por</label>
+                <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+                  Reservado por
+                </label>
                 <p className="font-[family-name:var(--font-body)] font-semibold text-[15px] text-[var(--color-brand-navy)]">
                   {scanResult.booker_name} · {scanResult.booker_document}
                 </p>
@@ -468,7 +540,9 @@ export default function AgencyScanPage() {
 
             <div className="border-t border-[#e5e7eb] pt-4">
               <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-3">
-                Pasajeros ({scanResult.passengers.filter(p => p.boarded).length}/{scanResult.passengers.length} abordados)
+                Pasajeros (
+                {scanResult.passengers.filter((p) => p.boarded).length}/
+                {scanResult.passengers.length} abordados)
               </label>
               <div className="space-y-2">
                 {scanResult.passengers.map((passenger) => (
@@ -485,20 +559,30 @@ export default function AgencyScanPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
-                      <span className={`font-[family-name:var(--font-body)] text-xs font-semibold ${
-                        passenger.boarded ? 'text-[#10b981]' : 'text-[#6b7280]'
-                      }`}>
-                        {passenger.boarded ? 'Abordado' : 'Pendiente'}
+                      <span
+                        className={`font-[family-name:var(--font-body)] text-xs font-semibold ${
+                          passenger.boarded
+                            ? "text-[#10b981]"
+                            : "text-[#6b7280]"
+                        }`}
+                      >
+                        {passenger.boarded ? "Abordado" : "Pendiente"}
                       </span>
                       <button
                         type="button"
                         disabled={togglingIds.has(passenger.id)}
-                        onClick={() => handleToggleBoarding(passenger.id, passenger.boarded)}
+                        onClick={() =>
+                          handleToggleBoarding(passenger.id, passenger.boarded)
+                        }
                         className={`
                           relative inline-flex h-[28px] w-[52px] shrink-0 cursor-pointer items-center rounded-full
                           transition-colors duration-200 ease-in-out
-                          ${passenger.boarded ? 'bg-[#10b981]' : 'bg-[#e5e7eb]'}
-                          ${togglingIds.has(passenger.id) ? 'opacity-50 cursor-not-allowed' : ''}
+                          ${passenger.boarded ? "bg-[#10b981]" : "bg-[#e5e7eb]"}
+                          ${
+                            togglingIds.has(passenger.id)
+                              ? "opacity-50 cursor-not-allowed"
+                              : ""
+                          }
                         `}
                         role="switch"
                         aria-checked={passenger.boarded}
@@ -507,7 +591,11 @@ export default function AgencyScanPage() {
                           className={`
                             inline-block h-[22px] w-[22px] transform rounded-full bg-white shadow-sm
                             transition-transform duration-200 ease-in-out
-                            ${passenger.boarded ? 'translate-x-[27px]' : 'translate-x-[3px]'}
+                            ${
+                              passenger.boarded
+                                ? "translate-x-[27px]"
+                                : "translate-x-[3px]"
+                            }
                           `}
                         />
                       </button>
@@ -528,11 +616,7 @@ export default function AgencyScanPage() {
                   Marcar todos como abordados
                 </Button>
               )}
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={handleReset}
-              >
+              <Button variant="secondary" size="lg" onClick={handleReset}>
                 <RotateCcw className="w-4 h-4" />
                 Escanear otro
               </Button>

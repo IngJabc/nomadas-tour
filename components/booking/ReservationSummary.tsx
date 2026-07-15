@@ -1,163 +1,165 @@
-'use client';
+"use client";
 
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { Calendar, MapPin, Users, Bus } from 'lucide-react';
-import { Seat } from '@/types';
-
-interface PassengerData {
-  seat_id: string;
-  seat_code: string;
-  name: string;
-  document: string;
-  phone: string;
-}
+import { Check, CreditCard, Users, Bus, AlertTriangle } from "lucide-react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Trip, PassengerData, Seat } from "@/types";
+import { Button } from "@/components/ui/Button";
 
 interface ReservationSummaryProps {
-  trip: any;
+  trip: Trip | null;
   selectedSeats: Seat[];
-  passengers: PassengerData[];
   bookerName: string;
   bookerDocument: string;
+  passengers: PassengerData[];
   onConfirm: () => void;
-  loading: boolean;
-  error: string | null;
+  submitting?: boolean;
+  submitError?: string | null;
+  onEditPassengers?: () => void;
+}
+
+const VEHICLE_LABELS: Record<string, string> = {
+  bus: "Autobús",
+  kia: "KIA",
+  van: "Van",
+  microbús: "Microbús",
+};
+
+function getVehicleLabel(trip: Trip): string {
+  const label = VEHICLE_LABELS[trip.vehicle_type] || trip.vehicle_type;
+  return trip.capacity ? `${label} (${trip.capacity} asientos)` : label;
 }
 
 export function ReservationSummary({
   trip,
   selectedSeats,
-  passengers,
   bookerName,
   bookerDocument,
+  passengers,
   onConfirm,
-  loading,
-  error,
+  submitting = false,
+  submitError,
+  onEditPassengers,
 }: ReservationSummaryProps) {
-  const vehicleLabel = trip.vehicle_type === 'bus' ? 'Autobús (31 asientos)' : 'KIA (10 asientos)';
+  if (!trip) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-1 h-[18px] bg-[var(--color-brand-cyan)] rounded-sm" />
-        <h3 className="font-[family-name:var(--font-heading)] font-bold text-base text-[var(--color-brand-navy)]">
-          Resumen de reserva
-        </h3>
-      </div>
-
-      {/* Trip info */}
-      <div className="bg-[var(--color-page-bg)] rounded-xl p-4 border border-[rgba(0,0,0,0.06)]">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="flex items-start gap-3">
-            <MapPin className="w-4 h-4 text-[var(--color-brand-cyan)] mt-0.5 shrink-0" />
-            <div>
-              <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)]">
-                {trip.routes?.origin ?? ''} → {trip.routes?.destination ?? ''}
-              </p>
-              <p className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)]">
-                Ruta del viaje
-              </p>
-            </div>
+    <div className="space-y-5">
+      <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-2xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-9 h-9 rounded-lg bg-[var(--color-brand-cyan)] text-white flex items-center justify-center">
+            <Bus className="w-5 h-5" />
           </div>
-          <div className="flex items-start gap-3">
-            <Calendar className="w-4 h-4 text-[var(--color-brand-cyan)] mt-0.5 shrink-0" />
-            <div>
-              <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)]">
-                {format(new Date(trip.departure_time), "d 'de' MMMM, HH:mm", { locale: es })}
-              </p>
-              <p className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)]">
-                Fecha y hora de salida
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Bus className="w-4 h-4 text-[var(--color-brand-cyan)] mt-0.5 shrink-0" />
-            <div>
-              <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)]">
-                {vehicleLabel}
-              </p>
-              <p className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)]">
-                Tipo de vehículo
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Users className="w-4 h-4 text-[var(--color-brand-cyan)] mt-0.5 shrink-0" />
-            <div>
-              <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)]">
-                {selectedSeats.length} pasajero{selectedSeats.length !== 1 ? 's' : ''}
-              </p>
-              <p className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)]">
-                Asientos: {selectedSeats.map((s) => s.seat_code).join(', ')}
-              </p>
-            </div>
+          <div>
+            <p className="text-sm font-semibold text-[var(--color-brand-navy)]">
+              {trip.routes?.destination}
+            </p>
+            <p className="text-xs text-[var(--color-brand-muted)]">
+              {trip.departure_time
+                ? `${format(new Date(trip.departure_time), "d 'de' MMMM yyyy, h:mm a", { locale: es })}`
+                : ""}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Booker info */}
-      <div className="bg-[var(--color-page-bg)] rounded-xl p-4 border border-[rgba(0,0,0,0.06)]">
-        <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)] mb-2">
-          Datos del comprador
-        </p>
-        <div className="flex gap-6 text-sm">
+      <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-[#f0fdf4] text-[#059669] flex items-center justify-center">
+              <CreditCard className="w-5 h-5" />
+            </div>
+            <p className="text-sm font-semibold text-[var(--color-brand-navy)]">
+              Reservante
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <span className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)]">Nombre:</span>
-            <p className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)]">{bookerName}</p>
+            <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+              Nombre
+            </p>
+            <p className="text-sm font-medium text-[var(--color-brand-navy)]">
+              {bookerName}
+            </p>
           </div>
           <div>
-            <span className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)]">Documento:</span>
-            <p className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)]">{bookerDocument}</p>
+            <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+              Documento
+            </p>
+            <p className="text-sm font-medium text-[var(--color-brand-navy)]">
+              {bookerDocument}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Passengers list */}
-      <div className="bg-[var(--color-page-bg)] rounded-xl p-4 border border-[rgba(0,0,0,0.06)]">
-        <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)] mb-2">
-          Pasajeros
-        </p>
+      <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-2xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-[#eff6ff] text-[#2563eb] flex items-center justify-center">
+              <Users className="w-5 h-5" />
+            </div>
+            <p className="text-sm font-semibold text-[var(--color-brand-navy)]">
+              Pasajeros ({passengers.length})
+            </p>
+          </div>
+          {onEditPassengers && (
+            <button
+              type="button"
+              onClick={onEditPassengers}
+              className="text-xs font-medium text-[var(--color-brand-cyan)] hover:underline"
+            >
+              Editar
+            </button>
+          )}
+        </div>
         <div className="space-y-2">
-          {passengers.map((p, i) => (
-            <div key={p.seat_id} className="flex items-center gap-3">
-              <span className="font-[family-name:var(--font-body)] font-bold text-[13px] text-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.1)] px-2 py-0.5 rounded-md min-w-[36px] text-center">
-                {p.seat_code}
-              </span>
-              <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)]">
-                {p.name}
-              </span>
-              <span className="font-[family-name:var(--font-body)] font-normal text-xs text-[var(--color-brand-muted)]">
-                {p.document}
-              </span>
+          {passengers.map((p) => (
+            <div
+              key={p.seat_id}
+              className="flex items-center justify-between py-2 border-b border-[rgba(0,0,0,0.06)] last:border-0"
+            >
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[var(--color-brand-cyan)] text-white flex items-center justify-center text-xs font-bold">
+                  {p.seat_code}
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[var(--color-brand-navy)]">
+                    {p.name || "Sin nombre"}
+                  </p>
+                  <p className="text-xs text-[var(--color-brand-muted)]">
+                    {p.document || "Sin documento"}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[var(--color-brand-muted)]">
+                  {p.phone || "Sin teléfono"}
+                </p>
+              </div>
             </div>
           ))}
         </div>
       </div>
 
-      {error && (
-        <div className="p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2] font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
-          {error}
+      {submitError && (
+        <div className="bg-[#fef2f2] border border-[#fecaca] rounded-xl p-3 flex items-start gap-2">
+          <AlertTriangle className="w-5 h-5 text-[#ef4444] shrink-0 mt-0.5" />
+          <p className="text-sm text-[#ef4444]">{submitError}</p>
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={onConfirm}
-        disabled={loading}
-        className="w-full px-6 py-3 bg-[var(--color-brand-cyan)] text-white font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl border-none cursor-pointer transition-all duration-200 hover:bg-[var(--color-brand-blue)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {loading ? (
-          <>
-            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Procesando...
-          </>
-        ) : (
-          'Confirmar reserva'
-        )}
-      </button>
+      <div className="flex justify-end pt-2">
+        <Button
+          variant="primary"
+          onClick={onConfirm}
+          loading={submitting}
+          disabled={submitting}
+        >
+          Confirmar Reserva
+        </Button>
+      </div>
     </div>
   );
 }

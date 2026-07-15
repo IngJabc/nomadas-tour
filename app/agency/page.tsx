@@ -129,8 +129,12 @@ export default function AgencyDashboardPage() {
   fetchDashboardRef.current = fetchDashboard;
 
   const tripIdsKey = useMemo(
-    () => (data?.upcoming_trips || []).map((t) => t.id).sort().join(","),
-    [data?.upcoming_trips],
+    () =>
+      (data?.upcoming_trips || [])
+        .map((t) => t.id)
+        .sort()
+        .join(","),
+    [data?.upcoming_trips]
   );
 
   useEffect(() => {
@@ -150,7 +154,8 @@ export default function AgencyDashboardPage() {
   useEffect(() => {
     if (!initialized) return;
 
-    const debounceTimerRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+    const debounceTimerRef: { current: ReturnType<typeof setTimeout> | null } =
+      { current: null };
 
     const handleEvent = () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -159,10 +164,20 @@ export default function AgencyDashboardPage() {
       }, 500);
     };
 
-    const cleanupReservations = subscribeToReservations(handleEvent, agencyId ?? undefined);
+    const cleanupReservations = subscribeToReservations(
+      handleEvent,
+      agencyId ?? undefined
+    );
     const cleanupTrips = subscribeToTrips(handleEvent);
-    const cleanupBoarding = subscribeToBoardingLogs(handleEvent, undefined, agencyId ?? undefined);
-    const cleanupTripAgencies = subscribeToTripAgencies(handleEvent, agencyId ?? undefined);
+    const cleanupBoarding = subscribeToBoardingLogs(
+      handleEvent,
+      undefined,
+      agencyId ?? undefined
+    );
+    const cleanupTripAgencies = subscribeToTripAgencies(
+      handleEvent,
+      agencyId ?? undefined
+    );
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -281,8 +296,13 @@ export default function AgencyDashboardPage() {
             className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
           >
             <div className="flex items-center gap-3">
-              <AlertTriangle className="w-5 h-5 text-[#ef4444] shrink-0" strokeWidth={1.75} />
-              <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">{fetchError}</p>
+              <AlertTriangle
+                className="w-5 h-5 text-[#ef4444] shrink-0"
+                strokeWidth={1.75}
+              />
+              <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+                {fetchError}
+              </p>
             </div>
             <Button variant="secondary" size="sm" onClick={fetchDashboard}>
               Reintentar
@@ -319,10 +339,7 @@ export default function AgencyDashboardPage() {
             const Icon = action.icon;
             return (
               <motion.div key={action.href} variants={staggerItem}>
-                <Link
-                  href={action.href}
-                  className="no-underline group"
-                >
+                <Link href={action.href} className="no-underline group">
                   <Card hover borderLeft borderColor="var(--color-brand-cyan)">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-[var(--color-brand-navy)]">
@@ -343,56 +360,6 @@ export default function AgencyDashboardPage() {
               </motion.div>
             );
           })}
-        </motion.div>
-
-        <motion.div
-          variants={pageFade}
-          initial="hidden"
-          animate="visible"
-          transition={{ duration: 0.25, delay: 0.05 }}
-        >
-          <SectionTitle>Resumen de la agencia</SectionTitle>
-        </motion.div>
-        <motion.div
-          className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10"
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          <motion.div variants={staggerItem}>
-            <StatCard
-              icon={<Calendar className="w-5 h-5" />}
-              label="Viajes activos"
-              value={data?.active_trips ?? 0}
-            />
-          </motion.div>
-          <motion.div variants={staggerItem}>
-            <StatCard
-              icon={<Ticket className="w-5 h-5" />}
-              label="Reservas hoy"
-              value={data?.today_reservations ?? 0}
-              iconBg="bg-[rgba(245,158,11,0.1)]"
-              iconColor="text-[#f59e0b]"
-            />
-          </motion.div>
-          <motion.div variants={staggerItem}>
-            <StatCard
-              icon={<Users className="w-5 h-5" />}
-              label="Reservas totales"
-              value={data?.total_reservations ?? 0}
-              iconBg="bg-[rgba(16,185,129,0.1)]"
-              iconColor="text-[#10b981]"
-            />
-          </motion.div>
-          <motion.div variants={staggerItem}>
-            <StatCard
-              icon={<UserCheck className="w-5 h-5" />}
-              label="Pendientes abordar"
-              value={data?.pending_boarding_passengers ?? 0}
-              iconBg="bg-[rgba(239,68,68,0.1)]"
-              iconColor="text-[#ef4444]"
-            />
-          </motion.div>
         </motion.div>
 
         <motion.div
