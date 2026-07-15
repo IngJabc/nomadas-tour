@@ -243,16 +243,6 @@ export class SuperadminController {
     }
   }
 
-  // Invitations
-  async listInvitations(req: Request, res: Response, next: NextFunction) {
-    try {
-      const invitations = await superadminService.listInvitations();
-      res.json(invitations);
-    } catch (error) {
-      next(error);
-    }
-  }
-
   // Dashboard
   async getDashboard(req: Request, res: Response, next: NextFunction) {
     try {

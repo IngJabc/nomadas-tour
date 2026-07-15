@@ -6,7 +6,6 @@ import {
   Calendar,
   Route,
   Building2,
-  Mail,
   ArrowRight,
   Users,
   Ticket,
@@ -76,12 +75,6 @@ const QUICK_ACTIONS = [
     title: "Agencias",
     desc: "Gestionar agencias y subdominios",
     icon: Building2,
-  },
-  {
-    href: "/admin/invitations",
-    title: "Invitaciones",
-    desc: "Invitar agencias al panel",
-    icon: Mail,
   },
 ];
 

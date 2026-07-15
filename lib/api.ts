@@ -148,10 +148,6 @@ export const adminApi = {
   getReservation: (id: string) => request<any>(`/admin/reservations/${id}`),
   updateReservationStatus: (id: string, status: string) =>
     request<any>(`/admin/reservations/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-  createInvitation: () =>
-    request<any>('/admin/invitations', { method: 'POST' }),
-  listInvitations: () =>
-    request<any[]>('/admin/invitations'),
 };
 
 // Agency
