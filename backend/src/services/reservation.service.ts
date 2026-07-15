@@ -1235,6 +1235,85 @@ export class ReservationService {
     });
   }
 
+  // ─── Agency: trip passenger manifest ─────────────────────────────────────
+
+  async getAgencyTripPassengers(tripId: string, agencyId: string) {
+    const { data: trip, error: tripError } = await supabaseAdmin
+      .from('trips')
+      .select('id, departure_time, vehicle_type, status, routes(origin, destination)')
+      .eq('id', tripId)
+      .single();
+
+    if (tripError || !trip) throw new NotFoundError('Trip not found');
+
+    const { data: assignment } = await supabaseAdmin
+      .from('trip_agencies')
+      .select('agency_id')
+      .eq('trip_id', tripId)
+      .eq('agency_id', agencyId)
+      .maybeSingle();
+
+    if (!assignment) throw new ForbiddenError('Trip not assigned to this agency');
+
+    const { data: seats } = await supabaseAdmin
+      .from('seats')
+      .select('id, status')
+      .eq('trip_id', tripId);
+
+    const total_seats = (seats || []).length;
+    const reserved_seats = (seats || []).filter((s: any) => s.status === 'reserved' || s.status === 'boarded').length;
+    const available_seats = (seats || []).filter((s: any) => s.status === 'available').length;
+
+    const { data: reservations } = await supabaseAdmin
+      .from('reservations')
+      .select('id, booker_name, status, reservation_passengers(id, name, document, phone, boarded, seat_id, seats(seat_code))')
+      .eq('trip_id', tripId)
+      .eq('agency_id', agencyId)
+      .neq('status', 'cancelled');
+
+    const passengers: any[] = [];
+    let boarded = 0;
+
+    for (const res of reservations || []) {
+      for (const p of (res as any).reservation_passengers || []) {
+        if (p.boarded) boarded++;
+        passengers.push({
+          id: p.id,
+          name: p.name,
+          document: p.document,
+          phone: p.phone,
+          seat_code: p.seats?.seat_code ?? '—',
+          reservation_id: res.id,
+          reservation_status: res.status,
+          booker_name: res.booker_name,
+          boarded: p.boarded,
+        });
+      }
+    }
+
+    passengers.sort((a: any, b: any) =>
+      (a.seat_code || '\uffff').localeCompare(b.seat_code || '\uffff', undefined, { numeric: true })
+    );
+
+    return {
+      trip: {
+        id: trip.id,
+        departure_time: trip.departure_time,
+        vehicle_type: trip.vehicle_type,
+        route: trip.routes,
+        total_seats,
+        available_seats,
+        reserved_seats,
+      },
+      passengers,
+      stats: {
+        total: passengers.length,
+        reserved: reserved_seats,
+        boarded,
+      },
+    };
+  }
+
   // ─── Seat locking ──────────────────────────────────────────────────────────
 
   async lockSeat(tripId: string, seatId: string, userId: string, agencyId: string) {

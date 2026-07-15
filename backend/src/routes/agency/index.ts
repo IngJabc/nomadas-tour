@@ -11,6 +11,7 @@ router.use(auth, authorize('agency'), tenant);
 router.get('/dashboard', (req, res, next) => reservationController.getAgencyDashboard(req, res, next));
 router.get('/trips', (req, res, next) => reservationController.getAgencyTrips(req, res, next));
 router.get('/trips/:tripId', (req, res, next) => reservationController.getAgencyTripById(req, res, next));
+router.get('/trips/:tripId/passengers', (req, res, next) => reservationController.getAgencyTripPassengers(req, res, next));
 router.get('/reservations', (req, res, next) => reservationController.getAgencyReservations(req, res, next));
 router.get('/reservations/:id', (req, res, next) => reservationController.getAgencyReservationById(req, res, next));
 router.post('/reservations', (req, res, next) => reservationController.createAgencyReservation(req, res, next));

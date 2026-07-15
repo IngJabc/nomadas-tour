@@ -1,3 +1,5 @@
+import type { AgencyReservation, AgencyTripPassengersResponse } from '@/types';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface RequestOptions extends RequestInit {
@@ -156,7 +158,9 @@ export const agencyApi = {
   listTrips: () => request<any[]>('/agency/trips'),
   getTrips: () => request<any[]>('/agency/trips'),
   getTrip: (tripId: string) => request<any>(`/agency/trips/${tripId}`),
-  listReservations: () => request<any[]>('/agency/reservations'),
+  getTripPassengers: (tripId: string) =>
+    request<AgencyTripPassengersResponse>(`/agency/trips/${tripId}/passengers`),
+  listReservations: () => request<AgencyReservation[]>('/agency/reservations'),
   createReservation: (data: {
     trip_id: string;
     booker_name: string;
@@ -183,7 +187,7 @@ export const agencyApi = {
       method: 'POST',
       body: JSON.stringify({ trip_id, transaction_id }),
     }),
-  getReservation: (id: string) => request<any>(`/agency/reservations/${id}`),
+  getReservation: (id: string) => request<AgencyReservation>(`/agency/reservations/${id}`),
   cancelAgencyReservation: (id: string) =>
     request<any>(`/agency/reservations/${id}/cancel`, { method: 'PATCH' }),
   lockSeat: (trip_id: string, seat_id: string) =>

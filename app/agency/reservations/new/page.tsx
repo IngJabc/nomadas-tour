@@ -40,6 +40,7 @@ import { ReservationSummary } from "@/components/booking/ReservationSummary";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { AgencyTripCard } from "@/components/agency/AgencyTripCard";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
 // ─── Toast hook ──────────────────────────────────────────────────────
@@ -544,46 +545,17 @@ function NewReservationContent() {
                   />
                 ) : (
                   <motion.div
-                    className="space-y-3"
+                    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
                     variants={staggerContainer}
                     initial="hidden"
                     animate="visible"
                   >
                     {availableTrips.map((trip) => (
                       <motion.div key={trip.id} variants={staggerItem}>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectTrip(trip.id)}
-                          className="w-full text-left bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] cursor-pointer transition-all duration-200 hover:shadow-[0_6px_24px_rgba(0,212,255,0.12)] hover:-translate-y-0.5"
-                        >
-                          <div className="flex items-center justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <p className="font-[family-name:var(--font-heading)] font-bold text-base text-[var(--color-brand-navy)]">
-                                {trip.route?.destination ?? "Destino"}
-                              </p>
-                              <p className="font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-muted)] mt-1">
-                                {trip.departure_time
-                                  ? format(
-                                      new Date(trip.departure_time),
-                                      "d 'de' MMMM yyyy, h:mm a",
-                                      { locale: es }
-                                    )
-                                  : ""}
-                              </p>
-                            </div>
-                            <div className="shrink-0 flex items-center gap-4">
-                              <div className="text-right">
-                                <p className="font-[family-name:var(--font-body)] font-bold text-lg text-[var(--color-brand-cyan)]">
-                                  {trip.available_seats}
-                                </p>
-                                <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] whitespace-nowrap">
-                                  disponibles
-                                </p>
-                              </div>
-                              <ArrowRight className="w-5 h-5 text-[var(--color-brand-muted)]" />
-                            </div>
-                          </div>
-                        </button>
+                        <AgencyTripCard
+                          trip={trip}
+                          onSelect={() => handleSelectTrip(trip.id)}
+                        />
                       </motion.div>
                     ))}
                   </motion.div>
