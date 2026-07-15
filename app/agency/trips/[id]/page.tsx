@@ -1,22 +1,30 @@
-'use client';
+"use client";
 
-import { useEffect, useState, useMemo } from 'react';
-import { useParams } from 'next/navigation';
-import { Bus, Calendar, Clock, Users } from 'lucide-react';
-import { agencyApi } from '@/lib/api';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { useEffect, useState, useMemo } from "react";
+import { useParams } from "next/navigation";
+import { Bus, Calendar, Clock, Users } from "lucide-react";
+import { agencyApi } from "@/lib/api";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { Card } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 
 function formatDate(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  return d.toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 function formatTime(iso: string) {
   const d = new Date(iso);
-  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 export default function AgencyTripDetailPage() {
@@ -32,7 +40,9 @@ export default function AgencyTripDetailPage() {
         const data = await agencyApi.getTrip(tripId);
         setTrip(data);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error al cargar el viaje');
+        setError(
+          err instanceof Error ? err.message : "Error al cargar el viaje"
+        );
       } finally {
         setLoading(false);
       }
@@ -44,8 +54,10 @@ export default function AgencyTripDetailPage() {
     if (!trip?.seats) return { total: 0, available: 0, reserved: 0 };
     const seats = trip.seats as any[];
     const total = seats.length;
-    const available = seats.filter((s: any) => s.status === 'available').length;
-    const reserved = seats.filter((s: any) => s.status === 'reserved' || s.status === 'boarded').length;
+    const available = seats.filter((s: any) => s.status === "available").length;
+    const reserved = seats.filter(
+      (s: any) => s.status === "reserved" || s.status === "boarded"
+    ).length;
     return { total, available, reserved };
   }, [trip]);
 
@@ -63,15 +75,9 @@ export default function AgencyTripDetailPage() {
   if (error || !trip) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <PageHeader
-          title="Viaje no encontrado"
-          breadcrumbs={[
-            { label: 'Agencia', href: '/agency' },
-            { label: 'Viajes', href: '/agency/trips' },
-          ]}
-        />
+        <PageHeader title="Viaje no encontrado" />
         <div className="p-3 rounded-xl bg-red-50 border border-red-200 font-[family-name:var(--font-body)] text-sm text-red-600">
-          {error || 'El viaje no existe o no está disponible'}
+          {error || "El viaje no existe o no está disponible"}
         </div>
       </main>
     );
@@ -80,20 +86,22 @@ export default function AgencyTripDetailPage() {
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <PageHeader
-        title={route ? `${route.origin} → ${route.destination}` : 'Detalle del viaje'}
-        breadcrumbs={[
-          { label: 'Agencia', href: '/agency' },
-          { label: 'Viajes', href: '/agency/trips' },
-        ]}
+        title={
+          route ? `${route.origin} → ${route.destination}` : "Detalle del viaje"
+        }
       />
 
       <Card>
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="font-[family-name:var(--font-heading)] font-bold text-[20px] text-[var(--color-brand-navy)] mb-1">
-              {route?.origin ?? '?'} → {route?.destination ?? '?'}
+              {route?.origin ?? "?"} → {route?.destination ?? "?"}
             </h2>
-            {isFull && <Badge variant="cancelled" size="sm">Completo</Badge>}
+            {isFull && (
+              <Badge variant="cancelled" size="sm">
+                Completo
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -103,8 +111,12 @@ export default function AgencyTripDetailPage() {
               <Calendar className="w-5 h-5 text-[var(--color-brand-cyan)]" />
             </div>
             <div>
-              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Fecha</p>
-              <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">{formatDate(trip.departure_time)}</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                Fecha
+              </p>
+              <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                {formatDate(trip.departure_time)}
+              </p>
             </div>
           </div>
 
@@ -113,8 +125,12 @@ export default function AgencyTripDetailPage() {
               <Clock className="w-5 h-5 text-[var(--color-brand-cyan)]" />
             </div>
             <div>
-              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Hora</p>
-              <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">{formatTime(trip.departure_time)} hs</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                Hora
+              </p>
+              <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                {formatTime(trip.departure_time)}
+              </p>
             </div>
           </div>
 
@@ -123,9 +139,12 @@ export default function AgencyTripDetailPage() {
               <Bus className="w-5 h-5 text-[var(--color-brand-cyan)]" />
             </div>
             <div>
-              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Vehículo</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                Vehículo
+              </p>
               <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
-                {trip.vehicle_type === 'bus' ? 'Autobús' : 'Kia'} · {stats.total} puestos
+                {trip.vehicle_type === "bus" ? "Autobús" : "Kia"} ·{" "}
+                {stats.total} puestos
               </p>
             </div>
           </div>
@@ -135,8 +154,12 @@ export default function AgencyTripDetailPage() {
               <Users className="w-5 h-5 text-[var(--color-brand-cyan)]" />
             </div>
             <div>
-              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Capacidad</p>
-              <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">{stats.total} puestos</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                Capacidad
+              </p>
+              <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                {stats.total} puestos
+              </p>
             </div>
           </div>
         </div>
@@ -144,13 +167,23 @@ export default function AgencyTripDetailPage() {
         <div className="border-t border-[rgba(0,0,0,0.06)] pt-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center p-4 rounded-xl bg-[rgba(0,212,255,0.08)]">
-              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide mb-1">Disponibles</p>
-              <p className={`font-[family-name:var(--font-heading)] font-bold text-[28px] ${stats.available > 0 ? 'text-[var(--color-brand-cyan)]' : 'text-[var(--color-brand-muted)]'}`}>
+              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide mb-1">
+                Disponibles
+              </p>
+              <p
+                className={`font-[family-name:var(--font-heading)] font-bold text-[28px] ${
+                  stats.available > 0
+                    ? "text-[var(--color-brand-cyan)]"
+                    : "text-[var(--color-brand-muted)]"
+                }`}
+              >
                 {stats.available}
               </p>
             </div>
             <div className="text-center p-4 rounded-xl bg-slate-50">
-              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide mb-1">Reservados</p>
+              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide mb-1">
+                Reservados
+              </p>
               <p className="font-[family-name:var(--font-heading)] font-bold text-[28px] text-[var(--color-brand-navy)]">
                 {stats.reserved}
               </p>
