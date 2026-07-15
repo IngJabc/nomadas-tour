@@ -258,6 +258,22 @@ export class ReservationController {
     }
   }
 
+  // Agency: trip passenger manifest
+  async getAgencyTripPassengers(req: Request, res: Response, next: NextFunction) {
+    try {
+      const tripId = req.params.tripId as string;
+      const agencyId = req.ctx!.agencyId;
+      if (!agencyId) {
+        res.status(400).json({ error: 'Agency ID not found' });
+        return;
+      }
+      const result = await reservationService.getAgencyTripPassengers(tripId, agencyId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Agency trips (Sprint 11.1)
   async getAgencyTrips(req: Request, res: Response, next: NextFunction) {
     try {

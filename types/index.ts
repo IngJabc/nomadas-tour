@@ -105,3 +105,61 @@ export interface BusRow {
   right: (string | null)[];
   isDoor?: boolean;
 }
+
+export interface AgencyReservationPassenger {
+  id: string;
+  name: string;
+  document: string;
+  phone?: string | null;
+  status: string;
+  seat_id: string;
+  seats?: { seat_code: string };
+}
+
+export interface AgencyReservation {
+  id: string;
+  booker_name: string;
+  booker_document: string;
+  booker_phone?: string | null;
+  status: string;
+  qr_code: string;
+  trip_id: string;
+  created_at: string;
+  trips: {
+    id: string;
+    departure_time: string;
+    vehicle_type: string;
+    routes: { origin: string; destination: string } | null;
+  } | null;
+  reservation_passengers?: AgencyReservationPassenger[];
+}
+
+export interface AgencyTripPassenger {
+  id: string;
+  name: string;
+  document: string;
+  phone: string | null;
+  seat_code: string;
+  reservation_id: string;
+  reservation_status: string;
+  booker_name: string;
+  boarded: boolean;
+}
+
+export interface AgencyTripPassengersResponse {
+  trip: {
+    id: string;
+    departure_time: string;
+    vehicle_type: string;
+    route: { origin: string; destination: string } | null;
+    total_seats: number;
+    available_seats: number;
+    reserved_seats: number;
+  };
+  passengers: AgencyTripPassenger[];
+  stats: {
+    total: number;
+    reserved: number;
+    boarded: number;
+  };
+}
