@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Plus, Calendar, Search, X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle } from 'lucide-react';
-import { AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -16,6 +16,7 @@ import { ContextualModal } from '@/components/ui/ContextualModal';
 import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
 import { adminApi } from '@/lib/api';
 import type { Route } from '@/types';
+import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 interface AgencyOption { id: string; name: string; }
 
 const STATUS_OPTIONS = [
@@ -286,29 +287,42 @@ export default function AdminTripsPage() {
 
   if (initialLoad) {
     return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => <CardSkeleton key={i} />)}
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <PageHeader
-        title="Viajes"
-        action={
-          <Button onClick={() => { setBuilderMode('create'); setBuilderOpen(true); }}>
-            <Plus className="w-4 h-4" />
-            Nuevo viaje
-          </Button>
-        }
-      />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <motion.div
+          variants={pageFade}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.25 }}
+        >
+          <PageHeader
+            title="Viajes"
+            action={
+              <Button onClick={() => { setBuilderMode('create'); setBuilderOpen(true); }}>
+                <Plus className="w-4 h-4" />
+                Nuevo viaje
+              </Button>
+            }
+          />
+        </motion.div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-3 mb-6">
+      <motion.div
+        className="flex flex-col gap-3 mb-6"
+        variants={pageFade}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.25, delay: 0.05 }}
+      >
         {/* Row 1: Status centered */}
         <div className="flex justify-center">
           <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto">
@@ -398,7 +412,11 @@ export default function AdminTripsPage() {
 
           <AnimatePresence>
             {(statusFilter || searchFilter || routeFilter || agencyFilter || dateFilter) && (
-              <button
+              <motion.button
+                initial={{ opacity: 0, width: 0, scaleX: 0 }}
+                animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
+                exit={{ opacity: 0, width: 0, scaleX: 0 }}
+                transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                 type="button"
                 onClick={() => {
                   setSearchInput('');
@@ -409,15 +427,15 @@ export default function AdminTripsPage() {
                   setDateFilter('');
                   doFetch(1, '', '', '', '', '');
                 }}
-                className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium"
+                className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
               >
                 <X className="w-3.5 h-3.5" />
                 Limpiar
-              </button>
+              </motion.button>
             )}
           </AnimatePresence>
         </div>
-      </div>
+      </motion.div>
 
       {/* Pagination top-right (like Gmail) */}
       {trips.length > 0 && pagination.totalPages > 1 && (
@@ -470,19 +488,25 @@ export default function AdminTripsPage() {
           }}
         />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
           {trips.map((trip) => (
-            <TripCard
-              key={trip.id}
-              trip={trip}
-              onEdit={handleEdit}
-              onAction={handleAction}
-              actionLoading={actionLoading}
-              canComplete={isActive(trip) && canComplete(trip.departure_time)}
-              canCancelPostpone={isActive(trip) && canCancelOrPostpone(trip.departure_time)}
-            />
+            <motion.div key={trip.id} variants={staggerItem}>
+              <TripCard
+                trip={trip}
+                onEdit={handleEdit}
+                onAction={handleAction}
+                actionLoading={actionLoading}
+                canComplete={isActive(trip) && canComplete(trip.departure_time)}
+                canCancelPostpone={isActive(trip) && canCancelOrPostpone(trip.departure_time)}
+              />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
 
       <TripBuilderModal
@@ -593,6 +617,6 @@ export default function AdminTripsPage() {
           </div>
         </ContextualModal>
       )}
-    </div>
+      </main>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MapPin, Search, X, Plus } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -13,24 +13,12 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { RouteCard, RouteFormModal } from '@/components/admin/routes';
 import type { RouteData } from '@/components/admin/routes';
 import { adminApi } from '@/lib/api';
-
-const pageFade = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0 },
-};
-
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.06 } },
-};
-
-const staggerItem = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0 },
-};
+import { subscribeToRoutes, subscribeToTrips, subscribeToReservations } from '@/lib/realtime/subscriptions';
+import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 
 export default function AdminRoutesPage() {
   const [routes, setRoutes] = useState<RouteData[]>([]);
+  const routesRef = useRef<RouteData[]>([]);
   const [initialLoad, setInitialLoad] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -58,6 +46,63 @@ export default function AdminRoutesPage() {
   useEffect(() => {
     doFetch().finally(() => setInitialLoad(false));
   }, [doFetch]);
+
+  // Keep ref in sync so realtime callbacks see latest state
+  useEffect(() => {
+    routesRef.current = routes;
+  });
+
+  // Realtime: routes CRUD + trips/reservations counter recalculation
+  useEffect(() => {
+    const debounceTimerRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+
+    const handleRouteEvent = (payload: { eventType: string; route: Record<string, any> }) => {
+      const { eventType, route } = payload;
+      if (eventType === 'INSERT') {
+        setRoutes((prev) => {
+          if (prev.some((r) => r.id === route.id)) return prev;
+          return [...prev, { id: route.id, origin: route.origin, destination: route.destination, status: route.status, tripCount: 0, reservationCount: 0 }];
+        });
+      } else if (eventType === 'UPDATE') {
+        setRoutes((prev) =>
+          prev.map((r) =>
+            r.id === route.id
+              ? { ...r, origin: route.origin ?? r.origin, destination: route.destination ?? r.destination, status: route.status ?? r.status }
+              : r
+          )
+        );
+      } else if (eventType === 'DELETE') {
+        setRoutes((prev) => prev.filter((r) => r.id !== route.id));
+      }
+    };
+
+    const handleTripOrReservation = () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(async () => {
+        if (!routesRef.current.length) return;
+        try {
+          const data = await adminApi.listRoutes();
+          if (data) {
+            setRoutes(data);
+            routesRef.current = data;
+          }
+        } catch {
+          // keep current state on error
+        }
+      }, 500);
+    };
+
+    const cleanupRoutes = subscribeToRoutes(handleRouteEvent);
+    const cleanupTrips = subscribeToTrips(handleTripOrReservation);
+    const cleanupReservations = subscribeToReservations(handleTripOrReservation);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      cleanupRoutes();
+      cleanupTrips();
+      cleanupReservations();
+    };
+  }, []);
 
   const filteredRoutes = useMemo(() => {
     if (!searchFilter.trim()) return routes;
@@ -153,17 +198,17 @@ export default function AdminRoutesPage() {
 
   if (initialLoad) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => <CardSkeleton key={i} />)}
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <motion.div
         variants={pageFade}
         initial="hidden"
@@ -183,13 +228,13 @@ export default function AdminRoutesPage() {
 
       {/* Search */}
       <motion.div
-        className="mb-6"
+        className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6"
         variants={pageFade}
         initial="hidden"
         animate="visible"
         transition={{ duration: 0.25, delay: 0.05 }}
       >
-        <div className="relative w-full sm:w-96">
+        <div className="relative flex-1 min-w-0 sm:max-w-96">
           <input
             type="text"
             placeholder="Buscar por destino u origen..."
@@ -199,16 +244,35 @@ export default function AdminRoutesPage() {
             className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all duration-200"
           />
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
+          <AnimatePresence>
+            {searchFilter && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors duration-150"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <AnimatePresence>
           {searchFilter && (
-            <button
+            <motion.button
+              initial={{ opacity: 0, width: 0, scaleX: 0 }}
+              animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
+              exit={{ opacity: 0, width: 0, scaleX: 0 }}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
               type="button"
               onClick={clearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors duration-150"
+              className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
             >
               <X className="w-3.5 h-3.5" />
-            </button>
+              Limpiar
+            </motion.button>
           )}
-        </div>
+        </AnimatePresence>
       </motion.div>
 
       {/* Error */}
@@ -292,6 +356,6 @@ export default function AdminRoutesPage() {
         onConfirm={handleConfirmDeactivate}
         onCancel={() => setDeactivateTarget(null)}
       />
-    </div>
+    </main>
   );
 }

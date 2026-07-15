@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   ClipboardList,
@@ -28,6 +28,7 @@ import { Card } from "@/components/ui/Card";
 import { ActivityWidget } from "@/components/dashboard/ActivityWidget";
 import { Timeline } from "@/components/dashboard/Timeline";
 import { OccupancyChart } from "@/components/dashboard/charts/OccupancyChart";
+import { createClient } from "@/lib/supabase/client";
 
 interface AgencyDashboardData {
   agency_name?: string;
@@ -91,6 +92,15 @@ export default function AgencyDashboardPage() {
   const [data, setData] = useState<AgencyDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialized, setInitialized] = useState(false);
+  const [agencyId, setAgencyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const id = (user?.user_metadata?.agency_id as string) ?? null;
+      setAgencyId(id);
+    });
+  }, []);
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -108,30 +118,34 @@ export default function AgencyDashboardPage() {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  // Realtime: al cambiar asientos, refrescar dashboard completo desde backend
+  const fetchDashboardRef = useRef(fetchDashboard);
+  fetchDashboardRef.current = fetchDashboard;
+
+  const tripIdsKey = useMemo(
+    () => (data?.upcoming_trips || []).map((t) => t.id).sort().join(","),
+    [data?.upcoming_trips],
+  );
+
   useEffect(() => {
-    if (!initialized || !data) return;
-
-    const tripIds = (data.upcoming_trips || []).map((t) => t.id);
-
+    if (!initialized) return;
+    const tripIds = tripIdsKey ? tripIdsKey.split(",") : [];
     const cleanupSeats = tripIds.length
       ? subscribeToTripSeats(tripIds, () => {
-          fetchDashboard();
+          fetchDashboardRef.current();
         })
       : () => {};
-
     return () => {
       cleanupSeats();
     };
-  }, [initialized]);
+  }, [initialized, tripIdsKey]);
 
-  // Realtime: cambios en reservas, viajes, boarding y asignaciones
+  // Realtime: cambios en reservas, viajes, boarding y asignaciones — filtrado por agencyId
   useEffect(() => {
     if (!initialized) return;
 
     const cleanupReservations = subscribeToReservations(() => {
       fetchDashboard();
-    });
+    }, agencyId ?? undefined);
 
     const cleanupTrips = subscribeToTrips(() => {
       fetchDashboard();
@@ -139,11 +153,11 @@ export default function AgencyDashboardPage() {
 
     const cleanupBoarding = subscribeToBoardingLogs(() => {
       fetchDashboard();
-    });
+    }, undefined, agencyId ?? undefined);
 
     const cleanupTripAgencies = subscribeToTripAgencies(() => {
       fetchDashboard();
-    });
+    }, agencyId ?? undefined);
 
     return () => {
       cleanupReservations();
@@ -151,7 +165,7 @@ export default function AgencyDashboardPage() {
       cleanupBoarding();
       cleanupTripAgencies();
     };
-  }, [initialized]);
+  }, [initialized, agencyId]);
 
   return (
     <>

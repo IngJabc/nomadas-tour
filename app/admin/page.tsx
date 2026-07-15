@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   Calendar,
@@ -76,6 +76,12 @@ const QUICK_ACTIONS = [
     desc: "Gestionar agencias y subdominios",
     icon: Building2,
   },
+  {
+    href: "/admin/bookings",
+    title: "Pasajeros",
+    desc: "Ver y gestionar pasajeros",
+    icon: Users,
+  },
 ];
 
 export default function AdminDashboardPage() {
@@ -99,22 +105,26 @@ export default function AdminDashboardPage() {
     fetchDashboard();
   }, [fetchDashboard]);
 
-  // Realtime: al cambiar asientos, refrescar dashboard completo desde backend
+  const fetchDashboardRef = useRef(fetchDashboard);
+  fetchDashboardRef.current = fetchDashboard;
+
+  const tripIdsKey = useMemo(
+    () => (data?.upcoming_trips || []).map((t) => t.id).sort().join(","),
+    [data?.upcoming_trips],
+  );
+
   useEffect(() => {
-    if (!initialized || !data) return;
-
-    const tripIds = (data.upcoming_trips || []).map((t) => t.id);
-
+    if (!initialized) return;
+    const tripIds = tripIdsKey ? tripIdsKey.split(",") : [];
     const cleanupSeats = tripIds.length
       ? subscribeToTripSeats(tripIds, () => {
-          fetchDashboard();
+          fetchDashboardRef.current();
         })
       : () => {};
-
     return () => {
       cleanupSeats();
     };
-  }, [initialized]);
+  }, [initialized, tripIdsKey]);
 
   return (
     <>
