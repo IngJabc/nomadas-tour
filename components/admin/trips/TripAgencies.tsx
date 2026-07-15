@@ -1,6 +1,7 @@
 'use client';
 
 import { Building2 } from 'lucide-react';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface TripAgenciesProps {
   agencies: {
@@ -10,12 +11,13 @@ interface TripAgenciesProps {
   }[];
 }
 
+const MAX_VISIBLE = 2;
+
 export function TripAgencies({ agencies }: TripAgenciesProps) {
   if (!agencies.length) return null;
 
-  const MAX_VISIBLE = 3;
   const visible = agencies.slice(0, MAX_VISIBLE);
-  const remaining = agencies.length - MAX_VISIBLE;
+  const remaining = agencies.slice(MAX_VISIBLE);
 
   return (
     <div className="flex flex-col gap-1">
@@ -34,10 +36,28 @@ export function TripAgencies({ agencies }: TripAgenciesProps) {
             {a.name}
           </span>
         ))}
-        {remaining > 0 && (
-          <span className="font-[family-name:var(--font-body)] font-semibold text-[11px] text-[var(--color-brand-cyan)] leading-tight">
-            +{remaining} más
-          </span>
+        {remaining.length > 0 && (
+          <Tooltip
+            content={
+              <div className="whitespace-normal max-h-40 overflow-y-auto">
+                <span className="font-[family-name:var(--font-body)] font-semibold text-[11px] text-white/70 leading-tight block mb-1">
+                  Agencias adicionales:
+                </span>
+                {remaining.map((a) => (
+                  <span
+                    key={a.id}
+                    className="font-[family-name:var(--font-body)] font-normal text-[11px] text-white leading-tight block"
+                  >
+                    {'\u2022'} {a.name}
+                  </span>
+                ))}
+              </div>
+            }
+          >
+            <span className="font-[family-name:var(--font-body)] font-semibold text-[11px] text-[var(--color-brand-cyan)] leading-tight cursor-default">
+              +{remaining.length} {remaining.length === 1 ? 'agencia más' : 'agencias más'}
+            </span>
+          </Tooltip>
         )}
       </div>
     </div>

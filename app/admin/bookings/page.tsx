@@ -15,12 +15,14 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { adminApi } from '@/lib/api';
+import { subscribeToReservations, subscribeToReservationPassengers, subscribeToBoardingLogs } from '@/lib/realtime/subscriptions';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,23 +91,6 @@ const RESERVATION_STATUS: Record<string, { label: string; variant: 'confirmed' |
 };
 
 // ─── Animation Variants ───────────────────────────────────────────────────────
-
-const pageFade = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0 },
-};
-
-const staggerContainer = {
-  hidden: {},
-  visible: {
-    transition: { staggerChildren: 0.06 },
-  },
-};
-
-const staggerItem = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0 },
-};
 
 const ease = [0.4, 0, 0.2, 1] as const;
 
@@ -252,6 +237,9 @@ export default function AdminBookingsPage() {
     return p;
   }, [statusFilter, searchFilter, routeFilter, agencyFilter, dateFilter, tripFilter]);
 
+  const buildParamsRef = useRef(buildParams);
+  buildParamsRef.current = buildParams;
+
   const resetAccordion = () => {
     setExpandedRoutes(new Set());
     setExpandedTrips(new Set());
@@ -271,6 +259,39 @@ export default function AdminBookingsPage() {
       adminApi.listAgencies().then(setAgencies).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, [doFetch]);
+
+  // Realtime: reservations, reservation_passengers, boarding_logs → debounced refetch
+  useEffect(() => {
+    const debounceTimerRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+
+    const handleEvent = () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(async () => {
+        const raw = buildParamsRef.current;
+        const params: Record<string, string> = {};
+        for (const [k, v] of Object.entries(raw)) {
+          if (v) params[k] = v;
+        }
+        try {
+          const data = await adminApi.getPassengerTree(params);
+          setTree(data || []);
+        } catch {
+          // silently keep current state on realtime refetch error
+        }
+      }, 500);
+    };
+
+    const cleanupReservations = subscribeToReservations(handleEvent);
+    const cleanupPassengers = subscribeToReservationPassengers(handleEvent);
+    const cleanupBoarding = subscribeToBoardingLogs(handleEvent);
+
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      cleanupReservations();
+      cleanupPassengers();
+      cleanupBoarding();
+    };
+  }, []);
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);
@@ -408,17 +429,12 @@ export default function AdminBookingsPage() {
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2 }}
-          className="p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2] font-[family-name:var(--font-body)] text-sm text-[#ef4444]"
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
         >
-          {fetchError}
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.1, duration: 0.2 }}
-          className="mt-4"
-        >
-          <Button variant="secondary" onClick={() => doFetch(buildParams())}>
+          <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+            {fetchError}
+          </p>
+          <Button variant="secondary" size="sm" onClick={() => doFetch(buildParams())}>
             Reintentar
           </Button>
         </motion.div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Building2, Search, X, Plus, Copy } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import toast from "react-hot-toast";
 
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -10,24 +10,12 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { Modal, ModalHeader, ModalBody, ModalFooter } from "@/components/ui/Modal";
 import { AgencyCard, AgencyFormModal } from "@/components/admin/agencies";
 import type { AgencyData } from "@/components/admin/agencies";
 import { adminApi } from "@/lib/api";
-
-const pageFade = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0 },
-};
-
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.06 } },
-};
-
-const staggerItem = {
-  hidden: { opacity: 0, y: 12 },
-  visible: { opacity: 1, y: 0 },
-};
+import { subscribeToAgencies } from "@/lib/realtime/subscriptions";
+import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Todas" },
@@ -68,9 +56,30 @@ export default function AdminAgenciesPage() {
     }
   }, []);
 
+  const doFetchRef = useRef(doFetch);
+  doFetchRef.current = doFetch;
+
   useEffect(() => {
     doFetch().finally(() => setInitialLoad(false));
   }, [doFetch]);
+
+  // Realtime: agencies INSERT and UPDATE → refetch for computed fields
+  useEffect(() => {
+    const debounceTimerRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+
+    const handleAgencyEvent = () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(() => {
+        doFetchRef.current();
+      }, 500);
+    };
+
+    const cleanup = subscribeToAgencies(handleAgencyEvent);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      cleanup();
+    };
+  }, []);
 
   const filteredAgencies = useMemo(() => {
     let result = agencies;
@@ -175,19 +184,19 @@ export default function AdminAgenciesPage() {
 
   if (initialLoad) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <CardSkeleton key={i} />
           ))}
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
       <motion.div
         variants={pageFade}
         initial="hidden"
@@ -213,7 +222,7 @@ export default function AdminAgenciesPage() {
         animate="visible"
         transition={{ duration: 0.25, delay: 0.05 }}
       >
-        <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-10 px-1 border border-[rgba(0,0,0,0.06)] shrink-0">
+        <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0">
           {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -240,31 +249,39 @@ export default function AdminAgenciesPage() {
             className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl pl-8 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all duration-200"
           />
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--color-brand-muted)]" />
-          {searchFilter && (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors duration-150"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <AnimatePresence>
+            {searchFilter && (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors duration-150"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </AnimatePresence>
         </div>
 
+        <AnimatePresence>
         {(statusFilter || searchFilter) && (
-          <button
+          <motion.button
+            initial={{ opacity: 0, width: 0, scaleX: 0 }}
+            animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
+            exit={{ opacity: 0, width: 0, scaleX: 0 }}
+            transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
             type="button"
             onClick={() => {
               setSearchInput("");
               setSearchFilter("");
               setStatusFilter("");
             }}
-            className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium"
+            className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
           >
             <X className="w-3.5 h-3.5" />
             Limpiar
-          </button>
+          </motion.button>
         )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Error */}
@@ -355,45 +372,44 @@ export default function AdminAgenciesPage() {
       />
 
       {/* Invitation Link Modal */}
-      {newAgencyLink && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setNewAgencyLink(null)}
-          />
-          <div className="relative bg-[var(--color-brand-surface)] rounded-2xl shadow-xl border border-[rgba(0,0,0,0.06)] p-6 w-full max-w-md">
-            <h3 className="font-[family-name:var(--font-heading)] font-bold text-lg text-[var(--color-brand-navy)] mb-2">
-              Agencia creada
-            </h3>
-            <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)] mb-4">
-              Comparte este enlace con la agencia para que complete el registro:
-            </p>
-            <div className="flex items-center gap-2 bg-[#f8fafc] rounded-xl border border-[rgba(0,0,0,0.06)] px-3 py-2.5 mb-5">
-              <code className="flex-1 font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-navy)] break-all select-all">
-                {typeof window !== "undefined"
-                  ? `${window.location.origin}${newAgencyLink}`
-                  : newAgencyLink}
-              </code>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  const fullUrl = `${window.location.origin}${newAgencyLink}`;
-                  navigator.clipboard
-                    .writeText(fullUrl)
-                    .then(() => setCopied(true));
-                }}
-              >
-                <Copy className="w-3.5 h-3.5" />
-                {copied ? "Copiado" : "Copiar"}
-              </Button>
-            </div>
-            <Button onClick={() => setNewAgencyLink(null)} className="w-full">
-              Cerrar
+      <Modal open={!!newAgencyLink} onClose={() => setNewAgencyLink(null)} size="sm">
+        <ModalHeader>
+          <h3 className="font-[family-name:var(--font-heading)] font-bold text-lg text-[var(--color-brand-navy)]">
+            Agencia creada
+          </h3>
+        </ModalHeader>
+        <ModalBody>
+          <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)] mb-4">
+            Comparte este enlace con la agencia para que complete el registro:
+          </p>
+          <div className="flex items-center gap-2 bg-[#f8fafc] rounded-xl border border-[rgba(0,0,0,0.06)] px-3 py-2.5">
+            <code className="flex-1 font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-navy)] break-all select-all">
+              {typeof window !== "undefined"
+                ? `${window.location.origin}${newAgencyLink}`
+                : newAgencyLink}
+            </code>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const fullUrl = `${window.location.origin}${newAgencyLink}`;
+                navigator.clipboard
+                  .writeText(fullUrl)
+                  .then(() => setCopied(true));
+              }}
+            >
+              <Copy className="w-3.5 h-3.5" />
+              {copied ? "Copiado" : "Copiar"}
             </Button>
           </div>
-        </div>
-      )}
-    </div>
+        </ModalBody>
+        <ModalFooter>
+          <div />
+          <Button onClick={() => setNewAgencyLink(null)}>
+            Cerrar
+          </Button>
+        </ModalFooter>
+      </Modal>
+    </main>
   );
 }
