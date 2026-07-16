@@ -1310,6 +1310,7 @@ export class ReservationService {
         id: trip.id,
         departure_time: trip.departure_time,
         vehicle_type: trip.vehicle_type,
+        status: trip.status,
         route: trip.routes,
         total_seats,
         available_seats,

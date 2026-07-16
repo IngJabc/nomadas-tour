@@ -6,6 +6,7 @@ import { Modal, ModalHeader, ModalDivider, ModalBody } from '@/components/ui/Mod
 import { BuilderLayout } from '@/components/admin/trip-builder/BuilderLayout';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { adminApi } from '@/lib/api';
+import { fromUTCToLocal } from '@/lib/timezone';
 
 interface TripBuilderModalProps {
   open: boolean;
@@ -22,6 +23,7 @@ export function TripBuilderModal({ open, mode, tripId, onClose, onSuccess }: Tri
   // Fetch trip data for edit mode
   useEffect(() => {
     if (!open || mode !== 'edit' || !tripId) {
+      setInitialData(null);
       setLoading(false);
       return;
     }
@@ -32,7 +34,7 @@ export function TripBuilderModal({ open, mode, tripId, onClose, onSuccess }: Tri
         setInitialData({
           route_id: trip.route_id,
           departure_time: trip.departure_time
-            ? new Date(trip.departure_time).toISOString().slice(0, 16)
+            ? fromUTCToLocal(trip.departure_time)
             : '',
           vehicle_type: trip.vehicle_type ?? 'bus',
           agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),

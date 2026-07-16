@@ -122,19 +122,43 @@ export default function AdminTripsPage() {
     [trips],
   );
 
-  const handleSeatUpdate = useCallback((seat: any) => {
+  // Compute occupancy from the seats array — fuente de verdad
+  function deriveOccupancy(seats: { id: string; seat_code: string; status: string }[], boarded: number) {
+    const occ = { total: seats.length, available: 0, reserved: 0, locked: 0, blocked: 0, boarded };
+    for (const s of seats) {
+      if (s.status === 'available') occ.available++;
+      else if (s.status === 'reserved') occ.reserved++;
+      else if (s.status === 'locked') occ.locked++;
+      else if (s.status === 'blocked') occ.blocked++;
+    }
+    return occ;
+  }
+
+  // Display trips with occupancy derived from seats array
+  const displayTrips = useMemo(
+    () => trips.map((t) => ({ ...t, occupancy: deriveOccupancy(t.seats || [], t.occupancy?.boarded || 0) })),
+    [trips],
+  );
+
+  // Realtime: update the seat in the seats array (fuente de verdad)
+  const handleSeatUpdate = useCallback(({ eventType, seat, old }: { eventType: string; seat: any; old: any }) => {
     setTrips((prev) =>
       prev.map((t) => {
         if (t.id !== seat.trip_id) return t;
-        const occ = { ...t.occupancy };
-        if (seat.status === 'available') {
-          occ.available = (occ.available || 0) + 1;
-          occ.reserved = (occ.reserved || 0) - 1;
-        } else {
-          occ.available = (occ.available || 0) - 1;
-          occ.reserved = (occ.reserved || 0) + 1;
+
+        if (eventType === 'DELETE') {
+          return { ...t, seats: (t.seats || []).filter((s: any) => s.id !== seat.id) };
         }
-        return { ...t, occupancy: occ };
+
+        const exists = (t.seats || []).findIndex((s: any) => s.id === seat.id);
+        if (exists >= 0) {
+          // UPDATE — replace seat in array
+          const newSeats = [...t.seats];
+          newSeats[exists] = { id: seat.id, seat_code: seat.seat_code, status: seat.status };
+          return { ...t, seats: newSeats };
+        }
+        // INSERT — add new seat
+        return { ...t, seats: [...(t.seats || []), { id: seat.id, seat_code: seat.seat_code, status: seat.status }] };
       }),
     );
   }, []);
@@ -202,7 +226,7 @@ export default function AdminTripsPage() {
           const data = {
             route_id: trip.route_id,
             departure_time: postponeDate,
-            vehicle_type: trip.vehicle_type ?? 'bus',
+            vehicle_type: trip.vehicle?.type ?? 'bus',
             agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),
           };
           await adminApi.updateTrip(tripId, data);
@@ -515,7 +539,7 @@ export default function AdminTripsPage() {
           initial="hidden"
           animate="visible"
         >
-          {trips.map((trip) => (
+          {displayTrips.map((trip) => (
             <motion.div key={trip.id} variants={staggerItem}>
               <TripCard
                 trip={trip}

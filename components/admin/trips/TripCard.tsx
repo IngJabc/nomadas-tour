@@ -23,7 +23,7 @@ interface TripCardProps {
     vehicle: { type: 'bus' | 'kia'; capacity: number };
     status: string;
     postponed_from: string | null;
-    occupancy: { total: number; available: number; reserved: number; boarded: number };
+    occupancy: { total: number; available: number; reserved: number; locked: number; blocked: number; boarded: number };
     agencies: { id: string; name: string; reservation_count: number }[];
   };
   onEdit: (id: string) => void;
@@ -111,6 +111,8 @@ export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripC
             total={trip.occupancy.total}
             available={trip.occupancy.available}
             reserved={trip.occupancy.reserved}
+            locked={trip.occupancy.locked}
+            blocked={trip.occupancy.blocked}
             boarded={trip.occupancy.boarded}
           />
           <TripAgencies agencies={trip.agencies} />

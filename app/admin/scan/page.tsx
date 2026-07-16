@@ -1,9 +1,10 @@
 'use client';
 
+import toast from 'react-hot-toast';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { format } from 'date-fns';
 import { Html5Qrcode } from 'html5-qrcode';
+import { formatDateTimeShort } from '@/lib/timezone';
 import type { Html5QrcodeResult } from 'html5-qrcode';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Camera, RotateCcw, CheckCircle, XCircle, AlertCircle, Search, ArrowRight } from 'lucide-react';
@@ -193,11 +194,13 @@ export default function ScanPage() {
         .eq('trip_id', booking.trip?.id)
         .eq('seat_code', booking.seat_code);
       setSuccessMsg('Abordaje confirmado correctamente');
+      toast.success('Abordaje confirmado correctamente');
       setShowConfetti(true);
       setBooking((prev) => prev ? { ...prev, status: 'boarded' } : null);
       setTimeout(() => setShowConfetti(false), 2500);
     } catch (err) {
       setLookupError(err instanceof Error ? err.message : 'Error al confirmar abordaje');
+      toast.error(err instanceof Error ? err.message : 'Error al confirmar abordaje');
     } finally {
       setUpdating(false);
     }
@@ -484,7 +487,7 @@ export default function ScanPage() {
                 </p>
                 <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
                   {booking.trip?.departure_time
-                    ? format(new Date(booking.trip.departure_time), 'dd/MM/yyyy HH:mm')
+                    ? formatDateTimeShort(booking.trip.departure_time)
                     : ''}
                 </p>
               </div>

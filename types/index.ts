@@ -153,6 +153,7 @@ export interface AgencyTripPassengersResponse {
     id: string;
     departure_time: string;
     vehicle_type: string;
+    status: string;
     route: { origin: string; destination: string } | null;
     total_seats: number;
     available_seats: number;

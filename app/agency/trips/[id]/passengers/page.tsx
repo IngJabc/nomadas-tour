@@ -99,6 +99,7 @@ export default function TripPassengersPage() {
   }, [data, search]);
 
   const trip = data?.trip;
+  const isClosed = trip?.status === 'cancelled' || trip?.status === 'completed';
 
   if (loading) {
     return (
@@ -284,7 +285,7 @@ export default function TripPassengersPage() {
                 : "Este viaje aún no tiene pasajeros"
             }
             action={
-              !search
+              !search && !isClosed
                 ? {
                     label: "Crear reserva",
                     href: `/agency/reservations/new?trip=${tripId}&source=trips`,

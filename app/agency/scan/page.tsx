@@ -1,8 +1,8 @@
 "use client";
 
+import toast from 'react-hot-toast';
 import { useCallback, useEffect, useRef, useState } from "react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatDateLong, formatTime12h } from "@/lib/timezone";
 import { Html5Qrcode } from "html5-qrcode";
 import type { Html5QrcodeResult } from "html5-qrcode";
 import { AnimatePresence, motion } from "framer-motion";
@@ -327,11 +327,14 @@ function AgencyScanContent() {
         });
         if (!currentlyBoarded) {
           setSuccessMsg("Abordaje confirmado");
+          toast.success('Abordaje confirmado');
         } else {
           setSuccessMsg("Abordaje cancelado");
+          toast.success('Abordaje cancelado');
         }
       } catch (err: any) {
         setLookupError(err?.message || "Error al actualizar abordaje");
+        toast.error(err?.message || 'Error al actualizar abordaje');
       } finally {
         setTogglingIds((prev) => {
           const next = new Set(prev);
@@ -364,8 +367,10 @@ function AgencyScanContent() {
         };
       });
       setSuccessMsg(`${unboarded.length} pasajero(s) abordado(s)`);
+      toast.success(`${unboarded.length} pasajero(s) abordado(s)`);
     } catch (err: any) {
       setLookupError(err?.message || "Error al abordar pasajeros");
+      toast.error(err?.message || 'Error al abordar pasajeros');
     } finally {
       setBulkLoading(false);
     }
@@ -698,11 +703,7 @@ function AgencyScanContent() {
                     </p>
                     <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
                       {scanResult.departure_time
-                        ? format(
-                            new Date(scanResult.departure_time),
-                            "d 'de' MMMM yyyy, h:mm a",
-                            { locale: es }
-                          )
+                        ? `${formatDateLong(scanResult.departure_time)}`
                         : ""}
                     </p>
                   </div>

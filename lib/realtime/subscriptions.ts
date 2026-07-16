@@ -6,7 +6,7 @@ type CleanupFn = () => void;
 /** Suscribirse a cambios en `seats` para múltiples viajes */
 export function subscribeToTripSeats(
   tripIds: string[],
-  onSeatUpdate: (seat: Record<string, any>) => void,
+  onSeatUpdate: (payload: { eventType: string; seat: Record<string, any>; old: Record<string, any> | null }) => void,
 ): CleanupFn {
   if (!tripIds.length) return () => {};
   const supabase = createClient();
@@ -25,8 +25,12 @@ export function subscribeToTripSeats(
         filter,
       },
       (payload: RealtimePostgresChangesPayload<any>) => {
-        if (payload.new && payload.new.seat_code) {
-          onSeatUpdate(payload.new);
+        if (payload.eventType === 'DELETE') {
+          if (payload.old?.trip_id) {
+            onSeatUpdate({ eventType: 'DELETE', seat: payload.old, old: null });
+          }
+        } else if (payload.new?.seat_code) {
+          onSeatUpdate({ eventType: payload.eventType, seat: payload.new, old: payload.old ?? null });
         }
       },
     )
@@ -105,23 +109,34 @@ export function subscribeToReservationPassengers(
 
 /** Suscribirse a cambios en la tabla `trips` */
 export function subscribeToTrips(
-  onUpdate: (trip: Record<string, any>) => void,
+  onEvent: (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; trip: Record<string, any> }) => void,
+  tripIds?: string[],
 ): CleanupFn {
   const supabase = createClient();
 
+  const filter = tripIds && tripIds.length > 0
+    ? `id=in.(${tripIds.join(',')})`
+    : undefined;
+
+  const channelName = tripIds && tripIds.length > 0
+    ? `trips:id=in.(${tripIds.join(',')})`
+    : 'trips:all';
+
   const channel = supabase
-    .channel('trips:all')
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
         event: '*',
         schema: 'public',
         table: 'trips',
+        filter,
       },
       (payload: RealtimePostgresChangesPayload<any>) => {
-        if (payload.new) {
-          onUpdate(payload.new);
-        }
+        onEvent({
+          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
+          trip: payload.new || payload.old,
+        });
       },
     )
     .subscribe();
@@ -244,7 +259,7 @@ export function subscribeToAgencies(
 
 /** Suscribirse a asignaciones de viajes (trip_agencies INSERT) */
 export function subscribeToTripAgencies(
-  onInsert: (ta: Record<string, any>) => void,
+  onEvent: (ta: Record<string, any>) => void,
   agencyId?: string,
 ): CleanupFn {
   const supabase = createClient();
@@ -260,15 +275,13 @@ export function subscribeToTripAgencies(
     .on(
       'postgres_changes',
       {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'trip_agencies',
         filter,
       },
       (payload: RealtimePostgresChangesPayload<any>) => {
-        if (payload.new) {
-          onInsert(payload.new);
-        }
+        onEvent(payload.new || payload.old);
       },
     )
     .subscribe();

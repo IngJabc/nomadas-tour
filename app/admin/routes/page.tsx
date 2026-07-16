@@ -303,49 +303,58 @@ export default function AdminRoutesPage() {
       )}
 
       {/* Content */}
-      {routes.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.25 }}
-        >
-          <EmptyState
-            icon={<MapPin className="w-8 h-8" />}
-            message="No hay rutas registradas"
-            action={{ label: 'Crear nueva ruta', onClick: handleOpenCreate }}
-          />
-        </motion.div>
-      ) : filteredRoutes.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.25 }}
-        >
-          <EmptyState
-            icon={<Search className="w-8 h-8" />}
-            message="No se encontraron rutas con ese criterio de búsqueda"
-            action={{ label: 'Limpiar búsqueda', onClick: clearSearch }}
-          />
-        </motion.div>
-      ) : (
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          {filteredRoutes.map((route) => (
-            <motion.div key={route.id} variants={staggerItem}>
-              <RouteCard
-                route={route}
-                onEdit={handleOpenEdit}
-                onDeactivate={handleOpenDeactivate}
-                onActivate={handleActivate}
-              />
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
+      <AnimatePresence mode="wait">
+        {routes.length === 0 ? (
+          <motion.div
+            key="empty-state"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+          >
+            <EmptyState
+              icon={<MapPin className="w-8 h-8" />}
+              message="No hay rutas registradas"
+              action={{ label: 'Crear nueva ruta', onClick: handleOpenCreate }}
+            />
+          </motion.div>
+        ) : filteredRoutes.length === 0 ? (
+          <motion.div
+            key="search-empty"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+          >
+            <EmptyState
+              icon={<Search className="w-8 h-8" />}
+              message="No se encontraron rutas con ese criterio de búsqueda"
+              action={{ label: 'Limpiar búsqueda', onClick: clearSearch }}
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="routes-grid"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {filteredRoutes.map((route) => (
+              <motion.div key={route.id} variants={staggerItem}>
+                <RouteCard
+                  route={route}
+                  onEdit={handleOpenEdit}
+                  onDeactivate={handleOpenDeactivate}
+                  onActivate={handleActivate}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Form Modal */}
       <RouteFormModal

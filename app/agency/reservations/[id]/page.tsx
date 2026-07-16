@@ -1,10 +1,10 @@
 "use client";
 
+import toast from 'react-hot-toast';
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatInTimezone, formatDateTimeShort } from "@/lib/timezone";
 import {
   ArrowLeft,
   MapPin,
@@ -106,10 +106,12 @@ export default function ReservationDetailPage() {
     try {
       await agencyApi.cancelAgencyReservation(id);
       setCancelLoading("success");
+      toast.success('Reserva cancelada correctamente');
       await doFetch();
       cancelTimerRef.current = setTimeout(() => setCancelLoading("idle"), 2500);
     } catch {
       setCancelLoading("error");
+      toast.error('No se pudo cancelar la reserva');
       cancelTimerRef.current = setTimeout(() => setCancelLoading("idle"), 2500);
     }
   };
@@ -296,11 +298,7 @@ export default function ReservationDetailPage() {
                   </p>
                   <p className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)]">
                     {trip?.departure_time
-                      ? format(
-                          new Date(trip.departure_time),
-                          "d 'de' MMMM yyyy, h:mm a",
-                          { locale: es }
-                        )
+                      ? formatInTimezone(trip.departure_time)
                       : "—"}
                   </p>
                 </div>
@@ -430,11 +428,7 @@ export default function ReservationDetailPage() {
                   Creada
                 </span>
                 <span className="font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-navy)]">
-                  {format(
-                    new Date(reservation.created_at),
-                    "d 'de' MMM, h:mm a",
-                    { locale: es }
-                  )}
+                  {formatDateTimeShort(reservation.created_at)}
                 </span>
               </div>
               <div className="flex items-center justify-between">

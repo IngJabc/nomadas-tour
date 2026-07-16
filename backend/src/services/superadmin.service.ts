@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../config/database.js';
 import { generateUniqueSubdomain } from '../utils/subdomain.js';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '../errors/index.js';
 import { generateToken } from '../utils/token.js';
+import { toUTC } from '../utils/timezone.js';
 
 export class SuperadminService {
   // ---- Agencies ----
@@ -315,7 +316,7 @@ export class SuperadminService {
       .from('trips')
       .insert({
         route_id: routeId,
-        departure_time: departureTime,
+        departure_time: toUTC(departureTime),
         capacity,
         vehicle_type: vehicleType,
         created_by: createdBy,
@@ -465,19 +466,26 @@ export class SuperadminService {
 
     const tripIds = trips.map((t: any) => t.id);
 
-    // Seat counts per trip
+    // Seat counts per trip + raw seats for frontend derivation
     const { data: seats } = await supabaseAdmin
       .from('seats')
-      .select('trip_id, status')
+      .select('id, trip_id, seat_code, status')
       .in('trip_id', tripIds);
 
-    const seatMap: Record<string, { total: number; available: number; reserved: number }> = {};
-    for (const tId of tripIds) seatMap[tId] = { total: 0, available: 0, reserved: 0 };
+    const seatMap: Record<string, { total: number; available: number; reserved: number; locked: number; blocked: number }> = {};
+    const seatsByTrip: Record<string, { id: string; seat_code: string; status: string }[]> = {};
+    for (const tId of tripIds) {
+      seatMap[tId] = { total: 0, available: 0, reserved: 0, locked: 0, blocked: 0 };
+      seatsByTrip[tId] = [];
+    }
     for (const s of seats || []) {
       if (seatMap[s.trip_id]) {
         seatMap[s.trip_id].total++;
+        seatsByTrip[s.trip_id].push({ id: s.id, seat_code: s.seat_code, status: s.status });
         if (s.status === 'available') seatMap[s.trip_id].available++;
-        else seatMap[s.trip_id].reserved++;
+        else if (s.status === 'reserved') seatMap[s.trip_id].reserved++;
+        else if (s.status === 'locked') seatMap[s.trip_id].locked++;
+        else if (s.status === 'blocked') seatMap[s.trip_id].blocked++;
       }
     }
 
@@ -529,7 +537,7 @@ export class SuperadminService {
 
     const data = trips.map((trip: any) => {
       const route = trip.routes;
-      const stats = seatMap[trip.id] || { total: 0, available: 0, reserved: 0 };
+      const stats = seatMap[trip.id] || { total: 0, available: 0, reserved: 0, locked: 0, blocked: 0 };
       const ta = trip.trip_agencies || [];
 
       return {
@@ -540,10 +548,13 @@ export class SuperadminService {
         vehicle: { type: trip.vehicle_type, capacity: trip.capacity },
         status: trip.status,
         postponed_from: trip.postponed_from,
+        seats: seatsByTrip[trip.id] || [],
         occupancy: {
           total: stats.total,
           available: stats.available,
           reserved: stats.reserved,
+          locked: stats.locked,
+          blocked: stats.blocked,
           boarded: boardedPerTrip[trip.id] || 0,
         },
         agencies: ta.map((taItem: any) => ({
@@ -642,7 +653,7 @@ export class SuperadminService {
 
     const updateFields: Record<string, any> = {
       route_id: routeId,
-      departure_time: departureTime,
+      departure_time: toUTC(departureTime),
       capacity,
       vehicle_type: vehicleType,
     };
