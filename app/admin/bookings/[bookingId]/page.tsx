@@ -5,12 +5,14 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Building2, Bus, MapPin, Calendar, Clock, ArrowLeft } from "lucide-react";
 import { QRCode } from "react-qr-code";
+import { motion } from "framer-motion";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { SectionTitle } from "@/components/ui/SectionTitle";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { adminApi } from "@/lib/api";
+import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
 type Passenger = {
   id: string;
@@ -99,7 +101,15 @@ export default function BookingDetailPage() {
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <CardSkeleton />
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div variants={staggerItem}>
+            <CardSkeleton />
+          </motion.div>
+        </motion.div>
       </main>
     );
   }
@@ -139,22 +149,35 @@ export default function BookingDetailPage() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <div className="mb-4">
-        <Link
-          href="/admin/bookings"
-          className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Volver a pasajeros
-        </Link>
-      </div>
+      <motion.div
+        variants={pageFade}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.25 }}
+      >
+        <div className="mb-4">
+          <Link
+            href="/admin/bookings"
+            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Volver a pasajeros
+          </Link>
+        </div>
 
-      <PageHeader
-        title="Detalle de reserva"
-        action={<Badge variant={sb.variant} size="md">{sb.label}</Badge>}
-      />
+        <PageHeader
+          title="Detalle de reserva"
+          action={<Badge variant={sb.variant} size="md">{sb.label}</Badge>}
+        />
+      </motion.div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <motion.div
+        variants={pageFade}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.25, delay: 0.05 }}
+      >
+        <div className="flex flex-col lg:flex-row gap-6">
         {/* Mobile: QR first */}
         <div className="block lg:hidden order-1">
           <Card>
@@ -310,6 +333,7 @@ export default function BookingDetailPage() {
           </div>
         </div>
       </div>
+      </motion.div>
     </main>
   );
 }
