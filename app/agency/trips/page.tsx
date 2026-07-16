@@ -7,7 +7,7 @@ import { agencyApi } from '@/lib/api';
 import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { AgencyTripCardSkeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { AgencyTripCard, type AgencyTrip } from '@/components/agency/AgencyTripCard';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
@@ -91,7 +91,7 @@ export default function AgencyTripsPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="h-8 w-40 bg-slate-200 rounded animate-pulse mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => <CardSkeleton key={i} />)}
+          {[1, 2, 3, 4, 5, 6].map((i) => <AgencyTripCardSkeleton key={i} />)}
         </div>
       </main>
     );

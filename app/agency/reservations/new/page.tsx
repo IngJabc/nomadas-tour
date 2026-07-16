@@ -37,7 +37,7 @@ import { validateForm } from "@/lib/reservations/validateForm";
 import { BusLayout } from "@/components/bus/BusLayout";
 import { PassengerForm } from "@/components/booking/PassengerForm";
 import { ReservationSummary } from "@/components/booking/ReservationSummary";
-import { CardSkeleton } from "@/components/ui/Skeleton";
+import { AgencyTripCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { AgencyTripCard } from "@/components/agency/AgencyTripCard";
@@ -492,6 +492,17 @@ function NewReservationContent() {
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
               >
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/agency/reservations")}
+                    className="flex items-center gap-1.5 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Volver a reservas
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-3 mb-6">
                   <div className="w-1 h-[22px] bg-[var(--color-brand-cyan)] rounded-sm" />
                   <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)]">
@@ -500,9 +511,9 @@ function NewReservationContent() {
                 </div>
 
                 {tripsLoading ? (
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {[1, 2, 3].map((i) => (
-                      <CardSkeleton key={i} />
+                      <AgencyTripCardSkeleton key={i} />
                     ))}
                   </div>
                 ) : tripsError ? (

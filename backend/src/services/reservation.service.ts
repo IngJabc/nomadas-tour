@@ -466,7 +466,17 @@ export class ReservationService {
       .single();
 
     if (error || !data) throw new NotFoundError('Reservation not found');
-    return data;
+
+    let qr_data_url: string | null = null;
+    if (data.qr_code) {
+      try {
+        qr_data_url = await generateQRDataURL(data.qr_code);
+      } catch {
+        qr_data_url = null;
+      }
+    }
+
+    return { ...data, qr_data_url };
   }
 
   async cancelAgencyReservation(id: string, agencyId: string) {

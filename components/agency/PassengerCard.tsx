@@ -26,9 +26,10 @@ const STATUS_MAP: Record<string, { variant: "confirmed" | "cancelled" | "active"
 
 interface PassengerCardProps {
   passenger: AgencyTripPassenger;
+  showReservationId?: boolean;
 }
 
-export function PassengerCard({ passenger }: PassengerCardProps) {
+export function PassengerCard({ passenger, showReservationId = true }: PassengerCardProps) {
   const status = passenger.boarded
     ? { variant: "boarded" as const, label: "Abordado" }
     : STATUS_MAP[passenger.reservation_status] ?? { variant: "confirmed" as const, label: "Confirmada" };
@@ -51,9 +52,11 @@ export function PassengerCard({ passenger }: PassengerCardProps) {
         <p className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
           {passenger.document}
         </p>
-        <p className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
-          Reserva #{passenger.reservation_id.slice(0, 8)}
-        </p>
+        {showReservationId && (
+          <p className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
+            Reserva #{passenger.reservation_id.slice(0, 8)}
+          </p>
+        )}
       </div>
 
       <div className="shrink-0">
