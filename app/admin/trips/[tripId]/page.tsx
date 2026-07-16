@@ -11,6 +11,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -18,6 +19,7 @@ import { CardSkeleton } from '@/components/ui/Skeleton';
 import { SectionTitle } from '@/components/ui/SectionTitle';
 import { BusLayout } from '@/components/bus/BusLayout';
 import { useTripRealtime } from '@/hooks/useTripRealtime';
+import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 
 const STATUS_STYLES: Record<string, { label: string; variant: 'active' | 'completed' | 'cancelled' | 'warning' }> = {
   active: { label: 'Activo', variant: 'active' },
@@ -48,7 +50,15 @@ export default function AdminTripDetailPage() {
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <CardSkeleton />
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div variants={staggerItem}>
+            <CardSkeleton />
+          </motion.div>
+        </motion.div>
       </main>
     );
   }
@@ -82,26 +92,39 @@ export default function AdminTripDetailPage() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <div className="mb-4">
-        <Link
-          href="/admin/trips"
-          className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          Volver a viajes
-        </Link>
-      </div>
+      <motion.div
+        variants={pageFade}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.25 }}
+      >
+        <div className="mb-4">
+          <Link
+            href="/admin/trips"
+            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Volver a viajes
+          </Link>
+        </div>
 
-      <PageHeader
-        title={route ? `${route.origin} → ${route.destination}` : 'Detalle del viaje'}
-        action={
-          <Badge variant={s.variant} size="md">
-            {s.label}
-          </Badge>
-        }
-      />
+        <PageHeader
+          title={route ? `${route.origin} → ${route.destination}` : 'Detalle del viaje'}
+          action={
+            <Badge variant={s.variant} size="md">
+              {s.label}
+            </Badge>
+          }
+        />
+      </motion.div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      <motion.div
+        variants={pageFade}
+        initial="hidden"
+        animate="visible"
+        transition={{ duration: 0.25, delay: 0.05 }}
+      >
+        <div className="flex flex-col lg:flex-row gap-6">
         {/* Left column: info, metrics, agencies, passengers */}
         <div className="flex-1 min-w-0 space-y-6">
           {/* Trip Info */}
@@ -295,6 +318,7 @@ export default function AdminTripDetailPage() {
           </div>
         </div>
       </div>
+      </motion.div>
     </main>
   );
 }

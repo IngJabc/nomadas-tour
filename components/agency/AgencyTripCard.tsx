@@ -138,7 +138,7 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
             </Link>
             <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
             <Link
-              href={isFull ? `/agency/trips/${trip.id}` : `/agency/reservations/new?trip=${trip.id}&source=trips`}
+              href={isFull ? `/agency/trips/${trip.id}/passengers` : `/agency/reservations/new?trip=${trip.id}&source=trips`}
               className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
               onClick={(e) => e.stopPropagation()}
             >
@@ -168,7 +168,7 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
   }
 
   return (
-    <Link href={`/agency/trips/${trip.id}`} className="no-underline block">
+    <Link href={`/agency/trips/${trip.id}/passengers`} className="no-underline block">
       <div className={isFull ? "" : "group"}>
         <Card hover={!isFull} className={isFull ? "opacity-70" : ""}>
           {cardContent}
