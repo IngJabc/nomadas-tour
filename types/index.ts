@@ -114,6 +114,7 @@ export interface AgencyReservationPassenger {
   status: string;
   seat_id: string;
   seats?: { seat_code: string };
+  boarded?: boolean;
 }
 
 export interface AgencyReservation {
@@ -123,6 +124,7 @@ export interface AgencyReservation {
   booker_phone?: string | null;
   status: string;
   qr_code: string;
+  qr_data_url?: string | null;
   trip_id: string;
   created_at: string;
   trips: {

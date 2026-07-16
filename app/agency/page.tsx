@@ -218,22 +218,6 @@ export default function AgencyDashboardPage() {
             ))}
           </div>
 
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-1 h-[18px] bg-slate-200 rounded-sm shrink-0" />
-            <Skeleton className="h-5 w-48" />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-10">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i}>
-                <div className="flex items-center gap-3 mb-3">
-                  <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-                <Skeleton className="h-8 w-16" />
-              </Card>
-            ))}
-          </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
             <Card className="p-5 h-[500px]">
               <div className="flex items-center gap-2 mb-4">

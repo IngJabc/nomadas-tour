@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import Link from "next/link";
 import Image from "next/image";
 
 export default function LoginPage() {
@@ -13,11 +13,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const router = useRouter();
   const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -37,6 +40,7 @@ export default function LoginPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -182,26 +186,6 @@ export default function LoginPage() {
           </div>
 
           {/* Back link */}
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 mb-5 sm:mb-6 font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
-            Volver al inicio
-          </Link>
-
           {/* Title */}
           <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[24px] sm:text-[28px] text-brand-navy">
             Bienvenido de vuelta
@@ -286,46 +270,9 @@ export default function LoginPage() {
                   }
                 >
                   {showPassword ? (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242-4.242m4.243 4.242L21 21"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M10.5 10.5a3 3 0 004.243 4.243"
-                        opacity="0"
-                      />
-                    </svg>
+                    <EyeOff className="w-5 h-5" strokeWidth={1.5} />
                   ) : (
-                    <svg
-                      className="w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                      />
-                    </svg>
+                    <Eye className="w-5 h-5" strokeWidth={1.5} />
                   )}
                 </button>
               </div>
@@ -390,26 +337,6 @@ export default function LoginPage() {
               )}
             </button>
           </form>
-
-          {/* Separator */}
-          <div className="flex items-center gap-3 my-6">
-            <div className="flex-1 h-px bg-gray-200" />
-            <span className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
-              o
-            </span>
-            <div className="flex-1 h-px bg-gray-200" />
-          </div>
-
-          {/* Register link */}
-          <p className="text-center font-['Poppins',sans-serif] font-normal text-sm text-brand-muted">
-            ¿No tienes cuenta?{" "}
-            <Link
-              href="/register"
-              className="font-['Poppins',sans-serif] font-semibold text-brand-cyan hover:underline"
-            >
-              Regístrate aquí
-            </Link>
-          </p>
         </motion.div>
       </div>
     </div>
