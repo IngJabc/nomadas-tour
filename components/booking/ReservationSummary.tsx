@@ -1,10 +1,9 @@
 "use client";
 
 import { Check, CreditCard, Users, Bus, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { Trip, PassengerData, Seat } from "@/types";
 import { Button } from "@/components/ui/Button";
+import { formatDateLong } from "@/lib/timezone";
 
 interface ReservationSummaryProps {
   trip: Trip | null;
@@ -56,7 +55,7 @@ export function ReservationSummary({
             </p>
             <p className="text-xs text-[var(--color-brand-muted)]">
               {trip.departure_time
-                ? `${format(new Date(trip.departure_time), "d 'de' MMMM yyyy, h:mm a", { locale: es })}`
+                ? formatDateLong(trip.departure_time)
                 : ""}
             </p>
           </div>

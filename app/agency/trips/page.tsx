@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Bus, AlertTriangle } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
-import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
+import { subscribeToTripSeats, subscribeToTripAgencies, subscribeToTrips } from '@/lib/realtime/subscriptions';
+import { createClient } from '@/lib/supabase/client';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AgencyTripCardSkeleton } from '@/components/ui/Skeleton';
@@ -17,6 +18,14 @@ export default function AgencyTripsPage() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [tripIds, setTripIds] = useState<string[]>([]);
+  const [agencyId, setAgencyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setAgencyId((user?.user_metadata?.agency_id as string) ?? null);
+    });
+  }, []);
 
   const doFetch = useCallback(async () => {
     try {
@@ -67,7 +76,7 @@ export default function AgencyTripsPage() {
       }
     };
 
-    const handleSeatUpdate = (seat: any) => {
+    const handleSeatUpdate = ({ seat }: { seat: any }) => {
       const tripId = seat.trip_id as string;
       if (!tripId) return;
 
@@ -84,6 +93,53 @@ export default function AgencyTripsPage() {
       cleanup();
     };
   }, [tripIds]);
+
+  // Realtime: refrescar lista cuando se asigna/desasigna un viaje a la agencia
+  useEffect(() => {
+    if (!agencyId) return;
+
+    const debounceRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+
+    const handleTripAgencyEvent = () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(doFetch, 500);
+    };
+
+    const cleanup = subscribeToTripAgencies(handleTripAgencyEvent, agencyId);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      cleanup();
+    };
+  }, [agencyId, doFetch]);
+
+  // Realtime: refrescar cuando cambian campos del viaje (status, departure_time, etc.)
+  useEffect(() => {
+    if (!tripIds.length) return;
+
+    const tripIdsRef: { current: string[] } = { current: tripIds };
+    tripIdsRef.current = tripIds;
+
+    const debounceRef: { current: ReturnType<typeof setTimeout> | null } = { current: null };
+
+    const handleTripUpdate = (payload: { eventType: string; trip: Record<string, any> }) => {
+      if (payload.eventType === 'DELETE') {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(doFetch, 500);
+        return;
+      }
+      if (!tripIdsRef.current.includes(payload.trip.id)) return;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(doFetch, 500);
+    };
+
+    const cleanup = subscribeToTrips(handleTripUpdate, tripIds);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      cleanup();
+    };
+  }, [tripIds, doFetch]);
 
   // ─── Loading skeleton ─────────────────────────────────────────────────
   if (initialLoad) {
@@ -125,31 +181,38 @@ export default function AgencyTripsPage() {
         </motion.div>
       )}
 
-      {trips.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.25 }}
-        >
-          <EmptyState
-            icon={<Bus className="w-8 h-8" />}
-            message="No tienes viajes asignados todavía"
-          />
-        </motion.div>
-      ) : (
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          {trips.map((trip) => (
-            <motion.div key={trip.id} variants={staggerItem}>
-              <AgencyTripCard trip={trip} />
-            </motion.div>
-          ))}
-        </motion.div>
-      )}
+      <AnimatePresence mode="wait">
+        {trips.length === 0 ? (
+          <motion.div
+            key="empty-state"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+          >
+            <EmptyState
+              icon={<Bus className="w-8 h-8" />}
+              message="No tienes viajes asignados todavía"
+            />
+          </motion.div>
+        ) : (
+          <motion.div
+            key="trips-grid"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {trips.map((trip) => (
+              <motion.div key={trip.id} variants={staggerItem}>
+                <AgencyTripCard trip={trip} />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

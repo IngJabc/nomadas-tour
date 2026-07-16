@@ -1,5 +1,6 @@
 "use client";
 
+import toast from 'react-hot-toast';
 import {
   useEffect,
   useState,
@@ -20,8 +21,7 @@ import {
   Clock,
   Bus as BusIcon,
 } from "lucide-react";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatDateTimeShort, formatDateLong, formatTime12h } from "@/lib/timezone";
 import { agencyApi } from "@/lib/api";
 import { subscribeToTripSeats } from "@/lib/realtime/subscriptions";
 import {
@@ -42,25 +42,6 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { AgencyTripCard } from "@/components/agency/AgencyTripCard";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
-
-// ─── Toast hook ──────────────────────────────────────────────────────
-function useToasts() {
-  const [toasts, setToasts] = useState<
-    { id: number; message: string; type: "error" | "info" }[]
-  >([]);
-  const toastIdRef = useRef(0);
-
-  const addToast = useCallback((message: string, type: "error" | "info") => {
-    const id = ++toastIdRef.current;
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(
-      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
-      4000
-    );
-  }, []);
-
-  return { toasts, addToast };
-}
 
 // ─── Page wrapper ────────────────────────────────────────────────────
 export default function NewAgencyReservationPage() {
@@ -121,7 +102,10 @@ function NewReservationContent() {
 
   // ─── Hooks ────────────────────────────────────────────────────────
   const wizard = useReservationWizard({ isDeepLink, origin });
-  const { toasts, addToast } = useToasts();
+  const addToast = useCallback((message: string, type: 'error' | 'info') => {
+    if (type === 'error') toast.error(message);
+    else toast(message);
+  }, []);
   const locking = useSeatLocking({ userId, onSeatLost: (seatCode) => {
     addToast(`El asiento ${seatCode} ya no está disponible`, "info");
   }});
@@ -212,7 +196,7 @@ function NewReservationContent() {
       }
     };
 
-    const handleSeatUpdate = (seat: any) => {
+    const handleSeatUpdate = ({ seat }: { seat: any }) => {
       const tripId = seat.trip_id as string;
       if (!tripId) return;
       pendingTripIds.add(tripId);
@@ -373,24 +357,6 @@ function NewReservationContent() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      {/* Toasts */}
-      {toasts.length > 0 && (
-        <div className="fixed top-4 right-4 z-50 space-y-2">
-          {toasts.map((t) => (
-            <div
-              key={t.id}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl shadow-lg font-[family-name:var(--font-body)] font-medium text-sm text-white ${
-                t.type === "error"
-                  ? "bg-[#ef4444]"
-                  : "bg-[var(--color-brand-navy)]"
-              }`}
-            >
-              <span>{t.message}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Deep link error */}
       {locking.deepLinkError && (
         <motion.div
@@ -696,24 +662,12 @@ function NewReservationContent() {
                               </p>
                               <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
                                 {locking.selectedTrip.departure_time
-                                  ? `${format(
-                                      new Date(
-                                        locking.selectedTrip.departure_time
-                                      ),
-                                      "d 'de' MMMM",
-                                      { locale: es }
-                                    )}`
+                                  ? formatDateLong(locking.selectedTrip.departure_time)
                                   : "—"}
                               </p>
                               <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
                                 {locking.selectedTrip.departure_time
-                                  ? format(
-                                      new Date(
-                                        locking.selectedTrip.departure_time
-                                      ),
-                                       "h:mm a",
-                                      { locale: es }
-                                    )
+                                  ? formatTime12h(locking.selectedTrip.departure_time)
                                   : ""}
                               </p>
                             </div>
@@ -907,11 +861,7 @@ function NewReservationContent() {
                       <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Salida</p>
                       <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
                         {locking.selectedTrip?.departure_time
-                          ? format(
-                              new Date(locking.selectedTrip.departure_time),
-                              "d MMM, h:mm a",
-                              { locale: es }
-                            )
+                          ? formatDateTimeShort(locking.selectedTrip.departure_time)
                           : "—"}
                       </p>
                     </div>

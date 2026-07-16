@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { BuilderLayout } from '@/components/admin/trip-builder/BuilderLayout';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { adminApi } from '@/lib/api';
+import { fromUTCToLocal } from '@/lib/timezone';
 import type { TripBuilderState } from '@/hooks/useTripBuilderReducer';
 import { staggerContainer, staggerItem } from '@/lib/motion/variants';
 
@@ -26,7 +27,7 @@ export default function EditTripPage() {
         setInitialData({
           route_id: trip.route_id,
           departure_time: trip.departure_time
-            ? new Date(trip.departure_time).toISOString().slice(0, 16)
+            ? fromUTCToLocal(trip.departure_time)
             : '',
           vehicle_type: trip.vehicle_type ?? 'bus',
           agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),

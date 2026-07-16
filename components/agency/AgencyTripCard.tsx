@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { formatDateLong, formatTime12h } from "@/lib/timezone";
 
 interface AgencyTripRoute {
   origin: string;
@@ -25,6 +26,7 @@ export interface AgencyTrip {
   total_seats: number;
   available_seats: number;
   reserved_seats: number;
+  postponed_from?: string | null;
 }
 
 interface AgencyTripCardProps {
@@ -32,36 +34,35 @@ interface AgencyTripCardProps {
   onSelect?: (tripId: string) => void;
 }
 
-function formatDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-ES", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function formatTime(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+function getStatusBadge(status: string, postponedFrom?: string | null) {
+  if (postponedFrom) return { label: 'Reprogramado', variant: 'warning' as const };
+  switch (status) {
+    case 'cancelled': return { label: 'Cancelado', variant: 'cancelled' as const };
+    case 'completed': return { label: 'Completado', variant: 'completed' as const };
+    case 'active': return { label: 'Programado', variant: 'active' as const };
+    default: return null;
+  }
 }
 
 export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
   const isFull = trip.available_seats === 0;
+  const isClosed = trip.status === 'cancelled' || trip.status === 'completed';
+  const statusBadge = getStatusBadge(trip.status, trip.postponed_from);
 
   const cardContent = (
     <>
-      {isFull && !onSelect && (
-        <div className="mb-3">
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        {statusBadge && (
+          <Badge variant={statusBadge.variant} size="sm">
+            {statusBadge.label}
+          </Badge>
+        )}
+        {isFull && !onSelect && (
           <Badge variant="cancelled" size="sm">
             Completo
           </Badge>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
@@ -72,11 +73,11 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--color-brand-muted)] mt-2">
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 shrink-0" />
-              {formatDate(trip.departure_time)}
+              {formatDateLong(trip.departure_time)}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 shrink-0" />
-              {formatTime(trip.departure_time)}
+              {formatTime12h(trip.departure_time)}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <Bus className="w-3.5 h-3.5 shrink-0" />
@@ -136,15 +137,19 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
               Ver pasajeros
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
-            <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
-            <Link
-              href={isFull ? `/agency/trips/${trip.id}/passengers` : `/agency/reservations/new?trip=${trip.id}&source=trips`}
-              className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {isFull ? "Ver información" : "Nueva Reserva"}
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+            {!isClosed && (
+              <>
+                <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
+                <Link
+                  href={isFull ? `/agency/trips/${trip.id}/passengers` : `/agency/reservations/new?trip=${trip.id}&source=trips`}
+                  className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {isFull ? "Ver información" : "Nueva Reserva"}
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>

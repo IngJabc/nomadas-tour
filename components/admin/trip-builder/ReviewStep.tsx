@@ -2,6 +2,7 @@
 
 import { MapPin, Calendar, Bus, Building2 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
+import { formatInTimezone } from '@/lib/timezone';
 import type { TripBuilderState } from '@/hooks/useTripBuilderReducer';
 import type { Route } from '@/types';
 
@@ -49,13 +50,7 @@ export function ReviewStep({ state, routes, agencies }: ReviewStepProps) {
   );
 
   const dt = state.departure_time
-    ? new Date(state.departure_time).toLocaleDateString('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
+    ? formatInTimezone(state.departure_time)
     : '';
 
   return (
