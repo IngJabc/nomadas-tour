@@ -58,11 +58,13 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
+  /** @deprecated No hay endpoint backend para esta llamada.保留 para futura implementación de Customer. */
   register: (email: string, password: string, full_name: string) =>
     request<{ token: string; user: any }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, full_name }),
     }),
+  /** @deprecated No hay endpoint backend para esta llamada.保留 para futura implementación de Customer. */
   registerAgency: (data: { email: string; password: string; agency_name: string }) =>
     request<{ token: string; user: any; agency: any }>('/auth/register-agency', {
       method: 'POST',
@@ -77,6 +79,11 @@ export const authApi = {
     request<{ token: string; user: any }>('/auth/accept-invitation', {
       method: 'POST',
       body: JSON.stringify({ token, password, confirm_password: password }),
+    }),
+  forgotPassword: (email: string) =>
+    request<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
     }),
 };
 

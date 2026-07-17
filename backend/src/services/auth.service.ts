@@ -1,9 +1,11 @@
 import { supabase, supabaseAdmin } from '../config/database.js';
 import { UnauthorizedError, ValidationError } from '../errors/index.js';
+import { emailService } from './email.service.js';
+import { env } from '../config/env.js';
 
 async function getToken(email: string, password: string): Promise<string> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.session) throw new UnauthorizedError('Failed to obtain session');
+  if (error || !data.session) throw new UnauthorizedError('Error al obtener la sesión');
   return data.session.access_token;
 }
 
@@ -15,7 +17,7 @@ export class AuthService {
     });
 
     if (error || !data.user) {
-      throw new UnauthorizedError('Invalid email or password');
+      throw new UnauthorizedError('Correo o contraseña incorrectos');
     }
 
     const { data: user } = await supabaseAdmin
@@ -24,12 +26,20 @@ export class AuthService {
       .eq('id', data.user.id)
       .single();
 
-    if (!user) throw new UnauthorizedError('User not found');
+    if (!user) throw new UnauthorizedError('Usuario no encontrado');
 
     return {
       token: data.session!.access_token,
       user,
     };
+  }
+
+  async forgotPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${env.FRONTEND_URL}/reset-password`,
+    });
+
+    if (error) throw new ValidationError(error.message);
   }
 
   async validateInvitation(token: string) {
@@ -42,7 +52,7 @@ export class AuthService {
       .single();
 
     if (error || !invitation) {
-      throw new UnauthorizedError('Invalid or expired invitation token');
+      throw new UnauthorizedError('El enlace de invitación no es válido o ha expirado');
     }
 
     return {
@@ -61,29 +71,44 @@ export class AuthService {
       .single();
 
     if (inviteError || !invitation) {
-      throw new UnauthorizedError('Invalid or expired invitation token');
+      throw new UnauthorizedError('El enlace de invitación no es válido o ha expirado');
     }
 
     const email = invitation.email;
     const agencyId = invitation.agency_id;
 
-    const { data: authData, error: signUpError } = await supabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { role: 'agency' },
-    });
+    let userId: string;
 
-    if (signUpError) throw new ValidationError(signUpError.message);
-    if (!authData.user) throw new ValidationError('Failed to create user');
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existing = existingUsers?.users?.find((u) => u.email === email);
 
-    const { error: userError } = await supabaseAdmin.from('users').insert({
-      id: authData.user.id,
-      email,
-      password_hash: '',
-      role: 'agency',
-      agency_id: agencyId,
-    });
+    if (existing) {
+      userId = existing.id;
+
+      await supabase.auth.admin.updateUserById(userId, {
+        password,
+        user_metadata: { role: 'agency', agency_id: agencyId },
+        email_confirm: true,
+      });
+    } else {
+      const { data: authData, error: signUpError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { role: 'agency', agency_id: agencyId },
+      });
+
+      if (signUpError) throw new ValidationError(signUpError.message);
+      if (!authData.user) throw new ValidationError('Error al crear el usuario');
+      userId = authData.user.id;
+    }
+
+    const { error: userError } = await supabaseAdmin
+      .from('users')
+      .upsert(
+        { id: userId, email, password_hash: '', role: 'agency', agency_id: agencyId },
+        { onConflict: 'id' },
+      );
 
     if (userError) throw new ValidationError(userError.message);
 
@@ -94,19 +119,20 @@ export class AuthService {
 
     await supabaseAdmin
       .from('agency_invitations')
-      .update({ used_at: new Date().toISOString(), used_by: authData.user.id })
+      .update({ used_at: new Date().toISOString(), used_by: userId })
       .eq('id', invitation.id);
 
-    await supabase.auth.admin.updateUserById(authData.user.id, {
-      user_metadata: { role: 'agency', agency_id: agencyId },
-    });
-
     const sessionToken = await getToken(email, password);
+
+    const agencyName = (invitation.agencies as any).name as string;
+    emailService.sendRegistrationCompleteEmail(email, agencyName).catch((err) => {
+      console.error('[AuthService] Failed to send registration complete email:', err);
+    });
 
     return {
       token: sessionToken,
       user: {
-        id: authData.user.id,
+        id: userId,
         email,
         role: 'agency',
         agency_id: agencyId,

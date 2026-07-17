@@ -11,6 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@react-email/render": "^2.1.0",
     "@supabase/supabase-js": "^2.108.2",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
@@ -19,6 +20,7 @@
     "helmet": "^8.0.0",
     "jsonwebtoken": "^9.0.2",
     "qrcode": "^1.5.4",
+    "resend": "^6.17.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {

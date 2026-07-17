@@ -22,14 +22,14 @@ function extractContext(user: { id: string; user_metadata?: Record<string, unkno
 export async function auth(req: Request, _res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
-    throw new UnauthorizedError('Missing or invalid authorization header');
+    throw new UnauthorizedError('Falta o es inválido el encabezado de autorización');
   }
 
   const token = header.slice(7);
   const { data: { user }, error } = await supabase.auth.getUser(token);
 
   if (error || !user) {
-    throw new UnauthorizedError('Invalid or expired token');
+    throw new UnauthorizedError('Token inválido o expirado');
   }
 
   req.ctx = extractContext(user);

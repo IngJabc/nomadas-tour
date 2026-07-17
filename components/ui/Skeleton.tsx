@@ -169,6 +169,52 @@ export function ReservationDetailSkeleton() {
   );
 }
 
+export function AgencyReservationCardSkeleton() {
+  return (
+    <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] animate-pulse flex flex-col gap-0">
+      {/* Header: name + badge */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0 space-y-1.5">
+          <Skeleton className="h-5 w-36" />
+          <Skeleton className="h-3 w-24" />
+        </div>
+        <Skeleton className="h-5 w-20 rounded-full shrink-0" />
+      </div>
+
+      {/* Route + date rows */}
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-3.5 h-3.5 rounded shrink-0" />
+          <Skeleton className="h-3 w-44" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Skeleton className="w-3.5 h-3.5 rounded shrink-0" />
+          <Skeleton className="h-3 w-40" />
+        </div>
+      </div>
+
+      {/* Seat codes */}
+      <div className="flex gap-1.5 mb-4">
+        <Skeleton className="h-5 w-8 rounded-md" />
+        <Skeleton className="h-5 w-8 rounded-md" />
+        <Skeleton className="h-5 w-8 rounded-md" />
+      </div>
+
+      {/* Passengers count */}
+      <div className="flex items-center gap-3 mb-4">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+
+      {/* Footer */}
+      <div className="pt-4 border-t border-[rgba(0,0,0,0.06)] flex items-center justify-between">
+        <Skeleton className="h-5 w-16 rounded" />
+        <Skeleton className="h-3 w-20" />
+      </div>
+    </div>
+  );
+}
+
 export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] overflow-hidden">

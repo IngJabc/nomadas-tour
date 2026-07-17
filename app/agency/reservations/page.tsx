@@ -9,7 +9,8 @@ import { subscribeToReservations, subscribeToReservationPassengers, subscribeToB
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { AgencyReservationCardSkeleton } from '@/components/ui/Skeleton';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { AgencyReservationCard } from '@/components/agency/AgencyReservationCard';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 import type { AgencyReservation } from '@/types';
@@ -78,12 +79,35 @@ export default function AgencyReservationsPage() {
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="h-8 w-40 bg-slate-200 rounded animate-pulse mb-6" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <CardSkeleton key={i} />
-          ))}
-        </div>
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div variants={staggerItem}>
+            <div className="flex items-center justify-between mb-6">
+              <div className="h-7 w-28 bg-slate-200 rounded-lg animate-pulse" />
+              <div className="h-9 w-32 bg-slate-200 rounded-xl animate-pulse" />
+            </div>
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+              <div className="flex gap-1.5 bg-slate-100 rounded-xl h-9 px-1 shrink-0 overflow-hidden">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="h-7 bg-slate-200 rounded-lg animate-pulse" style={{ width: i === 1 ? 48 : i === 2 ? 96 : i === 3 ? 80 : 72 }} />
+                ))}
+              </div>
+              <Skeleton className="h-9 flex-1 rounded-xl" />
+            </div>
+          </motion.div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <motion.div key={i} variants={staggerItem}>
+                <AgencyReservationCardSkeleton />
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
       </main>
     );
   }
