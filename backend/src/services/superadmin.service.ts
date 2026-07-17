@@ -292,6 +292,32 @@ export class SuperadminService {
     },
   };
 
+  private async getAgenciesWithEmail(agencyIds: string[]): Promise<{ id: string; name: string; email: string }[]> {
+    if (agencyIds.length === 0) return [];
+
+    const { data: agencies } = await supabaseAdmin
+      .from('agencies')
+      .select('id, name, email, status')
+      .in('id', agencyIds);
+
+    return (agencies || []).filter(
+      (a: any) => a.status === 'active' && a.email,
+    );
+  }
+
+  private formatDateForEmail(isoDate: string): string {
+    const d = new Date(isoDate);
+    return d.toLocaleDateString('es-VE', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'America/Caracas',
+    });
+  }
+
   // ---- Trips (atomic: trip + seats + allocations) ----
   async createTrip(
     routeId: string,
@@ -310,7 +336,7 @@ export class SuperadminService {
 
     const { data: route } = await supabaseAdmin
       .from('routes')
-      .select('id, status')
+      .select('id, status, origin, destination')
       .eq('id', routeId)
       .single();
 
@@ -359,6 +385,25 @@ export class SuperadminService {
       await supabaseAdmin.from('seats').delete().eq('trip_id', trip.id);
       await supabaseAdmin.from('trips').delete().eq('id', trip.id);
       throw new ValidationError(taError.message);
+    }
+
+    // Send "new trip assigned" emails to active agencies
+    const agenciesWithEmail = await this.getAgenciesWithEmail(agencyIds);
+    const departureFormatted = this.formatDateForEmail(trip.departure_time);
+    for (const agency of agenciesWithEmail) {
+      emailService.sendNewTripAssignedEmail(
+        agency.email,
+        agency.name,
+        route.origin,
+        route.destination,
+        departureFormatted,
+        vehicleType,
+        capacity,
+        trip.id,
+        agency.id,
+      ).catch((err) => {
+        console.error(JSON.stringify({ event: 'TRIP_ASSIGNED_EMAIL_FAILED', tripId: trip.id, agencyId: agency.id, error: err.message }));
+      });
     }
 
     return trip;
@@ -637,6 +682,7 @@ export class SuperadminService {
     departureTime: string,
     vehicleType: 'bus' | 'kia',
     agencyIds: string[],
+    postpone: boolean = false,
   ) {
     if (agencyIds.length === 0) {
       throw new ValidationError('At least one agency is required');
@@ -719,6 +765,42 @@ export class SuperadminService {
       await supabaseAdmin.from('trip_agencies').insert(taRows);
     }
 
+    // If postpone, save old departure_time and send emails
+    if (postpone) {
+      await supabaseAdmin
+        .from('trips')
+        .update({ postponed_from: existing.departure_time })
+        .eq('id', id);
+
+      const { data: route } = await supabaseAdmin
+        .from('routes')
+        .select('origin, destination')
+        .eq('id', routeId)
+        .single();
+
+      if (route) {
+        const allAgencyIds = [...new Set([...currentAgencyIds, ...agencyIds])];
+        const agenciesWithEmail = await this.getAgenciesWithEmail(allAgencyIds);
+        const oldFormatted = this.formatDateForEmail(existing.departure_time);
+        const newFormatted = this.formatDateForEmail(toUTC(departureTime));
+
+        for (const agency of agenciesWithEmail) {
+          emailService.sendTripPostponedEmail(
+            agency.email,
+            agency.name,
+            route.origin,
+            route.destination,
+            oldFormatted,
+            newFormatted,
+            id,
+            agency.id,
+          ).catch((err) => {
+            console.error(JSON.stringify({ event: 'TRIP_POSTPONED_EMAIL_FAILED', tripId: id, agencyId: agency.id, error: err.message }));
+          });
+        }
+      }
+    }
+
     const { data: trip } = await supabaseAdmin
       .from('trips')
       .select('*, routes(origin, destination), trip_agencies(*)')
@@ -738,7 +820,7 @@ export class SuperadminService {
   async updateTripStatus(id: string, status: 'completed' | 'cancelled') {
     const { data: trip, error: fetchError } = await supabaseAdmin
       .from('trips')
-      .select('departure_time, status')
+      .select('departure_time, status, route_id')
       .eq('id', id)
       .single();
 
@@ -764,6 +846,40 @@ export class SuperadminService {
       .eq('id', id);
 
     if (updateError) throw new ValidationError(updateError.message);
+
+    // Send "trip cancelled" emails to active agencies
+    if (status === 'cancelled') {
+      const { data: tripAgencies } = await supabaseAdmin
+        .from('trip_agencies')
+        .select('agency_id')
+        .eq('trip_id', id);
+
+      const agencyIds = (tripAgencies || []).map((ta: any) => ta.agency_id);
+      const agenciesWithEmail = await this.getAgenciesWithEmail(agencyIds);
+
+      const { data: route } = await supabaseAdmin
+        .from('routes')
+        .select('origin, destination')
+        .eq('id', trip.route_id)
+        .single();
+
+      if (route) {
+        const departureFormatted = this.formatDateForEmail(trip.departure_time);
+        for (const agency of agenciesWithEmail) {
+          emailService.sendTripCancelledEmail(
+            agency.email,
+            agency.name,
+            route.origin,
+            route.destination,
+            departureFormatted,
+            id,
+          ).catch((err) => {
+            console.error(JSON.stringify({ event: 'TRIP_CANCELLED_EMAIL_FAILED', tripId: id, agencyId: agency.id, error: err.message }));
+          });
+        }
+      }
+    }
+
     return { id, status };
   }
 

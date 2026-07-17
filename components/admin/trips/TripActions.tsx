@@ -11,6 +11,7 @@ interface TripActionsProps {
   actionLoading: boolean;
   canComplete: boolean;
   canCancelPostpone: boolean;
+  onMenuToggle?: (open: boolean) => void;
 }
 
 export function TripActions({
@@ -20,15 +21,21 @@ export function TripActions({
   actionLoading,
   canComplete,
   canCancelPostpone,
+  onMenuToggle,
 }: TripActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const toggleMenu = (open: boolean) => {
+    setMenuOpen(open);
+    onMenuToggle?.(open);
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
+        toggleMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -121,7 +128,7 @@ export function TripActions({
               variant="secondary"
               size="sm"
               disabled={actionLoading}
-              onClick={() => setMenuOpen(!menuOpen)}
+              onClick={() => toggleMenu(!menuOpen)}
             >
               <MoreHorizontal className="w-3.5 h-3.5" />
             </Button>
@@ -132,7 +139,7 @@ export function TripActions({
                     key={action.key}
                     type="button"
                     disabled={actionLoading}
-                    onClick={() => { action.onClick(); setMenuOpen(false); }}
+                    onClick={() => { action.onClick(); toggleMenu(false); }}
                     className="w-full text-left px-4 py-2 text-sm font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-navy)] hover:bg-slate-50 transition-colors disabled:opacity-40"
                   >
                     {action.label}

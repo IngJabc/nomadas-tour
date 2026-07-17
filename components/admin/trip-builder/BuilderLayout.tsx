@@ -41,7 +41,7 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
   const { state, dispatch, canProceed } = useTripBuilderReducer(initialData);
 
   const [routes, setRoutes] = useState<Route[]>([]);
-  const [agencies, setAgencies] = useState<{ id: string; name: string }[]>([]);
+  const [agencies, setAgencies] = useState<{ id: string; name: string; status: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitFeedback, setSubmitFeedback] = useState<'success' | 'error' | null>(null);
@@ -125,12 +125,12 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
   const isValid = canProceed();
 
   return (
-    <div className="flex flex-col overflow-x-hidden">
+    <div className="flex flex-col">
       <div className="mb-6">
         <StepIndicator currentStep={state.currentStep} />
       </div>
 
-      <div className="min-h-11">
+      <div className="min-h-11 overflow-hidden">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={`label-${state.currentStep}`}

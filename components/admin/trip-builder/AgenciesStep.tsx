@@ -8,7 +8,7 @@ const inputClass =
   "w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-white outline-none transition-all duration-200 focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)]";
 
 interface AgenciesStepProps {
-  agencies: { id: string; name: string }[];
+  agencies: { id: string; name: string; status?: string }[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
 }
@@ -24,6 +24,11 @@ export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepPr
     [agencies, search],
   );
 
+  const activeAgencies = useMemo(
+    () => filtered.filter((a) => a.status === 'active'),
+    [filtered],
+  );
+
   const toggleAgency = (id: string) => {
     onChange(
       selectedIds.includes(id)
@@ -36,6 +41,14 @@ export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepPr
     return (
       <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
         No hay agencias disponibles. Crea una agencia primero.
+      </p>
+    );
+  }
+
+  if (activeAgencies.length === 0) {
+    return (
+      <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
+        No hay agencias activas disponibles para asignar este viaje.
       </p>
     );
   }
@@ -86,12 +99,12 @@ export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepPr
       )}
 
       <div className="border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden max-h-[200px] overflow-y-auto">
-        {filtered.length === 0 ? (
+        {activeAgencies.length === 0 ? (
           <p className="px-4 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
             No se encontraron agencias
           </p>
         ) : (
-          filtered.map((a) => {
+          activeAgencies.map((a) => {
             const isSelected = selectedIds.includes(a.id);
             return (
               <label

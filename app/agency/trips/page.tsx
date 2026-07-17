@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bus, AlertTriangle, Search, X } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { agencyApi } from '@/lib/api';
 import { subscribeToTripSeats, subscribeToTripAgencies, subscribeToTrips } from '@/lib/realtime/subscriptions';
 import { createClient } from '@/lib/supabase/client';
@@ -13,6 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { AgencyTripCard, type AgencyTrip } from '@/components/agency/AgencyTripCard';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
+import toast from 'react-hot-toast';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
@@ -27,6 +29,17 @@ export default function AgencyTripsPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [tripIds, setTripIds] = useState<string[]>([]);
   const [agencyId, setAgencyId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  // Handle ?error=wrong-agency from middleware redirect
+  useEffect(() => {
+    const error = searchParams.get('error');
+    if (error === 'wrong-agency') {
+      toast.error('Esta cuenta no pertenece a la agencia asociada a este correo.');
+      router.replace('/agency/trips');
+    }
+  }, [searchParams, router]);
 
   // Filters (client-side)
   const [statusFilter, setStatusFilter] = useState('');

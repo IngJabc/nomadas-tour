@@ -46,7 +46,9 @@ export async function middleware(request: NextRequest) {
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
+    const originalPath = pathname + request.nextUrl.search;
     url.pathname = '/login';
+    url.searchParams.set('redirect', originalPath);
     return NextResponse.redirect(url);
   }
 
@@ -67,6 +69,18 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = '/dashboard';
       return NextResponse.redirect(url);
+    }
+
+    // Validate agency_id from email link against session
+    const agencyParam = request.nextUrl.searchParams.get('agency');
+    if (agencyParam) {
+      const userAgencyId = user?.user_metadata?.agency_id;
+      if (userAgencyId !== agencyParam) {
+        const url = request.nextUrl.clone();
+        url.pathname = '/agency/trips';
+        url.searchParams.set('error', 'wrong-agency');
+        return NextResponse.redirect(url);
+      }
     }
   }
 
