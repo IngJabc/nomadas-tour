@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { TripCard } from '@/components/admin/trips/TripCard';
 import { TripBuilderModal } from '@/components/admin/trip-builder/TripBuilderModal';
 import { ContextualModal } from '@/components/ui/ContextualModal';
-import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
+import { subscribeToTripSeats, subscribeToReservationPassengers } from '@/lib/realtime/subscriptions';
 import { adminApi } from '@/lib/api';
 import type { Route } from '@/types';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
@@ -170,6 +170,24 @@ export default function AdminTripsPage() {
     const cleanup = subscribeToTripSeats(tripIds, handleSeatUpdate);
     return cleanup;
   }, [tripIdsKey, handleSeatUpdate]);
+
+  // Realtime: refetch when passengers board/unboard (updates boarded count)
+  useEffect(() => {
+    if (!tripIdsKey) return;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const fetchRef = doFetch;
+    const pageRef = page;
+    const cleanup = subscribeToReservationPassengers(() => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchRef(pageRef, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter);
+      }, 500);
+    });
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      cleanup();
+    };
+  }, [tripIdsKey, doFetch, page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter]);
 
   const handleEdit = useCallback(async (tripId: string) => {
     setEditingTripId(tripId);
@@ -563,13 +581,12 @@ export default function AdminTripsPage() {
       />
 
       {/* Contextual Modal for trip actions */}
-      {activeModal && (
-        <ContextualModal
-          open={!!activeModal}
-          onClose={() => { setActiveModal(null); setPostponeDate(''); }}
-          anchorRect={activeModal.anchorRect}
-        >
-          <div className="p-6">
+      <ContextualModal
+        open={!!activeModal}
+        onClose={() => { setActiveModal(null); setPostponeDate(''); }}
+        anchorRect={activeModal?.anchorRect ?? null}
+      >
+        {activeModal && <div className="p-6">
             {activeModal.action === 'complete' && (
               <>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 bg-[rgba(0,212,255,0.1)]">
@@ -659,9 +676,8 @@ export default function AdminTripsPage() {
                   : 'Guardar'}
               </button>
             </div>
-          </div>
+          </div>}
         </ContextualModal>
-      )}
       </main>
   );
 }

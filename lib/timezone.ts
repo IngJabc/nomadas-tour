@@ -76,9 +76,12 @@ export function formatInTimezone(
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
     ...overrides,
   };
-  return new Intl.DateTimeFormat('es-ES', options).format(new Date(dateString));
+  return new Intl.DateTimeFormat('es-ES', options).format(new Date(dateString))
+    .replace(/a\.\s*m\./gi, 'AM')
+    .replace(/p\.\s*m\./gi, 'PM');
 }
 
 /**

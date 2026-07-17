@@ -1033,6 +1033,14 @@ export class ReservationService {
 
     // Recent agency activity
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Get trip_ids assigned to this agency (for boarding_logs filter)
+    const { data: assignedTripRows } = await supabaseAdmin
+      .from('trip_agencies')
+      .select('trip_id')
+      .eq('agency_id', agencyId);
+    const assignedTripIds = (assignedTripRows ?? []).map((t: any) => t.trip_id);
+
     const [{ data: recentReservations }, { data: recentBoardings }, { data: recentAssignments }] = await Promise.all([
       supabaseAdmin
         .from('reservations')
@@ -1041,18 +1049,21 @@ export class ReservationService {
         .gte('created_at', thirtyDaysAgo)
         .order('created_at', { ascending: false })
         .limit(10),
-      supabaseAdmin
-        .from('boarding_logs')
-        .select(`
-          id, created_at, action, reservation_passenger_id, scanned_by_agency_id,
-          reservations!reservation_id(
-            trip_id,
-            trips(departure_time, routes(origin, destination))
-          )
-        `)
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: false })
-        .limit(10),
+      assignedTripIds.length > 0
+        ? supabaseAdmin
+            .from('boarding_logs')
+            .select(`
+              id, created_at, action, reservation_passenger_id, scanned_by_agency_id,
+              reservations!reservation_id(
+                trip_id,
+                trips(departure_time, routes(origin, destination))
+              )
+            `)
+            .in('reservations.trip_id', assignedTripIds)
+            .gte('created_at', thirtyDaysAgo)
+            .order('created_at', { ascending: false })
+            .limit(10)
+        : Promise.resolve({ data: [] }),
       supabaseAdmin
         .from('trip_agencies')
         .select(`

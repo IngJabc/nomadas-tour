@@ -171,8 +171,6 @@ export default function AgencyDashboardPage() {
     const cleanupTrips = subscribeToTrips(handleEvent);
     const cleanupBoarding = subscribeToBoardingLogs(
       handleEvent,
-      undefined,
-      agencyId ?? undefined
     );
     const cleanupTripAgencies = subscribeToTripAgencies(
       handleEvent,

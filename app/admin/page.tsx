@@ -12,7 +12,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { adminApi } from "@/lib/api";
-import { subscribeToTripSeats } from "@/lib/realtime/subscriptions";
+import { subscribeToTripSeats, subscribeToTrips, subscribeToReservations, subscribeToBoardingLogs } from "@/lib/realtime/subscriptions";
 import { getGreeting } from "@/lib/utils/greeting";
 import { Topbar } from "@/components/layout/Topbar";
 import { SectionTitle } from "@/components/ui/SectionTitle";
@@ -42,7 +42,7 @@ interface DashboardData {
     days_until_departure: number;
   }[];
   recent_activity: {
-    type: "trip_created" | "reservation_created" | "boarding";
+    type: "trip_created" | "reservation_created" | "reservation_cancelled" | "boarding";
     label: string;
     timestamp: string;
   }[];
@@ -121,8 +121,24 @@ export default function AdminDashboardPage() {
           fetchDashboardRef.current();
         })
       : () => {};
+
+    const cleanupTrips = subscribeToTrips(() => {
+      fetchDashboardRef.current();
+    });
+
+    const cleanupReservations = subscribeToReservations(() => {
+      fetchDashboardRef.current();
+    });
+
+    const cleanupBoarding = subscribeToBoardingLogs(() => {
+      fetchDashboardRef.current();
+    });
+
     return () => {
       cleanupSeats();
+      cleanupTrips();
+      cleanupReservations();
+      cleanupBoarding();
     };
   }, [initialized, tripIdsKey]);
 

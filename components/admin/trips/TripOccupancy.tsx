@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface TripOccupancyProps {
@@ -11,6 +12,12 @@ interface TripOccupancyProps {
   boarded: number;
   className?: string;
 }
+
+const labelMotion = {
+  initial: { opacity: 0, scale: 0.8 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.8 },
+};
 
 export function TripOccupancy({
   total,
@@ -60,31 +67,53 @@ export function TripOccupancy({
           {Math.round(pct)}%
         </span>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {boarded > 0 && (
-          <span className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#10b981] mr-1" />
-            Abordados: {boarded}
-          </span>
-        )}
-        {reserved > 0 && (
-          <span className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#f59e0b] mr-1" />
-            Reservados: {reserved}
-          </span>
-        )}
-        {locked > 0 && (
-          <span className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]">
-            <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-brand-cyan)] mr-1 animate-pulse" />
-            Selección: {locked}
-          </span>
-        )}
-        {blocked > 0 && (
-          <span className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]">
-            <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-brand-navy)] mr-1" />
-            Bloqueados: {blocked}
-          </span>
-        )}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1 text-xs min-h-[42px]">
+        <AnimatePresence initial={false}>
+          {boarded > 0 && (
+            <motion.span
+              key="boarded"
+              {...labelMotion}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+              className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-[#10b981] mr-1" />
+              Abordados: {boarded}
+            </motion.span>
+          )}
+          {reserved > 0 && (
+            <motion.span
+              key="reserved"
+              {...labelMotion}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+              className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-[#f59e0b] mr-1" />
+              Reservados: {reserved}
+            </motion.span>
+          )}
+          {locked > 0 && (
+            <motion.span
+              key="locked"
+              {...labelMotion}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+              className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-brand-cyan)] mr-1 animate-pulse" />
+              Selección: {locked}
+            </motion.span>
+          )}
+          {blocked > 0 && (
+            <motion.span
+              key="blocked"
+              {...labelMotion}
+              transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+              className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]"
+            >
+              <span className="inline-block w-2 h-2 rounded-full bg-[var(--color-brand-navy)] mr-1" />
+              Bloqueados: {blocked}
+            </motion.span>
+          )}
+        </AnimatePresence>
         <span className="font-[family-name:var(--font-body)] text-[var(--color-brand-muted)]">
           <span className="inline-block w-2 h-2 rounded-full bg-slate-200 mr-1" />
           Disponibles: {available}
