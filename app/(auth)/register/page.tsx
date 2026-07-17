@@ -527,6 +527,10 @@ function InvitationForm({ token }: { token: string }) {
   );
 }
 
+/**
+ * @deprecated Este componente NO tiene endpoint backend activo (POST /auth/register no existe).
+ * Mantenido para futura implementación de Customer. No usar en nuevos flujos.
+ */
 function PassengerForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

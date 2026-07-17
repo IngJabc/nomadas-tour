@@ -3,6 +3,7 @@ import { generateUniqueSubdomain } from '../utils/subdomain.js';
 import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '../errors/index.js';
 import { generateToken } from '../utils/token.js';
 import { toUTC } from '../utils/timezone.js';
+import { emailService } from './email.service.js';
 
 export class SuperadminService {
   // ---- Agencies ----
@@ -91,6 +92,10 @@ export class SuperadminService {
       .insert({ token, agency_id: agency.id, email, expires_at: expiresAt });
 
     if (inviteError) throw new ValidationError(inviteError.message);
+
+    emailService.sendInvitationEmail(email, name, token).catch((err) => {
+      console.error('[SuperadminService] Failed to send invitation email:', err);
+    });
 
     return { ...agency, invitation_link: `/accept-invitation?token=${token}` };
   }

@@ -2,23 +2,26 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
 import { authApi } from "@/lib/api";
+import toast from "react-hot-toast";
 
 export default function AcceptInvitationPage() {
   return (
-    <Suspense fallback={
-      <div className="flex-1 flex pt-16 items-center justify-center">
-        <div className="w-full max-w-sm space-y-4 px-5">
-          <div className="h-5 bg-slate-100 rounded-lg animate-pulse" />
-          <div className="h-5 bg-slate-100 rounded-lg animate-pulse w-3/4" />
-          <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
-          <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+    <Suspense
+      fallback={
+        <div className="flex-1 flex pt-16 items-center justify-center">
+          <div className="w-full max-w-sm space-y-4 px-5">
+            <div className="h-5 bg-slate-100 rounded-lg animate-pulse" />
+            <div className="h-5 bg-slate-100 rounded-lg animate-pulse w-3/4" />
+            <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+            <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <AcceptInvitationContent />
     </Suspense>
   );
@@ -78,6 +81,7 @@ function AcceptInvitationContent() {
     setSubmitting(true);
     try {
       await authApi.acceptInvitation(token!, password);
+      toast.success("Registro exitoso. Ya puedes iniciar sesión.");
       router.push("/login?registered=true");
     } catch (err) {
       setSubmitError(
@@ -129,25 +133,79 @@ function AcceptInvitationContent() {
 
         <div className="relative z-10 mt-16 flex gap-8 sm:gap-12">
           <div className="flex flex-col items-center gap-2">
-            <svg className="w-5 h-5 text-brand-cyan" viewBox="0 0 24 24" fill="none">
-              <path d="M3 13V6a2 2 0 012-2h14a2 2 0 012 2v7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M5 19a2 2 0 100-4 2 2 0 000 4zM19 19a2 2 0 100-4 2 2 0 000 4z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              className="w-5 h-5 text-brand-cyan"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <path
+                d="M3 13V6a2 2 0 012-2h14a2 2 0 012 2v7"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M5 19a2 2 0 100-4 2 2 0 000 4zM19 19a2 2 0 100-4 2 2 0 000 4z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
-            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">Rutas seguras</span>
+            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">
+              Rutas seguras
+            </span>
           </div>
           <div className="flex flex-col items-center gap-2">
-            <svg className="w-5 h-5 text-brand-cyan" viewBox="0 0 24 24" fill="none">
-              <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M20 12a8 8 0 11-16 0 8 8 0 0116 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              className="w-5 h-5 text-brand-cyan"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <path
+                d="M9 12l2 2 4-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M20 12a8 8 0 11-16 0 8 8 0 0116 0z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
-            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">Reserva en minutos</span>
+            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">
+              Reserva en minutos
+            </span>
           </div>
           <div className="flex flex-col items-center gap-2">
-            <svg className="w-5 h-5 text-brand-cyan" viewBox="0 0 24 24" fill="none">
-              <path d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <svg
+              className="w-5 h-5 text-brand-cyan"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <path
+                d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
-            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">Seguimiento en tiempo real</span>
+            <span className="font-['Poppins',sans-serif] font-normal text-xs text-white/60">
+              Seguimiento en tiempo real
+            </span>
           </div>
         </div>
       </div>
@@ -161,19 +219,11 @@ function AcceptInvitationContent() {
         >
           <div className="lg:hidden flex justify-center mb-5">
             <div className="w-9 h-9 bg-brand-navy rounded-xl flex items-center justify-center">
-              <span className="font-['Montserrat',sans-serif] font-extrabold text-base text-white">N</span>
+              <span className="font-['Montserrat',sans-serif] font-extrabold text-base text-white">
+                N
+              </span>
             </div>
           </div>
-
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-1 mb-5 sm:mb-6 font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Volver al inicio
-          </Link>
 
           <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[24px] sm:text-[28px] text-brand-navy">
             Aceptar invitación
@@ -190,15 +240,22 @@ function AcceptInvitationContent() {
               <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
             </div>
           ) : error ? (
-            <div className="p-4 rounded-xl bg-red-50 border border-red-200">
-              <p className="font-['Poppins',sans-serif] font-medium text-sm text-red-600">{error}</p>
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+              className="p-4 rounded-xl bg-red-50 border border-red-200 text-center"
+            >
+              <p className="font-['Poppins',sans-serif] font-medium text-sm text-red-600">
+                {error}
+              </p>
               <Link
                 href="/login"
                 className="inline-block mt-3 font-['Poppins',sans-serif] font-semibold text-sm text-brand-cyan hover:underline"
               >
                 Ir a iniciar sesión
               </Link>
-            </div>
+            </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
@@ -239,8 +296,10 @@ function AcceptInvitationContent() {
                     placeholder="Mínimo 6 caracteres"
                     className="w-full border-[1.5px] border-gray-200 rounded-xl py-3 pl-4 pr-10 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none transition-[border-color,box-shadow] duration-200"
                     onFocus={(e) => {
-                      e.currentTarget.style.borderColor = "var(--color-brand-cyan)";
-                      e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,212,255,0.15)";
+                      e.currentTarget.style.borderColor =
+                        "var(--color-brand-cyan)";
+                      e.currentTarget.style.boxShadow =
+                        "0 0 0 3px rgba(0,212,255,0.15)";
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = "#e5e7eb";
@@ -252,17 +311,50 @@ function AcceptInvitationContent() {
                     onClick={() => setShowPassword((s) => !s)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-brand-muted"
                     tabIndex={-1}
-                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                    aria-label={
+                      showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                    }
                   >
                     {showPassword ? (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242-4.242m4.243 4.242L21 21" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.5 10.5a3 3 0 004.243 4.243" opacity="0" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242-4.242m4.243 4.242L21 21"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M10.5 10.5a3 3 0 004.243 4.243"
+                          opacity="0"
+                        />
                       </svg>
                     ) : (
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
                       </svg>
                     )}
                   </button>
@@ -282,8 +374,10 @@ function AcceptInvitationContent() {
                   placeholder="Repite la contraseña"
                   className="w-full border-[1.5px] border-gray-200 rounded-xl py-3 px-4 font-['Poppins',sans-serif] font-normal text-sm text-brand-navy bg-white outline-none transition-[border-color,box-shadow] duration-200"
                   onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "var(--color-brand-cyan)";
-                    e.currentTarget.style.boxShadow = "0 0 0 3px rgba(0,212,255,0.15)";
+                    e.currentTarget.style.borderColor =
+                      "var(--color-brand-cyan)";
+                    e.currentTarget.style.boxShadow =
+                      "0 0 0 3px rgba(0,212,255,0.15)";
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = "#e5e7eb";
@@ -292,11 +386,20 @@ function AcceptInvitationContent() {
                 />
               </div>
 
-              {submitError && (
-                <p className="text-red-400 text-sm font-medium bg-red-50 px-3 py-2 rounded-xl font-['Poppins',sans-serif] font-normal">
-                  {submitError}
-                </p>
-              )}
+              <AnimatePresence>
+                {submitError && (
+                  <motion.p
+                    key="submit-error"
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-red-400 text-sm font-medium bg-red-50 px-3 py-2 rounded-xl font-['Poppins',sans-serif] font-normal"
+                  >
+                    {submitError}
+                  </motion.p>
+                )}
+              </AnimatePresence>
 
               <button
                 type="submit"
@@ -311,17 +414,34 @@ function AcceptInvitationContent() {
                 }}
                 onMouseEnter={(e) => {
                   if (!submitting)
-                    e.currentTarget.style.background = "var(--color-brand-blue)";
+                    e.currentTarget.style.background =
+                      "var(--color-brand-blue)";
                 }}
                 onMouseLeave={(e) => {
                   if (!submitting)
-                    e.currentTarget.style.background = "var(--color-brand-cyan)";
+                    e.currentTarget.style.background =
+                      "var(--color-brand-cyan)";
                 }}
               >
                 {submitting ? (
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  <svg
+                    className="animate-spin h-5 w-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
                   </svg>
                 ) : (
                   "Crear cuenta"
@@ -332,7 +452,9 @@ function AcceptInvitationContent() {
 
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-gray-200" />
-            <span className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">o</span>
+            <span className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-muted">
+              o
+            </span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
 

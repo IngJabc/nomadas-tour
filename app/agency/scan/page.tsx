@@ -398,35 +398,43 @@ function AgencyScanContent() {
   if (initialLoad) {
     return (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <div className="mb-6">
-          <Skeleton className="h-7 w-52 mb-1" />
-          <Skeleton className="h-3.5 w-80" />
-        </div>
-        <div className="grid grid-cols-1 gap-6">
-          <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-1 h-[18px] bg-slate-200 rounded-sm" />
-                <Skeleton className="h-5 w-44" />
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.div variants={staggerItem} className="mb-6">
+            <Skeleton className="h-7 w-52 mb-1" />
+            <Skeleton className="h-3.5 w-80" />
+          </motion.div>
+          <div className="grid grid-cols-1 gap-6">
+            <motion.div variants={staggerItem}>
+              <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-[18px] bg-slate-200 rounded-sm" />
+                  <Skeleton className="h-5 w-44" />
+                </div>
+                <div className="flex flex-col items-center gap-4 py-8">
+                  <Skeleton className="w-20 h-20 rounded-2xl" />
+                  <Skeleton className="h-11 w-40 rounded-xl" />
+                  <Skeleton className="h-3 w-56" />
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col items-center gap-4 py-8">
-              <Skeleton className="w-20 h-20 rounded-2xl" />
-              <Skeleton className="h-11 w-40 rounded-xl" />
-              <Skeleton className="h-3 w-56" />
-            </div>
+            </motion.div>
+            <motion.div variants={staggerItem}>
+              <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-1 h-[18px] bg-slate-200 rounded-sm" />
+                  <Skeleton className="h-5 w-52" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-12 flex-1 rounded-xl" />
+                  <Skeleton className="h-12 w-12 rounded-xl" />
+                </div>
+              </div>
+            </motion.div>
           </div>
-          <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-1 h-[18px] bg-slate-200 rounded-sm" />
-              <Skeleton className="h-5 w-52" />
-            </div>
-            <div className="flex gap-2">
-              <Skeleton className="h-12 flex-1 rounded-xl" />
-              <Skeleton className="h-12 w-12 rounded-xl" />
-            </div>
-          </div>
-        </div>
+        </motion.div>
       </div>
     );
   }

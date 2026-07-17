@@ -2,10 +2,11 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -30,7 +31,9 @@ export default function LoginPage() {
         password,
       });
 
-      if (signInError) throw signInError;
+      if (signInError) {
+        throw new Error("Correo o contraseña incorrectos");
+      }
 
       const role = data.user?.user_metadata?.role;
       if (role === 'superadmin') router.push('/admin');
@@ -277,20 +280,29 @@ export default function LoginPage() {
                 </button>
               </div>
               <div className="text-right mt-1.5">
-                <button
-                  type="button"
+                <Link
+                  href="/forgot-password"
                   className="font-['Poppins',sans-serif] font-normal text-[13px] text-brand-cyan hover:underline"
                 >
                   ¿Olvidaste tu contraseña?
-                </button>
+                </Link>
               </div>
             </div>
 
-            {error && (
-              <p className="text-red-400 text-sm font-medium bg-red-50 px-3 py-2 rounded-xl font-['Poppins',sans-serif] font-normal">
-                {error}
-              </p>
-            )}
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  key="login-error"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-red-400 text-sm font-medium bg-red-50 px-3 py-2 rounded-xl font-['Poppins',sans-serif] font-normal"
+                >
+                  {error}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
             <button
               type="submit"

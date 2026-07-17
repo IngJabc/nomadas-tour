@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { CardSkeleton } from "@/components/ui/Skeleton";
+
 import { Button } from "@/components/ui/Button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Modal, ModalHeader, ModalBody, ModalFooter } from "@/components/ui/Modal";
@@ -191,12 +191,41 @@ export default function AdminAgenciesPage() {
           animate="visible"
         >
           <motion.div variants={staggerItem}>
-            <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
+            <div className="flex items-center justify-between mb-6">
+              <div className="h-7 w-32 bg-slate-200 rounded-lg animate-pulse" />
+              <div className="h-9 w-36 bg-slate-200 rounded-xl animate-pulse" />
+            </div>
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex gap-1 bg-slate-100 rounded-xl h-9 px-1">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="w-16 h-7 bg-slate-200 rounded-lg animate-pulse" />
+                ))}
+              </div>
+              <div className="flex-1 h-9 bg-slate-200 rounded-xl animate-pulse" />
+            </div>
           </motion.div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <motion.div key={i} variants={staggerItem}>
-                <CardSkeleton />
+                <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5 flex flex-col gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] animate-pulse shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <div className="h-4 w-32 bg-slate-200 rounded-lg animate-pulse" />
+                      <div className="h-3 w-40 bg-slate-100 rounded-lg animate-pulse" />
+                      <div className="flex gap-2 mt-1.5">
+                        <div className="h-5 w-14 bg-slate-200 rounded-full animate-pulse" />
+                        <div className="h-5 w-16 bg-slate-100 rounded-full animate-pulse" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <div className="h-8 w-16 bg-slate-100 rounded-lg animate-pulse" />
+                    <div className="h-8 w-22 bg-slate-100 rounded-lg animate-pulse" />
+                  </div>
+                </div>
               </motion.div>
             ))}
           </div>

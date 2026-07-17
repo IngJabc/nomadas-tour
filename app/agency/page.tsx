@@ -197,66 +197,86 @@ export default function AgencyDashboardPage() {
           subtext="Panel de Agencia — NomadApp"
         />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-1 h-[18px] bg-slate-200 rounded-sm shrink-0" />
-            <Skeleton className="h-5 w-40" />
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-10">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i}>
-                <div className="flex items-center gap-4">
-                  <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-48" />
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.div variants={staggerItem}>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-1 h-[18px] bg-slate-200 rounded-sm shrink-0" />
+                <Skeleton className="h-5 w-40" />
+              </div>
+            </motion.div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-10">
+              {[1, 2, 3, 4].map((i) => (
+                <motion.div key={i} variants={staggerItem}>
+                  <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5">
+                    <div className="flex items-center gap-4">
+                      <Skeleton className="w-12 h-12 rounded-xl shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                      <Skeleton className="w-5 h-5 rounded shrink-0" />
+                    </div>
                   </div>
-                  <Skeleton className="w-5 h-5 rounded" />
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+              <motion.div variants={staggerItem}>
+                <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-1 h-[18px] bg-slate-200 rounded-sm shrink-0" />
+                    <Skeleton className="h-5 w-36" />
+                  </div>
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex gap-4">
+                        <Skeleton className="w-14 h-10 rounded-lg shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-3 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </Card>
-            ))}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-            <Card className="p-5 h-[500px]">
-              <div className="flex items-center gap-2 mb-4">
-                <Skeleton className="w-4 h-4 rounded" />
-                <Skeleton className="h-4 w-36" />
-              </div>
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex gap-4">
-                    <Skeleton className="w-14 h-10 rounded-lg shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-3 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
+              </motion.div>
+              <motion.div variants={staggerItem}>
+                <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-1 h-[18px] bg-slate-200 rounded-sm shrink-0" />
+                    <Skeleton className="h-5 w-36" />
                   </div>
-                ))}
-              </div>
-            </Card>
-            <Card className="p-5 h-[500px]">
-              <div className="flex items-center gap-2 mb-4">
-                <Skeleton className="w-4 h-4 rounded" />
-                <Skeleton className="h-4 w-36" />
-              </div>
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-3 h-[104px]">
-                    <Skeleton className="w-8 h-8 rounded-lg" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-3 w-3/4" />
-                      <Skeleton className="h-2.5 w-1/4" />
-                    </div>
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center gap-3 h-[104px]">
+                        <Skeleton className="w-8 h-8 rounded-lg" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-3 w-3/4" />
+                          <Skeleton className="h-2.5 w-1/4" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </Card>
-          </div>
+                </div>
+              </motion.div>
+            </div>
 
-          <Card className="p-5">
-            <Skeleton className="h-4 w-48 mb-4" />
-            <Skeleton className="h-48 w-full rounded-lg" />
-          </Card>
+            <motion.div variants={staggerItem}>
+              <div className="bg-white rounded-2xl border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-[18px] bg-slate-200 rounded-sm shrink-0" />
+                  <Skeleton className="h-5 w-44" />
+                </div>
+                <Skeleton className="h-48 w-full rounded-lg" />
+              </div>
+            </motion.div>
+          </motion.div>
         </main>
       </>
     );

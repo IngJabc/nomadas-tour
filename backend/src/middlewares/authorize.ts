@@ -5,10 +5,10 @@ import { Role } from '../types/index.js';
 export function authorize(...allowedRoles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
     if (!req.ctx) {
-      throw new ForbiddenError('Authentication required');
+      throw new ForbiddenError('Se requiere autenticación');
     }
     if (!allowedRoles.includes(req.ctx.role)) {
-      throw new ForbiddenError('Insufficient permissions');
+      throw new ForbiddenError('Permisos insuficientes');
     }
     next();
   };
