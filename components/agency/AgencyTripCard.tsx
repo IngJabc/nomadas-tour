@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { formatDateLong, formatTime12h } from "@/lib/timezone";
 
 interface AgencyTripRoute {
@@ -66,9 +67,11 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
 
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <h3 className="font-[family-name:var(--font-heading)] font-bold text-[18px] text-[var(--color-brand-navy)] mb-1">
-            {trip.route?.destination ?? "?"}
-          </h3>
+          <Tooltip content={trip.route?.destination ?? "?"} className="block max-w-full">
+            <h3 className="font-[family-name:var(--font-heading)] font-bold text-[18px] text-[var(--color-brand-navy)] mb-1 truncate cursor-default">
+              {trip.route?.destination ?? "?"}
+            </h3>
+          </Tooltip>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--color-brand-muted)] mt-2">
             <span className="inline-flex items-center gap-1.5">
