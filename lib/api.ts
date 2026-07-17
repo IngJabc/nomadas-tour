@@ -85,6 +85,11 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ email }),
     }),
+  resetPassword: (identifier: { token?: string; code?: string }, password: string) =>
+    request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ ...identifier, password, confirm_password: password }),
+    }),
 };
 
 // Customer (public)
