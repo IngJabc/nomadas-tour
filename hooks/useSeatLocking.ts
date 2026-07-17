@@ -209,7 +209,7 @@ export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): U
       }
     };
 
-    const handleSeatUpdate = (seat: any) => {
+    const handleSeatUpdate = ({ seat }: { seat: any }) => {
       const seatTripId = seat.trip_id as string;
       if (!seatTripId || seatTripId !== tripId) return;
 

@@ -159,9 +159,9 @@ function AgencyScanContent() {
     setCameraFacingError(false);
   }, []);
 
-  const lookupByQR = useCallback(async (qrCode: string) => {
+  const lookupByQR = useCallback(async (qrCode: string, silent = false) => {
     setLookupError(null);
-    setLoadingBooking(true);
+    if (!silent) setLoadingBooking(true);
     setSuccessMsg(null);
 
     try {
@@ -179,7 +179,7 @@ function AgencyScanContent() {
       setScanResult(null);
       currentQrRef.current = null;
     } finally {
-      setLoadingBooking(false);
+      if (!silent) setLoadingBooking(false);
     }
   }, []);
 
@@ -273,7 +273,7 @@ function AgencyScanContent() {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         if (currentQrRef.current) {
-          lookupByQR(currentQrRef.current);
+          lookupByQR(currentQrRef.current, true);
         }
       }, 500);
     });

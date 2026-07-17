@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Building2, Bus, MapPin, Calendar, Clock, ArrowLeft } from "lucide-react";
+import {
+  Building2,
+  Bus,
+  MapPin,
+  Calendar,
+  Clock,
+  ArrowLeft,
+} from "lucide-react";
 import { QRCode } from "react-qr-code";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -43,13 +50,19 @@ type ReservationDetail = {
   reservation_passengers: Passenger[] | null;
 };
 
-const STATUS_BADGE: Record<string, { label: string; variant: "confirmed" | "cancelled" | "boarded" | "inactive" }> = {
+const STATUS_BADGE: Record<
+  string,
+  { label: string; variant: "confirmed" | "cancelled" | "boarded" | "inactive" }
+> = {
   confirmed: { label: "Confirmada", variant: "confirmed" },
   cancelled: { label: "Cancelada", variant: "cancelled" },
   boarded: { label: "Abordado", variant: "boarded" },
 };
 
-const TRIP_STATUS: Record<string, { label: string; variant: "active" | "completed" | "cancelled" | "warning" }> = {
+const TRIP_STATUS: Record<
+  string,
+  { label: string; variant: "active" | "completed" | "cancelled" | "warning" }
+> = {
   active: { label: "Activo", variant: "active" },
   completed: { label: "Completado", variant: "completed" },
   cancelled: { label: "Cancelado", variant: "cancelled" },
@@ -80,7 +93,9 @@ export default function BookingDetailPage() {
   const params = useParams();
   const bookingId = params.bookingId as string;
 
-  const [reservation, setReservation] = useState<ReservationDetail | null>(null);
+  const [reservation, setReservation] = useState<ReservationDetail | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,7 +139,7 @@ export default function BookingDetailPage() {
         <div className="mt-4">
           <Link
             href="/admin/bookings"
-            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
+            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Volver a pasajeros
@@ -137,14 +152,16 @@ export default function BookingDetailPage() {
   const sb = STATUS_BADGE[reservation.status] ?? STATUS_BADGE.confirmed;
   const trip = reservation.trips;
   const route = trip?.routes;
-  const passengers = (reservation.reservation_passengers ?? []).slice().sort((a, b) => {
-    const ac = a.seats?.seat_code;
-    const bc = b.seats?.seat_code;
-    if (ac && bc) return ac.localeCompare(bc, undefined, { numeric: true });
-    if (ac) return -1;
-    if (bc) return 1;
-    return 0;
-  });
+  const passengers = (reservation.reservation_passengers ?? [])
+    .slice()
+    .sort((a, b) => {
+      const ac = a.seats?.seat_code;
+      const bc = b.seats?.seat_code;
+      if (ac && bc) return ac.localeCompare(bc, undefined, { numeric: true });
+      if (ac) return -1;
+      if (bc) return 1;
+      return 0;
+    });
   const tripSb = trip ? TRIP_STATUS[trip.status] ?? TRIP_STATUS.active : null;
 
   return (
@@ -158,7 +175,7 @@ export default function BookingDetailPage() {
         <div className="mb-4">
           <Link
             href="/admin/bookings"
-            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
+            className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Volver a pasajeros
@@ -167,7 +184,11 @@ export default function BookingDetailPage() {
 
         <PageHeader
           title="Detalle de reserva"
-          action={<Badge variant={sb.variant} size="md">{sb.label}</Badge>}
+          action={
+            <Badge variant={sb.variant} size="md">
+              {sb.label}
+            </Badge>
+          }
         />
       </motion.div>
 
@@ -178,149 +199,12 @@ export default function BookingDetailPage() {
         transition={{ duration: 0.25, delay: 0.05 }}
       >
         <div className="flex flex-col lg:flex-row gap-6">
-        {/* Mobile: QR first */}
-        <div className="block lg:hidden order-1">
-          <Card>
-            <SectionTitle as="h3" className="mb-4">Código QR</SectionTitle>
-            <div className="flex flex-col items-center gap-3">
-              <div className="bg-white p-3 rounded-xl border border-[rgba(0,0,0,0.06)]">
-                <QRCode value={reservation.qr_code} size={160} />
-              </div>
-              <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] text-center break-all">
-                {reservation.qr_code}
-              </p>
-            </div>
-          </Card>
-        </div>
-
-        {/* Left column: info + passengers */}
-        <div className="flex-1 min-w-0 space-y-6 order-2 lg:order-1">
-          {/* Reservation Info */}
-          <Card>
-            <SectionTitle as="h3" className="mb-4">Información de reserva</SectionTitle>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {reservation.agencies && (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                    <Building2 className="w-5 h-5 text-[var(--color-brand-cyan)]" />
-                  </div>
-                  <div>
-                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Agencia</p>
-                    <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
-                      {reservation.agencies.name}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                  <MapPin className="w-5 h-5 text-[var(--color-brand-cyan)]" />
-                </div>
-                <div>
-                  <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Destino</p>
-                  <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
-                    {route?.destination ?? "—"}
-                  </p>
-                </div>
-              </div>
-
-              {trip && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                      <Calendar className="w-5 h-5 text-[var(--color-brand-cyan)]" />
-                    </div>
-                    <div>
-                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Fecha</p>
-                      <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
-                        {formatDate(trip.departure_time)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                      <Clock className="w-5 h-5 text-[var(--color-brand-cyan)]" />
-                    </div>
-                    <div>
-                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Hora</p>
-                      <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
-                        {formatTime(trip.departure_time)}
-                      </p>
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {tripSb && (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                    <Bus className="w-5 h-5 text-[var(--color-brand-cyan)]" />
-                  </div>
-                  <div>
-                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Viaje</p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
-                        {tripSb.label}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                  <Calendar className="w-5 h-5 text-[var(--color-brand-cyan)]" />
-                </div>
-                <div>
-                  <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">Creada</p>
-                  <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
-                    {formatDateTime(reservation.created_at)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* Passengers */}
-          <Card>
-            <SectionTitle as="h3" className="mb-4">Pasajeros ({passengers.length})</SectionTitle>
-            {passengers.length === 0 ? (
-              <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
-                No hay pasajeros registrados
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {passengers.map((p) => (
-                  <div
-                    key={p.id}
-                    className="p-3 rounded-xl border border-[rgba(0,0,0,0.06)] bg-[var(--color-brand-surface)]"
-                  >
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="font-[family-name:var(--font-heading)] font-bold text-[16px] text-[var(--color-brand-navy)]">
-                        {p.seats?.seat_code ?? "—"}
-                      </span>
-                       <Badge variant={p.boarded ? "boarded" : "confirmed"} size="xs">{p.boarded ? "Abordado" : "Confirmado"}</Badge>
-                    </div>
-                    <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)]">
-                      {p.name}
-                    </p>
-                    <p className="font-[family-name:var(--font-body)] text-[12px] text-[var(--color-brand-muted)]">
-                      {p.document}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
-        </div>
-
-        {/* Desktop: QR sticky right column */}
-        <div className="hidden lg:block w-full lg:w-[400px] xl:w-[420px] shrink-0 order-2">
-          <div className="sticky top-24">
+          {/* Mobile: QR first */}
+          <div className="block lg:hidden order-1">
             <Card>
-              <SectionTitle as="h3" className="mb-4">Código QR</SectionTitle>
+              <SectionTitle as="h3" className="mb-4">
+                Código QR
+              </SectionTitle>
               <div className="flex flex-col items-center gap-3">
                 <div className="bg-white p-3 rounded-xl border border-[rgba(0,0,0,0.06)]">
                   <QRCode value={reservation.qr_code} size={160} />
@@ -331,8 +215,170 @@ export default function BookingDetailPage() {
               </div>
             </Card>
           </div>
+
+          {/* Left column: info + passengers */}
+          <div className="flex-1 min-w-0 space-y-6 order-2 lg:order-1">
+            {/* Reservation Info */}
+            <Card>
+              <SectionTitle as="h3" className="mb-4">
+                Información de reserva
+              </SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {reservation.agencies && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                      <Building2 className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                    </div>
+                    <div>
+                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                        Agencia
+                      </p>
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                        {reservation.agencies.name}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                    <MapPin className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                  </div>
+                  <div>
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                      Destino
+                    </p>
+                    <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                      {route?.destination ?? "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {trip && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                        <Calendar className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                      </div>
+                      <div>
+                        <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                          Fecha
+                        </p>
+                        <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                          {formatDate(trip.departure_time)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                        <Clock className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                      </div>
+                      <div>
+                        <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                          Hora
+                        </p>
+                        <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                          {formatTime(trip.departure_time)}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {tripSb && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                      <Bus className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                    </div>
+                    <div>
+                      <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                        Viaje
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                          {tripSb.label}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                    <Calendar className="w-5 h-5 text-[var(--color-brand-cyan)]" />
+                  </div>
+                  <div>
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                      Creada
+                    </p>
+                    <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                      {formatDateTime(reservation.created_at)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Passengers */}
+            <Card>
+              <SectionTitle as="h3" className="mb-4">
+                Pasajeros ({passengers.length})
+              </SectionTitle>
+              {passengers.length === 0 ? (
+                <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
+                  No hay pasajeros registrados
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                  {passengers.map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-3 rounded-xl border border-[rgba(0,0,0,0.06)] bg-[var(--color-brand-surface)]"
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-[family-name:var(--font-heading)] font-bold text-[16px] text-[var(--color-brand-navy)]">
+                          {p.seats?.seat_code ?? "—"}
+                        </span>
+                        <Badge
+                          variant={p.boarded ? "boarded" : "confirmed"}
+                          size="xs"
+                        >
+                          {p.boarded ? "Abordado" : "Confirmado"}
+                        </Badge>
+                      </div>
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)]">
+                        {p.name}
+                      </p>
+                      <p className="font-[family-name:var(--font-body)] text-[12px] text-[var(--color-brand-muted)]">
+                        {p.document}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Desktop: QR sticky right column */}
+          <div className="hidden lg:block w-full lg:w-[400px] xl:w-[420px] shrink-0 order-2">
+            <div className="sticky top-24">
+              <Card>
+                <SectionTitle as="h3" className="mb-4">
+                  Código QR
+                </SectionTitle>
+                <div className="flex flex-col items-center gap-3">
+                  <div className="bg-white p-3 rounded-xl border border-[rgba(0,0,0,0.06)]">
+                    <QRCode value={reservation.qr_code} size={160} />
+                  </div>
+                  <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] text-center break-all">
+                    {reservation.qr_code}
+                  </p>
+                </div>
+              </Card>
+            </div>
+          </div>
         </div>
-      </div>
       </motion.div>
     </main>
   );

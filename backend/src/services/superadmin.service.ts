@@ -868,7 +868,7 @@ export class SuperadminService {
         .limit(10),
       supabaseAdmin
         .from('reservations')
-        .select('id, created_at, booker_name, trips!inner(routes(origin, destination))')
+        .select('id, created_at, updated_at, status, booker_name, trips!inner(routes(origin, destination))')
         .gte('created_at', thirtyDaysAgo)
         .order('created_at', { ascending: false })
         .limit(10),
@@ -911,11 +911,19 @@ export class SuperadminService {
     for (const r of recentReservations || []) {
       const trip = (r as any).trips;
       const route = trip?.routes;
-      activity.push({
-        type: 'reservation_created',
-        label: `Reserva: ${r.booker_name} — ${route?.origin || '?'} → ${route?.destination || '?'}`,
-        timestamp: r.created_at,
-      });
+      if ((r as any).status === 'cancelled') {
+        activity.push({
+          type: 'reservation_cancelled',
+          label: `Reserva cancelada: ${r.booker_name} — ${route?.origin || '?'} → ${route?.destination || '?'}`,
+          timestamp: (r as any).updated_at || r.created_at,
+        });
+      } else {
+        activity.push({
+          type: 'reservation_created',
+          label: `Reserva: ${r.booker_name} — ${route?.origin || '?'} → ${route?.destination || '?'}`,
+          timestamp: r.created_at,
+        });
+      }
     }
     for (const b of recentBoardings || []) {
       const res = (b as any).reservations;

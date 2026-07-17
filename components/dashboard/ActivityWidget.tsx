@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Plus, UserCheck, Ticket, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Plus, UserCheck, Ticket, Calendar, ChevronLeft, ChevronRight, XCircle } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 const PAGE_SIZE = 4;
 
 interface ActivityItem {
-  type: 'trip_created' | 'trip_assigned' | 'reservation_created' | 'boarding';
+  type: 'trip_created' | 'trip_assigned' | 'reservation_created' | 'reservation_cancelled' | 'boarding';
   label: string;
   timestamp: string;
   description?: string;
@@ -27,6 +27,7 @@ function ActivityIcon({ type }: { type: ActivityItem['type'] }) {
     trip_created: { icon: Plus, bg: 'bg-[rgba(0,212,255,0.1)]', color: 'text-[var(--color-brand-cyan)]' },
     trip_assigned: { icon: Calendar, bg: 'bg-[rgba(139,92,246,0.1)]', color: 'text-[#8b5cf6]' },
     reservation_created: { icon: Ticket, bg: 'bg-[rgba(245,158,11,0.1)]', color: 'text-[#f59e0b]' },
+    reservation_cancelled: { icon: XCircle, bg: 'bg-red-50', color: 'text-[#ef4444]' },
     boarding: { icon: UserCheck, bg: 'bg-[rgba(16,185,129,0.1)]', color: 'text-[#10b981]' },
   }[type];
   const Icon = cfg.icon;
@@ -111,12 +112,10 @@ export function ActivityWidget({ activities, loading }: ActivityWidgetProps) {
           ))}
         </div>
       ) : activities.length === 0 ? (
-        <div className="flex items-center justify-center min-h-[416px]">
-          <EmptyState
-            icon={<Clock className="w-8 h-8" />}
-            message="No hay actividad reciente"
-          />
-        </div>
+        <EmptyState
+          icon={<Clock className="w-8 h-8" />}
+          message="No hay actividad reciente"
+        />
       ) : (
         <div className="relative overflow-hidden">
           <AnimatePresence mode="wait" custom={direction}>
