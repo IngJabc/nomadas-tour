@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useRef, useCallback } from 'react';
+import { forwardRef, useRef, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bus, MapPin, Calendar } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
@@ -46,6 +46,7 @@ export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripC
 ) {
   const router = useRouter();
   const cardRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const captureRef = useCallback(
     (el: HTMLDivElement | null) => {
@@ -69,7 +70,7 @@ export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripC
   );
 
   return (
-    <Card ref={captureRef} hover className="relative flex flex-col gap-5 h-full">
+    <Card ref={captureRef} hover className={`relative flex flex-col gap-5 h-full${menuOpen ? ' z-10' : ''}`}>
       <div
         className="cursor-pointer flex-1 flex flex-col gap-5"
         onClick={() => wrappedOnAction(trip.id, 'view')}
@@ -126,6 +127,7 @@ export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripC
         actionLoading={actionLoading === trip.id}
         canComplete={canDoComplete}
         canCancelPostpone={canDoCancelPostpone}
+        onMenuToggle={setMenuOpen}
       />
     </Card>
   );

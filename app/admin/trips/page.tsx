@@ -246,6 +246,7 @@ export default function AdminTripsPage() {
             departure_time: postponeDate,
             vehicle_type: trip.vehicle?.type ?? 'bus',
             agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),
+            postpone: true,
           };
           await adminApi.updateTrip(tripId, data);
           doFetch(page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter);

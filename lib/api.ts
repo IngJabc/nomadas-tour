@@ -151,6 +151,7 @@ export const adminApi = {
     departure_time: string;
     vehicle_type: 'bus' | 'kia';
     agency_ids: string[];
+    postpone?: boolean;
   }) => request<any>(`/admin/trips/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   deleteTrip: (id: string) => request<void>(`/admin/trips/${id}`, { method: 'DELETE' }),
   updateTripStatus: (id: string, status: string) =>

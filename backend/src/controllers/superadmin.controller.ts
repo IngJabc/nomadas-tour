@@ -28,6 +28,7 @@ const createTripSchema = z.object({
   departure_time: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/),
   vehicle_type: z.enum(["bus", "kia"]),
   agency_ids: z.array(z.string().uuid()).min(1),
+  postpone: z.boolean().optional(),
 });
 
 export class SuperadminController {
@@ -156,7 +157,8 @@ export class SuperadminController {
         data.route_id,
         data.departure_time,
         data.vehicle_type,
-        data.agency_ids
+        data.agency_ids,
+        data.postpone ?? false,
       );
       res.json(trip);
     } catch (error) {
