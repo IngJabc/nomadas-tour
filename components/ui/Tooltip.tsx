@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,34 @@ export function Tooltip({ content, children, className }: TooltipProps) {
       setPos({ x: rect.left + rect.width / 2, y: rect.top });
     }
   };
+
+  const open = useCallback(() => {
+    updatePosition();
+    setShow(true);
+  }, []);
+
+  const close = useCallback(() => setShow(false), []);
+
+  useEffect(() => {
+    if (!show) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as Node;
+      if (
+        triggerRef.current && !triggerRef.current.contains(target) &&
+        tooltipRef.current && !tooltipRef.current.contains(target)
+      ) {
+        close();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [show, close]);
 
   useLayoutEffect(() => {
     if (!show || !tooltipRef.current) return;
@@ -45,10 +73,11 @@ export function Tooltip({ content, children, className }: TooltipProps) {
     <span
       ref={triggerRef}
       className={cn('relative inline-flex', className)}
-      onMouseEnter={() => { updatePosition(); setShow(true); }}
-      onMouseLeave={() => setShow(false)}
-      onFocus={() => { updatePosition(); setShow(true); }}
-      onBlur={() => setShow(false)}
+      onMouseEnter={open}
+      onMouseLeave={close}
+      onFocus={open}
+      onBlur={close}
+      onClick={(e) => { e.stopPropagation(); show ? close() : open(); }}
     >
       {children}
       {show && createPortal(
