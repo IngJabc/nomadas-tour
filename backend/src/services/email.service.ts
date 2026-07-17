@@ -2,6 +2,7 @@ import { render } from '@react-email/render';
 import { resend, EMAIL_CONFIG } from '../config/email.js';
 import { InvitationEmail } from '../templates/invitation-email.js';
 import { RegistrationCompleteEmail } from '../templates/registration-complete-email.js';
+import { ResetPasswordEmail } from '../templates/reset-password-email.js';
 
 export class EmailService {
   async sendInvitationEmail(to: string, agencyName: string, invitationLink: string) {
@@ -41,6 +42,26 @@ export class EmailService {
     if (error) {
       console.error('[EmailService] Failed to send registration complete email:', error);
       throw new Error('Failed to send registration complete email');
+    }
+  }
+
+  async sendResetPasswordEmail(to: string, code: string, token: string) {
+    const resetUrl = `${EMAIL_CONFIG.frontendUrl}/reset-password?token=${token}`;
+
+    const html = await render(
+      ResetPasswordEmail({ code, resetUrl })
+    );
+
+    const { error } = await resend.emails.send({
+      from: EMAIL_CONFIG.from,
+      to,
+      subject: 'Recuperar contraseña — Nómadas Tour',
+      html,
+    });
+
+    if (error) {
+      console.error('[EmailService] Failed to send reset password email:', error);
+      throw new Error('Failed to send reset password email');
     }
   }
 }

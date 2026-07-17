@@ -1,7 +1,7 @@
+import { createHash, randomBytes } from 'crypto';
 import { supabase, supabaseAdmin } from '../config/database.js';
 import { UnauthorizedError, ValidationError } from '../errors/index.js';
 import { emailService } from './email.service.js';
-import { env } from '../config/env.js';
 
 async function getToken(email: string, password: string): Promise<string> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -35,11 +35,90 @@ export class AuthService {
   }
 
   async forgotPassword(email: string) {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${env.FRONTEND_URL}/reset-password`,
+    const { data: user } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (!user) return;
+
+    await supabaseAdmin
+      .from('password_resets')
+      .delete()
+      .lt('expires_at', new Date().toISOString());
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const codeHash = createHash('sha256').update(code).digest('hex');
+    const token = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    await supabaseAdmin
+      .from('password_resets')
+      .update({ used_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .is('used_at', null);
+
+    const { error } = await supabaseAdmin
+      .from('password_resets')
+      .insert({
+        user_id: user.id,
+        code_hash: codeHash,
+        token,
+        expires_at: expiresAt,
+      });
+
+    if (error) throw new ValidationError('Error al generar código de recuperación');
+
+    emailService.sendResetPasswordEmail(email, code, token).catch((err) => {
+      console.error('[AuthService] Failed to send reset password email:', err);
+    });
+  }
+
+  async resetPassword(identifier: { token?: string; code?: string }, password: string) {
+    let record: any = null;
+
+    if (identifier.code) {
+      const codeHash = createHash('sha256').update(identifier.code).digest('hex');
+      const { data } = await supabaseAdmin
+        .from('password_resets')
+        .select('*')
+        .eq('code_hash', codeHash)
+        .is('used_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+      record = data;
+    } else if (identifier.token) {
+      const { data } = await supabaseAdmin
+        .from('password_resets')
+        .select('*')
+        .eq('token', identifier.token)
+        .is('used_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+      record = data;
+    }
+
+    if (!record) {
+      throw new ValidationError('Código inválido o expirado');
+    }
+
+    if (record.failed_attempts >= 5) {
+      throw new ValidationError('Código inválido o expirado');
+    }
+
+    const { error: updateError } = await supabase.auth.admin.updateUserById(record.user_id, {
+      password,
     });
 
-    if (error) throw new ValidationError(error.message);
+    if (updateError) throw new ValidationError('Error al actualizar la contraseña');
+
+    await supabaseAdmin
+      .from('password_resets')
+      .update({ used_at: new Date().toISOString() })
+      .eq('id', record.id);
+
+    return { message: 'Contraseña actualizada', user_id: record.user_id };
   }
 
   async validateInvitation(token: string) {

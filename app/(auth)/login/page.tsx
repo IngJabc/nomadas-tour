@@ -1,14 +1,31 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import Image from "next/image";
 import Link from "next/link";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex-1 flex pt-16 items-center justify-center">
+        <div className="w-full max-w-sm space-y-4 px-5">
+          <div className="h-5 bg-slate-100 rounded-lg animate-pulse" />
+          <div className="h-5 bg-slate-100 rounded-lg animate-pulse w-3/4" />
+          <div className="h-10 bg-slate-100 rounded-xl animate-pulse" />
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  );
+}
+
+function LoginContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -16,7 +33,15 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const submittingRef = useRef(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  useEffect(() => {
+    if (searchParams.get("password-reset") === "true") {
+      toast.success("Contraseña actualizada correctamente. Ya puedes iniciar sesión.");
+      router.replace("/login");
+    }
+  }, [searchParams, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
