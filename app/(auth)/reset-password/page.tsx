@@ -98,7 +98,7 @@ function ResetPasswordContent() {
             <div className="mt-4 w-16 h-1 bg-brand-cyan rounded-sm" />
           </div>
           <p className="relative z-10 mt-6 text-center font-['Poppins',sans-serif] font-normal text-lg text-white/70 max-w-[280px]">
-            Viaja con nosotros, llega seguro
+            Dejando huellas por Venezuela
           </p>
         </div>
 
@@ -141,7 +141,7 @@ function ResetPasswordContent() {
           <div className="mt-4 w-16 h-1 bg-brand-cyan rounded-sm" />
         </div>
         <p className="relative z-10 mt-6 text-center font-['Poppins',sans-serif] font-normal text-lg text-white/70 max-w-[280px]">
-          Viaja con nosotros, llega seguro
+          Dejando huellas por Venezuela
         </p>
         <div className="relative z-10 mt-16 flex gap-8 sm:gap-12">
           <div className="flex flex-col items-center gap-2">
