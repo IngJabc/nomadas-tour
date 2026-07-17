@@ -22,6 +22,9 @@ export const metadata: Metadata = {
   title: "Nómadas Tours",
   description:
     "Sistema de selección y reserva de asientos de autobús en tiempo real",
+  icons: {
+    icon: "/brand/logo-icon.svg",
+  },
 };
 
 export default function RootLayout({

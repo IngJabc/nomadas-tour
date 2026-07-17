@@ -66,7 +66,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         <p className="relative z-10 mt-6 text-center font-['Poppins',sans-serif] font-normal text-lg text-white/70 max-w-[280px]">
-          Viaja con nosotros, llega seguro
+          Dejando huellas por Venezuela
         </p>
 
         <div className="relative z-10 mt-16 flex gap-8 sm:gap-12">

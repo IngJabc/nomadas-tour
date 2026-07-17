@@ -52,7 +52,7 @@ export function RegistrationCompleteEmail({ agencyName, email, loginUrl }: Regis
             <div style={dividerStyle} />
 
             <p style={footerStyle}>
-              Nómadas Tour — Viaja con nosotros, llega seguro
+              Nómadas Tour — Dejando huellas por Venezuela
             </p>
           </div>
         </div>
