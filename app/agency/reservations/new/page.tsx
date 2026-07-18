@@ -20,6 +20,7 @@ import {
   Calendar,
   Clock,
   Bus as BusIcon,
+  Share2,
 } from "lucide-react";
 import { formatDateTimeShort, formatDateLong, formatTime12h } from "@/lib/timezone";
 import { agencyApi } from "@/lib/api";
@@ -30,17 +31,23 @@ import {
   AgencyTripListItem,
   ReservationOrigin,
 } from "@/types";
+import type { ReservationTicketData } from "@/types/reservation";
 import { useReservationWizard } from "@/hooks/useReservationWizard";
 import { useSeatLocking } from "@/hooks/useSeatLocking";
 import { useReservationSubmit } from "@/hooks/useReservationSubmit";
+import { useCapture } from "@/hooks/useCapture";
 import { validateForm } from "@/lib/reservations/validateForm";
 import { BusLayout } from "@/components/bus/BusLayout";
+import { BusLayoutSnapshot } from "@/components/bus/BusLayoutSnapshot";
+import { withReposition } from "@/lib/capture-reposition";
 import { PassengerForm } from "@/components/booking/PassengerForm";
 import { ReservationSummary } from "@/components/booking/ReservationSummary";
 import { AgencyTripCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
 import { AgencyTripCard } from "@/components/agency/AgencyTripCard";
+import { ReservationTicket } from "@/components/reservations/ReservationTicket";
+import { ReservationTicketActions } from "@/components/reservations/ReservationTicketActions";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
 // ─── Page wrapper ────────────────────────────────────────────────────
@@ -120,10 +127,48 @@ function NewReservationContent() {
   const [passengers, setPassengers] = useState<PassengerData[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const onSuccess = useCallback(() => {
+  // ─── Success view (post-redirect) ────────────────────────────────
+  const [successData, setSuccessData] = useState<ReservationTicketData | null>(null);
+  const [successLoading, setSuccessLoading] = useState(false);
+  const [successError, setSuccessError] = useState<string | null>(null);
+
+  const { captureRef, download, share } = useCapture({
+    filename: successData ? `boleto-${successData.qr_code}` : 'boleto',
+  });
+
+  const shareWithText = useCallback(async () => {
+    if (!successData?.trip) return share();
+    const text = `Reserva confirmada — ${successData.trip.origin} → ${successData.trip.destination} — ${formatDateLong(successData.trip.departure_time)}`;
+    return share({ text });
+  }, [share, successData]);
+
+  // ─── Seat map capture ────────────────────────────────────────────
+  const { captureRef: captureRefMap, share: shareMap } = useCapture({
+    filename: locking.selectedTrip
+      ? `mapa-${locking.selectedTrip.routes?.origin}-${locking.selectedTrip.routes?.destination}`
+      : 'mapa-asientos',
+  });
+
+  const handleShareMap = useCallback(async () => {
+    const el = captureRefMap.current;
+    if (!el || !locking.selectedTrip) return;
+    const trip = locking.selectedTrip;
+    const text = `Mapa de asientos — ${trip.routes?.origin ?? ''} → ${trip.routes?.destination ?? ''} — ${formatDateLong(trip.departure_time)}`;
+    const { shared } = await withReposition(el, () => shareMap({ text }));
+    if (!shared) {
+      toast('Mapa descargado', { icon: '🚌' });
+    }
+  }, [captureRefMap, shareMap, locking.selectedTrip]);
+
+  const [reservationIdFromUrl, setReservationIdFromUrl] = useState<string | null>(
+    searchParams?.get("reservation_id") ?? null
+  );
+
+  const onSuccess = useCallback((reservationId: string) => {
     locking.unlockAllCurrent();
-    wizard.goToSuccess();
-  }, [locking, wizard]);
+    setReservationIdFromUrl(reservationId);
+    router.replace(`/agency/reservations/new?reservation_id=${reservationId}`);
+  }, [locking, router]);
 
   const submit = useReservationSubmit({
     trip: locking.selectedTrip,
@@ -157,6 +202,52 @@ function NewReservationContent() {
   useEffect(() => {
     loadTripsList();
   }, [loadTripsList]);
+
+  // ─── Fetch reservation for success view ────────────────────────────
+  useEffect(() => {
+    if (!reservationIdFromUrl) return;
+
+    const fetchReservation = async () => {
+      setSuccessLoading(true);
+      setSuccessError(null);
+      try {
+        const data = await agencyApi.getReservation(reservationIdFromUrl);
+        const ticketData: ReservationTicketData = {
+          reservation_id: data.id,
+          qr_code: data.qr_code,
+          status: data.status,
+          created_at: data.created_at,
+          booker_name: data.booker_name,
+          booker_document: data.booker_document,
+          booker_phone: data.booker_phone,
+          trip: data.trips
+            ? {
+                id: data.trips.id,
+                departure_time: data.trips.departure_time,
+                origin: data.trips.routes?.origin ?? '',
+                destination: data.trips.routes?.destination ?? '',
+                vehicle_type: data.trips.vehicle_type as 'bus' | 'kia',
+                status: 'active',
+              }
+            : null,
+          passengers: (data.reservation_passengers ?? []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            document: p.document,
+            seat_code: p.seats?.seat_code ?? '—',
+            boarded: p.boarded ?? false,
+          })),
+        };
+        setSuccessData(ticketData);
+      } catch {
+        setSuccessError('No se pudo cargar la reserva.');
+      } finally {
+        setSuccessLoading(false);
+      }
+    };
+
+    fetchReservation();
+  }, [reservationIdFromUrl]);
 
   // ─── Realtime: trips list seat counts ──────────────────────────────
   useEffect(() => {
@@ -302,6 +393,8 @@ function NewReservationContent() {
     setBookerDocument("");
     setPassengers([]);
     setErrors({});
+    setReservationIdFromUrl(null);
+    setSuccessData(null);
     submit.resetResult();
     submit.clearError();
     locking.resetSeats();
@@ -387,7 +480,7 @@ function NewReservationContent() {
       )}
 
       {/* Stepper */}
-      {!locking.deepLinkError && wizard.step !== "success" && (
+      {!locking.deepLinkError && !reservationIdFromUrl && (
         <motion.div
           variants={pageFade}
           initial="hidden"
@@ -625,6 +718,30 @@ function NewReservationContent() {
                   </motion.div>
                 ) : (
                   <>
+                    {/* Hidden snapshot for seat map capture */}
+                    <div
+                      ref={captureRefMap}
+                      style={{
+                        position: 'fixed',
+                        left: '-9999px',
+                        top: 0,
+                        zIndex: -1,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      {locking.selectedTrip && (
+                        <BusLayoutSnapshot
+                          seats={locking.seatsMap}
+                          vehicleType={locking.selectedTrip.vehicle_type ?? 'bus'}
+                          trip={{
+                            origin: locking.selectedTrip.routes?.origin ?? '',
+                            destination: locking.selectedTrip.routes?.destination ?? '',
+                            departure_time: locking.selectedTrip.departure_time,
+                          }}
+                        />
+                      )}
+                    </div>
+
                     <div className="flex flex-col lg:flex-row gap-6">
                       {/* Left — Trip info */}
                       <motion.div
@@ -736,12 +853,22 @@ function NewReservationContent() {
 
                     {/* Footer */}
                     <div className="flex items-center justify-between mt-6">
-                      <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)]">
-                        {locking.selectedSeats.length} asiento
-                        {locking.selectedSeats.length !== 1 ? "s" : ""}{" "}
-                        seleccionado
-                        {locking.selectedSeats.length !== 1 ? "s" : ""}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)]">
+                          {locking.selectedSeats.length} asiento
+                          {locking.selectedSeats.length !== 1 ? "s" : ""}{" "}
+                          seleccionado
+                          {locking.selectedSeats.length !== 1 ? "s" : ""}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleShareMap}
+                        >
+                          <Share2 className="w-4 h-4" />
+                          Compartir mapa
+                        </Button>
+                      </div>
                       <Button
                         variant="primary"
                         onClick={handleProceedToForm}
@@ -793,7 +920,7 @@ function NewReservationContent() {
             )}
 
             {/* ─── summary ─────────────────────────────────────────────── */}
-            {wizard.step === "summary" && (
+            {wizard.step === "summary" && !reservationIdFromUrl && (
               <motion.div
                 key="summary"
                 variants={pageFade}
@@ -825,106 +952,72 @@ function NewReservationContent() {
               </motion.div>
             )}
 
-            {/* ─── success ─────────────────────────────────────────────── */}
-            {wizard.step === "success" && (
+            {/* ─── success (post-redirect) ────────────────────────────── */}
+            {reservationIdFromUrl && (
               <motion.div
                 key="success"
                 variants={pageFade}
                 initial="hidden"
                 animate="visible"
                 transition={{ duration: 0.3 }}
-                className="flex flex-col items-center text-center py-8"
               >
-                <div className="w-16 h-16 rounded-full bg-[#ecfdf5] flex items-center justify-center mb-4">
-                  <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
+                <button
+                  type="button"
+                  onClick={() => router.push("/agency/reservations")}
+                  className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Volver a reservas
+                </button>
+
+                <div className="flex flex-col items-center text-center mb-6">
+                  <div className="w-16 h-16 rounded-full bg-[#ecfdf5] flex items-center justify-center mb-4">
+                    <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
+                  </div>
+                  <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)] mb-1">
+                    Reserva confirmada
+                  </h2>
+                  <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] tracking-wider uppercase">
+                    Código: {reservationIdFromUrl.slice(0, 8).toUpperCase()}
+                  </p>
                 </div>
 
-                <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)] mb-2">
-                  Reserva confirmada
-                </h2>
-
-                {submit.result?.reservation?.id && (
-                  <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] mb-4 tracking-wider uppercase">
-                    Código: {submit.result.reservation.id.slice(0, 8).toUpperCase()}
-                  </p>
+                {successLoading && (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-[var(--color-brand-cyan)] border-t-transparent rounded-full animate-spin" />
+                  </div>
                 )}
 
-                <div className="bg-[var(--color-page-bg)] rounded-2xl p-4 border border-[rgba(0,0,0,0.06)] w-full max-w-sm mb-5">
-                  <div className="grid grid-cols-2 gap-3 text-center">
-                    <div>
-                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Destino</p>
-                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
-                        {locking.selectedTrip?.routes?.destination ?? "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Salida</p>
-                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
-                        {locking.selectedTrip?.departure_time
-                          ? formatDateTimeShort(locking.selectedTrip.departure_time)
-                          : "—"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Vehículo</p>
-                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
-                        {locking.selectedTrip?.vehicle_type === "bus" ? "Autobús" : "KIA"}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-0.5">Asientos</p>
-                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
-                        {passengers.length}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {submit.result?.qr_data_url ? (
-                  <div className="bg-white rounded-2xl p-4 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] mb-5">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={submit.result.qr_data_url}
-                      alt="Código QR de la reserva"
-                      className="w-44 h-44 sm:w-48 sm:h-48 max-w-full"
-                    />
-                  </div>
-                ) : (
-                  <div className="bg-[#fffbeb] border border-[#fef3c7] rounded-xl p-4 mb-5 max-w-sm">
-                    <p className="font-[family-name:var(--font-body)] text-sm text-[#92400e]">
-                      La reserva fue creada correctamente, pero no pudimos generar el código QR. Puedes consultarla en{" "}
-                      <span className="font-semibold">Mis Reservas</span>.
+                {successError && (
+                  <div className="p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2] mb-6">
+                    <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+                      {successError}
                     </p>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => window.location.reload()}
+                      className="mt-3"
+                    >
+                      Reintentar
+                    </Button>
                   </div>
                 )}
 
-                <div className="bg-[var(--color-page-bg)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] w-full max-w-sm mb-6">
-                  <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[var(--color-brand-navy)] mb-3">
-                    Pasajeros
-                  </p>
-                  <div className="space-y-2">
-                    {passengers.map((p) => (
-                      <div
-                        key={p.seat_id}
-                        className="flex items-center justify-between py-2 border-b border-[rgba(0,0,0,0.06)] last:border-0"
-                      >
-                        <div className="flex items-center gap-3">
-                          <span className="font-[family-name:var(--font-body)] font-bold text-[13px] text-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.1)] px-2 py-0.5 rounded-md min-w-[36px] text-center">
-                            {p.seat_code}
-                          </span>
-                          <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-navy)]">
-                            {p.name || "Sin nombre"}
-                          </span>
-                        </div>
-                        <span className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
-                          {p.document || ""}
-                        </span>
-                      </div>
-                    ))}
+                {successData && (
+                  <div className="max-w-[32rem] mx-auto">
+                    <ReservationTicket ref={captureRef} reservation={successData} />
+                    <div className="mt-4">
+                      <ReservationTicketActions
+                        reservationId={reservationIdFromUrl}
+                        onDownload={download}
+                        onShare={shareWithText}
+                      />
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm">
+                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mt-6 mx-auto">
                   <Button
                     variant="secondary"
                     onClick={() => router.push("/agency/reservations")}

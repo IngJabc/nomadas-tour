@@ -15,6 +15,7 @@ interface SeatProps {
   onSelect?: (seat: SeatType) => void;
   userId?: string | null;
   seatInfo?: SeatInfo;
+  mode?: "interactive" | "preview";
 }
 
 export const SEAT_SIZE = 48;
@@ -48,7 +49,14 @@ const STATUS_STYLES: Record<
   boarded: { base: "#10b981", text: "#ffffff", cursor: "default" },
 };
 
-export function Seat({ seat, isSelected, onSelect, userId, seatInfo }: SeatProps) {
+const PREVIEW_OCCUPIED = { base: "#374151", text: "#6b7280" };
+
+function getPreviewStyle(status: string): { base: string; text: string } {
+  if (status === "available") return STATUS_STYLES.available;
+  return PREVIEW_OCCUPIED;
+}
+
+export function Seat({ seat, isSelected, onSelect, userId, seatInfo, mode = "interactive" }: SeatProps) {
   const [showTooltip, setShowTooltip] = useState(false);
 
   if (!seat) {
@@ -57,6 +65,29 @@ export function Seat({ seat, isSelected, onSelect, userId, seatInfo }: SeatProps
         className="shrink-0"
         style={{ width: SEAT_SIZE, height: SEAT_SIZE }}
       />
+    );
+  }
+
+  if (mode === "preview") {
+    const { base, text } = getPreviewStyle(seat.status);
+    return (
+      <div
+        className="shrink-0 flex items-center justify-center font-bold rounded-[10px]"
+        style={{
+          width: SEAT_SIZE,
+          height: SEAT_SIZE,
+          fontFamily: "'Poppins', sans-serif",
+          fontSize: 11,
+          background: twoTone(base),
+          color: text,
+          border: "none",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.15)",
+          padding: 0,
+          lineHeight: 1,
+        }}
+      >
+        {seat.seat_code}
+      </div>
     );
   }
 

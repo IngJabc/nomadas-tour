@@ -32,9 +32,14 @@ import { Button } from "@/components/ui/Button";
 import { ReservationDetailSkeleton } from "@/components/ui/Skeleton";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { PassengerCard } from "@/components/agency/PassengerCard";
+import { ReservationTicket } from "@/components/reservations/ReservationTicket";
+import { ReservationTicketActions } from "@/components/reservations/ReservationTicketActions";
+import { useCapture } from "@/hooks/useCapture";
+import { withReposition } from "@/lib/capture-reposition";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 import { RESERVATION_STATUS_STYLES } from "@/lib/constants/reservation-status";
 import type { AgencyReservation, AgencyTripPassenger } from "@/types";
+import type { ReservationTicketData } from "@/types/reservation";
 
 const VEHICLE_LABELS: Record<string, string> = {
   bus: "Autobús",
@@ -59,6 +64,10 @@ export default function ReservationDetailPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { captureRef, download, share } = useCapture({
+    filename: reservation ? `boleto-${reservation.qr_code}` : 'boleto',
+  });
 
   const doFetch = useCallback(async () => {
     try {
@@ -116,6 +125,21 @@ export default function ReservationDetailPage() {
     }
   };
 
+  const handleDownload = useCallback(async () => {
+    const el = captureRef.current;
+    if (!el) return;
+    await withReposition(el, () => download());
+  }, [download]);
+
+  const handleShare = useCallback(async () => {
+    const el = captureRef.current;
+    if (!el) return;
+    const { shared } = await withReposition(el, () => share());
+    if (!shared) {
+      toast('Boleto descargado', { icon: '📥' });
+    }
+  }, [share]);
+
   const trip = reservation?.trips;
   const passengers = reservation?.reservation_passengers ?? [];
   const statusInfo =
@@ -145,6 +169,36 @@ export default function ReservationDetailPage() {
       })),
     [passengers, id, reservation?.booker_name]
   );
+
+  const ticketData: ReservationTicketData | null = useMemo(() => {
+    if (!reservation) return null;
+    return {
+      reservation_id: reservation.id,
+      qr_code: reservation.qr_code,
+      status: reservation.status,
+      created_at: reservation.created_at,
+      booker_name: reservation.booker_name,
+      booker_document: reservation.booker_document,
+      booker_phone: reservation.booker_phone,
+      trip: trip
+        ? {
+            id: trip.id,
+            departure_time: trip.departure_time,
+            origin: trip.routes?.origin ?? '',
+            destination: trip.routes?.destination ?? '',
+            vehicle_type: trip.vehicle_type as 'bus' | 'kia',
+            status: 'active',
+          }
+        : null,
+      passengers: passengers.map((p) => ({
+        id: p.id,
+        name: p.name,
+        document: p.document,
+        seat_code: p.seats?.seat_code ?? '—',
+        boarded: p.boarded ?? false,
+      })),
+    };
+  }, [reservation, trip, passengers]);
 
   const qrSrc = reservation?.qr_data_url || reservation?.qr_code || null;
 
@@ -193,6 +247,21 @@ export default function ReservationDetailPage() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      {/* Hidden ticket for download capture — positioned off-screen with real dimensions */}
+      <div
+        ref={captureRef}
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: 0,
+          maxWidth: '32rem',
+          zIndex: -1,
+          pointerEvents: 'none',
+        }}
+      >
+        {ticketData && <ReservationTicket reservation={ticketData} />}
+      </div>
+
       <div className="mb-4">
         <button
           type="button"
@@ -218,23 +287,30 @@ export default function ReservationDetailPage() {
               <Badge variant={statusInfo.variant} size="md">
                 {statusInfo.label}
               </Badge>
-              {reservation.status === "confirmed" && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  loading={cancelLoading === "loading"}
-                  feedback={
-                    cancelLoading === "success"
-                      ? "success"
-                      : cancelLoading === "error"
-                      ? "error"
-                      : null
-                  }
-                  onClick={() => setShowConfirm(true)}
-                >
-                  Cancelar reserva
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                <ReservationTicketActions
+                  reservationId={reservation.id}
+                  onDownload={handleDownload}
+                  onShare={handleShare}
+                />
+                {reservation.status === "confirmed" && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    loading={cancelLoading === "loading"}
+                    feedback={
+                      cancelLoading === "success"
+                        ? "success"
+                        : cancelLoading === "error"
+                        ? "error"
+                        : null
+                    }
+                    onClick={() => setShowConfirm(true)}
+                  >
+                    Cancelar reserva
+                  </Button>
+                )}
+              </div>
             </div>
           }
         />
@@ -262,7 +338,7 @@ export default function ReservationDetailPage() {
         animate="visible"
         className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-4"
       >
-        {/* ── Left column: Viaje + Reservador ── */}
+        {/* Left column: Viaje + Reservador */}
         <motion.div variants={staggerItem} className="space-y-6">
           {/* Viaje */}
           <Card>
@@ -385,7 +461,7 @@ export default function ReservationDetailPage() {
           </Card>
         </motion.div>
 
-        {/* ── Right column: QR + Quick Info ── */}
+        {/* Right column: QR + Quick Info */}
         <motion.div variants={staggerItem} className="space-y-6">
           {/* QR Card */}
           <Card className="flex flex-col items-center py-6">
@@ -457,7 +533,7 @@ export default function ReservationDetailPage() {
         </motion.div>
       </motion.div>
 
-      {/* ── Passengers section (full width) ── */}
+      {/* Passengers section (full width) */}
       <motion.div
         variants={staggerContainer}
         initial="hidden"

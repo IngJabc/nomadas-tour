@@ -18,6 +18,7 @@ interface BusLayoutProps {
   vehicleType: "bus" | "kia";
   userId?: string | null;
   seatInfo?: Record<string, SeatInfo>;
+  mode?: "interactive" | "preview";
 }
 
 const SEAT_GAP = 6;
@@ -67,6 +68,7 @@ export function BusLayout({
   vehicleType,
   userId,
   seatInfo,
+  mode = "interactive",
 }: BusLayoutProps) {
   const rows = useMemo(() => {
     if (vehicleType === "kia") return kiaRows;
@@ -87,8 +89,11 @@ export function BusLayout({
   const KIA_NATURAL_WIDTH = 256;
 
   const naturalWidth = vehicleType === "kia" ? KIA_NATURAL_WIDTH : BUS_NATURAL_WIDTH;
+  const isPreview = mode === "preview";
 
   useLayoutEffect(() => {
+    if (isPreview) return;
+
     function measure() {
       if (containerRef.current && busContentRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
@@ -108,7 +113,7 @@ export function BusLayout({
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [vehicleType]);
+  }, [vehicleType, isPreview]);
 
   const renderSeat = (code: string | null) => {
     if (!code)
@@ -124,19 +129,39 @@ export function BusLayout({
         key={code}
         seat={seat}
         isSelected={selectedSeats.some((s) => s.seat_code === code)}
-        onSelect={onToggleSeat}
+        onSelect={isPreview ? undefined : onToggleSeat}
         userId={userId}
         seatInfo={seatInfo?.[code]}
+        mode={mode}
       />
     );
   };
+
+  const rowVariants = isPreview
+    ? undefined
+    : {
+        hidden: { opacity: 0, y: 16 },
+        visible: {
+          opacity: 1,
+          y: 0,
+          transition: {
+            type: "spring" as const,
+            stiffness: 200,
+            damping: 20,
+          },
+        },
+      };
+
+  const containerVariants = isPreview
+    ? undefined
+    : { visible: { transition: { staggerChildren: 0.03 } } };
 
   return (
     <div ref={containerRef} className="flex flex-col items-center w-full">
       <div
         ref={busContentRef}
         style={{
-          transform: `scale(${scale})`,
+          transform: isPreview ? undefined : `scale(${scale})`,
           transformOrigin: "top center",
           width: naturalWidth,
           maxWidth: naturalWidth,
@@ -211,9 +236,9 @@ export function BusLayout({
             style={{ background: "#00000C", padding: vehicleType === "kia" ? "14px 4px" : "14px 6px" }}
           >
             <motion.div
-              initial="hidden"
+              initial={isPreview ? "visible" : "hidden"}
               animate="visible"
-              variants={{ visible: { transition: { staggerChildren: 0.03 } } }}
+              variants={containerVariants}
               className="flex flex-col"
               style={{ gap: 8 }}
             >
@@ -225,18 +250,9 @@ export function BusLayout({
                   <motion.div
                     key={rowIndex}
                     ref={isDoorRow ? doorRowRef : undefined}
-                    variants={{
-                      hidden: { opacity: 0, y: 16 },
-                      visible: {
-                        opacity: 1,
-                        y: 0,
-                        transition: {
-                          type: "spring",
-                          stiffness: 200,
-                          damping: 20,
-                        },
-                      },
-                    }}
+                    initial={isPreview ? undefined : "hidden"}
+                    animate="visible"
+                    variants={isPreview ? undefined : rowVariants}
                     className="flex items-center justify-center w-full"
                     style={{ gap: SEAT_GAP }}
                   >

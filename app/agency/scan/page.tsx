@@ -38,6 +38,7 @@ type PassengerInfo = {
   name: string;
   document: string;
   seat_id: string;
+  seat_code: string | null;
   boarded: boolean;
   boarded_at: string | null;
 };
@@ -173,6 +174,9 @@ function AgencyScanContent() {
         return;
       }
       currentQrRef.current = qrCode;
+      result.passengers = [...(result.passengers || [])].sort((a, b) =>
+        (a.seat_code || '\uffff').localeCompare(b.seat_code || '\uffff', undefined, { numeric: true })
+      );
       setScanResult(result);
     } catch (err: any) {
       setLookupError(err?.message || "Error al buscar reserva");
@@ -742,13 +746,20 @@ function AgencyScanContent() {
                         key={passenger.id}
                         className="flex items-center justify-between py-2 px-3 rounded-xl bg-[#f8fafc] border border-[#e5e7eb]"
                       >
-                        <div className="min-w-0">
-                          <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[#000024]">
-                            {passenger.name}
-                          </p>
-                          <p className="font-[family-name:var(--font-body)] text-xs text-[#6b7280]">
-                            {passenger.document}
-                          </p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          {passenger.seat_code && (
+                            <span className="shrink-0 inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[rgba(0,212,255,0.1)] font-[family-name:var(--font-heading)] font-bold text-xs text-[var(--color-brand-cyan)]">
+                              {passenger.seat_code}
+                            </span>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[#000024]">
+                              {passenger.name}
+                            </p>
+                            <p className="font-[family-name:var(--font-body)] text-xs text-[#6b7280]">
+                              {passenger.document}
+                            </p>
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           <span
