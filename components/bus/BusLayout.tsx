@@ -92,8 +92,6 @@ export function BusLayout({
   const isPreview = mode === "preview";
 
   useLayoutEffect(() => {
-    if (isPreview) return;
-
     function measure() {
       if (containerRef.current && busContentRef.current) {
         const containerWidth = containerRef.current.offsetWidth;
@@ -111,8 +109,10 @@ export function BusLayout({
       }
     }
     measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    if (!isPreview) {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
   }, [vehicleType, isPreview]);
 
   const renderSeat = (code: string | null) => {
