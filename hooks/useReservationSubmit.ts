@@ -10,7 +10,7 @@ interface UseReservationSubmitOptions {
   bookerName: string;
   bookerDocument: string;
   passengers: PassengerData[];
-  onSuccess: () => void;
+  onSuccess: (reservationId: string) => void;
 }
 
 interface UseReservationSubmitReturn {
@@ -72,7 +72,7 @@ export function useReservationSubmit({
       };
       const res: ReservationResult = await agencyApi.createReservation(payload);
       setResult(res);
-      onSuccess();
+      onSuccess(res.reservation.id);
     } catch (err) {
       setSubmitError(
         err instanceof Error

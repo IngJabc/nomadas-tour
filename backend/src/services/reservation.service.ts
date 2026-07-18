@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/database.js';
 import { NotFoundError, ValidationError, ConflictError, ForbiddenError } from '../errors/index.js';
 import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
+import { sortBySeatCode } from '../utils/sort.js';
 
 export class ReservationService {
   async listActiveTrips() {
@@ -439,7 +440,7 @@ export class ReservationService {
 
     return {
       reservation,
-      passengers: (reservation as any).reservation_passengers || [],
+      passengers: sortBySeatCode((reservation as any).reservation_passengers || []),
       qr_code: qrCodeText,
       qr_data_url: qrDataUrl,
     };
@@ -454,6 +455,11 @@ export class ReservationService {
       .order('created_at', { ascending: false });
 
     if (error) throw new ValidationError(error.message);
+    if (data) {
+      for (const r of data) {
+        (r as any).reservation_passengers = sortBySeatCode((r as any).reservation_passengers || []);
+      }
+    }
     return data;
   }
 
@@ -476,7 +482,7 @@ export class ReservationService {
       }
     }
 
-    return { ...data, qr_data_url };
+    return { ...data, qr_data_url, reservation_passengers: sortBySeatCode((data as any).reservation_passengers || []) };
   }
 
   async cancelAgencyReservation(id: string, agencyId: string) {
@@ -724,7 +730,7 @@ export class ReservationService {
 
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
-      .select('id, name, document, seat_id, boarded, boarded_at')
+      .select('id, name, document, seat_id, boarded, boarded_at, seats(seat_code)')
       .eq('reservation_id', reservation.id);
 
     return {
@@ -740,6 +746,7 @@ export class ReservationService {
         name: p.name,
         document: p.document,
         seat_id: p.seat_id,
+        seat_code: p.seats?.seat_code ?? null,
         boarded: p.boarded,
         boarded_at: p.boarded_at,
       })),
@@ -900,6 +907,11 @@ export class ReservationService {
     const { data, error } = await dataQuery;
 
     if (error) throw new ValidationError(error.message);
+
+    // Sort passengers by seat code within each reservation
+    for (const r of data || []) {
+      (r as any).reservation_passengers = sortBySeatCode((r as any).reservation_passengers || []);
+    }
 
     // Flatten: one row per passenger for agency reservations
     const flattened: any[] = [];
@@ -1454,7 +1466,7 @@ export class ReservationService {
       trip_id: r.trip_id,
       agencies: r.agencies ?? null,
       trips: r.trips ?? null,
-      reservation_passengers: passengers,
+      reservation_passengers: sortBySeatCode(passengers),
     };
   }
 
@@ -1775,7 +1787,7 @@ export class ReservationService {
         // Sort passengers by seat code within each reservation
         for (const [, res] of tg.reservations) {
           res.passengers.sort((a: any, b: any) =>
-            (a.seatCode || '').localeCompare(b.seatCode || '')
+            (a.seatCode || '\uffff').localeCompare(b.seatCode || '\uffff', undefined, { numeric: true })
           );
         }
 

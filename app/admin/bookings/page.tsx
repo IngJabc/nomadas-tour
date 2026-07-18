@@ -748,9 +748,6 @@ export default function AdminBookingsPage() {
                                         .flatMap((res) =>
                                           res.passengers.map((p) => ({ passenger: p, reservation: res }))
                                         )
-                                        .sort((a, b) =>
-                                          (a.passenger.seatCode || '\uffff').localeCompare(b.passenger.seatCode || '\uffff', undefined, { numeric: true })
-                                        )
                                         .map(({ passenger: p, reservation: res }) => {
                                           const rs2 = RESERVATION_STATUS[res.status] ?? RESERVATION_STATUS.confirmed;
                                           return (

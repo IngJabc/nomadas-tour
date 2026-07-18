@@ -152,16 +152,7 @@ export default function BookingDetailPage() {
   const sb = STATUS_BADGE[reservation.status] ?? STATUS_BADGE.confirmed;
   const trip = reservation.trips;
   const route = trip?.routes;
-  const passengers = (reservation.reservation_passengers ?? [])
-    .slice()
-    .sort((a, b) => {
-      const ac = a.seats?.seat_code;
-      const bc = b.seats?.seat_code;
-      if (ac && bc) return ac.localeCompare(bc, undefined, { numeric: true });
-      if (ac) return -1;
-      if (bc) return 1;
-      return 0;
-    });
+  const passengers = reservation.reservation_passengers ?? [];
   const tripSb = trip ? TRIP_STATUS[trip.status] ?? TRIP_STATUS.active : null;
 
   return (
