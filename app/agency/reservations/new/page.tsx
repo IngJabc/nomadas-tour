@@ -852,14 +852,14 @@ function NewReservationContent() {
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-between mt-6">
-                      <div className="flex items-center gap-3">
-                        <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)]">
-                          {locking.selectedSeats.length} asiento
-                          {locking.selectedSeats.length !== 1 ? "s" : ""}{" "}
-                          seleccionado
-                          {locking.selectedSeats.length !== 1 ? "s" : ""}
-                        </span>
+                    <div className="flex flex-col gap-3 mt-6 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)]">
+                        {locking.selectedSeats.length} asiento
+                        {locking.selectedSeats.length !== 1 ? "s" : ""}{" "}
+                        seleccionado
+                        {locking.selectedSeats.length !== 1 ? "s" : ""}
+                      </span>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <Button
                           variant="secondary"
                           size="sm"
@@ -868,15 +868,15 @@ function NewReservationContent() {
                           <Share2 className="w-4 h-4" />
                           Compartir mapa
                         </Button>
+                        <Button
+                          variant="primary"
+                          onClick={handleProceedToForm}
+                          disabled={locking.selectedSeats.length === 0}
+                        >
+                          Continuar
+                          <ArrowRight className="w-4 h-4" />
+                        </Button>
                       </div>
-                      <Button
-                        variant="primary"
-                        onClick={handleProceedToForm}
-                        disabled={locking.selectedSeats.length === 0}
-                      >
-                        Continuar
-                        <ArrowRight className="w-4 h-4" />
-                      </Button>
                     </div>
                   </>
                 )}
