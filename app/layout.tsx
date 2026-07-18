@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins, Montserrat } from "next/font/google";
-import { Navbar } from '@/components/ui/Navbar';
+import { Navbar } from "@/components/ui/Navbar";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 import "./design-tokens.css";
@@ -19,7 +19,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "Nómadas Tours",
+  title: "Nómadas Tours | Dejando huellas por Venezuela",
   description:
     "Sistema de selección y reserva de asientos de autobús en tiempo real",
   icons: {
@@ -52,8 +52,18 @@ export default function RootLayout({
               background: "var(--color-brand-navy)",
               color: "var(--color-brand-surface)",
             },
-            success: { iconTheme: { primary: "var(--color-brand-cyan)", secondary: "var(--color-brand-surface)" } },
-            error: { iconTheme: { primary: "#fb923c", secondary: "var(--color-brand-surface)" } },
+            success: {
+              iconTheme: {
+                primary: "var(--color-brand-cyan)",
+                secondary: "var(--color-brand-surface)",
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: "#fb923c",
+                secondary: "var(--color-brand-surface)",
+              },
+            },
           }}
         />
       </body>
