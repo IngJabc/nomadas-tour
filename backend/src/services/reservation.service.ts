@@ -715,14 +715,7 @@ export class ReservationService {
 
   // ─── Sprint 13 — Boarding por pasajero individual ─────────────────────────
 
-  async lookupPassengerByQR(qrCode: string, agencyId: string) {
-    const { data: reservation, error } = await supabaseAdmin
-      .from('reservations')
-      .select('id, trip_id, booker_name, booker_document, status, agencies!inner(name)')
-      .eq('qr_code', qrCode)
-      .single();
-
-    if (error || !reservation) throw new NotFoundError('Reserva no encontrada');
+  private async buildLookupDetail(reservation: any, agencyId: string) {
     const tripId = reservation.trip_id;
 
     const { data: assignment } = await supabaseAdmin
@@ -732,7 +725,7 @@ export class ReservationService {
       .eq('agency_id', agencyId)
       .maybeSingle();
 
-    if (!assignment) throw new ForbiddenError('Tu agencia no está asignada a este viaje');
+    if (!assignment) return null;
 
     const { data: trip } = await supabaseAdmin
       .from('trips')
@@ -740,7 +733,7 @@ export class ReservationService {
       .eq('id', tripId)
       .single();
 
-    if (trip?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible realizar boarding.');
+    if (trip?.status === 'cancelled') return null;
 
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
@@ -753,6 +746,8 @@ export class ReservationService {
       trip_id: tripId,
       booker_name: reservation.booker_name,
       booker_document: reservation.booker_document,
+      qr_code: reservation.qr_code,
+      reservation_status: reservation.status,
       reservation_agency_name: (reservation as any).agencies?.name || '',
       departure_time: (trip as any)?.departure_time || null,
       route: (trip as any)?.routes || null,
@@ -768,6 +763,27 @@ export class ReservationService {
     };
   }
 
+  async lookupPassengerByQR(qrCode: string, agencyId: string) {
+    const normalizedQr = qrCode.trim().toUpperCase();
+    const safePattern = normalizedQr.replace(/%/g, '\\%').replace(/_/g, '\\_');
+
+    const { data: reservations, error } = await supabaseAdmin
+      .from('reservations')
+      .select('id, trip_id, booker_name, booker_document, qr_code, status, agencies!inner(name)')
+      .ilike('qr_code', `%${safePattern}%`);
+
+    if (error) throw new ValidationError(error.message);
+    if (!reservations || reservations.length === 0) return [];
+
+    const results: any[] = [];
+    for (const r of reservations) {
+      const detail = await this.buildLookupDetail(r, agencyId);
+      if (detail) results.push(detail);
+    }
+
+    return results;
+  }
+
   async toggleBoarding(passengerId: string, boarded: boolean, userId: string, agencyId: string) {
     const { data: passenger, error: pErr } = await supabaseAdmin
       .from('reservation_passengers')
@@ -778,6 +794,7 @@ export class ReservationService {
     if (pErr || !passenger) throw new NotFoundError('Pasajero no encontrado');
     if ((passenger as any).status === 'cancelled') throw new ValidationError('No se puede abordar un pasajero cancelado');
     const reservation = passenger as any;
+    if (reservation.reservations.status === 'cancelled') throw new ValidationError('La reserva fue cancelada');
     const tripId = reservation.reservations.trip_id;
 
     const { data: assignment } = await supabaseAdmin
