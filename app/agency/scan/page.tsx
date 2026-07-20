@@ -15,9 +15,11 @@ import {
   QrCode,
   Search,
   UserCheck,
+  ChevronRight,
 } from "lucide-react";
 import { agencyApi } from "@/lib/api";
 import { subscribeToBoardingLogs } from "@/lib/realtime/subscriptions";
+import { validateQrInput, normalizeQrCode } from "@/lib/qr";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -48,16 +50,19 @@ type ScanLookupResult = {
   trip_id: string;
   booker_name: string;
   booker_document: string;
+  qr_code: string;
+  reservation_status: string;
   reservation_agency_name: string;
   departure_time: string | null;
   route: { origin: string; destination: string } | null;
   passengers: PassengerInfo[];
 };
 
-function computeBadge(passengers: PassengerInfo[]): {
+function computeBadge(passengers: PassengerInfo[], reservationStatus: string): {
   label: string;
   variant: "confirmed" | "boarded" | "cancelled";
 } {
+  if (reservationStatus === 'cancelled') return { label: "Cancelada", variant: "cancelled" };
   const allBoarded =
     passengers.length > 0 && passengers.every((p) => p.boarded);
   const someBoarded = passengers.some((p) => p.boarded);
@@ -136,15 +141,28 @@ function AgencyScanContent() {
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [bulkLoading, setBulkLoading] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [manualQrValue, setManualQrValue] = useState("");
+  const [qrValidationError, setQrValidationError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<ScanLookupResult[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const searchResultsRef = useRef<HTMLDivElement>(null);
+  const scanResultRef = useRef<HTMLDivElement>(null);
   const lookupRef = useRef(false);
   const bulkBoardingRef = useRef(false);
+  const togglingRefs = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const t = setTimeout(() => setInitialLoad(false), 350);
     return () => clearTimeout(t);
+  }, []);
+
+  const scrollToSearchResults = useCallback(() => {
+    searchResultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, []);
+
+  const scrollToScanResult = useCallback(() => {
+    scanResultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, []);
 
   const stopCamera = useCallback(async () => {
@@ -165,21 +183,38 @@ function AgencyScanContent() {
   const lookupByQR = useCallback(async (qrCode: string, silent = false) => {
     setLookupError(null);
     if (!silent) setLoadingBooking(true);
-    setSuccessMsg(null);
+
+    setSearchResults([]);
+    setShowSearchResults(false);
+
+    const normalized = normalizeQrCode(qrCode);
 
     try {
-      const result = await agencyApi.lookupPassengerByQR(qrCode);
-      if (!result.passengers || result.passengers.length === 0) {
-        setLookupError("Reserva sin pasajeros");
+      const results = await agencyApi.lookupPassengerByQR(normalized);
+
+      if (!results || results.length === 0) {
+        setLookupError("No se encontraron reservas para esa búsqueda");
         setScanResult(null);
         currentQrRef.current = null;
         return;
       }
-      currentQrRef.current = qrCode;
-      result.passengers = [...(result.passengers || [])].sort((a, b) =>
-        (a.seat_code || '\uffff').localeCompare(b.seat_code || '\uffff', undefined, { numeric: true })
-      );
-      setScanResult(result);
+
+      const sorted = results.map((r: ScanLookupResult) => ({
+        ...r,
+        passengers: [...(r.passengers || [])].sort((a: PassengerInfo, b: PassengerInfo) =>
+          (a.seat_code || '\uffff').localeCompare(b.seat_code || '\uffff', undefined, { numeric: true })
+        ),
+      }));
+
+      if (sorted.length === 1) {
+        currentQrRef.current = sorted[0].qr_code || normalized;
+        setScanResult(sorted[0]);
+      } else {
+        setSearchResults(sorted);
+        setShowSearchResults(true);
+        setScanResult(null);
+        currentQrRef.current = null;
+      }
     } catch (err: any) {
       setLookupError(err?.message || "Error al buscar reserva");
       setScanResult(null);
@@ -294,9 +329,10 @@ function AgencyScanContent() {
     setCameraError(null);
     setScanResult(null);
     setLookupError(null);
-    setSuccessMsg(null);
+
     setShowConfetti(false);
     setManualQrValue("");
+    setQrValidationError(null);
     setScanning(true);
   };
 
@@ -304,6 +340,12 @@ function AgencyScanContent() {
     if (lookupRef.current) return;
     const qr = manualQrValue.trim();
     if (!qr) return;
+    if (qr.length < 2) {
+      setQrValidationError("Ingresa al menos 2 caracteres para buscar");
+      return;
+    }
+    setQrValidationError(null);
+
     lookupRef.current = true;
     try {
       await stopCamera();
@@ -313,11 +355,21 @@ function AgencyScanContent() {
     }
   };
 
+  const handleSelectResult = (result: ScanLookupResult) => {
+    currentQrRef.current = result.qr_code || null;
+    setScanResult(result);
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
+
   const handleToggleBoarding = useCallback(
     async (passengerId: string, currentlyBoarded: boolean) => {
+      if (togglingRefs.current.has(passengerId)) return;
+      togglingRefs.current.add(passengerId);
       setTogglingIds((prev) => new Set(prev).add(passengerId));
       setLookupError(null);
-      setSuccessMsg(null);
+
+
       try {
         await agencyApi.toggleBoarding(passengerId, !currentlyBoarded);
         setScanResult((prev) => {
@@ -338,16 +390,15 @@ function AgencyScanContent() {
           };
         });
         if (!currentlyBoarded) {
-          setSuccessMsg("Abordaje confirmado");
           toast.success('Abordaje confirmado');
         } else {
-          setSuccessMsg("Abordaje cancelado");
           toast.success('Abordaje cancelado');
         }
       } catch (err: any) {
         setLookupError(err?.message || "Error al actualizar abordaje");
         toast.error(err?.message || 'Error al actualizar abordaje');
       } finally {
+        togglingRefs.current.delete(passengerId);
         setTogglingIds((prev) => {
           const next = new Set(prev);
           next.delete(passengerId);
@@ -365,7 +416,7 @@ function AgencyScanContent() {
     bulkBoardingRef.current = true;
     setBulkLoading(true);
     setLookupError(null);
-    setSuccessMsg(null);
+
     try {
       const now = new Date().toISOString();
       await Promise.all(
@@ -380,7 +431,6 @@ function AgencyScanContent() {
           ),
         };
       });
-      setSuccessMsg(`${unboarded.length} pasajero(s) abordado(s)`);
       toast.success(`${unboarded.length} pasajero(s) abordado(s)`);
     } catch (err: any) {
       setLookupError(err?.message || "Error al abordar pasajeros");
@@ -394,10 +444,13 @@ function AgencyScanContent() {
   const handleReset = () => {
     setScanResult(null);
     setLookupError(null);
-    setSuccessMsg(null);
+
     setCameraError(null);
     setShowConfetti(false);
     setManualQrValue("");
+    setQrValidationError(null);
+    setSearchResults([]);
+    setShowSearchResults(false);
     currentQrRef.current = null;
     setScanning(true);
   };
@@ -408,7 +461,7 @@ function AgencyScanContent() {
     setScanning(true);
   };
 
-  const badge = scanResult ? computeBadge(scanResult.passengers) : null;
+  const badge = scanResult ? computeBadge(scanResult.passengers, scanResult.reservation_status) : null;
 
   if (initialLoad) {
     return (
@@ -466,7 +519,7 @@ function AgencyScanContent() {
       </motion.div>
 
       <div className="grid grid-cols-1 gap-6">
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           {!scanResult && (
             <motion.div
               key="scanner"
@@ -614,10 +667,13 @@ function AgencyScanContent() {
                   <div className="mt-3 flex gap-2">
                     <div className="flex-1">
                       <Input
-                        label="Código QR"
-                        placeholder="Pega el código aquí"
+                        label="Búsqueda de reserva"
+                        placeholder="Escribe para buscar..."
                         value={manualQrValue}
-                        onChange={(e) => setManualQrValue(e.target.value)}
+                        onChange={(e) => {
+                          setManualQrValue(e.target.value);
+                          if (qrValidationError) setQrValidationError(null);
+                        }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleManualLookup();
                         }}
@@ -632,12 +688,24 @@ function AgencyScanContent() {
                       <Search className="w-4 h-4" />
                     </Button>
                   </div>
+                  {qrValidationError && (
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[#ef4444] mt-2">
+                      {qrValidationError}
+                    </p>
+                  )}
+                  {!qrValidationError && (
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] mt-2">
+                      Busca por código QR completo o fragmento (ej: OLLA, NT-LA, 00025)
+                    </p>
+                  )}
                 </Card>
               </motion.div>
 
             </motion.div>
           )}
+        </AnimatePresence>
 
+        <AnimatePresence mode="wait">
           {loadingBooking && (
             <motion.div
               key="loading"
@@ -683,6 +751,66 @@ function AgencyScanContent() {
             </motion.div>
           )}
 
+          {showSearchResults && searchResults.length > 0 && !loadingBooking && (
+            <motion.div
+              key="search-results"
+              variants={pageFade}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onAnimationComplete={(def) => {
+                if (def === "visible") scrollToSearchResults();
+              }}
+            >
+              <Card borderLeft borderColor="var(--color-brand-cyan)">
+                <div ref={searchResultsRef} tabIndex={-1} className="outline-none">
+                <SectionTitle>{searchResults.length} resultados encontrados</SectionTitle>
+                <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)] mt-1 mb-4">
+                  Selecciona una reserva para continuar
+                </p>
+                <div className="space-y-2">
+                  {searchResults.map((result) => {
+                    const badgeInfo = computeBadge(result.passengers, result.reservation_status);
+                    const boardedCount = result.passengers.filter((p) => p.boarded).length;
+                    return (
+                      <button
+                        key={result.reservation_id}
+                        onClick={() => handleSelectResult(result)}
+                        className="w-full text-left p-3 rounded-xl bg-[#f8fafc] border border-[#e5e7eb] hover:border-[var(--color-brand-cyan)] hover:shadow-[0_0_0_3px_rgba(0,212,255,0.1)] transition-all duration-200"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[#000024] truncate">
+                                {result.booker_name}
+                              </p>
+                              <Badge variant={badgeInfo.variant} size="sm">
+                                {badgeInfo.label}
+                              </Badge>
+                            </div>
+                            <p className="font-[family-name:var(--font-body)] text-xs text-[#6b7280] truncate">
+                              {result.route?.destination ?? "—"} · {result.passengers.length} pasajeros · {boardedCount} abordados
+                            </p>
+                            <p className="font-[family-name:var(--font-mono)] text-[10px] text-[#6b7280] mt-0.5 truncate">
+                              {result.qr_code}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-[#6b7280] shrink-0" />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-4 pt-3 border-t border-[#e5e7eb]">
+                  <Button variant="secondary" onClick={handleReset} className="w-full">
+                    Cancelar
+                  </Button>
+                </div>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
           {scanResult && !loadingBooking && (
             <motion.div
               key="result"
@@ -691,8 +819,12 @@ function AgencyScanContent() {
               animate="visible"
               exit="exit"
               className="contents"
+              onAnimationComplete={(def) => {
+                if (def === "visible") scrollToScanResult();
+              }}
             >
               <Card borderLeft borderColor="var(--color-brand-cyan)">
+                <div ref={scanResultRef} tabIndex={-1} className="outline-none">
                 <motion.div
                   variants={staggerContainer}
                   initial="hidden"
@@ -707,11 +839,11 @@ function AgencyScanContent() {
                   )}
                 </motion.div>
 
-                {successMsg && (
-                  <motion.div variants={staggerItem} className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-                    <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-emerald-700">
-                      {successMsg}
+                {scanResult.reservation_status === 'cancelled' && (
+                  <motion.div variants={staggerItem} className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                    <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-red-700">
+                      Esta reserva fue cancelada. No es posible realizar boarding.
                     </span>
                   </motion.div>
                 )}
@@ -742,6 +874,14 @@ function AgencyScanContent() {
                         Agencia: {scanResult.reservation_agency_name}
                       </p>
                     )}
+                  </div>
+                  <div>
+                    <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+                      Código
+                    </label>
+                    <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                      {scanResult.qr_code?.split('-').pop()?.slice(0, 8)?.toUpperCase() || scanResult.qr_code}
+                    </p>
                   </div>
                 </motion.div>
 
@@ -784,7 +924,7 @@ function AgencyScanContent() {
                           </span>
                           <button
                             type="button"
-                            disabled={togglingIds.has(passenger.id)}
+                            disabled={togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled'}
                             onClick={() =>
                               handleToggleBoarding(
                                 passenger.id,
@@ -796,7 +936,7 @@ function AgencyScanContent() {
                           transition-colors duration-200 ease-in-out
                           ${passenger.boarded ? "bg-[#10b981]" : "bg-[#e5e7eb]"}
                           ${
-                            togglingIds.has(passenger.id)
+                            togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled'
                               ? "opacity-50 cursor-not-allowed"
                               : ""
                           }
@@ -823,22 +963,38 @@ function AgencyScanContent() {
                 </motion.div>
 
                 <motion.div variants={staggerItem} className="border-t border-[#e5e7eb] pt-4 mt-4 flex flex-wrap gap-3">
-                  {scanResult.passengers.some((p) => !p.boarded) && (
-                    <Button
-                      onClick={handleBulkBoarding}
-                      loading={bulkLoading}
-                      size="lg"
-                    >
-                      <UserCheck className="w-4 h-4" />
-                      Marcar todos como abordados
+                  <AnimatePresence>
+                    {scanResult.passengers.some((p) => !p.boarded) && scanResult.reservation_status !== 'cancelled' && (
+                      <motion.div
+                        key="bulk-btn"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <Button
+                          onClick={handleBulkBoarding}
+                          loading={bulkLoading}
+                          size="lg"
+                        >
+                          <UserCheck className="w-4 h-4" />
+                          Marcar todos como abordados
+                        </Button>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                  <motion.div
+                    layout
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                  >
+                    <Button variant="secondary" size="lg" onClick={handleReset}>
+                      <RotateCcw className="w-4 h-4" />
+                      Escanear otro
                     </Button>
-                  )}
-                  <Button variant="secondary" size="lg" onClick={handleReset}>
-                    <RotateCcw className="w-4 h-4" />
-                    Escanear otro
-                  </Button>
+                  </motion.div>
                 </motion.div>
                 </motion.div>
+                </div>
               </Card>
             </motion.div>
           )}
