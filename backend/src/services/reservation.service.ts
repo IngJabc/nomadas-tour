@@ -272,7 +272,8 @@ export class ReservationService {
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
       .select('id, seat_id, boarded')
-      .eq('reservation_id', reservation.id);
+      .eq('reservation_id', reservation.id)
+      .eq('status', 'active');
 
     if (!passengers || passengers.length === 0) {
       throw new NotFoundError('No passengers found for this reservation');
@@ -296,7 +297,8 @@ export class ReservationService {
     const { data: allPassengers } = await supabaseAdmin
       .from('reservation_passengers')
       .select('boarded')
-      .eq('reservation_id', reservation.id);
+      .eq('reservation_id', reservation.id)
+      .eq('status', 'active');
 
     const totalCount = allPassengers?.length ?? 0;
     const boardedCount = allPassengers?.filter(p => p.boarded).length ?? 0;
@@ -450,14 +452,17 @@ export class ReservationService {
   async getAgencyReservations(agencyId: string) {
     const { data, error } = await supabaseAdmin
       .from('reservations')
-      .select('*, trips(departure_time, vehicle_type, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
+      .select('*, trips(departure_time, vehicle_type, status, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
       .eq('agency_id', agencyId)
       .order('created_at', { ascending: false });
 
     if (error) throw new ValidationError(error.message);
     if (data) {
       for (const r of data) {
-        (r as any).reservation_passengers = sortBySeatCode((r as any).reservation_passengers || []);
+        const allPassengers = (r as any).reservation_passengers || [];
+        (r as any).reservation_passengers = sortBySeatCode(
+          allPassengers.filter((p: any) => p.status === 'active')
+        );
       }
     }
     return data;
@@ -466,7 +471,7 @@ export class ReservationService {
   async getAgencyReservationById(id: string, agencyId: string) {
     const { data, error } = await supabaseAdmin
       .from('reservations')
-      .select('*, trips(departure_time, vehicle_type, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
+      .select('*, trips(departure_time, vehicle_type, status, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
       .eq('id', id)
       .eq('agency_id', agencyId)
       .single();
@@ -482,7 +487,10 @@ export class ReservationService {
       }
     }
 
-    return { ...data, qr_data_url, reservation_passengers: sortBySeatCode((data as any).reservation_passengers || []) };
+    const allPassengers = (data as any).reservation_passengers || [];
+    return { ...data, qr_data_url, reservation_passengers: sortBySeatCode(
+      allPassengers.filter((p: any) => p.status === 'active')
+    ) };
   }
 
   async cancelAgencyReservation(id: string, agencyId: string) {
@@ -596,7 +604,8 @@ export class ReservationService {
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
       .select('id, seat_id, boarded')
-      .eq('reservation_id', reservation.id);
+      .eq('reservation_id', reservation.id)
+      .eq('status', 'active');
 
     const totalPassengers = passengers?.length ?? 0;
     const boardedCount = passengers?.filter(p => p.boarded).length ?? 0;
@@ -635,6 +644,7 @@ export class ReservationService {
       .from('reservation_passengers')
       .select('id, seat_id, boarded')
       .eq('reservation_id', reservation.id)
+      .eq('status', 'active')
       .in('seat_id', seatIds);
 
     if (!passengers || passengers.length === 0) {
@@ -654,6 +664,7 @@ export class ReservationService {
       .from('reservation_passengers')
       .update({ boarded: true, boarded_at: now })
       .eq('reservation_id', reservation.id)
+      .eq('status', 'active')
       .in('seat_id', seatIds);
 
     if (updateError) throw new ValidationError(updateError.message);
@@ -661,7 +672,8 @@ export class ReservationService {
     const { data: allPassengers } = await supabaseAdmin
       .from('reservation_passengers')
       .select('boarded')
-      .eq('reservation_id', reservation.id);
+      .eq('reservation_id', reservation.id)
+      .eq('status', 'active');
 
     const totalCount = allPassengers?.length ?? 0;
     const boardedCount = allPassengers?.filter(p => p.boarded).length ?? 0;
@@ -724,14 +736,17 @@ export class ReservationService {
 
     const { data: trip } = await supabaseAdmin
       .from('trips')
-      .select('departure_time, routes(origin, destination)')
+      .select('departure_time, status, routes(origin, destination)')
       .eq('id', tripId)
       .single();
+
+    if (trip?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible realizar boarding.');
 
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
       .select('id, name, document, seat_id, boarded, boarded_at, seats(seat_code)')
-      .eq('reservation_id', reservation.id);
+      .eq('reservation_id', reservation.id)
+      .eq('status', 'active');
 
     return {
       reservation_id: reservation.id,
@@ -756,11 +771,12 @@ export class ReservationService {
   async toggleBoarding(passengerId: string, boarded: boolean, userId: string, agencyId: string) {
     const { data: passenger, error: pErr } = await supabaseAdmin
       .from('reservation_passengers')
-      .select('id, reservation_id, boarded, seat_id, reservations!inner(trip_id, status)')
+      .select('id, reservation_id, boarded, seat_id, status, reservations!inner(trip_id, status)')
       .eq('id', passengerId)
       .single();
 
     if (pErr || !passenger) throw new NotFoundError('Pasajero no encontrado');
+    if ((passenger as any).status === 'cancelled') throw new ValidationError('No se puede abordar un pasajero cancelado');
     const reservation = passenger as any;
     const tripId = reservation.reservations.trip_id;
 
@@ -772,6 +788,13 @@ export class ReservationService {
       .maybeSingle();
 
     if (!assignment) throw new ForbiddenError('Tu agencia no está asignada a este viaje');
+
+    const { data: tripStatus } = await supabaseAdmin
+      .from('trips')
+      .select('status')
+      .eq('id', tripId)
+      .single();
+    if (tripStatus?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible realizar boarding.');
 
     const now = new Date().toISOString();
 
@@ -785,7 +808,8 @@ export class ReservationService {
     const { data: allPassengers } = await supabaseAdmin
       .from('reservation_passengers')
       .select('boarded')
-      .eq('reservation_id', reservation.reservation_id);
+      .eq('reservation_id', reservation.reservation_id)
+      .eq('status', 'active');
 
     const totalCount = allPassengers?.length ?? 0;
     const boardedCount = allPassengers?.filter((p: any) => p.boarded).length ?? 0;
@@ -826,6 +850,95 @@ export class ReservationService {
       reservation_status: newStatus,
       boarded_count: boardedCount,
       total_count: totalCount,
+    };
+  }
+
+  // ─── Cancel individual passenger ─────────────────────────────────────────
+
+  async cancelPassenger(reservationId: string, passengerId: string, agencyId: string) {
+    const { data: passenger, error: pErr } = await supabaseAdmin
+      .from('reservation_passengers')
+      .select('id, reservation_id, seat_id, status, reservations!inner(id, agency_id, trip_id, status)')
+      .eq('id', passengerId)
+      .eq('reservation_id', reservationId)
+      .single();
+
+    if (pErr || !passenger) throw new NotFoundError('Pasajero no encontrado');
+
+    const reservation = (passenger as any).reservations;
+    if (reservation.agency_id !== agencyId) throw new ForbiddenError('No tienes acceso a esta reserva');
+    if (reservation.status === 'cancelled') throw new ValidationError('La reserva ya está cancelada');
+    if (passenger.status === 'cancelled') throw new ValidationError('El pasajero ya está cancelado');
+
+    const now = new Date().toISOString();
+
+    // 1. Mark passenger as cancelled
+    const { error: updateErr } = await supabaseAdmin
+      .from('reservation_passengers')
+      .update({ status: 'cancelled', boarded: false, boarded_at: null })
+      .eq('id', passengerId);
+
+    if (updateErr) throw new ValidationError(updateErr.message);
+
+    // 2. Free the seat
+    const { error: seatErr } = await supabaseAdmin
+      .from('seats')
+      .update({ status: 'available', updated_at: now })
+      .eq('id', passenger.seat_id)
+      .eq('trip_id', reservation.trip_id);
+
+    if (seatErr) throw new ValidationError(seatErr.message);
+
+    // 3. Check if any active passengers remain
+    const { data: activePassengers } = await supabaseAdmin
+      .from('reservation_passengers')
+      .select('id')
+      .eq('reservation_id', reservationId)
+      .eq('status', 'active');
+
+    const activeCount = activePassengers?.length ?? 0;
+
+    // 4. If no active passengers remain, cancel the whole reservation
+    if (activeCount === 0) {
+      const { error: resErr } = await supabaseAdmin
+        .from('reservations')
+        .update({ status: 'cancelled' })
+        .eq('id', reservationId);
+
+      if (resErr) throw new ValidationError(resErr.message);
+    } else {
+      // 5. Recalculate reservation status based on active passengers only
+      const { data: allActive } = await supabaseAdmin
+        .from('reservation_passengers')
+        .select('boarded')
+        .eq('reservation_id', reservationId)
+        .eq('status', 'active');
+
+      const totalCount = allActive?.length ?? 0;
+      const boardedCount = allActive?.filter((p: any) => p.boarded).length ?? 0;
+
+      let newStatus: string;
+      if (boardedCount >= totalCount && totalCount > 0) {
+        newStatus = 'completed';
+      } else if (boardedCount > 0) {
+        newStatus = 'partial';
+      } else {
+        newStatus = 'confirmed';
+      }
+
+      const { error: statusErr } = await supabaseAdmin
+        .from('reservations')
+        .update({ status: newStatus })
+        .eq('id', reservationId);
+
+      if (statusErr) throw new ValidationError(statusErr.message);
+    }
+
+    return {
+      cancelled: true,
+      passenger_id: passengerId,
+      seat_id: passenger.seat_id,
+      reservation_status: activeCount === 0 ? 'cancelled' : undefined,
     };
   }
 
@@ -910,7 +1023,10 @@ export class ReservationService {
 
     // Sort passengers by seat code within each reservation
     for (const r of data || []) {
-      (r as any).reservation_passengers = sortBySeatCode((r as any).reservation_passengers || []);
+      const allPassengers = (r as any).reservation_passengers || [];
+      (r as any).reservation_passengers = sortBySeatCode(
+        allPassengers.filter((p: any) => p.status === 'active')
+      );
     }
 
     // Flatten: one row per passenger for agency reservations
@@ -987,6 +1103,7 @@ export class ReservationService {
       .from('reservation_passengers')
       .select('id, reservations!inner(agency_id)')
       .eq('boarded', false)
+      .eq('status', 'active')
       .eq('reservations.agency_id', agencyId);
     const pendingBoarding = pendingPassengers?.length ?? 0;
 
@@ -1309,6 +1426,7 @@ export class ReservationService {
 
     for (const res of reservations || []) {
       for (const p of (res as any).reservation_passengers || []) {
+        if (p.status === 'cancelled') continue;
         if (p.boarded) boarded++;
         passengers.push({
           id: p.id,
@@ -1351,6 +1469,14 @@ export class ReservationService {
   // ─── Seat locking ──────────────────────────────────────────────────────────
 
   async lockSeat(tripId: string, seatId: string, userId: string, agencyId: string) {
+    const { data: trip, error: tripErr } = await supabaseAdmin
+      .from('trips')
+      .select('status')
+      .eq('id', tripId)
+      .single();
+    if (tripErr || !trip) throw new NotFoundError('Trip not found');
+    if (trip.status !== 'active') throw new ValidationError('Este viaje ya no está disponible');
+
     const { data: assignment } = await supabaseAdmin
       .from('trip_agencies')
       .select('id')
@@ -1453,7 +1579,8 @@ export class ReservationService {
     if (error || !data) throw new NotFoundError('Reservation not found');
 
     const r = data as any;
-    const passengers = r.reservation_passengers || [];
+    const allPassengers = r.reservation_passengers || [];
+    const passengers = allPassengers.filter((p: any) => p.status === 'active');
 
     return {
       id: r.id,
@@ -1500,7 +1627,9 @@ export class ReservationService {
     if (updateError) throw new ValidationError(updateError.message);
 
     if (status === 'cancelled') {
-      const seatIds = ((reservation as any).reservation_passengers || []).map((p: any) => p.seat_id);
+      const seatIds = ((reservation as any).reservation_passengers || [])
+        .filter((p: any) => p.status !== 'cancelled')
+        .map((p: any) => p.seat_id);
       if (seatIds.length > 0) {
         const { error: unlockError } = await supabaseAdmin
           .from('seats')
@@ -1757,6 +1886,7 @@ export class ReservationService {
       // Add passengers
       if (r.reservation_passengers && r.reservation_passengers.length > 0) {
         for (const p of r.reservation_passengers) {
+          if (p.status === 'cancelled') continue;
           resGroup.passengers.push({
             rowId: p.id,
             passengerId: p.id,

@@ -554,6 +554,7 @@ export class SuperadminService {
         .from('reservation_passengers')
         .select('reservation_id')
         .eq('boarded', true)
+        .eq('status', 'active')
         .in('reservation_id', tripResIds);
 
       for (const bp of boardedPassengers || []) {
@@ -657,6 +658,7 @@ export class SuperadminService {
       const { data: pData } = await supabaseAdmin
         .from('reservation_passengers')
         .select('*, seats(seat_code)')
+        .eq('status', 'active')
         .in('reservation_id', resIds);
       passengers = pData || [];
     }
@@ -847,6 +849,15 @@ export class SuperadminService {
 
     if (updateError) throw new ValidationError(updateError.message);
 
+    // Release all seats when trip is cancelled
+    if (status === 'cancelled') {
+      await supabaseAdmin
+        .from('seats')
+        .update({ status: 'available', locked_by: null, locked_at: null })
+        .eq('trip_id', id)
+        .in('status', ['locked', 'reserved', 'blocked']);
+    }
+
     // Send "trip cancelled" emails to active agencies
     if (status === 'cancelled') {
       const { data: tripAgencies } = await supabaseAdmin
@@ -920,7 +931,8 @@ export class SuperadminService {
     const { data: pendingData } = await supabaseAdmin
       .from('reservation_passengers')
       .select('id', { count: 'exact' })
-      .eq('boarded', false);
+      .eq('boarded', false)
+      .eq('status', 'active');
     const pendingBoarding = pendingData?.length ?? 0;
 
     // Upcoming trips (next 5 active trips with reservation count)

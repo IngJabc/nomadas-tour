@@ -203,6 +203,8 @@ export const agencyApi = {
   getReservation: (id: string) => request<AgencyReservation>(`/agency/reservations/${id}`),
   cancelAgencyReservation: (id: string) =>
     request<any>(`/agency/reservations/${id}/cancel`, { method: 'PATCH' }),
+  cancelPassenger: (reservationId: string, passengerId: string) =>
+    request<any>(`/agency/reservations/${reservationId}/passengers/${passengerId}/cancel`, { method: 'PATCH' }),
   lockSeat: (trip_id: string, seat_id: string) =>
     request<{ locked: boolean; seat_id: string }>('/agency/seats/lock', {
       method: 'POST',

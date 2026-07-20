@@ -111,7 +111,7 @@ export interface AgencyReservationPassenger {
   name: string;
   document: string;
   phone?: string | null;
-  status: string;
+  status: 'active' | 'cancelled';
   seat_id: string;
   seats?: { seat_code: string };
   boarded?: boolean;
@@ -131,6 +131,7 @@ export interface AgencyReservation {
     id: string;
     departure_time: string;
     vehicle_type: string;
+    status: string;
     routes: { origin: string; destination: string } | null;
   } | null;
   reservation_passengers?: AgencyReservationPassenger[];

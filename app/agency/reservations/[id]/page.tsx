@@ -17,6 +17,9 @@ import {
   AlertTriangle,
   Clock,
   QrCode,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { agencyApi } from "@/lib/api";
 import {
@@ -31,7 +34,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { ReservationDetailSkeleton } from "@/components/ui/Skeleton";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { PassengerCard } from "@/components/agency/PassengerCard";
 import { ReservationTicket } from "@/components/reservations/ReservationTicket";
 import { ReservationTicketActions } from "@/components/reservations/ReservationTicketActions";
 import { useCapture } from "@/hooks/useCapture";
@@ -62,8 +64,17 @@ export default function ReservationDetailPage() {
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [showConfirm, setShowConfirm] = useState(false);
+  const [cancellingPassenger, setCancellingPassenger] = useState<{
+    id: string;
+    name: string;
+    seat_code: string;
+  } | null>(null);
+  const [cancellingPassengerLoading, setCancellingPassengerLoading] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPassengerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { captureRef, download, share } = useCapture({
     filename: reservation ? `boleto-${reservation.qr_code}` : 'boleto',
@@ -106,8 +117,32 @@ export default function ReservationDetailPage() {
   useEffect(() => {
     return () => {
       if (cancelTimerRef.current) clearTimeout(cancelTimerRef.current);
+      if (cancelPassengerTimerRef.current) clearTimeout(cancelPassengerTimerRef.current);
     };
   }, []);
+
+  const handleCancelPassenger = async () => {
+    if (!cancellingPassenger) return;
+    setCancellingPassengerLoading("loading");
+    setShowConfirm(false);
+    try {
+      await agencyApi.cancelPassenger(id, cancellingPassenger.id);
+      setCancellingPassengerLoading("success");
+      toast.success(`Pasajero ${cancellingPassenger.name} cancelado`);
+      await doFetch();
+      cancelPassengerTimerRef.current = setTimeout(() => {
+        setCancellingPassengerLoading("idle");
+        setCancellingPassenger(null);
+      }, 2500);
+    } catch {
+      setCancellingPassengerLoading("error");
+      toast.error('No se pudo cancelar el pasajero');
+      cancelPassengerTimerRef.current = setTimeout(() => {
+        setCancellingPassengerLoading("idle");
+        setCancellingPassenger(null);
+      }, 2500);
+    }
+  };
 
   const handleCancel = async () => {
     setCancelLoading("loading");
@@ -273,6 +308,27 @@ export default function ReservationDetailPage() {
         </button>
       </div>
 
+      {reservation.trips?.status === "cancelled" && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-4 p-4 rounded-xl bg-[#fef2f2] border border-[#fecaca]"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-[#ef4444] shrink-0 mt-0.5" strokeWidth={1.75} />
+            <div>
+              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[#ef4444]">
+                Viaje cancelado
+              </p>
+              <p className="font-[family-name:var(--font-body)] text-[13px] text-[#b91c1c] mt-1">
+                Este viaje fue cancelado por el administrador. Contacte al administrador para más información.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <motion.div
         variants={pageFade}
         initial="hidden"
@@ -293,7 +349,7 @@ export default function ReservationDetailPage() {
                   onDownload={handleDownload}
                   onShare={handleShare}
                 />
-                {reservation.status === "confirmed" && (
+                {reservation.status === "confirmed" && reservation.trips?.status !== "cancelled" && (
                   <Button
                     variant="destructive"
                     size="sm"
@@ -305,7 +361,7 @@ export default function ReservationDetailPage() {
                         ? "error"
                         : null
                     }
-                    onClick={() => setShowConfirm(true)}
+                    onClick={() => { setCancellingPassenger(null); setShowConfirm(true); }}
                   >
                     Cancelar reserva
                   </Button>
@@ -323,7 +379,17 @@ export default function ReservationDetailPage() {
       )}
 
       <ConfirmModal
-        open={showConfirm}
+        open={showConfirm && !!cancellingPassenger}
+        title="¿Cancelar pasajero?"
+        message={`El asiento ${cancellingPassenger?.seat_code ?? ''} volverá a estar disponible. Esta acción no se puede deshacer.`}
+        confirmLabel="Sí, cancelar"
+        cancelLabel="Volver"
+        onConfirm={handleCancelPassenger}
+        onCancel={() => { setShowConfirm(false); setCancellingPassenger(null); }}
+      />
+
+      <ConfirmModal
+        open={showConfirm && !cancellingPassenger}
         title="¿Cancelar reserva?"
         message="Se liberarán todos los asientos de esta reserva. Esta acción no se puede deshacer."
         confirmLabel="Sí, cancelar"
@@ -567,13 +633,72 @@ export default function ReservationDetailPage() {
               animate="visible"
               className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
             >
-              {mappedPassengers.map((p) => (
-                <PassengerCard
-                  key={p.id}
-                  passenger={p}
-                  showReservationId={false}
-                />
-              ))}
+              {mappedPassengers.map((p) => {
+                const isCancelling =
+                  cancellingPassenger?.id === p.id &&
+                  cancellingPassengerLoading === "loading";
+                const wasCancelled =
+                  cancellingPassenger?.id === p.id &&
+                  cancellingPassengerLoading === "success";
+                const cancelFailed =
+                  cancellingPassenger?.id === p.id &&
+                  cancellingPassengerLoading === "error";
+
+                return (
+                  <motion.div
+                    key={p.id}
+                    initial={{ opacity: 0, scale: 0.96, y: 6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[rgba(0,0,0,0.06)] transition-all duration-150 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                      <span className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-cyan)]">
+                        {p.seat_code}
+                      </span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)] truncate">
+                        {p.name}
+                      </p>
+                      <p className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
+                        {p.document}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-2">
+                      {isCancelling ? (
+                        <Loader2 className="w-4 h-4 text-[var(--color-brand-muted)] animate-spin" />
+                      ) : wasCancelled ? (
+                        <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
+                      ) : cancelFailed ? (
+                        <XCircle className="w-4 h-4 text-[#ef4444]" />
+                      ) : (
+                        <>
+                          <span className="font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)] font-medium">Viaja</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCancellingPassenger({
+                                id: p.id,
+                                name: p.name,
+                                seat_code: p.seat_code,
+                              });
+                              setShowConfirm(true);
+                            }}
+                            disabled={reservation.status !== "confirmed" || reservation.trips?.status === "cancelled"}
+                            className="relative inline-flex h-6 w-11 items-center rounded-full bg-[#10b981] transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                            title={reservation.status === "confirmed" && reservation.trips?.status !== "cancelled" ? "Cancelar pasajero" : "Reserva no disponible"}
+                          >
+                            <span className="inline-block h-4 w-4 transform translate-x-6 rounded-full bg-white transition-transform duration-200" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </Card>
         </motion.div>

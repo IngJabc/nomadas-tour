@@ -18,6 +18,7 @@ router.post('/reservations', (req, res, next) => reservationController.createAge
 router.post('/reservations/board', (req, res, next) => reservationController.boardPassenger(req, res, next));
 router.post('/reservations/cancel', (req, res, next) => reservationController.cancelReservation(req, res, next));
 router.patch('/reservations/:id/cancel', (req, res, next) => reservationController.cancelAgencyReservation(req, res, next));
+router.patch('/reservations/:id/passengers/:passengerId/cancel', (req, res, next) => reservationController.cancelPassenger(req, res, next));
 
 // Seat locking (realtime)
 router.post('/seats/lock', (req, res, next) => reservationController.lockSeat(req, res, next));
