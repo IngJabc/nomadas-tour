@@ -122,6 +122,7 @@ export interface ReservationPassenger {
   phone: string | null;
   boarded: boolean;
   boarded_at: string | null;
+  status: 'active' | 'cancelled';
 }
 
 export interface BoardingLog {

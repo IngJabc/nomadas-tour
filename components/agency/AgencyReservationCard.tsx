@@ -7,6 +7,7 @@ import {
   Users,
   ChevronRight,
 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { RESERVATION_STATUS_STYLES } from "@/lib/constants/reservation-status";
@@ -58,6 +59,15 @@ export function AgencyReservationCard({ reservation }: AgencyReservationCardProp
           {statusInfo.label}
         </Badge>
       </div>
+
+      {reservation.trips?.status === "cancelled" && (
+        <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded-lg bg-[#fef2f2] border border-[#fecaca]">
+          <AlertTriangle className="w-3 h-3 text-[#ef4444] shrink-0" strokeWidth={1.75} />
+          <span className="font-[family-name:var(--font-body)] text-[11px] font-semibold text-[#ef4444]">
+            Viaje cancelado
+          </span>
+        </div>
+      )}
 
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-[13px] text-[var(--color-brand-muted)]">

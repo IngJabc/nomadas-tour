@@ -2,12 +2,13 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { agencyApi } from '@/lib/api';
-import { subscribeToTripSeats } from '@/lib/realtime/subscriptions';
+import { subscribeToTripSeats, subscribeToTrips } from '@/lib/realtime/subscriptions';
 import { Seat, Trip } from '@/types';
 
 interface UseSeatLockingOptions {
   userId: string | null;
   onSeatLost?: (seatCode: string) => void;
+  onTripCancelled?: () => void;
 }
 
 interface UseSeatLockingReturn {
@@ -24,7 +25,7 @@ interface UseSeatLockingReturn {
   deepLinkError: boolean;
 }
 
-export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): UseSeatLockingReturn {
+export function useSeatLocking({ userId, onSeatLost, onTripCancelled }: UseSeatLockingOptions): UseSeatLockingReturn {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [seatsMap, setSeatsMap] = useState<Record<string, Seat>>({});
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
@@ -38,11 +39,14 @@ export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): U
   const userIdRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
   const onSeatLostRef = useRef(onSeatLost);
+  const onTripCancelledRef = useRef(onTripCancelled);
+  const tripCancelledRef = useRef(false);
   const tokenRef = useRef<string | null>(null);
 
   selectedSeatsRef.current = selectedSeats;
   userIdRef.current = userId;
   onSeatLostRef.current = onSeatLost;
+  onTripCancelledRef.current = onTripCancelled;
 
   // Refresh cached auth token periodically for reliable cleanup on unload
   useEffect(() => {
@@ -116,6 +120,7 @@ export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): U
       try { await agencyApi.unlockAllSeats(prevId); } catch { /* silent */ }
     }
     cleanupChannel();
+    tripCancelledRef.current = false;
 
     setTripLoading(true);
     resetSeats();
@@ -139,11 +144,12 @@ export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): U
       try { await agencyApi.unlockAllSeats(prevId); } catch { /* silent */ }
     }
     cleanupChannel();
+    tripCancelledRef.current = false;
 
     setTripLoading(true);
     try {
       const trip: Trip = await agencyApi.getTrip(tripId);
-      if (!trip || trip.status === 'completed') {
+      if (!trip || trip.status === 'completed' || trip.status === 'cancelled') {
         setDeepLinkError(true);
         return false;
       }
@@ -225,7 +231,7 @@ export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): U
       if (newSeat.status === 'locked' && newSeat.locked_by !== userIdRef.current) {
         const wasSelected = selectedSeatsRef.current.some((s) => s.id === newSeat.id);
         setSelectedSeats((sel) => sel.filter((s) => s.id !== newSeat.id));
-        if (wasSelected) onSeatLostRef.current?.(newSeat.seat_code);
+        if (wasSelected && !tripCancelledRef.current) onSeatLostRef.current?.(newSeat.seat_code);
       }
 
       // Deselect if my locked seat expired (became available again)
@@ -233,7 +239,7 @@ export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): U
         const wasMyLockedSeat = selectedSeatsRef.current.some((s) => s.id === newSeat.id);
         if (wasMyLockedSeat) {
           setSelectedSeats((sel) => sel.filter((s) => s.id !== newSeat.id));
-          onSeatLostRef.current?.(newSeat.seat_code);
+          if (!tripCancelledRef.current) onSeatLostRef.current?.(newSeat.seat_code);
         }
       }
 
@@ -251,6 +257,24 @@ export function useSeatLocking({ userId, onSeatLost }: UseSeatLockingOptions): U
       cleanupChannel();
     };
   }, [selectedTrip?.id, cleanupChannel, buildSeatsMap]);
+
+  // ─── Realtime: detect trip cancellation ─────────────────────────────
+  useEffect(() => {
+    if (!tripIdRef.current || !selectedTrip?.id) return;
+    const tripId = tripIdRef.current;
+
+    const cleanup = subscribeToTrips((payload) => {
+      if (payload.eventType !== 'UPDATE') return;
+      const trip = payload.trip;
+      if (trip.id !== tripId) return;
+      if (trip.status === 'cancelled') {
+        tripCancelledRef.current = true;
+        onTripCancelledRef.current?.();
+      }
+    }, [tripId]);
+
+    return cleanup;
+  }, [selectedTrip?.id]);
 
   return {
     selectedTrip,

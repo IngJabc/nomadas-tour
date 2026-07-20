@@ -113,8 +113,14 @@ function NewReservationContent() {
     if (type === 'error') toast.error(message);
     else toast(message);
   }, []);
+  const tripCancelledHandledRef = useRef(false);
   const locking = useSeatLocking({ userId, onSeatLost: (seatCode) => {
     addToast(`El asiento ${seatCode} ya no está disponible`, "info");
+  }, onTripCancelled: () => {
+    if (tripCancelledHandledRef.current) return;
+    tripCancelledHandledRef.current = true;
+    toast.error("Este viaje fue cancelado por el administrador. La reserva no puede continuar.");
+    setTimeout(() => router.push("/agency/trips"), 300);
   }});
 
   // Keep ref in sync for beforeunload event handler
@@ -399,6 +405,7 @@ function NewReservationContent() {
     submit.clearError();
     locking.resetSeats();
     wizard.resetWizard();
+    tripCancelledHandledRef.current = false;
   }, [submit, locking, wizard]);
 
   const handleBookerNameChange = useCallback((v: string) => setBookerName(v), []);
@@ -427,6 +434,7 @@ function NewReservationContent() {
   // ─── Auto-revert when all seats lost on later steps ────────────────
   useEffect(() => {
     if (
+      !tripCancelledHandledRef.current &&
       (wizard.step === "passenger_form" || wizard.step === "summary") &&
       locking.selectedSeats.length === 0
     ) {

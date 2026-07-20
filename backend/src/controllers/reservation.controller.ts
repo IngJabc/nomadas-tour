@@ -197,6 +197,20 @@ export class ReservationController {
     }
   }
 
+  // Agency: cancel individual passenger
+  async cancelPassenger(req: Request, res: Response, next: NextFunction) {
+    try {
+      const agencyId = req.ctx!.agencyId;
+      if (!agencyId) { res.status(400).json({ error: 'Agency ID not found' }); return; }
+      const reservationId = req.params.id as string;
+      const passengerId = req.params.passengerId as string;
+      const result = await reservationService.cancelPassenger(reservationId, passengerId, agencyId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // Agency: cancel reservation
   async cancelAgencyReservation(req: Request, res: Response, next: NextFunction) {
     try {
