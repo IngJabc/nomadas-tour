@@ -49,6 +49,7 @@ import { AgencyTripCard } from "@/components/agency/AgencyTripCard";
 import { ReservationTicket } from "@/components/reservations/ReservationTicket";
 import { ReservationTicketActions } from "@/components/reservations/ReservationTicketActions";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
+import { isForcedLogout } from "@/lib/auth/session-handler";
 
 // ─── Page wrapper ────────────────────────────────────────────────────
 export default function NewAgencyReservationPage() {
@@ -99,6 +100,7 @@ function NewReservationContent() {
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isForcedLogout()) return;
       if (selectedSeatsCountRef.current > 0) {
         e.preventDefault();
       }

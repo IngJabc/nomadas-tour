@@ -27,6 +27,12 @@ export class ForbiddenError extends AppError {
   }
 }
 
+export class AgencyInactiveError extends AppError {
+  constructor(message: string = 'Tu cuenta ha sido desactivada por el administrador') {
+    super(message, 403, 'AGENCY_INACTIVE');
+  }
+}
+
 export class ConflictError extends AppError {
   constructor(message: string = 'Conflicto') {
     super(message, 409, 'CONFLICT');
