@@ -139,6 +139,8 @@ function AgencyScanContent() {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const [manualQrValue, setManualQrValue] = useState("");
+  const lookupRef = useRef(false);
+  const bulkBoardingRef = useRef(false);
 
   useEffect(() => {
     const t = setTimeout(() => setInitialLoad(false), 350);
@@ -299,10 +301,16 @@ function AgencyScanContent() {
   };
 
   const handleManualLookup = async () => {
+    if (lookupRef.current) return;
     const qr = manualQrValue.trim();
     if (!qr) return;
-    await stopCamera();
-    await lookupByQR(qr);
+    lookupRef.current = true;
+    try {
+      await stopCamera();
+      await lookupByQR(qr);
+    } finally {
+      lookupRef.current = false;
+    }
   };
 
   const handleToggleBoarding = useCallback(
@@ -351,8 +359,10 @@ function AgencyScanContent() {
   );
 
   const handleBulkBoarding = useCallback(async () => {
+    if (bulkBoardingRef.current) return;
     const unboarded = scanResult?.passengers.filter((p) => !p.boarded) ?? [];
     if (unboarded.length === 0) return;
+    bulkBoardingRef.current = true;
     setBulkLoading(true);
     setLookupError(null);
     setSuccessMsg(null);
@@ -376,6 +386,7 @@ function AgencyScanContent() {
       setLookupError(err?.message || "Error al abordar pasajeros");
       toast.error(err?.message || 'Error al abordar pasajeros');
     } finally {
+      bulkBoardingRef.current = false;
       setBulkLoading(false);
     }
   }, [scanResult]);

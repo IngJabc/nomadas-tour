@@ -86,14 +86,13 @@ function LoginContent() {
       }
       router.refresh();
     } catch (err) {
+      submittingRef.current = false;
+      setLoading(false);
       if (err instanceof ApiError && err.code === 'AGENCY_INACTIVE') {
         showAgencyInactiveToast();
         return;
       }
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
-    } finally {
-      submittingRef.current = false;
-      setLoading(false);
     }
   };
 

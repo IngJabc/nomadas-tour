@@ -20,9 +20,10 @@ interface RouteCardProps {
   onEdit: (route: RouteData) => void;
   onDeactivate: (route: RouteData) => void;
   onActivate: (route: RouteData) => void;
+  activatingId?: string | null;
 }
 
-export function RouteCard({ route, onEdit, onDeactivate, onActivate }: RouteCardProps) {
+export function RouteCard({ route, onEdit, onDeactivate, onActivate, activatingId }: RouteCardProps) {
   const hasTrips = route.tripCount > 0;
   const hasReservations = route.reservationCount > 0;
   const isActive = route.status === 'active';
@@ -111,6 +112,8 @@ export function RouteCard({ route, onEdit, onDeactivate, onActivate }: RouteCard
             variant="secondary"
             size="sm"
             onClick={() => onActivate(route)}
+            loading={activatingId === route.id}
+            disabled={!!activatingId}
           >
             <Power className="w-3.5 h-3.5" />
             Activar

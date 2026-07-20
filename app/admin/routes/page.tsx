@@ -31,6 +31,9 @@ export default function AdminRoutesPage() {
 
   const [deactivateTarget, setDeactivateTarget] = useState<RouteData | null>(null);
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const deactivateRef = useRef(false);
+  const activateRef = useRef(false);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
 
   const doFetch = useCallback(async () => {
     try {
@@ -172,7 +175,9 @@ export default function AdminRoutesPage() {
   };
 
   const handleConfirmDeactivate = async () => {
+    if (deactivateRef.current) return;
     if (!deactivateTarget) return;
+    deactivateRef.current = true;
     setDeactivateLoading(true);
     try {
       await adminApi.deactivateRoute(deactivateTarget.id);
@@ -182,17 +187,24 @@ export default function AdminRoutesPage() {
     } catch {
       toast.error('No se pudo desactivar la ruta');
     } finally {
+      deactivateRef.current = false;
       setDeactivateLoading(false);
     }
   };
 
   const handleActivate = async (route: RouteData) => {
+    if (activateRef.current) return;
+    activateRef.current = true;
+    setActivatingId(route.id);
     try {
       await adminApi.activateRoute(route.id);
       toast.success('Ruta activada');
       await doFetch();
     } catch {
       toast.error('No se pudo activar la ruta');
+    } finally {
+      activateRef.current = false;
+      setActivatingId(null);
     }
   };
 
@@ -373,6 +385,7 @@ export default function AdminRoutesPage() {
                   onEdit={handleOpenEdit}
                   onDeactivate={handleOpenDeactivate}
                   onActivate={handleActivate}
+                  activatingId={activatingId}
                 />
               </motion.div>
             ))}

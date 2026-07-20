@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { request } from '@/lib/api';
@@ -16,8 +16,11 @@ export function CancelBookingButton({ tripId, transactionId, reservationIds }: P
   const [modalOpen, setModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   const handleCancel = async () => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -29,6 +32,7 @@ export function CancelBookingButton({ tripId, transactionId, reservationIds }: P
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error al cancelar');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
