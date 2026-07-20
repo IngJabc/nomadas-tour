@@ -55,6 +55,8 @@ export default function ScanPage() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [manualQrValue, setManualQrValue] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
+  const lookupRef = useRef(false);
+  const boardingRef = useRef(false);
 
   const stopCamera = useCallback(async () => {
     if (scannerRef.current) {
@@ -172,14 +174,22 @@ export default function ScanPage() {
   };
 
   const handleManualLookup = async () => {
+    if (lookupRef.current) return;
     const qr = manualQrValue.trim();
     if (!qr) return;
-    await stopCamera();
-    await lookupByQR(qr);
+    lookupRef.current = true;
+    try {
+      await stopCamera();
+      await lookupByQR(qr);
+    } finally {
+      lookupRef.current = false;
+    }
   };
 
   const handleConfirmBoarding = async () => {
+    if (boardingRef.current) return;
     if (!booking || !booking.trip) return;
+    boardingRef.current = true;
     setUpdating(true);
     setSuccessMsg(null);
     try {
@@ -202,6 +212,7 @@ export default function ScanPage() {
       setLookupError(err instanceof Error ? err.message : 'Error al confirmar abordaje');
       toast.error(err instanceof Error ? err.message : 'Error al confirmar abordaje');
     } finally {
+      boardingRef.current = false;
       setUpdating(false);
     }
   };

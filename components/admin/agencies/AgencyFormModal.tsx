@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useId } from "react";
+import { useState, useEffect, useId, useRef } from "react";
 import {
   Modal,
   ModalHeader,
@@ -34,6 +34,7 @@ export function AgencyFormModal({
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<"success" | "error" | null>(null);
   const [fieldError, setFieldError] = useState("");
+  const submittingRef = useRef(false);
 
   const isEdit = mode === "edit";
 
@@ -54,6 +55,7 @@ export function AgencyFormModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setFieldError("");
 
     if (!name.trim() || name.trim().length < 2) {
@@ -71,6 +73,7 @@ export function AgencyFormModal({
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       if (isEdit) {
@@ -84,6 +87,7 @@ export function AgencyFormModal({
       setFeedback("error");
       setTimeout(() => setFeedback(null), 1500);
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

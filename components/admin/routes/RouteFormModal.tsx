@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useId } from 'react';
+import { useState, useEffect, useId, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { Input } from '@/components/ui/Input';
@@ -25,6 +25,7 @@ export function RouteFormModal({ open, mode, route, onClose, onSubmit }: RouteFo
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<'success' | 'error' | null>(null);
   const [fieldError, setFieldError] = useState('');
+  const submittingRef = useRef(false);
 
   const isEdit = mode === 'edit';
   const hasTripsButNoReservations = isEdit && route && route.tripCount > 0 && route.reservationCount === 0;
@@ -44,6 +45,7 @@ export function RouteFormModal({ open, mode, route, onClose, onSubmit }: RouteFo
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setFieldError('');
 
     if (!destination.trim() || destination.trim().length < 2) {
@@ -51,6 +53,7 @@ export function RouteFormModal({ open, mode, route, onClose, onSubmit }: RouteFo
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     try {
       await onSubmit({ origin: DEFAULT_ORIGIN, destination: destination.trim() });
@@ -60,6 +63,7 @@ export function RouteFormModal({ open, mode, route, onClose, onSubmit }: RouteFo
       setFeedback('error');
       setTimeout(() => setFeedback(null), 1500);
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

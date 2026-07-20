@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
@@ -173,6 +173,7 @@ function InvitationForm({ token }: { token: string }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -191,10 +192,12 @@ function InvitationForm({ token }: { token: string }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     if (password !== confirmPassword) {
       setError("Las contraseñas no coinciden");
       return;
     }
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -205,6 +208,7 @@ function InvitationForm({ token }: { token: string }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al registrarse");
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

@@ -22,9 +22,10 @@ interface AgencyCardProps {
   onEdit: (agency: AgencyData) => void;
   onDeactivate: (agency: AgencyData) => void;
   onActivate: (agency: AgencyData) => void;
+  activatingId?: string | null;
 }
 
-export function AgencyCard({ agency, onEdit, onDeactivate, onActivate }: AgencyCardProps) {
+export function AgencyCard({ agency, onEdit, onDeactivate, onActivate, activatingId }: AgencyCardProps) {
   const isActive = agency.status === 'active';
   const isPending = agency.status === 'pending';
 
@@ -81,6 +82,8 @@ export function AgencyCard({ agency, onEdit, onDeactivate, onActivate }: AgencyC
             variant="secondary"
             size="sm"
             onClick={() => onActivate(agency)}
+            loading={activatingId === agency.id}
+            disabled={!!activatingId}
           >
             <Power className="w-3.5 h-3.5" />
             Activar

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import QRCode from 'react-qr-code';
@@ -32,8 +32,10 @@ export function BookingPanel({
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [lastSeatCodes, setLastSeatCodes] = useState<string[] | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
+  const submittingRef = useRef(false);
 
   const handleConfirm = async () => {
+    if (submittingRef.current) return;
     if (!passengerName.trim() || !passengerCedula.trim()) {
       setError('Complete todos los campos');
       setShakeKey((k) => k + 1);
@@ -50,6 +52,7 @@ export function BookingPanel({
       return;
     }
 
+    submittingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -76,6 +79,7 @@ export function BookingPanel({
         await onReleaseLocks(selectedSeats.map((s) => s.id));
       }
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

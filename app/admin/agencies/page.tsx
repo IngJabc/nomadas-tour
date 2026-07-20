@@ -41,6 +41,9 @@ export default function AdminAgenciesPage() {
     null
   );
   const [deactivateLoading, setDeactivateLoading] = useState(false);
+  const deactivateRef = useRef(false);
+  const activateRef = useRef(false);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
 
   const [newAgencyLink, setNewAgencyLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -158,7 +161,9 @@ export default function AdminAgenciesPage() {
   };
 
   const handleConfirmDeactivate = async () => {
+    if (deactivateRef.current) return;
     if (!deactivateTarget) return;
+    deactivateRef.current = true;
     setDeactivateLoading(true);
     try {
       await adminApi.updateAgency(deactivateTarget.id, { status: "inactive" });
@@ -168,17 +173,24 @@ export default function AdminAgenciesPage() {
     } catch {
       toast.error("No se pudo desactivar la agencia");
     } finally {
+      deactivateRef.current = false;
       setDeactivateLoading(false);
     }
   };
 
   const handleActivate = async (agency: AgencyData) => {
+    if (activateRef.current) return;
+    activateRef.current = true;
+    setActivatingId(agency.id);
     try {
       await adminApi.updateAgency(agency.id, { status: "active" });
       toast.success("Agencia activada");
       await doFetch();
     } catch {
       toast.error("No se pudo activar la agencia");
+    } finally {
+      activateRef.current = false;
+      setActivatingId(null);
     }
   };
 
@@ -382,6 +394,7 @@ export default function AdminAgenciesPage() {
                 onEdit={handleOpenEdit}
                 onDeactivate={handleOpenDeactivate}
                 onActivate={handleActivate}
+                activatingId={activatingId}
               />
             </motion.div>
           ))}

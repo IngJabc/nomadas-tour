@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
@@ -41,6 +41,7 @@ function AcceptInvitationContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (!token) {
@@ -67,6 +68,7 @@ function AcceptInvitationContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setSubmitError(null);
 
     if (password.length < 6) {
@@ -78,6 +80,7 @@ function AcceptInvitationContent() {
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     try {
       await authApi.acceptInvitation(token!, password);
@@ -88,6 +91,7 @@ function AcceptInvitationContent() {
         err instanceof Error ? err.message : "Error al aceptar la invitación."
       );
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
