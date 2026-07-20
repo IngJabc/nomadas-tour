@@ -1,7 +1,7 @@
 import type { RealtimePostgresChangesPayload, RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 
-type CleanupFn = () => void;
+export type CleanupFn = () => void;
 
 /** Suscribirse a cambios en `seats` para múltiples viajes */
 export function subscribeToTripSeats(
@@ -219,17 +219,25 @@ export function subscribeToRoutes(
 /** Suscribirse a cambios en la tabla `agencies` (INSERT y UPDATE) */
 export function subscribeToAgencies(
   onEvent: (payload: { eventType: 'INSERT' | 'UPDATE'; agency: Record<string, any> }) => void,
+  agencyId?: string,
 ): CleanupFn {
   const supabase = createClient();
 
+  const channelName = agencyId
+    ? `agencies:id=eq.${agencyId}`
+    : 'agencies:all';
+
+  const filter = agencyId ? `id=eq.${agencyId}` : undefined;
+
   const channel = supabase
-    .channel('agencies:all')
+    .channel(channelName)
     .on(
       'postgres_changes',
       {
         event: 'INSERT',
         schema: 'public',
         table: 'agencies',
+        filter,
       },
       (payload: RealtimePostgresChangesPayload<any>) => {
         if (payload.new) {
@@ -243,6 +251,7 @@ export function subscribeToAgencies(
         event: 'UPDATE',
         schema: 'public',
         table: 'agencies',
+        filter,
       },
       (payload: RealtimePostgresChangesPayload<any>) => {
         if (payload.new) {

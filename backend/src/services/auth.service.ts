@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
 import { supabase, supabaseAdmin } from '../config/database.js';
-import { UnauthorizedError, ValidationError } from '../errors/index.js';
+import { UnauthorizedError, ValidationError, AgencyInactiveError } from '../errors/index.js';
 import { emailService } from './email.service.js';
 
 async function getToken(email: string, password: string): Promise<string> {
@@ -20,16 +20,41 @@ export class AuthService {
       throw new UnauthorizedError('Correo o contraseña incorrectos');
     }
 
-    const { data: user } = await supabaseAdmin
+    const { data: dbUser } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', data.user.id)
       .single();
 
-    if (!user) throw new UnauthorizedError('Usuario no encontrado');
+    let user: any;
+
+    if (dbUser) {
+      user = dbUser;
+    } else if (data.user.user_metadata?.role === 'superadmin') {
+      user = {
+        id: data.user.id,
+        role: 'superadmin',
+        agency_id: null,
+      };
+    } else {
+      throw new UnauthorizedError('Usuario no encontrado');
+    }
+
+    if (user.agency_id) {
+      const { data: agency } = await supabaseAdmin
+        .from('agencies')
+        .select('status')
+        .eq('id', user.agency_id)
+        .single();
+
+      if (agency && agency.status !== 'active') {
+        throw new AgencyInactiveError();
+      }
+    }
 
     return {
       token: data.session!.access_token,
+      refresh_token: data.session!.refresh_token,
       user,
     };
   }

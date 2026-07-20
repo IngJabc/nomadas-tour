@@ -5,6 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { authApi } from "@/lib/api";
+import { ApiError } from "@/lib/errors/api-error";
+import { showAgencyInactiveToast, clearForcedLogout } from "@/lib/auth/session-handler";
 import Image from "next/image";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -43,6 +46,10 @@ function LoginContent() {
     }
   }, [searchParams, router]);
 
+  useEffect(() => {
+    clearForcedLogout();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submittingRef.current) return;
@@ -51,14 +58,12 @@ function LoginContent() {
     setError(null);
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const result = await authApi.login(email, password);
 
-      if (signInError) {
-        throw new Error("Correo o contraseña incorrectos");
-      }
+      await supabase.auth.setSession({
+        access_token: result.token,
+        refresh_token: result.refresh_token,
+      });
 
       const redirect = searchParams.get('redirect');
       if (redirect) {
@@ -66,8 +71,7 @@ function LoginContent() {
         const agencyParam = redirectUrl.searchParams.get('agency');
 
         if (agencyParam) {
-          const userAgencyId = data.user?.user_metadata?.agency_id;
-          if (userAgencyId !== agencyParam) {
+          if (result.user?.agency_id !== agencyParam) {
             throw new Error("Esta cuenta no pertenece a la agencia asociada a este correo.");
           }
           router.push('/agency/trips');
@@ -75,13 +79,17 @@ function LoginContent() {
           router.push(redirect);
         }
       } else {
-        const role = data.user?.user_metadata?.role;
+        const role = result.user?.role;
         if (role === 'superadmin') router.push('/admin');
         else if (role === 'agency') router.push('/agency');
         else router.push('/dashboard');
       }
       router.refresh();
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'AGENCY_INACTIVE') {
+        showAgencyInactiveToast();
+        return;
+      }
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     } finally {
       submittingRef.current = false;

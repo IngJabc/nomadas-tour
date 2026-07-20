@@ -1,4 +1,6 @@
 import type { AgencyReservation, AgencyTripPassengersResponse } from '@/types';
+import { ApiError } from '@/lib/errors/api-error';
+import { logoutInactiveAgency } from '@/lib/auth/session-handler';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
@@ -45,7 +47,15 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const data = await res.json();
 
   if (!res.ok) {
-    throw new Error(data?.error?.message || data?.error || 'API request failed');
+    const errorObj = data?.error;
+    const code = errorObj?.code;
+    const message = errorObj?.message || data?.error || 'API request failed';
+
+    if (code === 'AGENCY_INACTIVE' && !path.startsWith('/auth/login')) {
+      logoutInactiveAgency();
+    }
+
+    throw new ApiError(message, code || 'UNKNOWN', res.status);
   }
 
   return data;
@@ -54,7 +64,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 // Auth
 export const authApi = {
   login: (email: string, password: string) =>
-    request<{ token: string; user: any }>('/auth/login', {
+    request<{ token: string; refresh_token: string; user: any }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
