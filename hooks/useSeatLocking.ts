@@ -5,10 +5,19 @@ import { agencyApi } from '@/lib/api';
 import { subscribeToTripSeats, subscribeToTrips } from '@/lib/realtime/subscriptions';
 import { Seat, Trip } from '@/types';
 
+export interface TripFieldChanges {
+  route_id: boolean;
+  departure_time: boolean;
+  vehicle_type: boolean;
+  capacity: boolean;
+}
+
 interface UseSeatLockingOptions {
   userId: string | null;
   onSeatLost?: (seatCode: string) => void;
   onTripCancelled?: () => void;
+  onTripCompleted?: () => void;
+  onTripUpdated?: (changes: TripFieldChanges) => void;
 }
 
 interface UseSeatLockingReturn {
@@ -27,7 +36,7 @@ interface UseSeatLockingReturn {
   deepLinkError: boolean;
 }
 
-export function useSeatLocking({ userId, onSeatLost, onTripCancelled }: UseSeatLockingOptions): UseSeatLockingReturn {
+export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripCompleted, onTripUpdated }: UseSeatLockingOptions): UseSeatLockingReturn {
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [seatsMap, setSeatsMap] = useState<Record<string, Seat>>({});
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
@@ -42,14 +51,25 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled }: UseSeatL
   const mountedRef = useRef(true);
   const onSeatLostRef = useRef(onSeatLost);
   const onTripCancelledRef = useRef(onTripCancelled);
+  const onTripCompletedRef = useRef(onTripCompleted);
+  const onTripUpdatedRef = useRef(onTripUpdated);
   const tripCancelledRef = useRef(false);
   const tokenRef = useRef<string | null>(null);
   const unlockSentRef = useRef(false);
+  const prevTripFieldsRef = useRef<{
+    route_id: string | null;
+    departure_time: string | null;
+    vehicle_type: string | null;
+    capacity: number | null;
+    status: string | null;
+  }>({ route_id: null, departure_time: null, vehicle_type: null, capacity: null, status: null });
 
   selectedSeatsRef.current = selectedSeats;
   userIdRef.current = userId;
   onSeatLostRef.current = onSeatLost;
   onTripCancelledRef.current = onTripCancelled;
+  onTripCompletedRef.current = onTripCompleted;
+  onTripUpdatedRef.current = onTripUpdated;
 
   // Refresh cached auth token periodically for reliable cleanup on unload
   useEffect(() => {
@@ -164,6 +184,13 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled }: UseSeatL
       setSelectedTrip(trip);
       setSeatsMap(buildSeatsMap(trip.seats || []));
       tripIdRef.current = tripId;
+      prevTripFieldsRef.current = {
+        route_id: trip.route_id,
+        departure_time: trip.departure_time,
+        vehicle_type: trip.vehicle_type,
+        capacity: trip.capacity,
+        status: trip.status,
+      };
     } catch (err) {
       setTripsError(err instanceof Error ? err.message : 'Error al cargar el viaje');
     } finally {
@@ -192,6 +219,13 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled }: UseSeatL
       setSelectedTrip(trip);
       setSeatsMap(buildSeatsMap(trip.seats || []));
       tripIdRef.current = tripId;
+      prevTripFieldsRef.current = {
+        route_id: trip.route_id,
+        departure_time: trip.departure_time,
+        vehicle_type: trip.vehicle_type,
+        capacity: trip.capacity,
+        status: trip.status,
+      };
       return true;
     } catch {
       setDeepLinkError(true);
@@ -302,7 +336,7 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled }: UseSeatL
     };
   }, [selectedTrip?.id, cleanupChannel, buildSeatsMap]);
 
-  // ─── Realtime: detect trip cancellation ─────────────────────────────
+  // ─── Realtime: detect trip updates ─────────────────────────────────
   useEffect(() => {
     if (!tripIdRef.current || !selectedTrip?.id) return;
     const tripId = tripIdRef.current;
@@ -311,10 +345,55 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled }: UseSeatL
       if (payload.eventType !== 'UPDATE') return;
       const trip = payload.trip;
       if (trip.id !== tripId) return;
+
+      const prev = prevTripFieldsRef.current;
+
+      // Status: cancelled
       if (trip.status === 'cancelled') {
         tripCancelledRef.current = true;
         onTripCancelledRef.current?.();
+        return;
       }
+
+      // Status: completed
+      if (trip.status === 'completed' && prev.status !== 'completed') {
+        onTripCompletedRef.current?.();
+        return;
+      }
+
+      // Detect relevant field changes
+      const changes: TripFieldChanges = {
+        route_id: prev.route_id !== null && trip.route_id !== prev.route_id,
+        departure_time: prev.departure_time !== null && trip.departure_time !== prev.departure_time,
+        vehicle_type: prev.vehicle_type !== null && trip.vehicle_type !== prev.vehicle_type,
+        capacity: prev.capacity !== null && trip.capacity !== prev.capacity,
+      };
+
+      const hasChanges = Object.values(changes).some(Boolean);
+      if (!hasChanges) return;
+
+      // Refetch trip to get fresh data + seats
+      agencyApi.getTrip(tripId).then((fresh) => {
+        setSelectedTrip(fresh);
+        setSeatsMap(buildSeatsMap(fresh.seats || []));
+
+        // Clear selected seats that no longer exist (e.g. vehicle_type changed)
+        const newMap = buildSeatsMap(fresh.seats || []);
+        setSelectedSeats((prev) => {
+          const valid = prev.filter((s) => newMap[s.seat_code]);
+          return valid;
+        });
+
+        prevTripFieldsRef.current = {
+          route_id: fresh.route_id,
+          departure_time: fresh.departure_time,
+          vehicle_type: fresh.vehicle_type,
+          capacity: fresh.capacity,
+          status: fresh.status,
+        };
+
+        onTripUpdatedRef.current?.(changes);
+      }).catch(() => {});
     }, [tripId]);
 
     return cleanup;

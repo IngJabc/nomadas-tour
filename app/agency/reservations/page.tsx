@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Users, Plus, AlertTriangle, X } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
-import { subscribeToReservations, subscribeToReservationPassengers, subscribeToBoardingLogs } from '@/lib/realtime/subscriptions';
+import { subscribeToReservations, subscribeToReservationPassengers, subscribeToBoardingLogs, subscribeToTrips } from '@/lib/realtime/subscriptions';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -56,6 +56,27 @@ export default function AgencyReservationsPage() {
       cleanups.forEach((fn) => fn());
     };
   }, [doFetch]);
+
+  // Subscribe to trips associated with current reservations for postpone/status changes
+  useEffect(() => {
+    const tripIds = [...new Set(
+      reservations.map((r) => r.trips?.id).filter(Boolean) as string[],
+    )];
+    if (tripIds.length === 0) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const cleanup = subscribeToTrips((payload) => {
+      if (payload.eventType !== 'UPDATE') return;
+      if (!tripIds.includes(payload.trip.id)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(doFetch, 500);
+    }, tripIds);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      cleanup();
+    };
+  }, [reservations, doFetch]);
 
   const filtered = reservations.filter((r) => {
     if (statusFilter && r.status !== statusFilter) return false;

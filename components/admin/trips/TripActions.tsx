@@ -11,6 +11,7 @@ interface TripActionsProps {
   actionLoading: boolean;
   canComplete: boolean;
   canCancelPostpone: boolean;
+  hasReservations: boolean;
   onMenuToggle?: (open: boolean) => void;
 }
 
@@ -21,6 +22,7 @@ export function TripActions({
   actionLoading,
   canComplete,
   canCancelPostpone,
+  hasReservations,
   onMenuToggle,
 }: TripActionsProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -62,12 +64,14 @@ export function TripActions({
   });
 
   if (isActive) {
-    actions.push({
-      key: 'edit',
-      label: 'Editar',
-      variant: 'secondary',
-      onClick: onEdit,
-    });
+    if (!hasReservations) {
+      actions.push({
+        key: 'edit',
+        label: 'Editar',
+        variant: 'secondary',
+        onClick: onEdit,
+      });
+    }
     if (canCancelPostpone) {
       actions.push({
         key: 'postpone',

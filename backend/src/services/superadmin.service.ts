@@ -4,6 +4,13 @@ import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '.
 import { generateToken } from '../utils/token.js';
 import { toUTC } from '../utils/timezone.js';
 import { emailService } from './email.service.js';
+import {
+  getTripOperationalContext,
+  validateTripEditable,
+  validateVehicleChange,
+  validateAgencyRemoval,
+  validateNoActiveReservations,
+} from './trip-edit-context.js';
 
 export class SuperadminService {
   // ---- Agencies ----
@@ -693,17 +700,26 @@ export class SuperadminService {
     const config = this.VEHICLE_CONFIG[vehicleType];
     const capacity = config.capacity;
 
-    const { data: existing } = await supabaseAdmin
-      .from('trips')
-      .select('capacity, departure_time, status')
-      .eq('id', id)
-      .single();
+    // ── Phase 1: Fetch operational context & validate ────────────────
+    const ctx = await getTripOperationalContext(id);
 
-    if (!existing) throw new NotFoundError('Trip not found');
-    if (existing.status === 'completed' || existing.status === 'cancelled') {
-      throw new ValidationError('Cannot modify a completed or cancelled trip');
+    // Block: completed, cancelled, departed, boarded
+    validateTripEditable(ctx);
+
+    // Block: active reservations (skip for postpone — postpone is an independent operation)
+    if (!postpone) {
+      validateNoActiveReservations(ctx);
     }
 
+    // Block: vehicle change when active reservations / locks / boarding exist
+    validateVehicleChange(ctx, vehicleType);
+
+    // Block: removing agencies that have active reservations
+    validateAgencyRemoval(ctx, agencyIds);
+
+    // ── Phase 2: Apply changes (sequential for consistency) ─────────
+
+    // 2a. Update trip fields
     const updateFields: Record<string, any> = {
       route_id: routeId,
       departure_time: toUTC(departureTime),
@@ -718,60 +734,83 @@ export class SuperadminService {
 
     if (tripError) throw new ValidationError(tripError.message);
 
-    // Adjust seats if capacity changed
-    const oldCapacity = existing.capacity;
+    // 2b. Adjust seats if capacity changed (vehicle type already validated)
+    const oldCapacity = ctx.trip.capacity;
     if (capacity > oldCapacity) {
       const newSeats = Array.from({ length: capacity - oldCapacity }, (_, i) => ({
         trip_id: id,
         seat_code: `A${oldCapacity + i + 1}`,
         status: 'available' as const,
       }));
-      await supabaseAdmin.from('seats').insert(newSeats);
+      const { error: seatsInsertError } = await supabaseAdmin.from('seats').insert(newSeats);
+      if (seatsInsertError) {
+        // Rollback trip update
+        await supabaseAdmin
+          .from('trips')
+          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
+          .eq('id', id);
+        throw new ValidationError(`Error al agregar asientos: ${seatsInsertError.message}`);
+      }
     } else if (capacity < oldCapacity) {
       const excessCodes = Array.from({ length: oldCapacity - capacity }, (_, i) => `A${capacity + i + 1}`);
-      const { data: reserved } = await supabaseAdmin
+      const { data: reserved, error: checkError } = await supabaseAdmin
         .from('seats')
         .select('seat_code')
         .eq('trip_id', id)
         .in('seat_code', excessCodes)
         .neq('status', 'available');
-      if (reserved && reserved.length > 0) {
-        throw new ValidationError(`Cannot reduce capacity: seats ${reserved.map(s => s.seat_code).join(', ')} are already reserved`);
+      if (checkError) {
+        await supabaseAdmin
+          .from('trips')
+          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
+          .eq('id', id);
+        throw new ValidationError(checkError.message);
       }
-      await supabaseAdmin.from('seats').delete().eq('trip_id', id).in('seat_code', excessCodes);
+      if (reserved && reserved.length > 0) {
+        // Rollback trip update
+        await supabaseAdmin
+          .from('trips')
+          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
+          .eq('id', id);
+        throw new ValidationError(
+          `No se puede reducir capacidad: los asientos ${reserved.map(s => s.seat_code).join(', ')} tienen actividad`,
+        );
+      }
+      const { error: deleteError } = await supabaseAdmin
+        .from('seats').delete().eq('trip_id', id).in('seat_code', excessCodes);
+      if (deleteError) {
+        await supabaseAdmin
+          .from('trips')
+          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
+          .eq('id', id);
+        throw new ValidationError(`Error al eliminar asientos: ${deleteError.message}`);
+      }
     }
 
-    // Get current trip_agencies for this trip
-    const { data: currentTAs } = await supabaseAdmin
-      .from('trip_agencies')
-      .select('agency_id')
-      .eq('trip_id', id);
-
-    const currentAgencyIds = (currentTAs || []).map(ta => ta.agency_id);
-
-    // Remove agencies no longer selected
-    const removedAgencies = currentAgencyIds.filter(aid => !agencyIds.includes(aid));
+    // 2c. Manage agency assignments
+    const removedAgencies = ctx.currentAgencyIds.filter(aid => !agencyIds.includes(aid));
     if (removedAgencies.length > 0) {
-      await supabaseAdmin.from('trip_agencies').delete()
+      const { error: removeError } = await supabaseAdmin.from('trip_agencies').delete()
         .eq('trip_id', id)
         .in('agency_id', removedAgencies);
+      if (removeError) throw new ValidationError(`Error al desasignar agencias: ${removeError.message}`);
     }
 
-    // Add newly selected agencies
-    const newAgencies = agencyIds.filter(aid => !currentAgencyIds.includes(aid));
+    const newAgencies = agencyIds.filter(aid => !ctx.currentAgencyIds.includes(aid));
     if (newAgencies.length > 0) {
       const taRows = newAgencies.map(agencyId => ({
         trip_id: id,
         agency_id: agencyId,
       }));
-      await supabaseAdmin.from('trip_agencies').insert(taRows);
+      const { error: insertError } = await supabaseAdmin.from('trip_agencies').insert(taRows);
+      if (insertError) throw new ValidationError(`Error al asignar agencias: ${insertError.message}`);
     }
 
-    // If postpone, save old departure_time and send emails
+    // 2d. If postpone, save old departure_time and send emails
     if (postpone) {
       await supabaseAdmin
         .from('trips')
-        .update({ postponed_from: existing.departure_time })
+        .update({ postponed_from: ctx.trip.departure_time })
         .eq('id', id);
 
       const { data: route } = await supabaseAdmin
@@ -781,9 +820,9 @@ export class SuperadminService {
         .single();
 
       if (route) {
-        const allAgencyIds = [...new Set([...currentAgencyIds, ...agencyIds])];
+        const allAgencyIds = [...new Set([...ctx.currentAgencyIds, ...agencyIds])];
         const agenciesWithEmail = await this.getAgenciesWithEmail(allAgencyIds);
-        const oldFormatted = this.formatDateForEmail(existing.departure_time);
+        const oldFormatted = this.formatDateForEmail(ctx.trip.departure_time);
         const newFormatted = this.formatDateForEmail(toUTC(departureTime));
 
         for (const agency of agenciesWithEmail) {

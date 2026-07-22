@@ -13,6 +13,7 @@ export interface ReservationTicketTrip {
   destination: string;
   vehicle_type: 'bus' | 'kia';
   status: string;
+  postponed_from?: string | null;
 }
 
 export interface ReservationTicketData {

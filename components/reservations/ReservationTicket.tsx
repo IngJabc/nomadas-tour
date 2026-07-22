@@ -12,6 +12,7 @@ import {
   User,
   CreditCard,
   CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface ReservationTicketProps {
@@ -108,6 +109,15 @@ export const ReservationTicket = forwardRef<HTMLDivElement, ReservationTicketPro
                   </div>
                 </div>
               </div>
+
+              {trip.postponed_from && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#fffbeb] border border-[#fde68a]">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#92400e] shrink-0" strokeWidth={1.75} />
+                  <p className="font-[family-name:var(--font-body)] text-[11px] text-[#92400e]">
+                    Viaje pospuesto — Salida original: {formatDateTimeShort(trip.postponed_from)}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

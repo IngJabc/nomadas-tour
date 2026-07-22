@@ -76,11 +76,13 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
       return;
     }
     setNavError(null);
+    setSubmitError(null);
     dispatch({ type: 'NEXT_STEP' });
   }, [canProceed, dispatch]);
 
   const handlePrevious = useCallback(() => {
     setNavError(null);
+    setSubmitError(null);
     dispatch({ type: 'PREVIOUS_STEP' });
   }, [dispatch]);
 
@@ -108,7 +110,6 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
       }, 600);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Error al guardar el viaje');
-      setSubmitFeedback('error');
     } finally {
       setSubmitLoading(false);
     }

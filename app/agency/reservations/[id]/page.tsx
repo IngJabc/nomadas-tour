@@ -249,6 +249,7 @@ export default function ReservationDetailPage() {
             destination: trip.routes?.destination ?? '',
             vehicle_type: trip.vehicle_type as 'bus' | 'kia',
             status: 'active',
+            postponed_from: trip.postponed_from ?? null,
           }
         : null,
       passengers: passengers.map((p) => ({
@@ -371,6 +372,37 @@ export default function ReservationDetailPage() {
               <p className="font-[family-name:var(--font-body)] text-[13px] text-[#047857] mt-1">
                 Este viaje ya fue completado. No se permiten más acciones sobre esta reserva.
               </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {reservation.trips?.postponed_from && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-4 p-4 rounded-xl bg-[#fffbeb] border border-[#fde68a]"
+        >
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-[#92400e] shrink-0 mt-0.5" strokeWidth={1.75} />
+            <div>
+              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[#92400e]">
+                Viaje pospuesto
+              </p>
+              <p className="font-[family-name:var(--font-body)] text-[13px] text-[#92400e] mt-1">
+                La salida de este viaje fue reprogramada por el administrador.
+                Su reserva y asientos se mantienen vigentes.
+              </p>
+              <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-[12px] font-[family-name:var(--font-body)]">
+                <span className="text-[#92400e]/60">
+                  Salida original: <span className="line-through">{formatInTimezone(reservation.trips.postponed_from)}</span>
+                </span>
+                <span className="text-[#92400e]/40 hidden sm:inline">→</span>
+                <span className="font-semibold text-[#92400e]">
+                  Nueva salida: {formatInTimezone(reservation.trips.departure_time)}
+                </span>
+              </div>
             </div>
           </div>
         </motion.div>
