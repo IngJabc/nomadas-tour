@@ -24,6 +24,7 @@ router.patch('/reservations/:id/passengers/:passengerId/cancel', (req, res, next
 router.post('/seats/lock', (req, res, next) => reservationController.lockSeat(req, res, next));
 router.post('/seats/unlock', (req, res, next) => reservationController.unlockSeat(req, res, next));
 router.post('/seats/unlock-all', (req, res, next) => reservationController.unlockAllSeats(req, res, next));
+router.post('/seats/unlock-all-user', (req, res, next) => reservationController.unlockAllUserSeats(req, res, next));
 
 // Scanner endpoints (boarding parcial con QR)
 router.post('/scanner/lookup', (req, res, next) => reservationController.lookupReservation(req, res, next));

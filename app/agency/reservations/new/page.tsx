@@ -36,11 +36,13 @@ import { useReservationWizard } from "@/hooks/useReservationWizard";
 import { useSeatLocking } from "@/hooks/useSeatLocking";
 import { useReservationSubmit } from "@/hooks/useReservationSubmit";
 import { useCapture } from "@/hooks/useCapture";
+import { useLockCountdown } from "@/hooks/useLockCountdown";
 import { validateForm } from "@/lib/reservations/validateForm";
 import { BusLayout } from "@/components/bus/BusLayout";
 import { BusLayoutSnapshot } from "@/components/bus/BusLayoutSnapshot";
 import { withReposition } from "@/lib/capture-reposition";
 import { PassengerForm } from "@/components/booking/PassengerForm";
+import { LockCountdown } from "@/components/booking/LockCountdown";
 import { ReservationSummary } from "@/components/booking/ReservationSummary";
 import { AgencyTripCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -116,6 +118,10 @@ function NewReservationContent() {
     else toast(message);
   }, []);
   const tripCancelledHandledRef = useRef(false);
+  const lockExpiredHandledRef = useRef(false);
+  const hadSeatsRef = useRef(false);
+  const prevWizardStepRef = useRef<string | null>(null);
+  const [refreshingSeats, setRefreshingSeats] = useState(false);
   const locking = useSeatLocking({ userId, onSeatLost: (seatCode) => {
     addToast(`El asiento ${seatCode} ya no está disponible`, "info");
   }, onTripCancelled: () => {
@@ -125,10 +131,49 @@ function NewReservationContent() {
     setTimeout(() => router.push("/agency/trips"), 300);
   }});
 
+  const handleLockExpired = useCallback(async () => {
+    if (lockExpiredHandledRef.current) return;
+    lockExpiredHandledRef.current = true;
+    hadSeatsRef.current = false;
+    setRefreshingSeats(true);
+    try {
+      await locking.unlockAllCurrent();
+      await locking.refreshSeats();
+    } finally {
+      locking.clearSelection();
+      setRefreshingSeats(false);
+      toast.error("El tiempo para completar la reserva expiró. Tus asientos fueron liberados. Selecciona nuevamente para continuar.");
+      wizard.goToSeatSelection();
+    }
+  }, [locking, wizard]);
+
+  const { remainingSeconds, formattedTime, stop: stopCountdown } = useLockCountdown({
+    selectedSeats: locking.selectedSeats,
+    ttlSeconds: Number(process.env.NEXT_PUBLIC_LOCK_TTL_SECONDS || 300),
+    onExpired: handleLockExpired,
+  });
+
   // Keep ref in sync for beforeunload event handler
   useEffect(() => {
     selectedSeatsCountRef.current = locking.selectedSeats.length;
   }, [locking.selectedSeats.length]);
+
+  // Track whether seats were ever selected (for auto-revert guard)
+  useEffect(() => {
+    if (locking.selectedSeats.length > 0) {
+      hadSeatsRef.current = true;
+    }
+  }, [locking.selectedSeats.length]);
+
+  // Reset hadSeatsRef when wizard navigates away from seat selection
+  useEffect(() => {
+    const prev = prevWizardStepRef.current;
+    prevWizardStepRef.current = wizard.step;
+    if (prev === null) return;
+    if (prev !== wizard.step && prev !== "select_seats") {
+      hadSeatsRef.current = false;
+    }
+  }, [wizard.step]);
 
   const [bookerName, setBookerName] = useState("");
   const [bookerDocument, setBookerDocument] = useState("");
@@ -174,9 +219,10 @@ function NewReservationContent() {
 
   const onSuccess = useCallback((reservationId: string) => {
     locking.unlockAllCurrent();
+    stopCountdown();
     setReservationIdFromUrl(reservationId);
     router.replace(`/agency/reservations/new?reservation_id=${reservationId}`);
-  }, [locking, router]);
+  }, [locking, router, stopCountdown]);
 
   const submit = useReservationSubmit({
     trip: locking.selectedTrip,
@@ -322,8 +368,11 @@ function NewReservationContent() {
   const handleBackFromSeats = useCallback(async () => {
     await locking.unlockAllCurrent();
     locking.resetSeats();
+    lockExpiredHandledRef.current = false;
+    hadSeatsRef.current = false;
+    stopCountdown();
     wizard.goBackFromSeats();
-  }, [locking, wizard]);
+  }, [locking, wizard, stopCountdown]);
 
   const handleSelectTrip = useCallback(
     async (tripId: string) => {
@@ -351,6 +400,7 @@ function NewReservationContent() {
       }))
     );
     setErrors({});
+    lockExpiredHandledRef.current = false;
     wizard.goToPassengerForm();
   }, [locking.selectedSeats, wizard]);
 
@@ -406,9 +456,13 @@ function NewReservationContent() {
     submit.resetResult();
     submit.clearError();
     locking.resetSeats();
+    lockExpiredHandledRef.current = false;
+    hadSeatsRef.current = false;
+    stopCountdown();
     wizard.resetWizard();
     tripCancelledHandledRef.current = false;
-  }, [submit, locking, wizard]);
+    router.replace('/agency/reservations/new');
+  }, [submit, locking, wizard, router, stopCountdown]);
 
   const handleBookerNameChange = useCallback((v: string) => setBookerName(v), []);
   const handleBookerDocumentChange = useCallback((v: string) => setBookerDocument(v), []);
@@ -428,20 +482,24 @@ function NewReservationContent() {
 
   const handleToggleSeat = useCallback(
     (seat: Seat) => {
+      if (refreshingSeats) return;
       locking.toggleSeat(seat, addToast);
     },
-    [locking, addToast]
+    [locking, addToast, refreshingSeats]
   );
 
-  // ─── Auto-revert when all seats lost on later steps ────────────────
+  // ─── Auto-revert when all seats lost on active steps ─────────────────
   useEffect(() => {
-    if (
-      !tripCancelledHandledRef.current &&
-      (wizard.step === "passenger_form" || wizard.step === "summary") &&
-      locking.selectedSeats.length === 0
-    ) {
+    if (tripCancelledHandledRef.current || lockExpiredHandledRef.current) return;
+    if (!hadSeatsRef.current) return;
+    const isOnActiveStep =
+      wizard.step === "select_seats" ||
+      wizard.step === "passenger_form" ||
+      wizard.step === "summary";
+    if (isOnActiveStep && locking.selectedSeats.length === 0) {
+      hadSeatsRef.current = false;
       addToast(
-        "Tus asientos expiraron. Selecciona nuevamente.",
+        "Tus asientos fueron liberados. Selecciona nuevamente.",
         "info"
       );
       wizard.goToSeatSelection();
@@ -763,7 +821,10 @@ function NewReservationContent() {
                         <p className="font-[family-name:var(--font-heading)] font-bold text-[13px] text-[var(--color-brand-navy)] uppercase tracking-wider mb-4 border-l-4 border-[var(--color-brand-cyan)] pl-3">
                           Resumen del viaje
                         </p>
-                        <div className="space-y-4">
+
+                        <LockCountdown seconds={remainingSeconds} formattedTime={formattedTime} />
+
+                        <div className="space-y-4 mt-4">
                           <div className="flex items-start gap-3">
                             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[rgba(0,212,255,0.1)] shrink-0">
                               <ArrowRight className="w-4 h-4 text-[var(--color-brand-cyan)]" />
@@ -849,15 +910,25 @@ function NewReservationContent() {
                         transition={{ duration: 0.25, delay: 0.05 }}
                         className="flex-1 flex flex-col items-center"
                       >
-                        <BusLayout
-                          seats={locking.seatsMap}
-                          selectedSeats={locking.selectedSeats}
-                          onToggleSeat={handleToggleSeat}
-                          vehicleType={
-                            locking.selectedTrip.vehicle_type ?? "bus"
-                          }
-                          userId={userId}
-                        />
+                        {refreshingSeats && (
+                          <div className="flex items-center gap-2 px-4 py-2 mb-3 rounded-xl bg-[rgba(0,212,255,0.04)] border border-[rgba(0,212,255,0.15)]">
+                            <div className="w-3.5 h-3.5 border-2 border-[var(--color-brand-cyan)] border-t-transparent rounded-full animate-spin" />
+                            <span className="font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)]">
+                              Actualizando disponibilidad...
+                            </span>
+                          </div>
+                        )}
+                        <div className={refreshingSeats ? 'pointer-events-none opacity-60' : ''}>
+                          <BusLayout
+                            seats={locking.seatsMap}
+                            selectedSeats={locking.selectedSeats}
+                            onToggleSeat={handleToggleSeat}
+                            vehicleType={
+                              locking.selectedTrip.vehicle_type ?? "bus"
+                            }
+                            userId={userId}
+                          />
+                        </div>
                       </motion.div>
                     </div>
 
@@ -912,6 +983,8 @@ function NewReservationContent() {
                   Volver a asientos
                 </button>
 
+                <LockCountdown seconds={remainingSeconds} formattedTime={formattedTime} />
+
                 <PassengerForm
                   passengers={passengers}
                   onUpdate={handlePassengerUpdate}
@@ -947,6 +1020,8 @@ function NewReservationContent() {
                   <ArrowLeft className="w-4 h-4" />
                   Volver a pasajeros
                 </button>
+
+                <LockCountdown seconds={remainingSeconds} formattedTime={formattedTime} />
 
                 <ReservationSummary
                   trip={locking.selectedTrip}

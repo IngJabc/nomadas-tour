@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/database.js';
 import { NotFoundError, AgencyInactiveError } from '../errors/index.js';
 
-const UNLOCK_PATHS = ['/seats/unlock', '/seats/unlock-all'];
+const UNLOCK_PATHS = ['/seats/unlock', '/seats/unlock-all', '/seats/unlock-all-user'];
 
 export async function tenant(req: Request, _res: Response, next: NextFunction) {
   const agencyId = req.ctx?.agencyId;

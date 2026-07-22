@@ -10,6 +10,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().min(1),
   EMAIL_FROM: z.string().min(1),
   FRONTEND_URL: z.string().url(),
+  LOCK_TTL_SECONDS: z.coerce.number().default(300),
 });
 
 function loadEnv() {

@@ -216,7 +216,7 @@ export const agencyApi = {
   cancelPassenger: (reservationId: string, passengerId: string) =>
     request<any>(`/agency/reservations/${reservationId}/passengers/${passengerId}/cancel`, { method: 'PATCH' }),
   lockSeat: (trip_id: string, seat_id: string) =>
-    request<{ locked: boolean; seat_id: string }>('/agency/seats/lock', {
+    request<{ locked: boolean; seat_id: string; locked_at: string }>('/agency/seats/lock', {
       method: 'POST',
       body: JSON.stringify({ trip_id, seat_id }),
     }),
@@ -229,6 +229,10 @@ export const agencyApi = {
     request<{ unlocked: number }>('/agency/seats/unlock-all', {
       method: 'POST',
       body: JSON.stringify({ trip_id }),
+    }),
+  unlockAllUserSeats: () =>
+    request<{ unlocked: number }>('/agency/seats/unlock-all-user', {
+      method: 'POST',
     }),
 
   // Sprint 13 — Boarding por pasajero individual
