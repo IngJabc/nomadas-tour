@@ -127,6 +127,7 @@ export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripC
         actionLoading={actionLoading === trip.id}
         canComplete={canDoComplete}
         canCancelPostpone={canDoCancelPostpone}
+        hasReservations={trip.occupancy.reserved > 0}
         onMenuToggle={setMenuOpen}
       />
     </Card>

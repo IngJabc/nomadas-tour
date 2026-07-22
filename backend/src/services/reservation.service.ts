@@ -453,7 +453,7 @@ export class ReservationService {
   async getAgencyReservations(agencyId: string) {
     const { data, error } = await supabaseAdmin
       .from('reservations')
-      .select('*, trips(departure_time, vehicle_type, status, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
+      .select('*, trips(departure_time, vehicle_type, status, postponed_from, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
       .eq('agency_id', agencyId)
       .order('created_at', { ascending: false });
 
@@ -472,7 +472,7 @@ export class ReservationService {
   async getAgencyReservationById(id: string, agencyId: string) {
     const { data, error } = await supabaseAdmin
       .from('reservations')
-      .select('*, trips(id, departure_time, vehicle_type, status, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
+      .select('*, trips(id, departure_time, vehicle_type, status, postponed_from, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
       .eq('id', id)
       .eq('agency_id', agencyId)
       .single();

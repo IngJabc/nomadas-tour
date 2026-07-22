@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { formatDateTimeShort, formatDateLong, formatTime12h } from "@/lib/timezone";
 import { agencyApi } from "@/lib/api";
-import { subscribeToTripSeats } from "@/lib/realtime/subscriptions";
+import { subscribeToTripSeats, subscribeToTrips } from "@/lib/realtime/subscriptions";
 import {
   Seat,
   PassengerData,
@@ -118,6 +118,7 @@ function NewReservationContent() {
     else toast(message);
   }, []);
   const tripCancelledHandledRef = useRef(false);
+  const tripCompletedHandledRef = useRef(false);
   const lockExpiredHandledRef = useRef(false);
   const isSubmittingRef = useRef(false);
   const hadSeatsRef = useRef(false);
@@ -130,6 +131,18 @@ function NewReservationContent() {
     tripCancelledHandledRef.current = true;
     toast.error("Este viaje fue cancelado por el administrador. La reserva no puede continuar.");
     setTimeout(() => router.push("/agency/trips"), 300);
+  }, onTripCompleted: () => {
+    if (tripCompletedHandledRef.current) return;
+    tripCompletedHandledRef.current = true;
+    toast.error("Este viaje fue completado por el administrador. La reserva no puede continuar.");
+    setTimeout(() => router.push("/agency/trips"), 300);
+  }, onTripUpdated: (changes) => {
+    const labels: string[] = [];
+    if (changes.route_id) labels.push('la ruta');
+    if (changes.departure_time) labels.push('la fecha/hora de salida');
+    if (changes.vehicle_type) labels.push('el tipo de vehículo');
+    if (changes.capacity) labels.push('la capacidad');
+    toast(`El viaje fue actualizado (${labels.join(', ')}). Los datos se han refrescado.`, { icon: '🔄' });
   }});
 
   const handleLockExpired = useCallback(async () => {
@@ -360,6 +373,71 @@ function NewReservationContent() {
     };
   }, [wizard.step, trips.length]);
 
+  // ─── Realtime: trip field changes on the list ──────────────────────
+  useEffect(() => {
+    if (wizard.step !== "select_trip" || trips.length === 0) return;
+
+    const tripIds = trips.map((t) => t.id);
+    const debounceTimerRef: { current: ReturnType<typeof setTimeout> | null } =
+      { current: null };
+    const pendingTripIds = new Set<string>();
+
+    const flush = async () => {
+      if (pendingTripIds.size === 0) return;
+      const idsToFetch = Array.from(pendingTripIds);
+      pendingTripIds.clear();
+
+      for (const tripId of idsToFetch) {
+        try {
+          const fresh = await agencyApi.getTrip(tripId);
+          const seats = fresh.seats ?? [];
+          const available_seats = seats.filter(
+            (s: Seat) => s.status === "available"
+          ).length;
+          const reserved_seats = seats.filter(
+            (s: Seat) => s.status === "reserved" || s.status === "boarded"
+          ).length;
+
+          setTrips((prev) => {
+            const idx = prev.findIndex((t) => t.id === tripId);
+            if (idx === -1) return prev;
+            const updated = [...prev];
+            updated[idx] = {
+              ...updated[idx],
+              departure_time: fresh.departure_time,
+              vehicle_type: fresh.vehicle_type,
+              status: fresh.status,
+              total_seats: fresh.capacity ?? updated[idx].total_seats,
+              available_seats,
+              reserved_seats,
+              route: fresh.route
+                ? { origin: fresh.route.origin, destination: fresh.route.destination }
+                : updated[idx].route,
+            };
+            return updated;
+          });
+        } catch {
+          /* silent */
+        }
+      }
+    };
+
+    const handleTripUpdate = (payload: { eventType: string; trip: Record<string, any> }) => {
+      if (payload.eventType !== 'UPDATE') return;
+      const trip = payload.trip;
+      if (!tripIds.includes(trip.id)) return;
+      pendingTripIds.add(trip.id);
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(flush, 500);
+    };
+
+    const cleanup = subscribeToTrips(handleTripUpdate, tripIds);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      cleanup();
+    };
+  }, [wizard.step, trips.length]);
+
   // ─── Deep link ────────────────────────────────────────────────────
   useEffect(() => {
     if (!tripIdParam) return;
@@ -465,6 +543,7 @@ function NewReservationContent() {
     stopCountdown();
     wizard.resetWizard();
     tripCancelledHandledRef.current = false;
+    tripCompletedHandledRef.current = false;
     router.replace('/agency/reservations/new');
   }, [submit, locking, wizard, router, stopCountdown]);
 

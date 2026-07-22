@@ -8,10 +8,12 @@ import {
   ChevronRight,
   AlertTriangle,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { RESERVATION_STATUS_STYLES } from "@/lib/constants/reservation-status";
+import { formatDateTimeShort } from "@/lib/timezone";
 import type { AgencyReservation } from "@/types";
 
 interface AgencyReservationCardProps {
@@ -76,6 +78,24 @@ export function AgencyReservationCard({ reservation }: AgencyReservationCardProp
           <span className="font-[family-name:var(--font-body)] text-[11px] font-semibold text-[#059669]">
             Viaje completado
           </span>
+        </div>
+      )}
+
+      {reservation.trips?.postponed_from && (
+        <div className="mb-3 px-2 py-2 rounded-lg bg-[#fffbeb] border border-[#fde68a]">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <AlertTriangle className="w-3 h-3 text-[#92400e] shrink-0" strokeWidth={1.75} />
+            <span className="font-[family-name:var(--font-body)] text-[11px] font-semibold text-[#92400e]">
+              Viaje pospuesto
+            </span>
+          </div>
+          <div className="space-y-0.5 ml-[18px]">
+            <p className="font-[family-name:var(--font-body)] text-[10px] text-[#92400e]">
+              <span className="line-through opacity-60">{formatDateTimeShort(reservation.trips.postponed_from)}</span>
+              <span className="mx-1">→</span>
+              <span className="font-semibold">{formatDateTimeShort(reservation.trips.departure_time)}</span>
+            </p>
+          </div>
         </div>
       )}
 

@@ -132,6 +132,7 @@ export interface AgencyReservation {
     departure_time: string;
     vehicle_type: string;
     status: string;
+    postponed_from?: string | null;
     routes: { origin: string; destination: string } | null;
   } | null;
   reservation_passengers?: AgencyReservationPassenger[];
