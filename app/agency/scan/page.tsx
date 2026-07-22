@@ -18,7 +18,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { agencyApi } from "@/lib/api";
-import { subscribeToBoardingLogs } from "@/lib/realtime/subscriptions";
+import { subscribeToBoardingLogs, subscribeToTrips } from "@/lib/realtime/subscriptions";
 import { validateQrInput, normalizeQrCode } from "@/lib/qr";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -48,6 +48,7 @@ type PassengerInfo = {
 type ScanLookupResult = {
   reservation_id: string;
   trip_id: string;
+  trip_status: string | null;
   booker_name: string;
   booker_document: string;
   qr_code: string;
@@ -324,6 +325,29 @@ function AgencyScanContent() {
       cleanup();
     };
   }, [scanResult?.reservation_id, lookupByQR]);
+
+  // ─── Realtime: refetch when trip status changes ─────────────────────
+  useEffect(() => {
+    if (!scanResult?.trip_id) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = subscribeToTrips((payload) => {
+      if (payload.trip.id !== scanResult.trip_id) return;
+      if (payload.eventType !== 'UPDATE') return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (currentQrRef.current) {
+          lookupByQR(currentQrRef.current, true);
+        }
+      }, 500);
+    }, [scanResult.trip_id]);
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      cleanup();
+    };
+  }, [scanResult?.trip_id, lookupByQR]);
 
   const handleStartCamera = () => {
     setCameraError(null);
@@ -848,6 +872,24 @@ function AgencyScanContent() {
                   </motion.div>
                 )}
 
+                {scanResult.trip_status === 'cancelled' && scanResult.reservation_status !== 'cancelled' && (
+                  <motion.div variants={staggerItem} className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                    <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-red-700">
+                      Este viaje fue cancelado. No es posible realizar boarding.
+                    </span>
+                  </motion.div>
+                )}
+
+                {scanResult.trip_status === 'completed' && scanResult.reservation_status !== 'cancelled' && (
+                  <motion.div variants={staggerItem} className="mb-4 p-3 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
+                    <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-green-700">
+                      Este viaje ya fue completado. No es posible realizar boarding.
+                    </span>
+                  </motion.div>
+                )}
+
                 <motion.div variants={staggerItem} className="mb-5 space-y-3">
                   <div>
                     <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
@@ -924,7 +966,7 @@ function AgencyScanContent() {
                           </span>
                           <button
                             type="button"
-                            disabled={togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled'}
+                            disabled={togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed'}
                             onClick={() =>
                               handleToggleBoarding(
                                 passenger.id,
@@ -936,7 +978,7 @@ function AgencyScanContent() {
                           transition-colors duration-200 ease-in-out
                           ${passenger.boarded ? "bg-[#10b981]" : "bg-[#e5e7eb]"}
                           ${
-                            togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled'
+                            togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed'
                               ? "opacity-50 cursor-not-allowed"
                               : ""
                           }
@@ -964,7 +1006,7 @@ function AgencyScanContent() {
 
                 <motion.div variants={staggerItem} className="border-t border-[#e5e7eb] pt-4 mt-4 flex flex-wrap gap-3">
                   <AnimatePresence>
-                    {scanResult.passengers.some((p) => !p.boarded) && scanResult.reservation_status !== 'cancelled' && (
+                    {scanResult.passengers.some((p) => !p.boarded) && scanResult.reservation_status !== 'cancelled' && scanResult.trip_status !== 'cancelled' && scanResult.trip_status !== 'completed' && (
                       <motion.div
                         key="bulk-btn"
                         initial={{ opacity: 0, scale: 0.9 }}
