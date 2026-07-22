@@ -132,6 +132,19 @@ export function formatDateLong(dateString: string): string {
 }
 
 /**
+ * Format date as dd/mm/yyyy.
+ * e.g. "20/07/2026"
+ */
+export function formatDateShort(dateString: string): string {
+  return new Intl.DateTimeFormat('es-ES', {
+    timeZone: BUSINESS_TIMEZONE,
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(dateString));
+}
+
+/**
  * Convert a UTC ISO string to a datetime-local format string in BUSINESS_TIMEZONE.
  * e.g. "2026-07-20T11:00:00.000Z" → "2026-07-20T07:00"
  *

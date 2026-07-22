@@ -2,7 +2,7 @@
 
 import toast from 'react-hot-toast';
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatDateLong, formatTime12h } from "@/lib/timezone";
+import { formatDateLong, formatDateShort, formatTime12h } from "@/lib/timezone";
 import { Html5Qrcode } from "html5-qrcode";
 import type { Html5QrcodeResult } from "html5-qrcode";
 import { AnimatePresence, motion } from "framer-motion";
@@ -55,6 +55,7 @@ type ScanLookupResult = {
   reservation_status: string;
   reservation_agency_name: string;
   departure_time: string | null;
+  boarding_allowed: boolean;
   route: { origin: string; destination: string } | null;
   passengers: PassengerInfo[];
 };
@@ -890,6 +891,28 @@ function AgencyScanContent() {
                   </motion.div>
                 )}
 
+                {!scanResult.boarding_allowed && scanResult.trip_status !== 'cancelled' && scanResult.trip_status !== 'completed' && scanResult.reservation_status !== 'cancelled' && (
+                  <motion.div variants={staggerItem} className="mb-4 p-4 rounded-xl bg-[#fffbeb] border border-[#fde68a]">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="w-5 h-5 text-[#92400e] shrink-0" />
+                      <span className="font-[family-name:var(--font-heading)] font-bold text-[14px] text-[#92400e]">
+                        Boarding no disponible
+                      </span>
+                    </div>
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[#92400e] mb-1">
+                      Este viaje aún no ha iniciado.
+                    </p>
+                    <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[#92400e]">
+                      El boarding estará disponible a partir de la hora programada de salida.
+                    </p>
+                    {scanResult.departure_time && (
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[#92400e] mt-2">
+                        Salida: {formatDateShort(scanResult.departure_time)} {formatTime12h(scanResult.departure_time)}
+                      </p>
+                    )}
+                  </motion.div>
+                )}
+
                 <motion.div variants={staggerItem} className="mb-5 space-y-3">
                   <div>
                     <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
@@ -900,7 +923,7 @@ function AgencyScanContent() {
                     </p>
                     <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
                       {scanResult.departure_time
-                        ? `${formatDateLong(scanResult.departure_time)}`
+                        ? `${formatDateLong(scanResult.departure_time)} · ${formatTime12h(scanResult.departure_time)}`
                         : ""}
                     </p>
                   </div>
@@ -966,7 +989,7 @@ function AgencyScanContent() {
                           </span>
                           <button
                             type="button"
-                            disabled={togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed'}
+                            disabled={togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed' || !scanResult.boarding_allowed}
                             onClick={() =>
                               handleToggleBoarding(
                                 passenger.id,
@@ -978,7 +1001,7 @@ function AgencyScanContent() {
                           transition-colors duration-200 ease-in-out
                           ${passenger.boarded ? "bg-[#10b981]" : "bg-[#e5e7eb]"}
                           ${
-                            togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed'
+                            togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed' || !scanResult.boarding_allowed
                               ? "opacity-50 cursor-not-allowed"
                               : ""
                           }
@@ -1006,7 +1029,7 @@ function AgencyScanContent() {
 
                 <motion.div variants={staggerItem} className="border-t border-[#e5e7eb] pt-4 mt-4 flex flex-wrap gap-3">
                   <AnimatePresence>
-                    {scanResult.passengers.some((p) => !p.boarded) && scanResult.reservation_status !== 'cancelled' && scanResult.trip_status !== 'cancelled' && scanResult.trip_status !== 'completed' && (
+                    {scanResult.passengers.some((p) => !p.boarded) && scanResult.reservation_status !== 'cancelled' && scanResult.trip_status !== 'cancelled' && scanResult.trip_status !== 'completed' && scanResult.boarding_allowed && (
                       <motion.div
                         key="bulk-btn"
                         initial={{ opacity: 0, scale: 0.9 }}

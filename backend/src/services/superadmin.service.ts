@@ -275,18 +275,6 @@ export class SuperadminService {
     if (error) throw new ValidationError(error.message);
   }
 
-  // ---- Auto-complete expired trips ----
-  async autoCompleteExpiredTrips() {
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { error } = await supabaseAdmin
-      .from('trips')
-      .update({ status: 'completed' })
-      .eq('status', 'active')
-      .lt('departure_time', cutoff);
-
-    if (error) throw new ValidationError(error.message);
-  }
-
   // ---- Vehicle config ----
   private readonly VEHICLE_CONFIG: Record<string, { capacity: number; seats: string[] }> = {
     bus: {
@@ -421,8 +409,6 @@ export class SuperadminService {
     limit: number = 12,
     filters?: { status?: string; route_id?: string; agency_id?: string; search?: string; departure_date?: string }
   ) {
-    await this.autoCompleteExpiredTrips();
-
     // Resolve text search to route IDs and agency IDs
     let routeIdFilter: string[] | undefined;
     let tripIdFilterFromSearch: string[] | undefined;
@@ -628,7 +614,6 @@ export class SuperadminService {
   }
 
   async getTrip(id: string) {
-    await this.autoCompleteExpiredTrips();
     const { data, error } = await supabaseAdmin
       .from('trips')
       .select('*, routes(*), trip_agencies(*)')

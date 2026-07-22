@@ -82,7 +82,7 @@ function LoginContent() {
         const role = result.user?.role;
         if (role === 'superadmin') router.push('/admin');
         else if (role === 'agency') router.push('/agency');
-        else router.push('/dashboard');
+        else router.push('/');
       }
       router.refresh();
     } catch (err) {

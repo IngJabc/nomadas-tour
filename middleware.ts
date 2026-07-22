@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const protectedPaths = ['/dashboard', '/bookings', '/admin', '/agency'];
+const protectedPaths = ['/bookings', '/admin', '/agency'];
 const adminPaths = ['/admin'];
 const agencyPaths = ['/agency'];
 const publicPaths = ['/login', '/register', '/', '/trips'];
@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
     const role = user?.user_metadata?.role ?? '';
     if (role !== 'superadmin') {
       const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
+      url.pathname = '/';
       return NextResponse.redirect(url);
     }
   }
@@ -67,7 +67,7 @@ export async function middleware(request: NextRequest) {
     const role = user?.user_metadata?.role ?? '';
     if (role !== 'agency') {
       const url = request.nextUrl.clone();
-      url.pathname = '/dashboard';
+      url.pathname = '/';
       return NextResponse.redirect(url);
     }
 

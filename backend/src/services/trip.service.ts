@@ -6,7 +6,7 @@ export async function completeExpiredTrips(): Promise<void> {
   const { data, error } = await supabaseAdmin
     .from('trips')
     .update({ status: 'completed' })
-    .neq('status', 'completed')
+    .eq('status', 'active')
     .lt('departure_time', cutoff)
     .select();
 
