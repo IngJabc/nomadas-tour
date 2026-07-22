@@ -104,12 +104,8 @@ export const authApi = {
 
 // Customer (public)
 export const customerApi = {
-  listTrips: () => request<any[]>('/trips'),
   getTripWithSeats: (tripId: string) =>
     request<any>(`/trips/${tripId}`),
-  getAvailableAgencies: (tripId: string) =>
-    request<any[]>(`/trips/${tripId}/agencies`),
-  getMyReservations: () => request<any[]>('/reservations/my'),
   createReservation: (data: {
     trip_id: string;
     customer_name: string;

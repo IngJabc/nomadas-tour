@@ -2,7 +2,7 @@
 
 import { forwardRef } from 'react';
 import { QRCode } from 'react-qr-code';
-import { formatDateTimeShort, formatTime12h, formatDateLong } from '@/lib/timezone';
+import { formatDateTimeShort, formatTime12h, formatDateShort } from '@/lib/timezone';
 import { VEHICLE_LABELS, type ReservationTicketData } from '@/types/reservation';
 import {
   MapPin,
@@ -80,7 +80,7 @@ export const ReservationTicket = forwardRef<HTMLDivElement, ReservationTicketPro
                       Fecha
                     </p>
                     <p className="font-[family-name:var(--font-body)] font-medium text-[12px] text-[var(--color-brand-navy)] truncate">
-                      {formatDateLong(trip.departure_time)}
+                      {formatDateShort(trip.departure_time)}
                     </p>
                   </div>
                 </div>

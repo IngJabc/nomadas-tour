@@ -148,14 +148,6 @@ export function BookingPanel({
                 Ver mi boleto
               </Link>
             )}
-            <Link
-              href="/dashboard"
-              className="w-full sm:flex-1 px-5 py-3 bg-brand-cyan text-white font-['Poppins',sans-serif] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 flex items-center justify-center"
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--color-brand-blue)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-brand-cyan)'; }}
-            >
-              Mis reservas
-            </Link>
           </div>
         </motion.div>
       ) : selectedSeats.length === 0 ? (

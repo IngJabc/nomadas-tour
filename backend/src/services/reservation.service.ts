@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { NotFoundError, ValidationError, ConflictError, ForbiddenError } from '../errors/index.js';
 import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
 import { sortBySeatCode } from '../utils/sort.js';
+import { validateBoardingAllowed } from './boarding.guard.js';
 
 export class ReservationService {
   async listActiveTrips() {
@@ -251,6 +252,10 @@ export class ReservationService {
   }
 
   async boardPassenger(tripId: string, qrCode: string, scannedBy: string, agencyId: string | null, isSuperadmin: boolean) {
+    if (agencyId) {
+      await validateBoardingAllowed({ tripId, agencyId });
+    }
+
     let query = supabaseAdmin
       .from('reservations')
       .select('id')
@@ -642,12 +647,14 @@ export class ReservationService {
   ) {
     const { data: reservation, error } = await supabaseAdmin
       .from('reservations')
-      .select('id, status')
+      .select('id, status, trip_id')
       .eq('qr_code', qrCode)
       .eq('agency_id', agencyId)
       .single();
 
     if (error || !reservation) throw new NotFoundError('Reservation not found');
+
+    await validateBoardingAllowed({ tripId: reservation.trip_id, agencyId });
 
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
@@ -742,7 +749,7 @@ export class ReservationService {
       .eq('id', tripId)
       .single();
 
-    if (trip?.status === 'cancelled') return null;
+    if (trip?.status === 'cancelled' || trip?.status === 'completed') return null;
 
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
@@ -761,6 +768,9 @@ export class ReservationService {
       reservation_agency_name: (reservation as any).agencies?.name || '',
       departure_time: (trip as any)?.departure_time || null,
       route: (trip as any)?.routes || null,
+      boarding_allowed: (trip as any)?.departure_time
+        ? new Date((trip as any).departure_time) <= new Date()
+        : false,
       passengers: (passengers || []).map((p: any) => ({
         id: p.id,
         name: p.name,
@@ -807,22 +817,7 @@ export class ReservationService {
     if (reservation.reservations.status === 'cancelled') throw new ValidationError('La reserva fue cancelada');
     const tripId = reservation.reservations.trip_id;
 
-    const { data: assignment } = await supabaseAdmin
-      .from('trip_agencies')
-      .select('id')
-      .eq('trip_id', tripId)
-      .eq('agency_id', agencyId)
-      .maybeSingle();
-
-    if (!assignment) throw new ForbiddenError('Tu agencia no está asignada a este viaje');
-
-    const { data: tripStatus } = await supabaseAdmin
-      .from('trips')
-      .select('status')
-      .eq('id', tripId)
-      .single();
-    if (tripStatus?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible realizar boarding.');
-    if (tripStatus?.status === 'completed') throw new ValidationError('Este viaje ya fue completado. No es posible realizar boarding.');
+    await validateBoardingAllowed({ tripId, agencyId });
 
     const now = new Date().toISOString();
 

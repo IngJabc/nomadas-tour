@@ -3,7 +3,6 @@
 import {
   LayoutDashboard,
   Users,
-  QrCode,
   Calendar,
   Route,
   Building2,
