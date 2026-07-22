@@ -119,6 +119,7 @@ function NewReservationContent() {
   }, []);
   const tripCancelledHandledRef = useRef(false);
   const lockExpiredHandledRef = useRef(false);
+  const isSubmittingRef = useRef(false);
   const hadSeatsRef = useRef(false);
   const prevWizardStepRef = useRef<string | null>(null);
   const [refreshingSeats, setRefreshingSeats] = useState(false);
@@ -133,6 +134,7 @@ function NewReservationContent() {
 
   const handleLockExpired = useCallback(async () => {
     if (lockExpiredHandledRef.current) return;
+    if (isSubmittingRef.current) return;
     lockExpiredHandledRef.current = true;
     hadSeatsRef.current = false;
     setRefreshingSeats(true);
@@ -218,6 +220,7 @@ function NewReservationContent() {
   );
 
   const onSuccess = useCallback((reservationId: string) => {
+    lockExpiredHandledRef.current = true;
     locking.unlockAllCurrent();
     stopCountdown();
     setReservationIdFromUrl(reservationId);
@@ -231,6 +234,7 @@ function NewReservationContent() {
     bookerDocument,
     passengers,
     onSuccess,
+    submittingFlag: isSubmittingRef,
   });
 
   // ─── Load trips list ──────────────────────────────────────────────
