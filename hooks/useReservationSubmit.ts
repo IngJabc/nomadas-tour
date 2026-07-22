@@ -11,6 +11,7 @@ interface UseReservationSubmitOptions {
   bookerDocument: string;
   passengers: PassengerData[];
   onSuccess: (reservationId: string) => void;
+  submittingFlag?: React.MutableRefObject<boolean>;
 }
 
 interface UseReservationSubmitReturn {
@@ -20,6 +21,7 @@ interface UseReservationSubmitReturn {
   submit: () => Promise<void>;
   clearError: () => void;
   resetResult: () => void;
+  submittingRef: React.RefObject<boolean>;
 }
 
 export function useReservationSubmit({
@@ -29,6 +31,7 @@ export function useReservationSubmit({
   bookerDocument,
   passengers,
   onSuccess,
+  submittingFlag,
 }: UseReservationSubmitOptions): UseReservationSubmitReturn {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -51,6 +54,7 @@ export function useReservationSubmit({
     if (!trip || selectedSeats.length === 0) return;
 
     submittingRef.current = true;
+    if (submittingFlag) submittingFlag.current = true;
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -85,6 +89,7 @@ export function useReservationSubmit({
       );
     } finally {
       submittingRef.current = false;
+      if (submittingFlag) submittingFlag.current = false;
       setSubmitting(false);
     }
   }, [trip, selectedSeats, bookerName, bookerDocument, passengerMap, onSuccess]);
@@ -96,5 +101,6 @@ export function useReservationSubmit({
     submit,
     clearError,
     resetResult,
+    submittingRef,
   };
 }
