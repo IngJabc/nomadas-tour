@@ -4,10 +4,12 @@ import { env } from './config/env.js';
 import { supabaseAdmin } from './config/database.js';
 import { completeExpiredTrips } from './services/trip.service.js';
 
+const LOCK_TTL_MS = env.LOCK_TTL_SECONDS * 1000;
+
 // Auto-expiration for locked seats (every 60s)
 setInterval(async () => {
   try {
-    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - LOCK_TTL_MS).toISOString();
     const { data, error } = await supabaseAdmin
       .from('seats')
       .update({ status: 'available', locked_by: null, locked_at: null })

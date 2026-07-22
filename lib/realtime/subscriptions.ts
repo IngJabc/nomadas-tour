@@ -8,6 +8,7 @@ export function subscribeToTripSeats(
   tripIds: string[],
   onSeatUpdate: (payload: { eventType: string; seat: Record<string, any>; old: Record<string, any> | null }) => void,
 ): CleanupFn {
+  console.log('[RT:subscribeToTripSeats] called with tripIds:', tripIds);
   if (!tripIds.length) return () => {};
   const supabase = createClient();
 
@@ -25,16 +26,23 @@ export function subscribeToTripSeats(
         filter,
       },
       (payload: RealtimePostgresChangesPayload<any>) => {
+        console.log('[RT:raw] event:', payload.eventType, '| new:', payload.new, '| old:', payload.old);
         if (payload.eventType === 'DELETE') {
           if (payload.old?.trip_id) {
             onSeatUpdate({ eventType: 'DELETE', seat: payload.old, old: null });
+          } else {
+            console.log('[RT:raw] DROPPED (no old.trip_id)');
           }
         } else if (payload.new?.seat_code) {
           onSeatUpdate({ eventType: payload.eventType, seat: payload.new, old: payload.old ?? null });
+        } else {
+          console.log('[RT:raw] DROPPED (no new.seat_code). new keys:', Object.keys(payload.new || {}));
         }
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      console.log('[RT:channel] status:', status, '| channel:', channelName, '| filter:', filter);
+    });
 
   return () => {
     supabase.removeChannel(channel);

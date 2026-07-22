@@ -35,10 +35,8 @@ export function validatePassengerForm(
 
   if (!bookerDocument.trim()) {
     bookerErrors.document = 'El documento es requerido';
-  } else if (bookerDocument.trim().length < 3) {
-    bookerErrors.document = 'Mínimo 3 caracteres';
-  } else if (bookerDocument.trim().length > 8) {
-    bookerErrors.document = 'Máximo 8 caracteres';
+  } else if (!/^\d{8}$/.test(bookerDocument.trim())) {
+    bookerErrors.document = 'Debe ser exactamente 8 dígitos';
   }
 
   const passengerErrors: PassengerValidation[] = passengers.map((p) => {
@@ -52,10 +50,8 @@ export function validatePassengerForm(
 
     if (!p.document.trim()) {
       errors.push({ field: 'document', message: 'Documento requerido' });
-    } else if (p.document.trim().length < 3) {
-      errors.push({ field: 'document', message: 'Mínimo 3 caracteres' });
-    } else if (p.document.trim().length > 8) {
-      errors.push({ field: 'document', message: 'Máximo 8 caracteres' });
+    } else if (!/^\d{8}$/.test(p.document.trim())) {
+      errors.push({ field: 'document', message: 'Debe ser exactamente 8 dígitos' });
     }
 
     if (p.phone && p.phone.trim() && !isValidPhone(p.phone.trim())) {

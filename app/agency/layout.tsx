@@ -7,6 +7,7 @@ import { AgencySidebar } from '@/components/layout/AgencySidebar';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { subscribeToAgencies } from '@/lib/realtime/subscriptions';
 import { logoutInactiveAgency } from '@/lib/auth/session-handler';
+import { agencyApi } from '@/lib/api';
 import type { CleanupFn } from '@/lib/realtime/subscriptions';
 
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,13 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
   const cleanupRef = useRef<CleanupFn | null>(null);
 
   const handleLogout = async () => {
+    try {
+      await Promise.race([
+        agencyApi.unlockAllUserSeats(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+      ]);
+    } catch { /* best-effort — TTL is the safety net */ }
+
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push('/login');

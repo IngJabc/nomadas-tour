@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/database.js';
+import { env } from '../config/env.js';
 import { NotFoundError, ValidationError, ConflictError, ForbiddenError } from '../errors/index.js';
 import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
 import { sortBySeatCode } from '../utils/sort.js';
@@ -1511,18 +1512,21 @@ export class ReservationService {
     if (seat.trip_id !== tripId) throw new ValidationError('Seat does not belong to this trip');
     if (seat.status !== 'available') throw new ConflictError('Seat is not available');
 
-    const { error: updateError } = await supabaseAdmin
+    const now = new Date().toISOString();
+    const { data: updated, error: updateError } = await supabaseAdmin
       .from('seats')
       .update({
         status: 'locked',
         locked_by: userId,
-        locked_at: new Date().toISOString(),
+        locked_at: now,
       })
       .eq('id', seatId)
-      .eq('status', 'available');
+      .eq('status', 'available')
+      .select('id');
 
     if (updateError) throw new ConflictError('Seat was locked by another user');
-    return { locked: true, seat_id: seatId };
+    if (!updated || updated.length === 0) throw new ConflictError('Seat is not available');
+    return { locked: true, seat_id: seatId, locked_at: now };
   }
 
   async unlockSeat(tripId: string, seatId: string, userId: string, agencyId: string) {
@@ -1534,18 +1538,16 @@ export class ReservationService {
       .maybeSingle();
     if (!assignment) throw new ForbiddenError('Your agency is not assigned to this trip');
 
-    const { data: seat, error: seatError } = await supabaseAdmin
-      .from('seats')
-      .select('id, status, locked_by, trip_id')
-      .eq('id', seatId)
-      .single();
-    if (seatError || !seat) throw new NotFoundError('Seat not found');
-    if (seat.locked_by !== userId) throw new ForbiddenError('Seat is locked by another user');
-
-    await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from('seats')
       .update({ status: 'available', locked_by: null, locked_at: null })
-      .eq('id', seatId);
+      .eq('id', seatId)
+      .eq('status', 'locked')
+      .eq('locked_by', userId)
+      .select('id');
+
+    if (error) throw new ValidationError(error.message);
+    if (!data || data.length === 0) throw new NotFoundError('Seat not found or not locked by this user');
 
     return { unlocked: true, seat_id: seatId };
   }
@@ -1571,8 +1573,20 @@ export class ReservationService {
     return { unlocked: (data || []).length };
   }
 
+  async unlockAllSeatsForUser(userId: string) {
+    const { data, error } = await supabaseAdmin
+      .from('seats')
+      .update({ status: 'available', locked_by: null, locked_at: null })
+      .eq('status', 'locked')
+      .eq('locked_by', userId)
+      .select();
+
+    if (error) throw new ValidationError(error.message);
+    return { unlocked: (data || []).length };
+  }
+
   async releaseExpiredLocks() {
-    const cutoff = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const cutoff = new Date(Date.now() - env.LOCK_TTL_SECONDS * 1000).toISOString();
     const { data, error } = await supabaseAdmin
       .from('seats')
       .update({ status: 'available', locked_by: null, locked_at: null })

@@ -25,12 +25,12 @@ const boardPassengerSchema = z.object({
 const agencyReservationSchema = z.object({
   trip_id: z.string().uuid(),
   booker_name: z.string().min(2),
-  booker_document: z.string().min(5),
+  booker_document: z.string().regex(/^\d{8}$/, 'Documento debe ser exactamente 8 dígitos'),
   booker_phone: z.string().optional(),
   passengers: z.array(z.object({
     seat_id: z.string().uuid(),
     name: z.string().min(2),
-    document: z.string().min(5),
+    document: z.string().regex(/^\d{8}$/, 'Documento debe ser exactamente 8 dígitos'),
     phone: z.string().optional(),
   })).min(1),
 });
@@ -428,6 +428,15 @@ export class ReservationController {
       res.json(result);
     } catch (error) {
       next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
+    }
+  }
+
+  async unlockAllUserSeats(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await reservationService.unlockAllSeatsForUser(req.ctx!.userId);
+      res.json(result);
+    } catch (error) {
+      next(error);
     }
   }
 

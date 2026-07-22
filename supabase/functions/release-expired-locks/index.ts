@@ -12,11 +12,12 @@ serve(async (_req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
+    const lockTtlSeconds = Number(Deno.env.get('LOCK_TTL_SECONDS') ?? 300);
     const { data, error } = await supabase
       .from('seats')
       .update({ status: 'available', locked_by: null, locked_at: null })
       .eq('status', 'locked')
-      .lt('locked_at', new Date(Date.now() - 5 * 60 * 1000).toISOString());
+      .lt('locked_at', new Date(Date.now() - lockTtlSeconds * 1000).toISOString());
 
     if (error) throw error;
 
