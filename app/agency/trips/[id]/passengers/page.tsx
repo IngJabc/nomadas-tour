@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -13,8 +13,11 @@ import {
   AlertTriangle,
   Search,
   UserCheck,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { agencyApi } from "@/lib/api";
+import { subscribeToTrips } from "@/lib/realtime/subscriptions";
 import type {
   AgencyTripPassengersResponse,
   AgencyTripPassenger,
@@ -22,6 +25,7 @@ import type {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { PassengerCard } from "@/components/agency/PassengerCard";
@@ -67,6 +71,7 @@ export default function TripPassengersPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const doFetchRef = useRef<() => Promise<void>>(async () => {});
 
   const doFetch = useCallback(async () => {
     try {
@@ -82,8 +87,33 @@ export default function TripPassengersPage() {
   }, [tripId]);
 
   useEffect(() => {
-    doFetch();
+    doFetchRef.current = doFetch;
   }, [doFetch]);
+
+  useEffect(() => {
+    doFetchRef.current();
+  }, [doFetch]);
+
+  // Realtime: refetch when trip status changes
+  useEffect(() => {
+    if (!data?.trip?.id) return;
+    const tripIdForSub = data.trip.id;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = subscribeToTrips((payload) => {
+      if (payload.trip.id !== tripIdForSub) return;
+      if (payload.eventType !== 'UPDATE') return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        doFetchRef.current();
+      }, 500);
+    }, [tripIdForSub]);
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      cleanup();
+    };
+  }, [data?.trip?.id]);
 
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -190,8 +220,57 @@ export default function TripPassengersPage() {
       >
         <PageHeader
           title={`Pasajeros — ${trip?.route?.destination ?? "Viaje"}`}
+          action={
+            trip?.status === 'cancelled' ? (
+              <Badge variant="cancelled" size="md">Cancelado</Badge>
+            ) : trip?.status === 'completed' ? (
+              <Badge variant="completed" size="md">Completado</Badge>
+            ) : undefined
+          }
         />
       </motion.div>
+
+      {trip?.status === 'cancelled' && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-4 p-4 rounded-xl bg-[#fef2f2] border border-[#fecaca]"
+        >
+          <div className="flex items-start gap-3">
+            <XCircle className="w-5 h-5 text-[#ef4444] shrink-0 mt-0.5" strokeWidth={1.75} />
+            <div>
+              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[#ef4444]">
+                Viaje cancelado
+              </p>
+              <p className="font-[family-name:var(--font-body)] text-[13px] text-[#b91c1c] mt-1">
+                Este viaje fue cancelado. La información se muestra con fines históricos. No se permiten operaciones.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {trip?.status === 'completed' && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-4 p-4 rounded-xl bg-[#ecfdf5] border border-[#a7f3d0]"
+        >
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0 mt-0.5" strokeWidth={1.75} />
+            <div>
+              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[#059669]">
+                Viaje completado
+              </p>
+              <p className="font-[family-name:var(--font-body)] text-[13px] text-[#047857] mt-1">
+                Este viaje ya fue completado. La información se muestra con fines históricos. No se permiten operaciones.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {trip && (
         <motion.div

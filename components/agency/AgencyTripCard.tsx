@@ -120,26 +120,29 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
         <div className="flex items-center gap-2 text-[12px] text-[var(--color-brand-muted)]">
           <Users className="w-3.5 h-3.5" />
           <span>
-            {trip.total_seats - trip.available_seats - trip.reserved_seats > 0
-              ? `${
-                  trip.total_seats - trip.available_seats - trip.reserved_seats
-                } en proceso`
-              : "Sin bloqueos"}
+            {isClosed
+              ? trip.status === 'cancelled' ? 'Viaje cancelado' : 'Viaje completado'
+              : trip.total_seats - trip.available_seats - trip.reserved_seats > 0
+                ? `${trip.total_seats - trip.available_seats - trip.reserved_seats} en proceso`
+                : "Sin bloqueos"
+            }
           </span>
         </div>
 
         {onSelect ? (
-          <ChevronRight className="w-5 h-5 text-[var(--color-brand-muted)] group-hover:text-[var(--color-brand-cyan)] transition-colors" />
+          <ChevronRight className={`w-5 h-5 transition-colors ${isClosed ? 'text-[var(--color-brand-muted)] opacity-40' : 'text-[var(--color-brand-muted)] group-hover:text-[var(--color-brand-cyan)]'}`} />
         ) : (
           <div className="flex items-center gap-3">
-            <Link
-              href={`/agency/trips/${trip.id}/passengers`}
-              className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
-              onClick={(e) => e.stopPropagation()}
-            >
-              Ver pasajeros
-              <ChevronRight className="w-3.5 h-3.5" />
-            </Link>
+            {!isClosed && (
+              <Link
+                href={`/agency/trips/${trip.id}/passengers`}
+                className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Ver pasajeros
+                <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
+            )}
             {!isClosed && (
               <>
                 <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
@@ -161,12 +164,13 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
 
   if (onSelect) {
     return (
-      <div className="group">
-        <Card hover>
+      <div className={isClosed ? "" : "group"}>
+        <Card hover={!isClosed}>
           <button
             type="button"
-            onClick={() => onSelect(trip.id)}
-            className="w-full text-left bg-transparent border-none p-0 cursor-pointer"
+            onClick={() => { if (!isClosed) onSelect(trip.id); }}
+            disabled={isClosed}
+            className={`w-full text-left bg-transparent border-none p-0 ${isClosed ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {cardContent}
           </button>
@@ -175,10 +179,20 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
     );
   }
 
+  if (isClosed) {
+    return (
+      <div className="cursor-not-allowed">
+        <Card>
+          {cardContent}
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <Link href={`/agency/trips/${trip.id}/passengers`} className="no-underline block">
-      <div className={isFull ? "" : "group"}>
-        <Card hover={!isFull} className={isFull ? "opacity-70" : ""}>
+      <div className="group">
+        <Card hover>
           {cardContent}
         </Card>
       </div>

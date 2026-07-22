@@ -26,6 +26,7 @@ import {
   subscribeToReservations,
   subscribeToReservationPassengers,
   subscribeToBoardingLogs,
+  subscribeToTrips,
 } from "@/lib/realtime/subscriptions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
@@ -75,6 +76,7 @@ export default function ReservationDetailPage() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelPassengerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const doFetchRef = useRef<() => Promise<void>>(async () => {});
 
   const { captureRef, download, share } = useCapture({
     filename: reservation ? `boleto-${reservation.qr_code}` : 'boleto',
@@ -93,13 +95,17 @@ export default function ReservationDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    doFetch();
+    doFetchRef.current = doFetch;
+  }, [doFetch]);
+
+  useEffect(() => {
+    doFetchRef.current();
   }, [doFetch]);
 
   useEffect(() => {
     const debouncedRefetch = () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
-      debounceRef.current = setTimeout(doFetch, 500);
+      debounceRef.current = setTimeout(() => doFetchRef.current(), 500);
     };
 
     const cleanups = [
@@ -112,7 +118,27 @@ export default function ReservationDetailPage() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       cleanups.forEach((fn) => fn());
     };
-  }, [doFetch]);
+  }, []);
+
+  useEffect(() => {
+    if (!reservation?.trips?.id) return;
+    const tripId = reservation.trips.id;
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const cleanup = subscribeToTrips((payload) => {
+      if (payload.trip.id !== tripId) return;
+      if (payload.eventType !== 'UPDATE') return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        doFetchRef.current();
+      }, 500);
+    }, [tripId]);
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      cleanup();
+    };
+  }, [reservation?.trips?.id]);
 
   useEffect(() => {
     return () => {
@@ -329,6 +355,27 @@ export default function ReservationDetailPage() {
         </motion.div>
       )}
 
+      {reservation.trips?.status === "completed" && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="mb-4 p-4 rounded-xl bg-[#ecfdf5] border border-[#a7f3d0]"
+        >
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0 mt-0.5" strokeWidth={1.75} />
+            <div>
+              <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[#059669]">
+                Viaje completado
+              </p>
+              <p className="font-[family-name:var(--font-body)] text-[13px] text-[#047857] mt-1">
+                Este viaje ya fue completado. No se permiten más acciones sobre esta reserva.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       <motion.div
         variants={pageFade}
         initial="hidden"
@@ -349,7 +396,7 @@ export default function ReservationDetailPage() {
                   onDownload={handleDownload}
                   onShare={handleShare}
                 />
-                {reservation.status === "confirmed" && reservation.trips?.status !== "cancelled" && (
+                {reservation.status === "confirmed" && reservation.trips?.status !== "cancelled" && reservation.trips?.status !== "completed" && (
                   <Button
                     variant="destructive"
                     size="sm"
@@ -687,9 +734,9 @@ export default function ReservationDetailPage() {
                               });
                               setShowConfirm(true);
                             }}
-                            disabled={reservation.status !== "confirmed" || reservation.trips?.status === "cancelled"}
+                            disabled={reservation.status !== "confirmed" || reservation.trips?.status === "cancelled" || reservation.trips?.status === "completed"}
                             className="relative inline-flex h-6 w-11 items-center rounded-full bg-[#10b981] transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                            title={reservation.status === "confirmed" && reservation.trips?.status !== "cancelled" ? "Cancelar pasajero" : "Reserva no disponible"}
+                            title={reservation.status === "confirmed" && reservation.trips?.status !== "cancelled" && reservation.trips?.status !== "completed" ? "Cancelar pasajero" : "Reserva no disponible"}
                           >
                             <span className="inline-block h-4 w-4 transform translate-x-6 rounded-full bg-white transition-transform duration-200" />
                           </button>

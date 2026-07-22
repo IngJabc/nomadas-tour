@@ -472,7 +472,7 @@ export class ReservationService {
   async getAgencyReservationById(id: string, agencyId: string) {
     const { data, error } = await supabaseAdmin
       .from('reservations')
-      .select('*, trips(departure_time, vehicle_type, status, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
+      .select('*, trips(id, departure_time, vehicle_type, status, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
       .eq('id', id)
       .eq('agency_id', agencyId)
       .single();
@@ -507,6 +507,14 @@ export class ReservationService {
     if (reservation.status !== 'confirmed') {
       throw new ValidationError('Only confirmed reservations can be cancelled');
     }
+
+    const { data: tripStatus } = await supabaseAdmin
+      .from('trips')
+      .select('status')
+      .eq('id', (reservation as any).trip_id)
+      .single();
+    if (tripStatus?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible cancelar reservas.');
+    if (tripStatus?.status === 'completed') throw new ValidationError('Este viaje ya fue completado. No es posible cancelar reservas.');
 
     const seatIds = ((reservation as any).reservation_passengers || []).map((p: any) => p.seat_id);
 
@@ -745,6 +753,7 @@ export class ReservationService {
     return {
       reservation_id: reservation.id,
       trip_id: tripId,
+      trip_status: (trip as any)?.status || null,
       booker_name: reservation.booker_name,
       booker_document: reservation.booker_document,
       qr_code: reservation.qr_code,
@@ -813,6 +822,7 @@ export class ReservationService {
       .eq('id', tripId)
       .single();
     if (tripStatus?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible realizar boarding.');
+    if (tripStatus?.status === 'completed') throw new ValidationError('Este viaje ya fue completado. No es posible realizar boarding.');
 
     const now = new Date().toISOString();
 
@@ -887,6 +897,14 @@ export class ReservationService {
     if (reservation.agency_id !== agencyId) throw new ForbiddenError('No tienes acceso a esta reserva');
     if (reservation.status === 'cancelled') throw new ValidationError('La reserva ya está cancelada');
     if (passenger.status === 'cancelled') throw new ValidationError('El pasajero ya está cancelado');
+
+    const { data: tripStatus } = await supabaseAdmin
+      .from('trips')
+      .select('status')
+      .eq('id', reservation.trip_id)
+      .single();
+    if (tripStatus?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible modificar pasajeros.');
+    if (tripStatus?.status === 'completed') throw new ValidationError('Este viaje ya fue completado. No es posible modificar pasajeros.');
 
     const now = new Date().toISOString();
 

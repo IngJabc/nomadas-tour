@@ -6,8 +6,9 @@ import {
   Calendar,
   Users,
   ChevronRight,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
-import { AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { RESERVATION_STATUS_STYLES } from "@/lib/constants/reservation-status";
@@ -65,6 +66,15 @@ export function AgencyReservationCard({ reservation }: AgencyReservationCardProp
           <AlertTriangle className="w-3 h-3 text-[#ef4444] shrink-0" strokeWidth={1.75} />
           <span className="font-[family-name:var(--font-body)] text-[11px] font-semibold text-[#ef4444]">
             Viaje cancelado
+          </span>
+        </div>
+      )}
+
+      {reservation.trips?.status === "completed" && (
+        <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded-lg bg-[#ecfdf5] border border-[#a7f3d0]">
+          <CheckCircle2 className="w-3 h-3 text-[#059669] shrink-0" strokeWidth={1.75} />
+          <span className="font-[family-name:var(--font-body)] text-[11px] font-semibold text-[#059669]">
+            Viaje completado
           </span>
         </div>
       )}
