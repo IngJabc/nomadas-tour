@@ -1,17 +1,18 @@
 'use client';
 
-import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface TopbarProps {
   greeting: string;
   subtext: string;
   notificationCount?: number;
+  role?: string;
   className?: string;
 }
 
-export function Topbar({ greeting, subtext, notificationCount = 0, className }: TopbarProps) {
+export function Topbar({ greeting, subtext, role, className }: TopbarProps) {
   const [currentTime, setCurrentTime] = useState('');
 
   useEffect(() => {
@@ -43,17 +44,7 @@ export function Topbar({ greeting, subtext, notificationCount = 0, className }: 
             {subtext} · {currentTime}
           </p>
         </div>
-        {notificationCount > 0 && (
-          <button
-            className="relative w-9 h-9 rounded-xl bg-[var(--color-page-bg)] flex items-center justify-center hover:bg-slate-200 transition-colors"
-            aria-label="Notificaciones"
-          >
-            <Bell className="w-[18px] h-[18px] text-[var(--color-brand-muted)]" strokeWidth={1.75} />
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-[var(--color-brand-cyan)] text-white text-[9px] font-bold flex items-center justify-center">
-              {notificationCount}
-            </span>
-          </button>
-        )}
+        {role && <NotificationBell role={role} />}
       </div>
     </div>
   );

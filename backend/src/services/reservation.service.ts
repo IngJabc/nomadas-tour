@@ -4,6 +4,7 @@ import { NotFoundError, ValidationError, ConflictError, ForbiddenError } from '.
 import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
 import { sortBySeatCode } from '../utils/sort.js';
 import { validateBoardingAllowed } from './boarding.guard.js';
+import { notificationService } from './notification.service.js';
 
 export class ReservationService {
   async listActiveTrips() {
@@ -446,6 +447,37 @@ export class ReservationService {
 
     if (!reservation) throw new NotFoundError('Reservation not found after creation');
 
+    // Get trip info for notification
+    const { data: tripForNotif } = await supabaseAdmin
+      .from('trips')
+      .select('routes!inner(origin, destination)')
+      .eq('id', tripId)
+      .single();
+    const routeNotif = (tripForNotif as any)?.routes;
+    const routeLabel = routeNotif ? `${routeNotif.origin} → ${routeNotif.destination}` : 'viaje';
+
+    // Notification: reservation created → superadmin only (agency is the actor)
+    notificationService.createForAgency({
+      type: 'reservation_created',
+      title: 'Nueva reserva',
+      body: `${bookerName} realizó una reserva de ${passengers.length} pasajeros para ${routeLabel}`,
+      entityType: 'reservation',
+      entityId: reservationId,
+      agencyId,
+      actor: 'agency',
+      action_url: `/admin/bookings/${reservationId}`,
+      metadata: {
+        reservation_id: reservationId,
+        trip_id: tripId,
+        booker_name: bookerName,
+        passenger_count: passengers.length,
+        origin: routeNotif?.origin ?? null,
+        destination: routeNotif?.destination ?? null,
+      },
+    }).catch((err) => {
+      console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'reservation_created', reservationId, error: err.message }));
+    });
+
     return {
       reservation,
       passengers: sortBySeatCode((reservation as any).reservation_passengers || []),
@@ -539,6 +571,29 @@ export class ReservationService {
 
       if (unlockError) throw new ValidationError(unlockError.message);
     }
+
+    // Get trip info for notification
+    const { data: tripForCancelNotif } = await supabaseAdmin
+      .from('trips')
+      .select('routes!inner(origin, destination)')
+      .eq('id', (reservation as any).trip_id)
+      .single();
+    const routeCancelNotif = (tripForCancelNotif as any)?.routes;
+    const routeCancelLabel = routeCancelNotif ? `${routeCancelNotif.origin} → ${routeCancelNotif.destination}` : 'viaje';
+
+    // Notification: reservation cancelled → superadmin only (agency is the actor)
+    notificationService.createForAgency({
+      type: 'reservation_cancelled',
+      title: 'Reserva cancelada',
+      body: `La reserva de ${(reservation as any).booker_name || 'cliente'} fue cancelada para ${routeCancelLabel}`,
+      entityType: 'reservation',
+      entityId: id,
+      agencyId,
+      actor: 'agency',
+      action_url: `/admin/bookings/${id}`,
+    }).catch((err) => {
+      console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'reservation_cancelled', reservationId: id, error: err.message }));
+    });
 
     return { cancelled: true, reservation_id: id, freed_seats: seatIds.length };
   }
@@ -963,6 +1018,40 @@ export class ReservationService {
         .eq('id', reservationId);
 
       if (statusErr) throw new ValidationError(statusErr.message);
+    }
+
+    // Notification: passenger cancelled → agency + superadmin
+    {
+      const { data: tripForPassNotif } = await supabaseAdmin
+        .from('trips')
+        .select('routes!inner(origin, destination)')
+        .eq('id', reservation.trip_id)
+        .single();
+      const routePassNotif = (tripForPassNotif as any)?.routes;
+      const routePassLabel = routePassNotif ? `${routePassNotif.origin} → ${routePassNotif.destination}` : 'viaje';
+      const passengerName = (passenger as any).name || 'pasajero';
+
+      // Notification: passenger cancelled → superadmin only (agency is the actor)
+      notificationService.createForAgency({
+        type: 'passenger_cancelled',
+        title: 'Pasajero cancelado',
+        body: `El pasajero ${passengerName} fue cancelado del viaje ${routePassLabel}`,
+        entityType: 'passenger',
+        entityId: passengerId,
+        agencyId,
+        actor: 'agency',
+        action_url: `/admin/bookings/${(passenger as any).reservation_id}`,
+        metadata: {
+          passenger_id: passengerId,
+          reservation_id: (passenger as any).reservation_id,
+          trip_id: reservation.trip_id,
+          passenger_name: passengerName,
+          origin: routePassNotif?.origin ?? null,
+          destination: routePassNotif?.destination ?? null,
+        },
+      }).catch((err) => {
+        console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'passenger_cancelled', passengerId, error: err.message }));
+      });
     }
 
     return {

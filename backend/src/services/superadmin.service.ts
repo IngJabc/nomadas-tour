@@ -4,6 +4,7 @@ import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '.
 import { generateToken } from '../utils/token.js';
 import { toUTC } from '../utils/timezone.js';
 import { emailService } from './email.service.js';
+import { notificationService } from './notification.service.js';
 import {
   getTripOperationalContext,
   validateTripEditable,
@@ -400,6 +401,20 @@ export class SuperadminService {
         console.error(JSON.stringify({ event: 'TRIP_ASSIGNED_EMAIL_FAILED', tripId: trip.id, agencyId: agency.id, error: err.message }));
       });
     }
+
+    // Notification: trip created → agencies only (superadmin is the actor)
+    notificationService.createForAgenciesAndAdmin({
+      type: 'trip_created',
+      title: 'Viaje creado',
+      body: `Nuevo viaje disponible: ${route.origin} → ${route.destination} el ${departureFormatted}`,
+      entityType: 'trip',
+      entityId: trip.id,
+      agencyIds,
+      actor: 'superadmin',
+      action_url: `/agency/trips/${trip.id}/passengers`,
+    }).catch((err) => {
+      console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'trip_created', tripId: trip.id, error: err.message }));
+    });
 
     return trip;
   }
@@ -824,6 +839,29 @@ export class SuperadminService {
             console.error(JSON.stringify({ event: 'TRIP_POSTPONED_EMAIL_FAILED', tripId: id, agencyId: agency.id, error: err.message }));
           });
         }
+
+        // Notification: trip postponed → agencies only (superadmin is the actor)
+        const notifAgencyIds = [...new Set([...ctx.currentAgencyIds, ...agencyIds])];
+        const newDepartureFormatted = this.formatDateForEmail(toUTC(departureTime));
+        notificationService.createForAgenciesAndAdmin({
+          type: 'trip_postponed',
+          title: 'Viaje pospuesto',
+          body: `El viaje ${route.origin} → ${route.destination} fue pospuesto. Nueva salida: ${newDepartureFormatted}`,
+          entityType: 'trip',
+          entityId: id,
+          agencyIds: notifAgencyIds,
+          actor: 'superadmin',
+          action_url: `/agency/trips/${id}/passengers`,
+          metadata: {
+            trip_id: id,
+            origin: route.origin,
+            destination: route.destination,
+            old_departure_time: ctx.trip.departure_time ?? null,
+            new_departure_time: toUTC(departureTime),
+          },
+        }).catch((err) => {
+          console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'trip_postponed', tripId: id, error: err.message }));
+        });
       }
     }
 
@@ -837,10 +875,52 @@ export class SuperadminService {
   }
 
   async deleteTrip(id: string) {
+    // Get agencies before deletion for notification
+    const { data: tripAgenciesForDelete } = await supabaseAdmin
+      .from('trip_agencies')
+      .select('agency_id')
+      .eq('trip_id', id);
+
+    const deleteAgencyIds = (tripAgenciesForDelete || []).map((ta: any) => ta.agency_id);
+
+    // Get route info before deletion
+    const { data: tripForDelete } = await supabaseAdmin
+      .from('trips')
+      .select('route_id')
+      .eq('id', id)
+      .single();
+
+    let routeLabel = 'viaje';
+    if (tripForDelete?.route_id) {
+      const { data: routeForDelete } = await supabaseAdmin
+        .from('routes')
+        .select('origin, destination')
+        .eq('id', tripForDelete.route_id)
+        .single();
+      if (routeForDelete) {
+        routeLabel = `${routeForDelete.origin} → ${routeForDelete.destination}`;
+      }
+    }
+
     await supabaseAdmin.from('trip_agencies').delete().eq('trip_id', id);
     await supabaseAdmin.from('seats').delete().eq('trip_id', id);
     const { error } = await supabaseAdmin.from('trips').delete().eq('id', id);
     if (error) throw new ValidationError(error.message);
+
+    // Notification: trip deleted → agencies only (superadmin is the actor)
+    if (deleteAgencyIds.length > 0) {
+      notificationService.createForAgenciesAndAdmin({
+        type: 'trip_deleted',
+        title: 'Viaje eliminado',
+        body: `El viaje ${routeLabel} fue eliminado del sistema`,
+        entityType: 'trip',
+        entityId: id,
+        agencyIds: deleteAgencyIds,
+        actor: 'superadmin',
+      }).catch((err) => {
+        console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'trip_deleted', tripId: id, error: err.message }));
+      });
+    }
   }
 
   async updateTripStatus(id: string, status: 'completed' | 'cancelled') {
@@ -913,6 +993,47 @@ export class SuperadminService {
           });
         }
       }
+    }
+
+    // Notification: trip cancelled/completed → agencies only (superadmin is the actor)
+    {
+      const { data: tripAgenciesForNotif } = await supabaseAdmin
+        .from('trip_agencies')
+        .select('agency_id')
+        .eq('trip_id', id);
+
+      const notifAgencyIds = (tripAgenciesForNotif || []).map((ta: any) => ta.agency_id);
+
+      const { data: routeForNotif } = await supabaseAdmin
+        .from('routes')
+        .select('origin, destination')
+        .eq('id', trip.route_id)
+        .single();
+
+      const routeLabel = routeForNotif
+        ? `${routeForNotif.origin} → ${routeForNotif.destination}`
+        : 'viaje';
+
+      notificationService.createForAgenciesAndAdmin({
+        type: status === 'cancelled' ? 'trip_cancelled' : 'trip_completed',
+        title: status === 'cancelled' ? 'Viaje cancelado' : 'Viaje completado',
+        body: status === 'cancelled'
+          ? `El viaje ${routeLabel} del ${this.formatDateForEmail(trip.departure_time)} fue cancelado`
+          : `El viaje ${routeLabel} fue completado`,
+        entityType: 'trip',
+        entityId: id,
+        agencyIds: notifAgencyIds,
+        actor: 'superadmin',
+        action_url: status === 'cancelled' ? `/agency/trips/${id}/passengers` : undefined,
+        metadata: {
+          trip_id: id,
+          origin: routeForNotif?.origin ?? null,
+          destination: routeForNotif?.destination ?? null,
+          departure_time: trip.departure_time ?? null,
+        },
+      }).catch((err) => {
+        console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: `trip_${status}`, tripId: id, error: err.message }));
+      });
     }
 
     return { id, status };
