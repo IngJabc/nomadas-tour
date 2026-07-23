@@ -3,6 +3,7 @@ import { auth } from '../../middlewares/auth.js';
 import { authorize } from '../../middlewares/authorize.js';
 import { tenant } from '../../middlewares/tenant.js';
 import { reservationController } from '../../controllers/reservation.controller.js';
+import { notificationController } from '../../controllers/notification.controller.js';
 
 const router = Router();
 
@@ -36,5 +37,11 @@ router.patch('/boarding/:passengerId', (req, res, next) => reservationController
 
 // Expired lock cleanup (internal)
 router.post('/seats/release-expired', (req, res, next) => reservationController.releaseExpiredLocks(req, res, next));
+
+// Notifications
+router.get('/notifications', (req, res, next) => notificationController.getNotifications(req, res, next));
+router.get('/notifications/unread-count', (req, res, next) => notificationController.getUnreadCount(req, res, next));
+router.patch('/notifications/:id/read', (req, res, next) => notificationController.markAsRead(req, res, next));
+router.patch('/notifications/read-all', (req, res, next) => notificationController.markAllAsRead(req, res, next));
 
 export default router;

@@ -8,6 +8,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { subscribeToAgencies } from '@/lib/realtime/subscriptions';
 import { logoutInactiveAgency } from '@/lib/auth/session-handler';
 import { agencyApi } from '@/lib/api';
+import { NotificationProvider } from '@/components/notifications/NotificationProvider';
 import type { CleanupFn } from '@/lib/realtime/subscriptions';
 
 export default function AgencyLayout({ children }: { children: React.ReactNode }) {
@@ -52,8 +53,10 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
   }, []);
 
   return (
-    <DashboardLayout sidebar={<AgencySidebar onLogout={handleLogout} />}>
-      {children}
-    </DashboardLayout>
+    <NotificationProvider>
+      <DashboardLayout sidebar={<AgencySidebar onLogout={handleLogout} />}>
+        {children}
+      </DashboardLayout>
+    </NotificationProvider>
   );
 }

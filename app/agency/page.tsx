@@ -195,6 +195,7 @@ export default function AgencyDashboardPage() {
         <Topbar
           greeting={`${getGreeting()}, Agencia`}
           subtext="Panel de Agencia — NomadApp"
+          role="agency"
         />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <motion.div
@@ -289,6 +290,7 @@ export default function AgencyDashboardPage() {
         <Topbar
           greeting={`${getGreeting()}, Agencia`}
           subtext="Panel de Agencia — NomadApp"
+          role="agency"
         />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
           <motion.div
@@ -320,6 +322,7 @@ export default function AgencyDashboardPage() {
       <Topbar
         greeting={`${getGreeting()}, ${data?.agency_name ?? "Agencia"}`}
         subtext="Panel de Agencia — NomadApp"
+        role="agency"
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">

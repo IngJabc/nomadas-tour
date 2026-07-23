@@ -307,3 +307,50 @@ export function subscribeToTripAgencies(
     supabase.removeChannel(channel);
   };
 }
+
+/** Suscribirse a notificaciones en tiempo real */
+export function subscribeToNotifications(
+  onEvent: (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; notification: Record<string, any> }) => void,
+  role: string,
+  agencyId?: string,
+): CleanupFn {
+  const supabase = createClient();
+
+  let filter: string;
+  let channelName: string;
+
+  if (role === 'superadmin') {
+    filter = 'recipient_role=eq.superadmin';
+    channelName = 'notifications:recipient_role=eq.superadmin';
+  } else {
+    filter = `agency_id=eq.${agencyId}`;
+    channelName = `notifications:agency_id=eq.${agencyId}`;
+  }
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter,
+      },
+      (payload: RealtimePostgresChangesPayload<any>) => {
+        onEvent({
+          eventType: payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE',
+          notification: payload.new || payload.old,
+        });
+      },
+    )
+    .subscribe((status) => {
+      if (status === 'CHANNEL_ERROR') {
+        console.error('[RT:notifications] Channel error:', channelName);
+      }
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

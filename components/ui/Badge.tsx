@@ -14,6 +14,8 @@ const badgeVariants = cva(
         boarded: 'bg-blue-50 text-blue-600',
         confirmed: 'bg-emerald-50 text-emerald-600',
         completed: 'bg-[#f1f5f9] text-[var(--color-brand-muted)]',
+        count: 'bg-[var(--color-brand-cyan)] text-white font-bold min-w-[16px] h-4 justify-center',
+        danger: 'bg-[var(--color-danger)] text-white font-bold min-w-[16px] h-4 justify-center',
       },
       size: {
         xs: 'text-[9px] px-1.5 py-0.5',
