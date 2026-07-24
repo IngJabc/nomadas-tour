@@ -100,14 +100,17 @@ export default function TripPassengersPage() {
     const tripIdForSub = data.trip.id;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const cleanup = subscribeToTrips((payload) => {
-      if (payload.trip.id !== tripIdForSub) return;
-      if (payload.eventType !== 'UPDATE') return;
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        doFetchRef.current();
-      }, 500);
-    }, [tripIdForSub]);
+    const cleanup = subscribeToTrips(
+      (payload) => {
+        if (payload.trip.id !== tripIdForSub) return;
+        if (payload.eventType !== "UPDATE") return;
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          doFetchRef.current();
+        }, 500);
+      },
+      [tripIdForSub]
+    );
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
@@ -124,12 +127,12 @@ export default function TripPassengersPage() {
         p.name.toLowerCase().includes(q) ||
         p.document.toLowerCase().includes(q) ||
         p.seat_code.toLowerCase().includes(q) ||
-        p.booker_name.toLowerCase().includes(q),
+        p.booker_name.toLowerCase().includes(q)
     );
   }, [data, search]);
 
   const trip = data?.trip;
-  const isClosed = trip?.status === 'cancelled' || trip?.status === 'completed';
+  const isClosed = trip?.status === "cancelled" || trip?.status === "completed";
 
   if (loading) {
     return (
@@ -221,16 +224,20 @@ export default function TripPassengersPage() {
         <PageHeader
           title={`Pasajeros — ${trip?.route?.destination ?? "Viaje"}`}
           action={
-            trip?.status === 'cancelled' ? (
-              <Badge variant="cancelled" size="md">Cancelado</Badge>
-            ) : trip?.status === 'completed' ? (
-              <Badge variant="completed" size="md">Completado</Badge>
+            trip?.status === "cancelled" ? (
+              <Badge variant="cancelled" size="md">
+                Cancelado
+              </Badge>
+            ) : trip?.status === "completed" ? (
+              <Badge variant="completed" size="md">
+                Completado
+              </Badge>
             ) : undefined
           }
         />
       </motion.div>
 
-      {trip?.status === 'cancelled' && (
+      {trip?.status === "cancelled" && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -238,20 +245,23 @@ export default function TripPassengersPage() {
           className="mb-4 p-4 rounded-xl bg-[#fef2f2] border border-[#fecaca]"
         >
           <div className="flex items-start gap-3">
-            <XCircle className="w-5 h-5 text-[#ef4444] shrink-0 mt-0.5" strokeWidth={1.75} />
+            <XCircle
+              className="w-5 h-5 text-[#ef4444] shrink-0 mt-0.5"
+              strokeWidth={1.75}
+            />
             <div>
               <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[#ef4444]">
                 Viaje cancelado
               </p>
               <p className="font-[family-name:var(--font-body)] text-[13px] text-[#b91c1c] mt-1">
-                Este viaje fue cancelado. La información se muestra con fines históricos. No se permiten operaciones.
+                Este viaje fue cancelado. No se permiten operaciones.
               </p>
             </div>
           </div>
         </motion.div>
       )}
 
-      {trip?.status === 'completed' && (
+      {trip?.status === "completed" && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -259,13 +269,16 @@ export default function TripPassengersPage() {
           className="mb-4 p-4 rounded-xl bg-[#ecfdf5] border border-[#a7f3d0]"
         >
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-[#059669] shrink-0 mt-0.5" strokeWidth={1.75} />
+            <CheckCircle2
+              className="w-5 h-5 text-[#059669] shrink-0 mt-0.5"
+              strokeWidth={1.75}
+            />
             <div>
               <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[#059669]">
                 Viaje completado
               </p>
               <p className="font-[family-name:var(--font-body)] text-[13px] text-[#047857] mt-1">
-                Este viaje ya fue completado. La información se muestra con fines históricos. No se permiten operaciones.
+                Este viaje ya fue completado. No se permiten operaciones.
               </p>
             </div>
           </div>

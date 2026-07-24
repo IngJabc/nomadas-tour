@@ -1,25 +1,30 @@
-import { supabaseAdmin } from '../config/database.js';
-import { generateUniqueSubdomain } from '../utils/subdomain.js';
-import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '../errors/index.js';
-import { generateToken } from '../utils/token.js';
-import { toUTC } from '../utils/timezone.js';
-import { emailService } from './email.service.js';
-import { notificationService } from './notification.service.js';
+import { supabaseAdmin } from "../config/database.js";
+import { generateUniqueSubdomain } from "../utils/subdomain.js";
+import {
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+  ForbiddenError,
+} from "../errors/index.js";
+import { generateToken } from "../utils/token.js";
+import { toUTC } from "../utils/timezone.js";
+import { emailService } from "./email.service.js";
+import { notificationService } from "./notification.service.js";
 import {
   getTripOperationalContext,
   validateTripEditable,
   validateVehicleChange,
   validateAgencyRemoval,
   validateNoActiveReservations,
-} from './trip-edit-context.js';
+} from "./trip-edit-context.js";
 
 export class SuperadminService {
   // ---- Agencies ----
   async listAgencies() {
     const { data: agencies, error } = await supabaseAdmin
-      .from('agencies')
-      .select('*')
-      .order('name');
+      .from("agencies")
+      .select("*")
+      .order("name");
 
     if (error) throw new ValidationError(error.message);
     if (!agencies || agencies.length === 0) return [];
@@ -28,14 +33,15 @@ export class SuperadminService {
 
     // Get trip count per agency via trip_agencies junction
     const { data: tripLinks } = await supabaseAdmin
-      .from('trip_agencies')
-      .select('agency_id, trip_id')
-      .in('agency_id', agencyIds);
+      .from("trip_agencies")
+      .select("agency_id, trip_id")
+      .in("agency_id", agencyIds);
 
     const tripCountByAgency: Record<string, number> = {};
     const allTripIds: string[] = [];
     for (const tl of tripLinks || []) {
-      tripCountByAgency[tl.agency_id] = (tripCountByAgency[tl.agency_id] || 0) + 1;
+      tripCountByAgency[tl.agency_id] =
+        (tripCountByAgency[tl.agency_id] || 0) + 1;
       allTripIds.push(tl.trip_id);
     }
 
@@ -43,10 +49,10 @@ export class SuperadminService {
     let reservationCountByTrip: Record<string, number> = {};
     if (allTripIds.length > 0) {
       const { data: reservations } = await supabaseAdmin
-        .from('reservations')
-        .select('trip_id, agency_id')
-        .in('trip_id', [...new Set(allTripIds)])
-        .in('status', ['confirmed', 'partial', 'completed', 'boarded']);
+        .from("reservations")
+        .select("trip_id, agency_id")
+        .in("trip_id", [...new Set(allTripIds)])
+        .in("status", ["confirmed", "partial", "completed", "boarded"]);
       for (const r of reservations || []) {
         reservationCountByTrip[`${r.trip_id}:${r.agency_id}`] =
           (reservationCountByTrip[`${r.trip_id}:${r.agency_id}`] || 0) + 1;
@@ -59,7 +65,8 @@ export class SuperadminService {
       const key = `${tl.trip_id}:${tl.agency_id}`;
       if (reservationCountByTrip[key]) {
         reservationCountByAgency[tl.agency_id] =
-          (reservationCountByAgency[tl.agency_id] || 0) + reservationCountByTrip[key];
+          (reservationCountByAgency[tl.agency_id] || 0) +
+          reservationCountByTrip[key];
       }
     }
 
@@ -72,12 +79,12 @@ export class SuperadminService {
 
   async getAgency(id: string) {
     const { data, error } = await supabaseAdmin
-      .from('agencies')
-      .select('*')
-      .eq('id', id)
+      .from("agencies")
+      .select("*")
+      .eq("id", id)
       .single();
 
-    if (error || !data) throw new NotFoundError('Agency not found');
+    if (error || !data) throw new NotFoundError("Agency not found");
     return data;
   }
 
@@ -85,8 +92,8 @@ export class SuperadminService {
     const subdomain = await generateUniqueSubdomain(name, supabaseAdmin);
 
     const { data: agency, error: agencyError } = await supabaseAdmin
-      .from('agencies')
-      .insert({ name, subdomain, email, status: 'pending' })
+      .from("agencies")
+      .insert({ name, subdomain, email, status: "pending" })
       .select()
       .single();
 
@@ -96,13 +103,16 @@ export class SuperadminService {
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
     const { error: inviteError } = await supabaseAdmin
-      .from('agency_invitations')
+      .from("agency_invitations")
       .insert({ token, agency_id: agency.id, email, expires_at: expiresAt });
 
     if (inviteError) throw new ValidationError(inviteError.message);
 
     emailService.sendInvitationEmail(email, name, token).catch((err) => {
-      console.error('[SuperadminService] Failed to send invitation email:', err);
+      console.error(
+        "[SuperadminService] Failed to send invitation email:",
+        err
+      );
     });
 
     return { ...agency, invitation_link: `/accept-invitation?token=${token}` };
@@ -110,23 +120,23 @@ export class SuperadminService {
 
   async updateAgency(id: string, updates: { name?: string; status?: string }) {
     const { data, error } = await supabaseAdmin
-      .from('agencies')
+      .from("agencies")
       .update(updates)
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
 
     if (error) throw new ValidationError(error.message);
-    if (!data) throw new NotFoundError('Agency not found');
+    if (!data) throw new NotFoundError("Agency not found");
     return data;
   }
 
   // ---- Routes ----
   async listRoutes() {
     const { data: routes, error } = await supabaseAdmin
-      .from('routes')
-      .select('*')
-      .order('origin');
+      .from("routes")
+      .select("*")
+      .order("origin");
 
     if (error) throw new ValidationError(error.message);
     if (!routes || routes.length === 0) return [];
@@ -134,9 +144,9 @@ export class SuperadminService {
     const routeIds = routes.map((r: any) => r.id);
 
     const { data: trips } = await supabaseAdmin
-      .from('trips')
-      .select('id, route_id')
-      .in('route_id', routeIds);
+      .from("trips")
+      .select("id, route_id")
+      .in("route_id", routeIds);
 
     const tripCountByRoute: Record<string, number> = {};
     const allTripIds: string[] = [];
@@ -148,12 +158,13 @@ export class SuperadminService {
     let reservationCountByTrip: Record<string, number> = {};
     if (allTripIds.length > 0) {
       const { data: reservations } = await supabaseAdmin
-        .from('reservations')
-        .select('trip_id')
-        .in('trip_id', allTripIds)
-        .in('status', ['confirmed', 'partial', 'completed', 'boarded']);
+        .from("reservations")
+        .select("trip_id")
+        .in("trip_id", allTripIds)
+        .in("status", ["confirmed", "partial", "completed", "boarded"]);
       for (const r of reservations || []) {
-        reservationCountByTrip[r.trip_id] = (reservationCountByTrip[r.trip_id] || 0) + 1;
+        reservationCountByTrip[r.trip_id] =
+          (reservationCountByTrip[r.trip_id] || 0) + 1;
       }
     }
 
@@ -167,7 +178,8 @@ export class SuperadminService {
       const routeTripIds = tripIdsByRoute[route.id] || [];
       const tripCount = routeTripIds.length;
       const reservationCount = routeTripIds.reduce(
-        (sum, tid) => sum + (reservationCountByTrip[tid] || 0), 0
+        (sum, tid) => sum + (reservationCountByTrip[tid] || 0),
+        0
       );
       return { ...route, tripCount, reservationCount };
     });
@@ -175,7 +187,7 @@ export class SuperadminService {
 
   async createRoute(origin: string, destination: string) {
     const { data, error } = await supabaseAdmin
-      .from('routes')
+      .from("routes")
       .insert({ origin, destination })
       .select()
       .single();
@@ -184,37 +196,42 @@ export class SuperadminService {
     return data;
   }
 
-  async updateRoute(id: string, updates: { origin?: string; destination?: string }) {
+  async updateRoute(
+    id: string,
+    updates: { origin?: string; destination?: string }
+  ) {
     const { data: existing } = await supabaseAdmin
-      .from('routes')
-      .select('id')
-      .eq('id', id)
+      .from("routes")
+      .select("id")
+      .eq("id", id)
       .single();
 
-    if (!existing) throw new NotFoundError('Route not found');
+    if (!existing) throw new NotFoundError("Route not found");
 
     const { data: trips } = await supabaseAdmin
-      .from('trips')
-      .select('id')
-      .eq('route_id', id);
+      .from("trips")
+      .select("id")
+      .eq("route_id", id);
 
     if (trips && trips.length > 0) {
-      const tripIds = trips.map(t => t.id);
+      const tripIds = trips.map((t) => t.id);
       const { count } = await supabaseAdmin
-        .from('reservations')
-        .select('*', { count: 'exact', head: true })
-        .in('trip_id', tripIds)
-        .in('status', ['confirmed', 'partial', 'completed', 'boarded']);
+        .from("reservations")
+        .select("*", { count: "exact", head: true })
+        .in("trip_id", tripIds)
+        .in("status", ["confirmed", "partial", "completed", "boarded"]);
 
       if (count && count > 0) {
-        throw new ForbiddenError('No puedes editar esta ruta porque tiene reservas asociadas.');
+        throw new ForbiddenError(
+          "No puedes editar esta ruta porque tiene reservas asociadas."
+        );
       }
     }
 
     const { data, error } = await supabaseAdmin
-      .from('routes')
+      .from("routes")
       .update(updates)
-      .eq('id', id)
+      .eq("id", id)
       .select()
       .single();
 
@@ -224,93 +241,132 @@ export class SuperadminService {
 
   async deactivateRoute(id: string) {
     const { data: existing } = await supabaseAdmin
-      .from('routes')
-      .select('id, status')
-      .eq('id', id)
+      .from("routes")
+      .select("id, status")
+      .eq("id", id)
       .single();
 
-    if (!existing) throw new NotFoundError('Route not found');
+    if (!existing) throw new NotFoundError("Route not found");
 
-    if (existing.status === 'inactive') {
-      throw new ValidationError('La ruta ya está inactiva.');
+    if (existing.status === "inactive") {
+      throw new ValidationError("La ruta ya está inactiva.");
     }
 
     const { data: trips } = await supabaseAdmin
-      .from('trips')
-      .select('id, status')
-      .eq('route_id', id);
+      .from("trips")
+      .select("id, status")
+      .eq("route_id", id);
 
     if (trips && trips.length > 0) {
-      const activeTrips = trips.filter(t => t.status === 'active');
+      const activeTrips = trips.filter((t) => t.status === "active");
       if (activeTrips.length > 0) {
-        throw new ForbiddenError('No puedes desactivar esta ruta porque tiene viajes activos. Cancela o completa los viajes primero.');
+        throw new ForbiddenError(
+          "No puedes desactivar esta ruta porque tiene viajes activos. Cancela o completa los viajes primero."
+        );
       }
     }
 
     const { error } = await supabaseAdmin
-      .from('routes')
-      .update({ status: 'inactive' })
-      .eq('id', id);
+      .from("routes")
+      .update({ status: "inactive" })
+      .eq("id", id);
 
     if (error) throw new ValidationError(error.message);
   }
 
   async activateRoute(id: string) {
     const { data: existing } = await supabaseAdmin
-      .from('routes')
-      .select('id, status')
-      .eq('id', id)
+      .from("routes")
+      .select("id, status")
+      .eq("id", id)
       .single();
 
-    if (!existing) throw new NotFoundError('Route not found');
+    if (!existing) throw new NotFoundError("Route not found");
 
-    if (existing.status === 'active') {
-      throw new ValidationError('La ruta ya está activa.');
+    if (existing.status === "active") {
+      throw new ValidationError("La ruta ya está activa.");
     }
 
     const { error } = await supabaseAdmin
-      .from('routes')
-      .update({ status: 'active' })
-      .eq('id', id);
+      .from("routes")
+      .update({ status: "active" })
+      .eq("id", id);
 
     if (error) throw new ValidationError(error.message);
   }
 
   // ---- Vehicle config ----
-  private readonly VEHICLE_CONFIG: Record<string, { capacity: number; seats: string[] }> = {
+  private readonly VEHICLE_CONFIG: Record<
+    string,
+    { capacity: number; seats: string[] }
+  > = {
     bus: {
       capacity: 31,
-      seats: ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10','A11','A12','A13','A14','A15','A16','A17','A18','A19','A20','A21','A22','A23','A24','A25','A26','A27','A28','A29','A30','A31'],
+      seats: [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14",
+        "A15",
+        "A16",
+        "A17",
+        "A18",
+        "A19",
+        "A20",
+        "A21",
+        "A22",
+        "A23",
+        "A24",
+        "A25",
+        "A26",
+        "A27",
+        "A28",
+        "A29",
+        "A30",
+        "A31",
+      ],
     },
     kia: {
       capacity: 10,
-      seats: ['A1','A2','A3','A4','A5','A6','A7','A8','A9','A10'],
+      seats: ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10"],
     },
   };
 
-  private async getAgenciesWithEmail(agencyIds: string[]): Promise<{ id: string; name: string; email: string }[]> {
+  private async getAgenciesWithEmail(
+    agencyIds: string[]
+  ): Promise<{ id: string; name: string; email: string }[]> {
     if (agencyIds.length === 0) return [];
 
     const { data: agencies } = await supabaseAdmin
-      .from('agencies')
-      .select('id, name, email, status')
-      .in('id', agencyIds);
+      .from("agencies")
+      .select("id, name, email, status")
+      .in("id", agencyIds);
 
     return (agencies || []).filter(
-      (a: any) => a.status === 'active' && a.email,
+      (a: any) => a.status === "active" && a.email
     );
   }
 
   private formatDateForEmail(isoDate: string): string {
     const d = new Date(isoDate);
-    return d.toLocaleDateString('es-VE', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'America/Caracas',
+    return d.toLocaleDateString("es-VE", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Caracas",
     });
   }
 
@@ -318,12 +374,12 @@ export class SuperadminService {
   async createTrip(
     routeId: string,
     departureTime: string,
-    vehicleType: 'bus' | 'kia',
+    vehicleType: "bus" | "kia",
     agencyIds: string[],
-    createdBy: string,
+    createdBy: string
   ) {
     if (agencyIds.length === 0) {
-      throw new ValidationError('At least one agency is required');
+      throw new ValidationError("At least one agency is required");
     }
 
     const config = this.VEHICLE_CONFIG[vehicleType];
@@ -331,16 +387,19 @@ export class SuperadminService {
     const seatCodes = config.seats;
 
     const { data: route } = await supabaseAdmin
-      .from('routes')
-      .select('id, status, origin, destination')
-      .eq('id', routeId)
+      .from("routes")
+      .select("id, status, origin, destination")
+      .eq("id", routeId)
       .single();
 
-    if (!route) throw new NotFoundError('Route not found');
-    if (route.status === 'inactive') throw new ValidationError('No se puede crear un viaje con una ruta inactiva. Activa la ruta primero.');
+    if (!route) throw new NotFoundError("Route not found");
+    if (route.status === "inactive")
+      throw new ValidationError(
+        "No se puede crear un viaje con una ruta inactiva. Activa la ruta primero."
+      );
 
     const { data: trip, error: tripError } = await supabaseAdmin
-      .from('trips')
+      .from("trips")
       .insert({
         route_id: routeId,
         departure_time: toUTC(departureTime),
@@ -353,33 +412,33 @@ export class SuperadminService {
 
     if (tripError) throw new ValidationError(tripError.message);
 
-    const seatRows = seatCodes.map(seatCode => ({
+    const seatRows = seatCodes.map((seatCode) => ({
       trip_id: trip.id,
       seat_code: seatCode,
-      status: 'available' as const,
+      status: "available" as const,
     }));
 
     const { error: seatsError } = await supabaseAdmin
-      .from('seats')
+      .from("seats")
       .insert(seatRows);
 
     if (seatsError) {
-      await supabaseAdmin.from('trips').delete().eq('id', trip.id);
+      await supabaseAdmin.from("trips").delete().eq("id", trip.id);
       throw new ValidationError(seatsError.message);
     }
 
-    const taRows = agencyIds.map(agencyId => ({
+    const taRows = agencyIds.map((agencyId) => ({
       trip_id: trip.id,
       agency_id: agencyId,
     }));
 
     const { error: taError } = await supabaseAdmin
-      .from('trip_agencies')
+      .from("trip_agencies")
       .insert(taRows);
 
     if (taError) {
-      await supabaseAdmin.from('seats').delete().eq('trip_id', trip.id);
-      await supabaseAdmin.from('trips').delete().eq('id', trip.id);
+      await supabaseAdmin.from("seats").delete().eq("trip_id", trip.id);
+      await supabaseAdmin.from("trips").delete().eq("id", trip.id);
       throw new ValidationError(taError.message);
     }
 
@@ -387,34 +446,52 @@ export class SuperadminService {
     const agenciesWithEmail = await this.getAgenciesWithEmail(agencyIds);
     const departureFormatted = this.formatDateForEmail(trip.departure_time);
     for (const agency of agenciesWithEmail) {
-      emailService.sendNewTripAssignedEmail(
-        agency.email,
-        agency.name,
-        route.origin,
-        route.destination,
-        departureFormatted,
-        vehicleType,
-        capacity,
-        trip.id,
-        agency.id,
-      ).catch((err) => {
-        console.error(JSON.stringify({ event: 'TRIP_ASSIGNED_EMAIL_FAILED', tripId: trip.id, agencyId: agency.id, error: err.message }));
-      });
+      emailService
+        .sendNewTripAssignedEmail(
+          agency.email,
+          agency.name,
+          route.origin,
+          route.destination,
+          departureFormatted,
+          vehicleType,
+          capacity,
+          trip.id,
+          agency.id
+        )
+        .catch((err) => {
+          console.error(
+            JSON.stringify({
+              event: "TRIP_ASSIGNED_EMAIL_FAILED",
+              tripId: trip.id,
+              agencyId: agency.id,
+              error: err.message,
+            })
+          );
+        });
     }
 
     // Notification: trip created → agencies only (superadmin is the actor)
-    notificationService.createForAgenciesAndAdmin({
-      type: 'trip_created',
-      title: 'Viaje creado',
-      body: `Nuevo viaje disponible: ${route.origin} → ${route.destination} el ${departureFormatted}`,
-      entityType: 'trip',
-      entityId: trip.id,
-      agencyIds,
-      actor: 'superadmin',
-      action_url: `/agency/trips/${trip.id}/passengers`,
-    }).catch((err) => {
-      console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'trip_created', tripId: trip.id, error: err.message }));
-    });
+    notificationService
+      .createForAgenciesAndAdmin({
+        type: "trip_created",
+        title: "Viaje creado",
+        body: `Viaje asignado: ${route.origin} → ${route.destination} el ${departureFormatted}`,
+        entityType: "trip",
+        entityId: trip.id,
+        agencyIds,
+        actor: "superadmin",
+        action_url: `/agency/trips/${trip.id}/passengers`,
+      })
+      .catch((err) => {
+        console.error(
+          JSON.stringify({
+            event: "NOTIFICATION_FAILED",
+            type: "trip_created",
+            tripId: trip.id,
+            error: err.message,
+          })
+        );
+      });
 
     return trip;
   }
@@ -422,29 +499,35 @@ export class SuperadminService {
   async listTrips(
     page: number = 1,
     limit: number = 12,
-    filters?: { status?: string; route_id?: string; agency_id?: string; search?: string; departure_date?: string }
+    filters?: {
+      status?: string;
+      route_id?: string;
+      agency_id?: string;
+      search?: string;
+      departure_date?: string;
+    }
   ) {
     // Resolve text search to route IDs and agency IDs
     let routeIdFilter: string[] | undefined;
     let tripIdFilterFromSearch: string[] | undefined;
     if (filters?.search) {
       const { data: matchingRoutes } = await supabaseAdmin
-        .from('routes')
-        .select('id')
-        .ilike('destination', `%${filters.search}%`);
-      routeIdFilter = matchingRoutes?.map(r => r.id) || [];
+        .from("routes")
+        .select("id")
+        .ilike("destination", `%${filters.search}%`);
+      routeIdFilter = matchingRoutes?.map((r) => r.id) || [];
 
       const { data: matchingAgencies } = await supabaseAdmin
-        .from('agencies')
-        .select('id')
-        .ilike('name', `%${filters.search}%`);
+        .from("agencies")
+        .select("id")
+        .ilike("name", `%${filters.search}%`);
       if (matchingAgencies && matchingAgencies.length > 0) {
-        const agencyIds = matchingAgencies.map(a => a.id);
+        const agencyIds = matchingAgencies.map((a) => a.id);
         const { data: agencyTrips } = await supabaseAdmin
-          .from('trip_agencies')
-          .select('trip_id')
-          .in('agency_id', agencyIds);
-        tripIdFilterFromSearch = agencyTrips?.map(t => t.trip_id) || [];
+          .from("trip_agencies")
+          .select("trip_id")
+          .in("agency_id", agencyIds);
+        tripIdFilterFromSearch = agencyTrips?.map((t) => t.trip_id) || [];
       }
     }
 
@@ -452,10 +535,10 @@ export class SuperadminService {
     let tripIdFilterFromAgency: string[] | undefined;
     if (filters?.agency_id) {
       const { data: agencyTrips } = await supabaseAdmin
-        .from('trip_agencies')
-        .select('trip_id')
-        .eq('agency_id', filters.agency_id);
-      tripIdFilterFromAgency = agencyTrips?.map(t => t.trip_id) || [];
+        .from("trip_agencies")
+        .select("trip_id")
+        .eq("agency_id", filters.agency_id);
+      tripIdFilterFromAgency = agencyTrips?.map((t) => t.trip_id) || [];
       if (tripIdFilterFromAgency.length === 0) {
         const totalPages = Math.ceil(0 / limit);
         return { data: [], pagination: { page, limit, total: 0, totalPages } };
@@ -466,11 +549,17 @@ export class SuperadminService {
     let tripIdFilter: string[] | undefined;
     if (routeIdFilter || tripIdFilterFromSearch) {
       // Search: trips matching route destination OR agency name
-      const { data: tripsByRoute } = routeIdFilter && routeIdFilter.length > 0
-        ? await supabaseAdmin.from('trips').select('id').in('route_id', routeIdFilter)
-        : { data: [] as any[] };
-      const routeTripIds = (tripsByRoute || []).map(t => t.id);
-      const allIds = [...new Set([...routeTripIds, ...(tripIdFilterFromSearch || [])])];
+      const { data: tripsByRoute } =
+        routeIdFilter && routeIdFilter.length > 0
+          ? await supabaseAdmin
+              .from("trips")
+              .select("id")
+              .in("route_id", routeIdFilter)
+          : { data: [] as any[] };
+      const routeTripIds = (tripsByRoute || []).map((t) => t.id);
+      const allIds = [
+        ...new Set([...routeTripIds, ...(tripIdFilterFromSearch || [])]),
+      ];
       tripIdFilter = allIds;
       if (allIds.length === 0) {
         const totalPages = Math.ceil(0 / limit);
@@ -479,7 +568,7 @@ export class SuperadminService {
     }
     if (tripIdFilterFromAgency) {
       tripIdFilter = tripIdFilter
-        ? tripIdFilter.filter(id => tripIdFilterFromAgency!.includes(id))
+        ? tripIdFilter.filter((id) => tripIdFilterFromAgency!.includes(id))
         : tripIdFilterFromAgency;
     }
 
@@ -494,76 +583,107 @@ export class SuperadminService {
     }
 
     // Count with filters
-    let countQuery = supabaseAdmin.from('trips').select('*', { count: 'exact', head: true }) as any;
-    if (filters?.status) countQuery = countQuery.eq('status', filters.status);
-    if (filters?.route_id) countQuery = countQuery.eq('route_id', filters.route_id);
-    if (dateStart) countQuery = countQuery.gte('departure_time', dateStart);
-    if (dateEnd) countQuery = countQuery.lt('departure_time', dateEnd);
-    if (tripIdFilter) countQuery = countQuery.in('id', tripIdFilter);
+    let countQuery = supabaseAdmin
+      .from("trips")
+      .select("*", { count: "exact", head: true }) as any;
+    if (filters?.status) countQuery = countQuery.eq("status", filters.status);
+    if (filters?.route_id)
+      countQuery = countQuery.eq("route_id", filters.route_id);
+    if (dateStart) countQuery = countQuery.gte("departure_time", dateStart);
+    if (dateEnd) countQuery = countQuery.lt("departure_time", dateEnd);
+    if (tripIdFilter) countQuery = countQuery.in("id", tripIdFilter);
     const { count: total } = await countQuery;
 
     // Data query with filters
     let dataQuery = supabaseAdmin
-      .from('trips')
-      .select('*, routes(origin, destination), trip_agencies(agency_id)')
-      .order('departure_time')
+      .from("trips")
+      .select("*, routes(origin, destination), trip_agencies(agency_id)")
+      .order("departure_time")
       .range((page - 1) * limit, page * limit - 1) as any;
-    if (filters?.status) dataQuery = dataQuery.eq('status', filters.status);
-    if (filters?.route_id) dataQuery = dataQuery.eq('route_id', filters.route_id);
-    if (dateStart) dataQuery = dataQuery.gte('departure_time', dateStart);
-    if (dateEnd) dataQuery = dataQuery.lt('departure_time', dateEnd);
-    if (tripIdFilter) dataQuery = dataQuery.in('id', tripIdFilter);
+    if (filters?.status) dataQuery = dataQuery.eq("status", filters.status);
+    if (filters?.route_id)
+      dataQuery = dataQuery.eq("route_id", filters.route_id);
+    if (dateStart) dataQuery = dataQuery.gte("departure_time", dateStart);
+    if (dateEnd) dataQuery = dataQuery.lt("departure_time", dateEnd);
+    if (tripIdFilter) dataQuery = dataQuery.in("id", tripIdFilter);
 
     const { data: trips, error } = await dataQuery;
 
     const totalPages = Math.ceil((total || 0) / limit);
 
     if (!trips || trips.length === 0) {
-      return { data: [], pagination: { page, limit, total: total || 0, totalPages } };
+      return {
+        data: [],
+        pagination: { page, limit, total: total || 0, totalPages },
+      };
     }
 
     const tripIds = trips.map((t: any) => t.id);
 
     // Seat counts per trip + raw seats for frontend derivation
     const { data: seats } = await supabaseAdmin
-      .from('seats')
-      .select('id, trip_id, seat_code, status')
-      .in('trip_id', tripIds);
+      .from("seats")
+      .select("id, trip_id, seat_code, status")
+      .in("trip_id", tripIds);
 
-    const seatMap: Record<string, { total: number; available: number; reserved: number; locked: number; blocked: number }> = {};
-    const seatsByTrip: Record<string, { id: string; seat_code: string; status: string }[]> = {};
+    const seatMap: Record<
+      string,
+      {
+        total: number;
+        available: number;
+        reserved: number;
+        locked: number;
+        blocked: number;
+      }
+    > = {};
+    const seatsByTrip: Record<
+      string,
+      { id: string; seat_code: string; status: string }[]
+    > = {};
     for (const tId of tripIds) {
-      seatMap[tId] = { total: 0, available: 0, reserved: 0, locked: 0, blocked: 0 };
+      seatMap[tId] = {
+        total: 0,
+        available: 0,
+        reserved: 0,
+        locked: 0,
+        blocked: 0,
+      };
       seatsByTrip[tId] = [];
     }
     for (const s of seats || []) {
       if (seatMap[s.trip_id]) {
         seatMap[s.trip_id].total++;
-        seatsByTrip[s.trip_id].push({ id: s.id, seat_code: s.seat_code, status: s.status });
-        if (s.status === 'available') seatMap[s.trip_id].available++;
-        else if (s.status === 'reserved') seatMap[s.trip_id].reserved++;
-        else if (s.status === 'locked') seatMap[s.trip_id].locked++;
-        else if (s.status === 'blocked') seatMap[s.trip_id].blocked++;
+        seatsByTrip[s.trip_id].push({
+          id: s.id,
+          seat_code: s.seat_code,
+          status: s.status,
+        });
+        if (s.status === "available") seatMap[s.trip_id].available++;
+        else if (s.status === "reserved") seatMap[s.trip_id].reserved++;
+        else if (s.status === "locked") seatMap[s.trip_id].locked++;
+        else if (s.status === "blocked") seatMap[s.trip_id].blocked++;
       }
     }
 
     // Boarded passenger count per trip
     const { data: tripReservations } = await supabaseAdmin
-      .from('reservations')
-      .select('id, trip_id')
-      .in('trip_id', tripIds);
+      .from("reservations")
+      .select("id, trip_id")
+      .in("trip_id", tripIds);
 
-    const tripResIds = (tripReservations || []).map(r => r.id);
-    const tripForRes = new Map((tripReservations || []).map(r => [r.id, r.trip_id]));
+    const tripResIds = (tripReservations || []).map((r) => r.id);
+    const tripForRes = new Map(
+      (tripReservations || []).map((r) => [r.id, r.trip_id])
+    );
     const boardedPerTrip: Record<string, number> = {};
 
     if (tripResIds.length > 0) {
       const { data: boardedPassengers } = await supabaseAdmin
-        .from('reservation_passengers')
-        .select('reservation_id')
-        .eq('boarded', true)
-        .eq('status', 'active')
-        .in('reservation_id', tripResIds);
+        .from("reservation_passengers")
+        .select("reservation_id")
+        .eq("boarded", true)
+        .eq("status", "active")
+        .in("reservation_id", tripResIds);
 
       for (const bp of boardedPassengers || []) {
         const tId = tripForRes.get(bp.reservation_id);
@@ -573,36 +693,52 @@ export class SuperadminService {
 
     // Reservation count per agency per trip
     const { data: reservations } = await supabaseAdmin
-      .from('reservations')
-      .select('id, trip_id, agency_id')
-      .in('trip_id', tripIds)
-      .in('status', ['confirmed', 'partial', 'completed']);
+      .from("reservations")
+      .select("id, trip_id, agency_id")
+      .in("trip_id", tripIds)
+      .in("status", ["confirmed", "partial", "completed"]);
 
     const agencyResMap: Record<string, Record<string, number>> = {};
     for (const r of reservations || []) {
       if (!agencyResMap[r.trip_id]) agencyResMap[r.trip_id] = {};
-      agencyResMap[r.trip_id][r.agency_id] = (agencyResMap[r.trip_id][r.agency_id] || 0) + 1;
+      agencyResMap[r.trip_id][r.agency_id] =
+        (agencyResMap[r.trip_id][r.agency_id] || 0) + 1;
     }
 
     // Agency names for trip_agencies
-    const allAgencyIds = [...new Set(
-      trips.flatMap((t: any) => (t.trip_agencies || []).map((ta: any) => ta.agency_id))
-    )];
+    const allAgencyIds = [
+      ...new Set(
+        trips.flatMap((t: any) =>
+          (t.trip_agencies || []).map((ta: any) => ta.agency_id)
+        )
+      ),
+    ];
     const { data: agencyNames } = await supabaseAdmin
-      .from('agencies')
-      .select('id, name')
-      .in('id', allAgencyIds.length ? allAgencyIds : ['none']);
-    const agencyNameMap = new Map((agencyNames || []).map(a => [a.id, a.name]));
+      .from("agencies")
+      .select("id, name")
+      .in("id", allAgencyIds.length ? allAgencyIds : ["none"]);
+    const agencyNameMap = new Map(
+      (agencyNames || []).map((a) => [a.id, a.name])
+    );
 
     const data = trips.map((trip: any) => {
       const route = trip.routes;
-      const stats = seatMap[trip.id] || { total: 0, available: 0, reserved: 0, locked: 0, blocked: 0 };
+      const stats = seatMap[trip.id] || {
+        total: 0,
+        available: 0,
+        reserved: 0,
+        locked: 0,
+        blocked: 0,
+      };
       const ta = trip.trip_agencies || [];
 
       return {
         id: trip.id,
         route_id: trip.route_id,
-        route: { origin: route?.origin || '', destination: route?.destination || '' },
+        route: {
+          origin: route?.origin || "",
+          destination: route?.destination || "",
+        },
         departure_time: trip.departure_time,
         vehicle: { type: trip.vehicle_type, capacity: trip.capacity },
         status: trip.status,
@@ -618,10 +754,12 @@ export class SuperadminService {
         },
         agencies: ta.map((taItem: any) => ({
           id: taItem.agency_id,
-          name: agencyNameMap.get(taItem.agency_id) || '',
+          name: agencyNameMap.get(taItem.agency_id) || "",
           reservation_count: agencyResMap[trip.id]?.[taItem.agency_id] || 0,
         })),
-        trip_agencies: ta.map((taItem: any) => ({ agency_id: taItem.agency_id })),
+        trip_agencies: ta.map((taItem: any) => ({
+          agency_id: taItem.agency_id,
+        })),
       };
     });
 
@@ -630,43 +768,47 @@ export class SuperadminService {
 
   async getTrip(id: string) {
     const { data, error } = await supabaseAdmin
-      .from('trips')
-      .select('*, routes(*), trip_agencies(*)')
-      .eq('id', id)
+      .from("trips")
+      .select("*, routes(*), trip_agencies(*)")
+      .eq("id", id)
       .single();
 
-    if (error || !data) throw new NotFoundError('Trip not found');
+    if (error || !data) throw new NotFoundError("Trip not found");
 
     // Get agency names for trip_agencies
-    const taAgencyIds = ((data as any).trip_agencies || []).map((ta: any) => ta.agency_id);
+    const taAgencyIds = ((data as any).trip_agencies || []).map(
+      (ta: any) => ta.agency_id
+    );
     const { data: agencies } = await supabaseAdmin
-      .from('agencies')
-      .select('id, name')
-      .in('id', taAgencyIds.length ? taAgencyIds : ['none']);
+      .from("agencies")
+      .select("id, name")
+      .in("id", taAgencyIds.length ? taAgencyIds : ["none"]);
 
-    const agencyNameMap = new Map((agencies || []).map(a => [a.id, a.name]));
+    const agencyNameMap = new Map((agencies || []).map((a) => [a.id, a.name]));
 
     // Get seats with status
     const { data: seats } = await supabaseAdmin
-      .from('seats')
-      .select('*')
-      .eq('trip_id', id)
-      .order('seat_code');
+      .from("seats")
+      .select("*")
+      .eq("trip_id", id)
+      .order("seat_code");
 
     // Get reservations for this trip with passenger counts
     const { data: reservations } = await supabaseAdmin
-      .from('reservations')
-      .select('id, agency_id, booker_name, booker_document, booker_phone, status, qr_code, created_at')
-      .eq('trip_id', id);
+      .from("reservations")
+      .select(
+        "id, agency_id, booker_name, booker_document, booker_phone, status, qr_code, created_at"
+      )
+      .eq("trip_id", id);
 
-    const resIds = (reservations || []).map(r => r.id);
+    const resIds = (reservations || []).map((r) => r.id);
     let passengers: any[] = [];
     if (resIds.length > 0) {
       const { data: pData } = await supabaseAdmin
-        .from('reservation_passengers')
-        .select('*, seats(seat_code)')
-        .eq('status', 'active')
-        .in('reservation_id', resIds);
+        .from("reservation_passengers")
+        .select("*, seats(seat_code)")
+        .eq("status", "active")
+        .in("reservation_id", resIds);
       passengers = pData || [];
     }
 
@@ -675,12 +817,12 @@ export class SuperadminService {
       routes: (data as any).routes,
       trip_agencies: ((data as any).trip_agencies || []).map((ta: any) => ({
         ...ta,
-        agency_name: agencyNameMap.get(ta.agency_id) || '',
+        agency_name: agencyNameMap.get(ta.agency_id) || "",
       })),
       seats: seats || [],
-      reservations: (reservations || []).map(r => ({
+      reservations: (reservations || []).map((r) => ({
         ...r,
-        passengers: passengers.filter(p => p.reservation_id === r.id),
+        passengers: passengers.filter((p) => p.reservation_id === r.id),
       })),
     };
   }
@@ -689,12 +831,12 @@ export class SuperadminService {
     id: string,
     routeId: string,
     departureTime: string,
-    vehicleType: 'bus' | 'kia',
+    vehicleType: "bus" | "kia",
     agencyIds: string[],
-    postpone: boolean = false,
+    postpone: boolean = false
   ) {
     if (agencyIds.length === 0) {
-      throw new ValidationError('At least one agency is required');
+      throw new ValidationError("At least one agency is required");
     }
 
     const config = this.VEHICLE_CONFIG[vehicleType];
@@ -728,147 +870,212 @@ export class SuperadminService {
     };
 
     const { error: tripError } = await supabaseAdmin
-      .from('trips')
+      .from("trips")
       .update(updateFields)
-      .eq('id', id);
+      .eq("id", id);
 
     if (tripError) throw new ValidationError(tripError.message);
 
     // 2b. Adjust seats if capacity changed (vehicle type already validated)
     const oldCapacity = ctx.trip.capacity;
     if (capacity > oldCapacity) {
-      const newSeats = Array.from({ length: capacity - oldCapacity }, (_, i) => ({
-        trip_id: id,
-        seat_code: `A${oldCapacity + i + 1}`,
-        status: 'available' as const,
-      }));
-      const { error: seatsInsertError } = await supabaseAdmin.from('seats').insert(newSeats);
+      const newSeats = Array.from(
+        { length: capacity - oldCapacity },
+        (_, i) => ({
+          trip_id: id,
+          seat_code: `A${oldCapacity + i + 1}`,
+          status: "available" as const,
+        })
+      );
+      const { error: seatsInsertError } = await supabaseAdmin
+        .from("seats")
+        .insert(newSeats);
       if (seatsInsertError) {
         // Rollback trip update
         await supabaseAdmin
-          .from('trips')
-          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
-          .eq('id', id);
-        throw new ValidationError(`Error al agregar asientos: ${seatsInsertError.message}`);
+          .from("trips")
+          .update({
+            capacity: oldCapacity,
+            vehicle_type: ctx.trip.vehicle_type,
+          })
+          .eq("id", id);
+        throw new ValidationError(
+          `Error al agregar asientos: ${seatsInsertError.message}`
+        );
       }
     } else if (capacity < oldCapacity) {
-      const excessCodes = Array.from({ length: oldCapacity - capacity }, (_, i) => `A${capacity + i + 1}`);
+      const excessCodes = Array.from(
+        { length: oldCapacity - capacity },
+        (_, i) => `A${capacity + i + 1}`
+      );
       const { data: reserved, error: checkError } = await supabaseAdmin
-        .from('seats')
-        .select('seat_code')
-        .eq('trip_id', id)
-        .in('seat_code', excessCodes)
-        .neq('status', 'available');
+        .from("seats")
+        .select("seat_code")
+        .eq("trip_id", id)
+        .in("seat_code", excessCodes)
+        .neq("status", "available");
       if (checkError) {
         await supabaseAdmin
-          .from('trips')
-          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
-          .eq('id', id);
+          .from("trips")
+          .update({
+            capacity: oldCapacity,
+            vehicle_type: ctx.trip.vehicle_type,
+          })
+          .eq("id", id);
         throw new ValidationError(checkError.message);
       }
       if (reserved && reserved.length > 0) {
         // Rollback trip update
         await supabaseAdmin
-          .from('trips')
-          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
-          .eq('id', id);
+          .from("trips")
+          .update({
+            capacity: oldCapacity,
+            vehicle_type: ctx.trip.vehicle_type,
+          })
+          .eq("id", id);
         throw new ValidationError(
-          `No se puede reducir capacidad: los asientos ${reserved.map(s => s.seat_code).join(', ')} tienen actividad`,
+          `No se puede reducir capacidad: los asientos ${reserved.map((s) => s.seat_code).join(", ")} tienen actividad`
         );
       }
       const { error: deleteError } = await supabaseAdmin
-        .from('seats').delete().eq('trip_id', id).in('seat_code', excessCodes);
+        .from("seats")
+        .delete()
+        .eq("trip_id", id)
+        .in("seat_code", excessCodes);
       if (deleteError) {
         await supabaseAdmin
-          .from('trips')
-          .update({ capacity: oldCapacity, vehicle_type: ctx.trip.vehicle_type })
-          .eq('id', id);
-        throw new ValidationError(`Error al eliminar asientos: ${deleteError.message}`);
+          .from("trips")
+          .update({
+            capacity: oldCapacity,
+            vehicle_type: ctx.trip.vehicle_type,
+          })
+          .eq("id", id);
+        throw new ValidationError(
+          `Error al eliminar asientos: ${deleteError.message}`
+        );
       }
     }
 
     // 2c. Manage agency assignments
-    const removedAgencies = ctx.currentAgencyIds.filter(aid => !agencyIds.includes(aid));
+    const removedAgencies = ctx.currentAgencyIds.filter(
+      (aid) => !agencyIds.includes(aid)
+    );
     if (removedAgencies.length > 0) {
-      const { error: removeError } = await supabaseAdmin.from('trip_agencies').delete()
-        .eq('trip_id', id)
-        .in('agency_id', removedAgencies);
-      if (removeError) throw new ValidationError(`Error al desasignar agencias: ${removeError.message}`);
+      const { error: removeError } = await supabaseAdmin
+        .from("trip_agencies")
+        .delete()
+        .eq("trip_id", id)
+        .in("agency_id", removedAgencies);
+      if (removeError)
+        throw new ValidationError(
+          `Error al desasignar agencias: ${removeError.message}`
+        );
     }
 
-    const newAgencies = agencyIds.filter(aid => !ctx.currentAgencyIds.includes(aid));
+    const newAgencies = agencyIds.filter(
+      (aid) => !ctx.currentAgencyIds.includes(aid)
+    );
     if (newAgencies.length > 0) {
-      const taRows = newAgencies.map(agencyId => ({
+      const taRows = newAgencies.map((agencyId) => ({
         trip_id: id,
         agency_id: agencyId,
       }));
-      const { error: insertError } = await supabaseAdmin.from('trip_agencies').insert(taRows);
-      if (insertError) throw new ValidationError(`Error al asignar agencias: ${insertError.message}`);
+      const { error: insertError } = await supabaseAdmin
+        .from("trip_agencies")
+        .insert(taRows);
+      if (insertError)
+        throw new ValidationError(
+          `Error al asignar agencias: ${insertError.message}`
+        );
     }
 
     // 2d. If postpone, save old departure_time and send emails
     if (postpone) {
       await supabaseAdmin
-        .from('trips')
+        .from("trips")
         .update({ postponed_from: ctx.trip.departure_time })
-        .eq('id', id);
+        .eq("id", id);
 
       const { data: route } = await supabaseAdmin
-        .from('routes')
-        .select('origin, destination')
-        .eq('id', routeId)
+        .from("routes")
+        .select("origin, destination")
+        .eq("id", routeId)
         .single();
 
       if (route) {
-        const allAgencyIds = [...new Set([...ctx.currentAgencyIds, ...agencyIds])];
+        const allAgencyIds = [
+          ...new Set([...ctx.currentAgencyIds, ...agencyIds]),
+        ];
         const agenciesWithEmail = await this.getAgenciesWithEmail(allAgencyIds);
         const oldFormatted = this.formatDateForEmail(ctx.trip.departure_time);
         const newFormatted = this.formatDateForEmail(toUTC(departureTime));
 
         for (const agency of agenciesWithEmail) {
-          emailService.sendTripPostponedEmail(
-            agency.email,
-            agency.name,
-            route.origin,
-            route.destination,
-            oldFormatted,
-            newFormatted,
-            id,
-            agency.id,
-          ).catch((err) => {
-            console.error(JSON.stringify({ event: 'TRIP_POSTPONED_EMAIL_FAILED', tripId: id, agencyId: agency.id, error: err.message }));
-          });
+          emailService
+            .sendTripPostponedEmail(
+              agency.email,
+              agency.name,
+              route.origin,
+              route.destination,
+              oldFormatted,
+              newFormatted,
+              id,
+              agency.id
+            )
+            .catch((err) => {
+              console.error(
+                JSON.stringify({
+                  event: "TRIP_POSTPONED_EMAIL_FAILED",
+                  tripId: id,
+                  agencyId: agency.id,
+                  error: err.message,
+                })
+              );
+            });
         }
 
         // Notification: trip postponed → agencies only (superadmin is the actor)
-        const notifAgencyIds = [...new Set([...ctx.currentAgencyIds, ...agencyIds])];
-        const newDepartureFormatted = this.formatDateForEmail(toUTC(departureTime));
-        notificationService.createForAgenciesAndAdmin({
-          type: 'trip_postponed',
-          title: 'Viaje pospuesto',
-          body: `El viaje ${route.origin} → ${route.destination} fue pospuesto. Nueva salida: ${newDepartureFormatted}`,
-          entityType: 'trip',
-          entityId: id,
-          agencyIds: notifAgencyIds,
-          actor: 'superadmin',
-          action_url: `/agency/trips/${id}/passengers`,
-          metadata: {
-            trip_id: id,
-            origin: route.origin,
-            destination: route.destination,
-            old_departure_time: ctx.trip.departure_time ?? null,
-            new_departure_time: toUTC(departureTime),
-          },
-        }).catch((err) => {
-          console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'trip_postponed', tripId: id, error: err.message }));
-        });
+        const notifAgencyIds = [
+          ...new Set([...ctx.currentAgencyIds, ...agencyIds]),
+        ];
+        const newDepartureFormatted = this.formatDateForEmail(
+          toUTC(departureTime)
+        );
+        notificationService
+          .createForAgenciesAndAdmin({
+            type: "trip_postponed",
+            title: "Viaje pospuesto",
+            body: `El viaje a ${route.destination} fue pospuesto. Nueva salida: ${newDepartureFormatted}`,
+            entityType: "trip",
+            entityId: id,
+            agencyIds: notifAgencyIds,
+            actor: "superadmin",
+            action_url: `/agency/trips/${id}/passengers`,
+            metadata: {
+              trip_id: id,
+              origin: route.origin,
+              destination: route.destination,
+              old_departure_time: ctx.trip.departure_time ?? null,
+              new_departure_time: toUTC(departureTime),
+            },
+          })
+          .catch((err) => {
+            console.error(
+              JSON.stringify({
+                event: "NOTIFICATION_FAILED",
+                type: "trip_postponed",
+                tripId: id,
+                error: err.message,
+              })
+            );
+          });
       }
     }
 
     const { data: trip } = await supabaseAdmin
-      .from('trips')
-      .select('*, routes(origin, destination), trip_agencies(*)')
-      .eq('id', id)
+      .from("trips")
+      .select("*, routes(origin, destination), trip_agencies(*)")
+      .eq("id", id)
       .single();
 
     return trip;
@@ -877,120 +1084,145 @@ export class SuperadminService {
   async deleteTrip(id: string) {
     // Get agencies before deletion for notification
     const { data: tripAgenciesForDelete } = await supabaseAdmin
-      .from('trip_agencies')
-      .select('agency_id')
-      .eq('trip_id', id);
+      .from("trip_agencies")
+      .select("agency_id")
+      .eq("trip_id", id);
 
-    const deleteAgencyIds = (tripAgenciesForDelete || []).map((ta: any) => ta.agency_id);
+    const deleteAgencyIds = (tripAgenciesForDelete || []).map(
+      (ta: any) => ta.agency_id
+    );
 
     // Get route info before deletion
     const { data: tripForDelete } = await supabaseAdmin
-      .from('trips')
-      .select('route_id')
-      .eq('id', id)
+      .from("trips")
+      .select("route_id")
+      .eq("id", id)
       .single();
 
-    let routeLabel = 'viaje';
+    let routeLabel = "viaje";
     if (tripForDelete?.route_id) {
       const { data: routeForDelete } = await supabaseAdmin
-        .from('routes')
-        .select('origin, destination')
-        .eq('id', tripForDelete.route_id)
+        .from("routes")
+        .select("origin, destination")
+        .eq("id", tripForDelete.route_id)
         .single();
       if (routeForDelete) {
         routeLabel = `${routeForDelete.origin} → ${routeForDelete.destination}`;
       }
     }
 
-    await supabaseAdmin.from('trip_agencies').delete().eq('trip_id', id);
-    await supabaseAdmin.from('seats').delete().eq('trip_id', id);
-    const { error } = await supabaseAdmin.from('trips').delete().eq('id', id);
+    await supabaseAdmin.from("trip_agencies").delete().eq("trip_id", id);
+    await supabaseAdmin.from("seats").delete().eq("trip_id", id);
+    const { error } = await supabaseAdmin.from("trips").delete().eq("id", id);
     if (error) throw new ValidationError(error.message);
 
     // Notification: trip deleted → agencies only (superadmin is the actor)
     if (deleteAgencyIds.length > 0) {
-      notificationService.createForAgenciesAndAdmin({
-        type: 'trip_deleted',
-        title: 'Viaje eliminado',
-        body: `El viaje ${routeLabel} fue eliminado del sistema`,
-        entityType: 'trip',
-        entityId: id,
-        agencyIds: deleteAgencyIds,
-        actor: 'superadmin',
-      }).catch((err) => {
-        console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'trip_deleted', tripId: id, error: err.message }));
-      });
+      notificationService
+        .createForAgenciesAndAdmin({
+          type: "trip_deleted",
+          title: "Viaje eliminado",
+          body: `El viaje ${routeLabel} fue eliminado del sistema`,
+          entityType: "trip",
+          entityId: id,
+          agencyIds: deleteAgencyIds,
+          actor: "superadmin",
+        })
+        .catch((err) => {
+          console.error(
+            JSON.stringify({
+              event: "NOTIFICATION_FAILED",
+              type: "trip_deleted",
+              tripId: id,
+              error: err.message,
+            })
+          );
+        });
     }
   }
 
-  async updateTripStatus(id: string, status: 'completed' | 'cancelled') {
+  async updateTripStatus(id: string, status: "completed" | "cancelled") {
     const { data: trip, error: fetchError } = await supabaseAdmin
-      .from('trips')
-      .select('departure_time, status, route_id')
-      .eq('id', id)
+      .from("trips")
+      .select("departure_time, status, route_id")
+      .eq("id", id)
       .single();
 
-    if (fetchError || !trip) throw new NotFoundError('Trip not found');
-    if (trip.status !== 'active') throw new ValidationError('Trip is not active');
+    if (fetchError || !trip) throw new NotFoundError("Trip not found");
+    if (trip.status !== "active")
+      throw new ValidationError("Trip is not active");
 
     const now = new Date();
     const departure = new Date(trip.departure_time);
 
-    if (status === 'completed') {
+    if (status === "completed") {
       if (now < departure) {
-        throw new ForbiddenError('Cannot complete a trip before its departure time');
+        throw new ForbiddenError(
+          "Cannot complete a trip before its departure time"
+        );
       }
-    } else if (status === 'cancelled') {
+    } else if (status === "cancelled") {
       if (now >= departure) {
-        throw new ForbiddenError('Cannot cancel a trip after its departure time');
+        throw new ForbiddenError(
+          "Cannot cancel a trip after its departure time"
+        );
       }
     }
 
     const { error: updateError } = await supabaseAdmin
-      .from('trips')
+      .from("trips")
       .update({ status })
-      .eq('id', id);
+      .eq("id", id);
 
     if (updateError) throw new ValidationError(updateError.message);
 
     // Release all seats when trip is cancelled
-    if (status === 'cancelled') {
+    if (status === "cancelled") {
       await supabaseAdmin
-        .from('seats')
-        .update({ status: 'available', locked_by: null, locked_at: null })
-        .eq('trip_id', id)
-        .in('status', ['locked', 'reserved', 'blocked']);
+        .from("seats")
+        .update({ status: "available", locked_by: null, locked_at: null })
+        .eq("trip_id", id)
+        .in("status", ["locked", "reserved", "blocked"]);
     }
 
     // Send "trip cancelled" emails to active agencies
-    if (status === 'cancelled') {
+    if (status === "cancelled") {
       const { data: tripAgencies } = await supabaseAdmin
-        .from('trip_agencies')
-        .select('agency_id')
-        .eq('trip_id', id);
+        .from("trip_agencies")
+        .select("agency_id")
+        .eq("trip_id", id);
 
       const agencyIds = (tripAgencies || []).map((ta: any) => ta.agency_id);
       const agenciesWithEmail = await this.getAgenciesWithEmail(agencyIds);
 
       const { data: route } = await supabaseAdmin
-        .from('routes')
-        .select('origin, destination')
-        .eq('id', trip.route_id)
+        .from("routes")
+        .select("origin, destination")
+        .eq("id", trip.route_id)
         .single();
 
       if (route) {
         const departureFormatted = this.formatDateForEmail(trip.departure_time);
         for (const agency of agenciesWithEmail) {
-          emailService.sendTripCancelledEmail(
-            agency.email,
-            agency.name,
-            route.origin,
-            route.destination,
-            departureFormatted,
-            id,
-          ).catch((err) => {
-            console.error(JSON.stringify({ event: 'TRIP_CANCELLED_EMAIL_FAILED', tripId: id, agencyId: agency.id, error: err.message }));
-          });
+          emailService
+            .sendTripCancelledEmail(
+              agency.email,
+              agency.name,
+              route.origin,
+              route.destination,
+              departureFormatted,
+              id
+            )
+            .catch((err) => {
+              console.error(
+                JSON.stringify({
+                  event: "TRIP_CANCELLED_EMAIL_FAILED",
+                  tripId: id,
+                  agencyId: agency.id,
+                  error: err.message,
+                })
+              );
+            });
         }
       }
     }
@@ -998,42 +1230,58 @@ export class SuperadminService {
     // Notification: trip cancelled/completed → agencies only (superadmin is the actor)
     {
       const { data: tripAgenciesForNotif } = await supabaseAdmin
-        .from('trip_agencies')
-        .select('agency_id')
-        .eq('trip_id', id);
+        .from("trip_agencies")
+        .select("agency_id")
+        .eq("trip_id", id);
 
-      const notifAgencyIds = (tripAgenciesForNotif || []).map((ta: any) => ta.agency_id);
+      const notifAgencyIds = (tripAgenciesForNotif || []).map(
+        (ta: any) => ta.agency_id
+      );
 
       const { data: routeForNotif } = await supabaseAdmin
-        .from('routes')
-        .select('origin, destination')
-        .eq('id', trip.route_id)
+        .from("routes")
+        .select("origin, destination")
+        .eq("id", trip.route_id)
         .single();
 
       const routeLabel = routeForNotif
         ? `${routeForNotif.origin} → ${routeForNotif.destination}`
-        : 'viaje';
+        : "viaje";
 
-      notificationService.createForAgenciesAndAdmin({
-        type: status === 'cancelled' ? 'trip_cancelled' : 'trip_completed',
-        title: status === 'cancelled' ? 'Viaje cancelado' : 'Viaje completado',
-        body: status === 'cancelled'
-          ? `El viaje ${routeLabel} del ${this.formatDateForEmail(trip.departure_time)} fue cancelado`
-          : `El viaje ${routeLabel} fue completado`,
-        entityType: 'trip',
-        entityId: id,
-        agencyIds: notifAgencyIds,
-        actor: 'superadmin',
-        action_url: status === 'cancelled' ? `/agency/trips/${id}/passengers` : undefined,
-        metadata: {
-          trip_id: id,
-          origin: routeForNotif?.origin ?? null,
-          destination: routeForNotif?.destination ?? null,
-          departure_time: trip.departure_time ?? null,
-        },
-      }).catch((err) => {
-        console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: `trip_${status}`, tripId: id, error: err.message }));
-      });
+      notificationService
+        .createForAgenciesAndAdmin({
+          type: status === "cancelled" ? "trip_cancelled" : "trip_completed",
+          title:
+            status === "cancelled" ? "Viaje cancelado" : "Viaje completado",
+          body:
+            status === "cancelled"
+              ? `El viaje ${routeLabel} del ${this.formatDateForEmail(trip.departure_time)} fue cancelado`
+              : `El viaje ${routeLabel} fue completado`,
+          entityType: "trip",
+          entityId: id,
+          agencyIds: notifAgencyIds,
+          actor: "superadmin",
+          action_url:
+            status === "cancelled"
+              ? `/agency/trips/${id}/passengers`
+              : undefined,
+          metadata: {
+            trip_id: id,
+            origin: routeForNotif?.origin ?? null,
+            destination: routeForNotif?.destination ?? null,
+            departure_time: trip.departure_time ?? null,
+          },
+        })
+        .catch((err) => {
+          console.error(
+            JSON.stringify({
+              event: "NOTIFICATION_FAILED",
+              type: `trip_${status}`,
+              tripId: id,
+              error: err.message,
+            })
+          );
+        });
     }
 
     return { id, status };
@@ -1042,61 +1290,61 @@ export class SuperadminService {
   // ---- Dashboard KPIs ----
   async getDashboard() {
     const { count: totalAgencies } = await supabaseAdmin
-      .from('agencies')
-      .select('*', { count: 'exact', head: true });
+      .from("agencies")
+      .select("*", { count: "exact", head: true });
 
     const { count: activeAgencies } = await supabaseAdmin
-      .from('agencies')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active');
+      .from("agencies")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active");
 
     const { count: totalTrips } = await supabaseAdmin
-      .from('trips')
-      .select('*', { count: 'exact', head: true });
+      .from("trips")
+      .select("*", { count: "exact", head: true });
 
     const { count: activeTrips } = await supabaseAdmin
-      .from('trips')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active');
+      .from("trips")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "active");
 
     const { count: totalRoutes } = await supabaseAdmin
-      .from('routes')
-      .select('*', { count: 'exact', head: true });
+      .from("routes")
+      .select("*", { count: "exact", head: true });
 
     const { count: totalReservations } = await supabaseAdmin
-      .from('reservations')
-      .select('*', { count: 'exact', head: true });
+      .from("reservations")
+      .select("*", { count: "exact", head: true });
 
     const { count: todayReservations } = await supabaseAdmin
-      .from('reservations')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', new Date().toISOString().slice(0, 10));
+      .from("reservations")
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", new Date().toISOString().slice(0, 10));
 
     // Pending boarding: reservation_passengers not boarded from confirmed/partial reservations
     const { data: pendingData } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('id', { count: 'exact' })
-      .eq('boarded', false)
-      .eq('status', 'active');
+      .from("reservation_passengers")
+      .select("id", { count: "exact" })
+      .eq("boarded", false)
+      .eq("status", "active");
     const pendingBoarding = pendingData?.length ?? 0;
 
     // Upcoming trips (next 5 active trips with reservation count)
     const { data: upcomingTrips } = await supabaseAdmin
-      .from('trips')
-      .select('id, departure_time, routes(origin, destination), capacity')
-      .eq('status', 'active')
-      .gte('departure_time', new Date().toISOString())
-      .order('departure_time')
+      .from("trips")
+      .select("id, departure_time, routes(origin, destination), capacity")
+      .eq("status", "active")
+      .gte("departure_time", new Date().toISOString())
+      .order("departure_time")
       .limit(5);
 
     let upcoming: any[] = [];
     if (upcomingTrips && upcomingTrips.length > 0) {
-      const tripIds = upcomingTrips.map(t => t.id);
+      const tripIds = upcomingTrips.map((t) => t.id);
       const { data: reservationCounts } = await supabaseAdmin
-        .from('reservations')
-        .select('trip_id')
-        .in('trip_id', tripIds)
-        .in('status', ['confirmed', 'partial', 'completed', 'boarded']);
+        .from("reservations")
+        .select("trip_id")
+        .in("trip_id", tripIds)
+        .in("status", ["confirmed", "partial", "completed", "boarded"]);
 
       const countMap: Record<string, number> = {};
       for (const r of reservationCounts || []) {
@@ -1104,21 +1352,25 @@ export class SuperadminService {
       }
 
       const { data: seatCounts } = await supabaseAdmin
-        .from('seats')
-        .select('trip_id, status')
-        .in('trip_id', tripIds);
+        .from("seats")
+        .select("trip_id, status")
+        .in("trip_id", tripIds);
 
       const seatMap: Record<string, { total: number; available: number }> = {};
       for (const s of seatCounts || []) {
-        if (!seatMap[s.trip_id]) seatMap[s.trip_id] = { total: 0, available: 0 };
+        if (!seatMap[s.trip_id])
+          seatMap[s.trip_id] = { total: 0, available: 0 };
         seatMap[s.trip_id].total++;
-        if (s.status === 'available') seatMap[s.trip_id].available++;
+        if (s.status === "available") seatMap[s.trip_id].available++;
       }
 
       const now = new Date();
-      upcoming = upcomingTrips.map(t => {
+      upcoming = upcomingTrips.map((t) => {
         const tripId = t.id;
-        const seats = seatMap[tripId] || { total: t.capacity || 0, available: 0 };
+        const seats = seatMap[tripId] || {
+          total: t.capacity || 0,
+          available: 0,
+        };
         const diffMs = new Date(t.departure_time).getTime() - now.getTime();
         const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         return {
@@ -1135,70 +1387,91 @@ export class SuperadminService {
 
     // Recent activity (last 10): trips created + reservations + boardings
     const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const thirtyDaysAgo = new Date(
+      now.getTime() - 30 * 24 * 60 * 60 * 1000
+    ).toISOString();
 
-    const [{ data: recentTrips }, { data: recentReservations }, { data: recentBoardings }] = await Promise.all([
+    const [
+      { data: recentTrips },
+      { data: recentReservations },
+      { data: recentBoardings },
+    ] = await Promise.all([
       supabaseAdmin
-        .from('trips')
-        .select('id, created_at, routes(origin, destination)')
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: false })
+        .from("trips")
+        .select("id, created_at, routes(origin, destination)")
+        .gte("created_at", thirtyDaysAgo)
+        .order("created_at", { ascending: false })
         .limit(10),
       supabaseAdmin
-        .from('reservations')
-        .select('id, created_at, updated_at, status, booker_name, trips!inner(routes(origin, destination))')
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: false })
+        .from("reservations")
+        .select(
+          "id, created_at, updated_at, status, booker_name, trips!inner(routes(origin, destination))"
+        )
+        .gte("created_at", thirtyDaysAgo)
+        .order("created_at", { ascending: false })
         .limit(10),
       supabaseAdmin
-        .from('boarding_logs')
-        .select(`
+        .from("boarding_logs")
+        .select(
+          `
           id, created_at, action, reservation_passenger_id, scanned_by_agency_id,
           reservations!reservation_id(
             trip_id,
             trips(departure_time, routes(origin, destination))
           )
-        `)
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: false })
+        `
+        )
+        .gte("created_at", thirtyDaysAgo)
+        .order("created_at", { ascending: false })
         .limit(10),
     ]);
 
-    const passengerIds = (recentBoardings ?? []).map((b: any) => b.reservation_passenger_id).filter(Boolean);
-    const agencyIds = (recentBoardings ?? []).map((b: any) => b.scanned_by_agency_id).filter(Boolean);
+    const passengerIds = (recentBoardings ?? [])
+      .map((b: any) => b.reservation_passenger_id)
+      .filter(Boolean);
+    const agencyIds = (recentBoardings ?? [])
+      .map((b: any) => b.scanned_by_agency_id)
+      .filter(Boolean);
     const [{ data: passengers }, { data: agencies }] = await Promise.all([
       passengerIds.length > 0
-        ? supabaseAdmin.from('reservation_passengers').select('id, name').in('id', passengerIds)
+        ? supabaseAdmin
+            .from("reservation_passengers")
+            .select("id, name")
+            .in("id", passengerIds)
         : Promise.resolve({ data: [] }),
       agencyIds.length > 0
-        ? supabaseAdmin.from('agencies').select('id, name').in('id', agencyIds)
+        ? supabaseAdmin.from("agencies").select("id, name").in("id", agencyIds)
         : Promise.resolve({ data: [] }),
     ]);
-    const passengerNames = new Map((passengers ?? []).map((p: any) => [p.id, p.name]));
-    const agencyNames = new Map((agencies ?? []).map((a: any) => [a.id, a.name]));
+    const passengerNames = new Map(
+      (passengers ?? []).map((p: any) => [p.id, p.name])
+    );
+    const agencyNames = new Map(
+      (agencies ?? []).map((a: any) => [a.id, a.name])
+    );
 
     const activity: any[] = [];
     for (const t of recentTrips || []) {
       const route = (t as any).routes;
       activity.push({
-        type: 'trip_created',
-        label: `Viaje creado: ${route?.origin || '?'} → ${route?.destination || '?'}`,
+        type: "trip_created",
+        label: `Viaje creado: ${route?.origin || "?"} → ${route?.destination || "?"}`,
         timestamp: t.created_at,
       });
     }
     for (const r of recentReservations || []) {
       const trip = (r as any).trips;
       const route = trip?.routes;
-      if ((r as any).status === 'cancelled') {
+      if ((r as any).status === "cancelled") {
         activity.push({
-          type: 'reservation_cancelled',
-          label: `Reserva cancelada: ${r.booker_name} — ${route?.origin || '?'} → ${route?.destination || '?'}`,
+          type: "reservation_cancelled",
+          label: `Reserva cancelada: ${r.booker_name} — ${route?.origin || "?"} → ${route?.destination || "?"}`,
           timestamp: (r as any).updated_at || r.created_at,
         });
       } else {
         activity.push({
-          type: 'reservation_created',
-          label: `Reserva: ${r.booker_name} — ${route?.origin || '?'} → ${route?.destination || '?'}`,
+          type: "reservation_created",
+          label: `Reserva: ${r.booker_name} — ${route?.origin || "?"} → ${route?.destination || "?"}`,
           timestamp: r.created_at,
         });
       }
@@ -1207,52 +1480,65 @@ export class SuperadminService {
       const res = (b as any).reservations;
       const trip = res?.trips;
       const route = trip?.routes;
-      const passengerName = passengerNames.get((b as any).reservation_passenger_id) || '';
-      const agencyName = agencyNames.get((b as any).scanned_by_agency_id) || null;
+      const passengerName =
+        passengerNames.get((b as any).reservation_passenger_id) || "";
+      const agencyName =
+        agencyNames.get((b as any).scanned_by_agency_id) || null;
 
-      if (b.action === 'board') {
-        let label = 'Abordaje confirmado';
+      if (b.action === "board") {
+        let label = "Abordaje confirmado";
         if (passengerName) label += ` — ${passengerName}`;
         activity.push({
-          type: 'boarding',
+          type: "boarding",
           label,
-          description: `${route?.origin || '?'} → ${route?.destination || '?'}`,
+          description: `${route?.origin || "?"} → ${route?.destination || "?"}`,
           actor: agencyName,
           timestamp: b.created_at,
         });
-      } else if (b.action === 'unboard') {
-        let label = 'Abordaje revertido';
+      } else if (b.action === "unboard") {
+        let label = "Abordaje revertido";
         if (passengerName) label += ` — ${passengerName}`;
         activity.push({
-          type: 'boarding',
+          type: "boarding",
           label,
-          description: `${route?.origin || '?'} → ${route?.destination || '?'}`,
+          description: `${route?.origin || "?"} → ${route?.destination || "?"}`,
           actor: agencyName,
           timestamp: b.created_at,
         });
       } else {
         activity.push({
-          type: 'boarding',
+          type: "boarding",
           label: `Abordaje ${b.action}`,
           timestamp: b.created_at,
         });
       }
     }
 
-    activity.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    activity.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
     const recentActivity = activity.slice(0, 10);
 
     // Reservations by month (current month)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    const monthEnd = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
     const daysInMonth = monthEnd.getDate();
 
     const { data: reservationsByDate } = await supabaseAdmin
-      .from('reservations')
-      .select('created_at')
-      .gte('created_at', monthStart.toISOString())
-      .lte('created_at', monthEnd.toISOString())
-      .order('created_at');
+      .from("reservations")
+      .select("created_at")
+      .gte("created_at", monthStart.toISOString())
+      .lte("created_at", monthEnd.toISOString())
+      .order("created_at");
 
     const dateMap: Record<string, number> = {};
     for (let d = 1; d <= daysInMonth; d++) {
@@ -1263,45 +1549,54 @@ export class SuperadminService {
       const day = r.created_at.slice(0, 10);
       if (dateMap[day] !== undefined) dateMap[day]++;
     }
-    const reservations_by_date = Object.entries(dateMap).map(([date, count]) => ({ date, count }));
+    const reservations_by_date = Object.entries(dateMap).map(
+      ([date, count]) => ({ date, count })
+    );
 
     // Occupancy by trip (last 10 active/completed trips)
     const { data: recentTripsForOccupancy } = await supabaseAdmin
-      .from('trips')
-      .select('id, capacity, departure_time, routes(origin, destination)')
-      .in('status', ['active', 'completed'])
-      .order('departure_time', { ascending: false })
+      .from("trips")
+      .select("id, capacity, departure_time, routes(origin, destination)")
+      .in("status", ["active", "completed"])
+      .order("departure_time", { ascending: false })
       .limit(10);
 
     const occupancyData: any[] = [];
     if (recentTripsForOccupancy && recentTripsForOccupancy.length > 0) {
-      const tripIds = recentTripsForOccupancy.map(t => t.id);
+      const tripIds = recentTripsForOccupancy.map((t) => t.id);
       const { data: allSeats } = await supabaseAdmin
-        .from('seats')
-        .select('trip_id, status')
-        .in('trip_id', tripIds);
+        .from("seats")
+        .select("trip_id, status")
+        .in("trip_id", tripIds);
 
-      const tripSeatMap: Record<string, { total: number; reserved: number }> = {};
+      const tripSeatMap: Record<string, { total: number; reserved: number }> =
+        {};
       for (const t of tripIds) {
         tripSeatMap[t] = { total: 0, reserved: 0 };
       }
       for (const s of allSeats || []) {
         if (tripSeatMap[s.trip_id]) {
           tripSeatMap[s.trip_id].total++;
-          if (s.status !== 'available') tripSeatMap[s.trip_id].reserved++;
+          if (s.status !== "available") tripSeatMap[s.trip_id].reserved++;
         }
       }
 
       for (const t of recentTripsForOccupancy) {
-        const stats = tripSeatMap[t.id] || { total: t.capacity || 0, reserved: 0 };
+        const stats = tripSeatMap[t.id] || {
+          total: t.capacity || 0,
+          reserved: 0,
+        };
         const route = (t as any).routes;
         occupancyData.push({
           trip_id: t.id,
-          label: `${route?.origin || '?'} → ${route?.destination || '?'}`,
+          label: `${route?.origin || "?"} → ${route?.destination || "?"}`,
           departure: t.departure_time,
           total: stats.total,
           reserved: stats.reserved,
-          occupancy_pct: stats.total > 0 ? Math.round((stats.reserved / stats.total) * 100) : 0,
+          occupancy_pct:
+            stats.total > 0
+              ? Math.round((stats.reserved / stats.total) * 100)
+              : 0,
         });
       }
     }
