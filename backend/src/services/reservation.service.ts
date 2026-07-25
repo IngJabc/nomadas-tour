@@ -5,6 +5,8 @@ import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
 import { sortBySeatCode } from '../utils/sort.js';
 import { validateBoardingAllowed } from './boarding.guard.js';
 import { notificationService } from './notification.service.js';
+import { emailService } from './email.service.js';
+import type { TicketData, TicketTrip, TicketPassenger } from '../types/reservation.js';
 
 export class ReservationService {
   async listActiveTrips() {
@@ -362,6 +364,8 @@ export class ReservationService {
     passengers: { seat_id: string; name: string; document: string; phone: string | null }[],
     agencyId: string,
     userId: string,
+    contactEmail: string | null = null,
+    sendTicketEmail: boolean = false,
   ) {
     const { data: trip, error: tripError } = await supabaseAdmin
       .from('trips')
@@ -478,6 +482,37 @@ export class ReservationService {
       console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'reservation_created', reservationId, error: err.message }));
     });
 
+    // Update reservation with contact_email and send_ticket_email flags
+    if (contactEmail || sendTicketEmail) {
+      await supabaseAdmin
+        .from('reservations')
+        .update({
+          contact_email: contactEmail,
+          send_ticket_email: sendTicketEmail,
+        })
+        .eq('id', reservationId);
+    }
+
+    // Send ticket email if requested (fire-and-forget, idempotent via ticket_email_sent_at)
+    if (sendTicketEmail && contactEmail) {
+      this.getTicketData(reservationId).then((ticketData) => {
+        emailService.sendReservationConfirmationEmail(contactEmail, ticketData).then(async () => {
+          await supabaseAdmin
+            .from('reservations')
+            .update({ ticket_email_sent_at: new Date().toISOString() })
+            .eq('id', reservationId)
+            .is('ticket_email_sent_at', null);
+        });
+      }).catch((err) => {
+        console.error(JSON.stringify({
+          event: 'TICKET_EMAIL_FAILED',
+          reservationId,
+          contactEmail,
+          error: err.message,
+        }));
+      });
+    }
+
     return {
       reservation,
       passengers: sortBySeatCode((reservation as any).reservation_passengers || []),
@@ -506,29 +541,79 @@ export class ReservationService {
     return data;
   }
 
-  async getAgencyReservationById(id: string, agencyId: string) {
+  async getTicketData(reservationId: string): Promise<TicketData> {
     const { data, error } = await supabaseAdmin
       .from('reservations')
       .select('*, trips(id, departure_time, vehicle_type, status, postponed_from, routes(origin, destination)), reservation_passengers(*, seats(seat_code))')
-      .eq('id', id)
-      .eq('agency_id', agencyId)
+      .eq('id', reservationId)
       .single();
 
     if (error || !data) throw new NotFoundError('Reservation not found');
 
-    let qr_data_url: string | null = null;
-    if (data.qr_code) {
+    const row = data as any;
+    const tripRow = row.trips;
+    const routeRow = tripRow?.routes;
+
+    let qr_data_url = '';
+    if (row.qr_code) {
       try {
-        qr_data_url = await generateQRDataURL(data.qr_code);
+        qr_data_url = await generateQRDataURL(row.qr_code);
       } catch {
-        qr_data_url = null;
+        qr_data_url = '';
       }
     }
 
-    const allPassengers = (data as any).reservation_passengers || [];
-    return { ...data, qr_data_url, reservation_passengers: sortBySeatCode(
+    const allPassengers = row.reservation_passengers || [];
+    const activePassengers: TicketPassenger[] = sortBySeatCode(
       allPassengers.filter((p: any) => p.status === 'active')
-    ) };
+    ).map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      document: p.document,
+      seat_code: p.seats?.seat_code ?? '—',
+      boarded: p.boarded ?? false,
+    }));
+
+    const trip: TicketTrip | null = tripRow
+      ? {
+          id: tripRow.id,
+          departure_time: tripRow.departure_time,
+          origin: routeRow?.origin ?? '',
+          destination: routeRow?.destination ?? '',
+          vehicle_type: tripRow.vehicle_type as 'bus' | 'kia',
+          status: tripRow.status,
+          postponed_from: tripRow.postponed_from ?? null,
+        }
+      : null;
+
+    return {
+      reservation_id: row.id,
+      qr_code: row.qr_code,
+      qr_data_url,
+      status: row.status,
+      created_at: row.created_at,
+      booker_name: row.booker_name,
+      booker_document: row.booker_document,
+      booker_phone: row.booker_phone ?? null,
+      trip,
+      passengers: activePassengers,
+    };
+  }
+
+  async getAgencyReservationById(id: string, agencyId: string) {
+    const ticketData = await this.getTicketData(id);
+
+    const { data: reservation } = await supabaseAdmin
+      .from('reservations')
+      .select('agency_id')
+      .eq('id', id)
+      .single();
+
+    if (!reservation || (reservation as any).agency_id !== agencyId) {
+      throw new NotFoundError('Reservation not found');
+    }
+
+    return ticketData;
   }
 
   async cancelAgencyReservation(id: string, agencyId: string) {

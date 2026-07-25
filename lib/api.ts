@@ -185,6 +185,8 @@ export const agencyApi = {
     booker_name: string;
     booker_document: string;
     booker_phone?: string;
+    contact_email?: string;
+    send_ticket_email?: boolean;
     passengers: { seat_id: string; name: string; document: string; phone?: string }[];
   }) =>
     request<{
@@ -206,7 +208,7 @@ export const agencyApi = {
       method: 'POST',
       body: JSON.stringify({ trip_id, transaction_id }),
     }),
-  getReservation: (id: string) => request<AgencyReservation>(`/agency/reservations/${id}`),
+  getReservation: (id: string) => request<any>(`/agency/reservations/${id}`),
   cancelAgencyReservation: (id: string) =>
     request<any>(`/agency/reservations/${id}/cancel`, { method: 'PATCH' }),
   cancelPassenger: (reservationId: string, passengerId: string) =>

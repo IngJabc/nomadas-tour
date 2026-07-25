@@ -102,6 +102,9 @@ export interface Reservation {
   booker_name: string;
   booker_document: string;
   booker_phone: string | null;
+  contact_email: string | null;
+  send_ticket_email: boolean;
+  ticket_email_sent_at: string | null;
   qr_code: string;
   status: 'confirmed' | 'cancelled' | 'partial' | 'completed';
   created_at: string;

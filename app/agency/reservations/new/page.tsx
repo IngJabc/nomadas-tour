@@ -194,6 +194,8 @@ function NewReservationContent() {
   const [bookerDocument, setBookerDocument] = useState("");
   const [passengers, setPassengers] = useState<PassengerData[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [contactEmail, setContactEmail] = useState("");
+  const [sendTicketEmail, setSendTicketEmail] = useState(false);
 
   // ─── Success view (post-redirect) ────────────────────────────────
   const [successData, setSuccessData] = useState<ReservationTicketData | null>(null);
@@ -246,6 +248,8 @@ function NewReservationContent() {
     bookerName,
     bookerDocument,
     passengers,
+    contactEmail,
+    sendTicketEmail,
     onSuccess,
     submittingFlag: isSubmittingRef,
   });
@@ -284,28 +288,29 @@ function NewReservationContent() {
       try {
         const data = await agencyApi.getReservation(reservationIdFromUrl);
         const ticketData: ReservationTicketData = {
-          reservation_id: data.id,
+          reservation_id: data.reservation_id,
           qr_code: data.qr_code,
           status: data.status,
           created_at: data.created_at,
           booker_name: data.booker_name,
           booker_document: data.booker_document,
           booker_phone: data.booker_phone,
-          trip: data.trips
+          trip: data.trip
             ? {
-                id: data.trips.id,
-                departure_time: data.trips.departure_time,
-                origin: data.trips.routes?.origin ?? '',
-                destination: data.trips.routes?.destination ?? '',
-                vehicle_type: data.trips.vehicle_type as 'bus' | 'kia',
-                status: 'active',
+                id: data.trip.id,
+                departure_time: data.trip.departure_time,
+                origin: data.trip.origin,
+                destination: data.trip.destination,
+                vehicle_type: data.trip.vehicle_type as 'bus' | 'kia',
+                status: data.trip.status,
+                postponed_from: data.trip.postponed_from ?? null,
               }
             : null,
-          passengers: (data.reservation_passengers ?? []).map((p: any) => ({
+          passengers: (data.passengers ?? []).map((p: any) => ({
             id: p.id,
             name: p.name,
             document: p.document,
-            seat_code: p.seats?.seat_code ?? '—',
+            seat_code: p.seat_code ?? '—',
             boarded: p.boarded ?? false,
           })),
         };
@@ -493,7 +498,9 @@ function NewReservationContent() {
       locking.selectedSeats,
       bookerName,
       bookerDocument,
-      passengers
+      passengers,
+      contactEmail,
+      sendTicketEmail,
     );
     setErrors(err);
     if (Object.keys(err).length > 0) return;
@@ -504,6 +511,8 @@ function NewReservationContent() {
     bookerName,
     bookerDocument,
     passengers,
+    contactEmail,
+    sendTicketEmail,
     wizard,
   ]);
 
@@ -514,7 +523,9 @@ function NewReservationContent() {
       locking.selectedSeats,
       bookerName,
       bookerDocument,
-      passengers
+      passengers,
+      contactEmail,
+      sendTicketEmail,
     );
     setErrors(err);
     if (Object.keys(err).length > 0) return;
@@ -525,6 +536,8 @@ function NewReservationContent() {
     bookerName,
     bookerDocument,
     passengers,
+    contactEmail,
+    sendTicketEmail,
     submit,
   ]);
 
@@ -533,6 +546,8 @@ function NewReservationContent() {
     setBookerDocument("");
     setPassengers([]);
     setErrors({});
+    setContactEmail("");
+    setSendTicketEmail(false);
     setReservationIdFromUrl(null);
     setSuccessData(null);
     submit.resetResult();
@@ -1080,7 +1095,12 @@ function NewReservationContent() {
                   bookerErrors={{
                     name: errors["booker_name"],
                     document: errors["booker_document"],
+                    email: errors["booker_email"],
                   }}
+                  contactEmail={contactEmail}
+                  onContactEmailChange={setContactEmail}
+                  sendTicketEmail={sendTicketEmail}
+                  onSendTicketEmailChange={setSendTicketEmail}
                 />
               </motion.div>
             )}
@@ -1116,6 +1136,8 @@ function NewReservationContent() {
                   submitting={submit.submitting}
                   submitError={submit.submitError}
                   onEditPassengers={handleEditPassengers}
+                  contactEmail={contactEmail}
+                  sendTicketEmail={sendTicketEmail}
                 />
               </motion.div>
             )}

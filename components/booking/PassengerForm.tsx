@@ -3,6 +3,7 @@
 import { PassengerData } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Mail } from 'lucide-react';
 
 const LETTER_RE = /[^a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s\-']/g;
 const PHONE_RE = /[^\d+]/g;
@@ -31,7 +32,11 @@ interface PassengerFormProps {
   bookerDocument: string;
   onBookerNameChange: (v: string) => void;
   onBookerDocumentChange: (v: string) => void;
-  bookerErrors: { name?: string; document?: string };
+  bookerErrors: { name?: string; document?: string; email?: string };
+  contactEmail: string;
+  onContactEmailChange: (v: string) => void;
+  sendTicketEmail: boolean;
+  onSendTicketEmailChange: (v: boolean) => void;
 }
 
 export function PassengerForm({
@@ -44,6 +49,10 @@ export function PassengerForm({
   onBookerNameChange,
   onBookerDocumentChange,
   bookerErrors,
+  contactEmail,
+  onContactEmailChange,
+  sendTicketEmail,
+  onSendTicketEmailChange,
 }: PassengerFormProps) {
   return (
     <div className="space-y-6">
@@ -75,6 +84,50 @@ export function PassengerForm({
             enterKeyHint="next"
             maxLength={8}
           />
+        </div>
+
+        <div className="bg-white border border-[rgba(0,0,0,0.06)] rounded-2xl p-4">
+          <label className="flex items-center gap-3 cursor-pointer select-none">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={sendTicketEmail}
+                onChange={(e) => {
+                  onSendTicketEmailChange(e.target.checked);
+                  if (!e.target.checked) {
+                    onContactEmailChange('');
+                  }
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-5 h-5 rounded border-2 border-[#d1d5db] bg-white peer-checked:bg-[var(--color-brand-cyan)] peer-checked:border-[var(--color-brand-cyan)] transition-colors duration-150 flex items-center justify-center">
+                {sendTicketEmail && (
+                  <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+            </div>
+            <span className="font-[family-name:var(--font-body)] text-sm font-medium text-[var(--color-brand-navy)]">
+              Enviar boleto por correo electrónico
+            </span>
+          </label>
+
+          {sendTicketEmail && (
+            <div className="mt-3">
+              <Input
+                label="Correo electrónico del reservante"
+                placeholder="correo@ejemplo.com"
+                value={contactEmail}
+                onChange={(e) => onContactEmailChange(e.target.value)}
+                error={bookerErrors.email}
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                leftIcon={<Mail className="w-4 h-4" />}
+              />
+            </div>
+          )}
         </div>
       </div>
 

@@ -71,6 +71,8 @@ export interface ReservationPayload {
   booker_name: string;
   booker_document: string;
   booker_phone?: string;
+  contact_email?: string;
+  send_ticket_email?: boolean;
   passengers: { seat_id: string; name: string; document: string; phone?: string }[];
 }
 
