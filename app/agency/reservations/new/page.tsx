@@ -697,8 +697,8 @@ function NewReservationContent() {
         </motion.div>
       )}
 
-      {/* Main content card */}
-      {!locking.deepLinkError && (
+      {/* Main content card — wizard only when NOT in success mode */}
+      {!locking.deepLinkError && !reservationIdFromUrl && (
         <motion.div
           variants={pageFade}
           initial="hidden"
@@ -1142,89 +1142,91 @@ function NewReservationContent() {
               </motion.div>
             )}
 
-            {/* ─── success (post-redirect) ────────────────────────────── */}
-            {reservationIdFromUrl && (
-              <motion.div
-                key="success"
-                variants={pageFade}
-                initial="hidden"
-                animate="visible"
-                transition={{ duration: 0.3 }}
-              >
-                <button
-                  type="button"
-                  onClick={() => router.push("/agency/reservations")}
-                  className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Volver a reservas
-                </button>
-
-                <div className="flex flex-col items-center text-center mb-6">
-                  <div className="w-16 h-16 rounded-full bg-[#ecfdf5] flex items-center justify-center mb-4">
-                    <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
-                  </div>
-                  <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)] mb-1">
-                    Reserva confirmada
-                  </h2>
-                  <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] tracking-wider uppercase">
-                    Código: {reservationIdFromUrl.slice(0, 8).toUpperCase()}
-                  </p>
-                </div>
-
-                {successLoading && (
-                  <div className="flex justify-center py-12">
-                    <div className="w-8 h-8 border-2 border-[var(--color-brand-cyan)] border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-
-                {successError && (
-                  <div className="p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2] mb-6">
-                    <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
-                      {successError}
-                    </p>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => window.location.reload()}
-                      className="mt-3"
-                    >
-                      Reintentar
-                    </Button>
-                  </div>
-                )}
-
-                {successData && (
-                  <div className="max-w-[32rem] mx-auto">
-                    <ReservationTicket ref={captureRef} reservation={successData} />
-                    <div className="mt-4">
-                      <ReservationTicketActions
-                        onDownload={download}
-                        onShare={shareWithText}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mt-6 mx-auto">
-                  <Button
-                    variant="secondary"
-                    onClick={() => router.push("/agency/reservations")}
-                    className="flex-1"
-                  >
-                    Ver reservas
-                  </Button>
-                  <Button
-                    variant="primary"
-                    onClick={handleReset}
-                    className="flex-1"
-                  >
-                    Nueva reserva
-                  </Button>
-                </div>
-              </motion.div>
-            )}
           </AnimatePresence>
+        </motion.div>
+      )}
+
+      {/* ─── success (post-redirect) — exclusive mode ────────────────── */}
+      {reservationIdFromUrl && (
+        <motion.div
+          key="success"
+          variants={pageFade}
+          initial="hidden"
+          animate="visible"
+          transition={{ duration: 0.3 }}
+          className="bg-[var(--color-brand-surface)] rounded-2xl p-6 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+        >
+          <button
+            type="button"
+            onClick={() => router.push("/agency/reservations")}
+            className="flex items-center gap-1.5 mb-4 font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)] cursor-pointer bg-transparent border-none hover:text-[var(--color-brand-navy)] transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Volver a reservas
+          </button>
+
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-16 h-16 rounded-full bg-[#ecfdf5] flex items-center justify-center mb-4">
+              <CheckCircle2 className="w-8 h-8 text-[#10b981]" />
+            </div>
+            <h2 className="font-[family-name:var(--font-heading)] font-bold text-xl text-[var(--color-brand-navy)] mb-1">
+              Reserva confirmada
+            </h2>
+            <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] tracking-wider uppercase">
+              Código: {reservationIdFromUrl.slice(0, 8).toUpperCase()}
+            </p>
+          </div>
+
+          {successLoading && (
+            <div className="flex justify-center py-12">
+              <div className="w-8 h-8 border-2 border-[var(--color-brand-cyan)] border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+
+          {successError && (
+            <div className="p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2] mb-6">
+              <p className="font-[family-name:var(--font-body)] text-sm text-[#ef4444]">
+                {successError}
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => window.location.reload()}
+                className="mt-3"
+              >
+                Reintentar
+              </Button>
+            </div>
+          )}
+
+          {successData && (
+            <div className="max-w-[32rem] mx-auto">
+              <ReservationTicket ref={captureRef} reservation={successData} />
+              <div className="mt-4">
+                <ReservationTicketActions
+                  onDownload={download}
+                  onShare={shareWithText}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mt-6 mx-auto">
+            <Button
+              variant="secondary"
+              onClick={() => router.push("/agency/reservations")}
+              className="flex-1"
+            >
+              Ver reservas
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleReset}
+              className="flex-1"
+            >
+              Nueva reserva
+            </Button>
+          </div>
         </motion.div>
       )}
     </main>
