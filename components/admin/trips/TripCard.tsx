@@ -69,11 +69,13 @@ export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripC
     [onAction, router],
   );
 
+  const isCancelled = trip.status === 'cancelled';
+
   return (
-    <Card ref={captureRef} hover className={`relative flex flex-col gap-5 h-full${menuOpen ? ' z-10' : ''}`}>
+    <Card ref={captureRef} hover={!isCancelled} className={`relative flex flex-col gap-5 h-full${menuOpen ? ' z-10' : ''}`}>
       <div
-        className="cursor-pointer flex-1 flex flex-col gap-5"
-        onClick={() => wrappedOnAction(trip.id, 'view')}
+        className={`${isCancelled ? '' : 'cursor-pointer'} flex-1 flex flex-col gap-5`}
+        onClick={isCancelled ? undefined : () => wrappedOnAction(trip.id, 'view')}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
