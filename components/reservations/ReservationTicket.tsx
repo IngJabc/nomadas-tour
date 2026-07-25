@@ -164,9 +164,17 @@ export const ReservationTicket = forwardRef<HTMLDivElement, ReservationTicketPro
                       <span className="font-[family-name:var(--font-body)] font-bold text-[12px] text-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.1)] px-2 py-0.5 rounded-md min-w-[34px] text-center shrink-0">
                         {p.seat_code}
                       </span>
-                      <span className="font-[family-name:var(--font-body)] font-medium text-[12px] text-[var(--color-brand-navy)] truncate">
-                        {p.name || 'Sin nombre'}
-                      </span>
+                      <div className="min-w-0">
+                        <span className="font-[family-name:var(--font-body)] font-medium text-[12px] text-[var(--color-brand-navy)] truncate block">
+                          {p.name || 'Sin nombre'}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <CreditCard className="w-3 h-3 text-[var(--color-brand-muted)]" strokeWidth={1.75} />
+                          <span className="font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)]">
+                            {p.document}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}

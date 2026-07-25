@@ -10,6 +10,8 @@ interface UseReservationSubmitOptions {
   bookerName: string;
   bookerDocument: string;
   passengers: PassengerData[];
+  contactEmail: string;
+  sendTicketEmail: boolean;
   onSuccess: (reservationId: string) => void;
   submittingFlag?: React.MutableRefObject<boolean>;
 }
@@ -30,6 +32,8 @@ export function useReservationSubmit({
   bookerName,
   bookerDocument,
   passengers,
+  contactEmail,
+  sendTicketEmail,
   onSuccess,
   submittingFlag,
 }: UseReservationSubmitOptions): UseReservationSubmitReturn {
@@ -63,6 +67,8 @@ export function useReservationSubmit({
         booker_name: bookerName.trim(),
         booker_document: bookerDocument.trim(),
         booker_phone: '',
+        contact_email: contactEmail.trim() || undefined,
+        send_ticket_email: sendTicketEmail,
         passengers: selectedSeats.map((s) => {
           const p = passengerMap.get(s.id);
           if (!p) throw new Error(`Datos del pasajero para asiento ${s.seat_code} no encontrados`);
@@ -92,7 +98,7 @@ export function useReservationSubmit({
       if (submittingFlag) submittingFlag.current = false;
       setSubmitting(false);
     }
-  }, [trip, selectedSeats, bookerName, bookerDocument, passengerMap, onSuccess]);
+  }, [trip, selectedSeats, bookerName, bookerDocument, passengerMap, contactEmail, sendTicketEmail, onSuccess]);
 
   return {
     submitting,

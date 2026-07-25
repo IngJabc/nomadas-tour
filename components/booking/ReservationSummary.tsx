@@ -15,6 +15,8 @@ interface ReservationSummaryProps {
   submitting?: boolean;
   submitError?: string | null;
   onEditPassengers?: () => void;
+  contactEmail?: string;
+  sendTicketEmail?: boolean;
 }
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -39,6 +41,8 @@ export function ReservationSummary({
   submitting = false,
   submitError,
   onEditPassengers,
+  contactEmail,
+  sendTicketEmail,
 }: ReservationSummaryProps) {
   if (!trip) return null;
 
@@ -90,6 +94,16 @@ export function ReservationSummary({
               {bookerDocument}
             </p>
           </div>
+          {sendTicketEmail && contactEmail && (
+            <div className="sm:col-span-2">
+              <p className="text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+                Correo electrónico
+              </p>
+              <p className="text-sm font-medium text-[var(--color-brand-navy)]">
+                {contactEmail}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

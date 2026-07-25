@@ -24,8 +24,8 @@ export function validatePassengerForm(
   bookerName: string,
   bookerDocument: string,
   passengers: { seat_id: string; seat_code: string; name: string; document: string; phone?: string }[]
-): { bookerErrors: { name?: string; document?: string }; passengerErrors: PassengerValidation[] } {
-  const bookerErrors: { name?: string; document?: string } = {};
+): { bookerErrors: { name?: string; document?: string; email?: string }; passengerErrors: PassengerValidation[] } {
+  const bookerErrors: { name?: string; document?: string; email?: string } = {};
 
   if (!bookerName.trim()) {
     bookerErrors.name = 'El nombre es requerido';
@@ -65,19 +65,20 @@ export function validatePassengerForm(
 }
 
 export function hasValidationErrors(
-  result: { bookerErrors: { name?: string; document?: string }; passengerErrors: PassengerValidation[] }
+  result: { bookerErrors: { name?: string; document?: string; email?: string }; passengerErrors: PassengerValidation[] }
 ): boolean {
-  if (result.bookerErrors.name || result.bookerErrors.document) return true;
+  if (result.bookerErrors.name || result.bookerErrors.document || result.bookerErrors.email) return true;
   return result.passengerErrors.some((p) => p.errors.length > 0);
 }
 
 export function buildErrorMap(
-  bookerErrors: { name?: string; document?: string },
+  bookerErrors: { name?: string; document?: string; email?: string },
   passengerErrors: PassengerValidation[]
 ): Record<string, string> {
   const map: Record<string, string> = {};
   if (bookerErrors.name) map['booker_name'] = bookerErrors.name;
   if (bookerErrors.document) map['booker_document'] = bookerErrors.document;
+  if (bookerErrors.email) map['booker_email'] = bookerErrors.email;
   for (const p of passengerErrors) {
     for (const err of p.errors) {
       map[`${p.seat_id}_${err.field}`] = err.message;
@@ -93,9 +94,21 @@ export function validateForm(
   _seats: unknown[],
   bookerName: string,
   bookerDocument: string,
-  passengers: { seat_id: string; seat_code: string; name: string; document: string; phone?: string }[]
+  passengers: { seat_id: string; seat_code: string; name: string; document: string; phone?: string }[],
+  contactEmail?: string,
+  sendTicketEmail?: boolean,
 ): Record<string, string> {
   const result = validatePassengerForm(bookerName, bookerDocument, passengers);
+  if (sendTicketEmail && contactEmail && contactEmail.trim()) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactEmail.trim())) {
+      result.bookerErrors.email = 'Correo electrónico inválido';
+    }
+  }
+  if (sendTicketEmail && (!contactEmail || !contactEmail.trim())) {
+    result.bookerErrors.email = 'El correo es requerido para enviar el boleto';
+  }
   if (!hasValidationErrors(result)) return {};
-  return buildErrorMap(result.bookerErrors, result.passengerErrors);
+  const map = buildErrorMap(result.bookerErrors, result.passengerErrors);
+  return map;
 }

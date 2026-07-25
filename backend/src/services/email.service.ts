@@ -6,6 +6,9 @@ import { ResetPasswordEmail } from '../templates/reset-password-email.js';
 import { NewTripAssignedEmail } from '../templates/new-trip-assigned-email.js';
 import { TripPostponedEmail } from '../templates/trip-postponed-email.js';
 import { TripCancelledEmail } from '../templates/trip-cancelled-email.js';
+import { ReservationConfirmedEmail } from '../templates/reservation-confirmed-email.js';
+import { generateTicketPNG } from '../utils/ticket-png.js';
+import type { TicketData } from '../types/reservation.js';
 
 export class EmailService {
   async sendInvitationEmail(to: string, agencyName: string, invitationLink: string) {
@@ -149,6 +152,46 @@ export class EmailService {
     if (error) {
       console.error('[EmailService] Failed to send trip cancelled email:', error);
       throw new Error('Failed to send trip cancelled email');
+    }
+  }
+
+  async sendReservationConfirmationEmail(to: string, ticket: TicketData) {
+    const origin = ticket.trip?.origin ?? '';
+    const destination = ticket.trip?.destination ?? '';
+
+    const html = await render(
+      ReservationConfirmedEmail({ ticket })
+    );
+
+    // Generate PNG attachment (non-blocking: email sends even if PNG fails)
+    let attachments: { filename: string; content: Buffer }[] | undefined;
+    try {
+      const pngBuffer = await generateTicketPNG(ticket);
+      const dest = ticket.trip?.destination ?? 'Destino';
+      const date = new Date(ticket.trip?.departure_time ?? ticket.created_at);
+      const dateStr = date.toLocaleDateString('es-VE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const booker = ticket.booker_name ?? 'Pasajero';
+      const filename = `${dest} - ${dateStr} - ${booker}.png`;
+      attachments = [{ filename, content: pngBuffer }];
+    } catch (err) {
+      console.error(JSON.stringify({
+        event: 'TICKET_PNG_FAILED',
+        reservation_id: ticket.reservation_id,
+        error: err instanceof Error ? err.message : String(err),
+      }));
+    }
+
+    const { error } = await resend.emails.send({
+      from: EMAIL_CONFIG.from,
+      to,
+      subject: `Reserva confirmada — ${origin} → ${destination} — Nómadas Tour`,
+      html,
+      ...(attachments ? { attachments } : {}),
+    });
+
+    if (error) {
+      console.error('[EmailService] Failed to send reservation confirmation email:', error);
+      throw new Error('Failed to send reservation confirmation email');
     }
   }
 }

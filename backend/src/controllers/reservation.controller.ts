@@ -27,6 +27,8 @@ const agencyReservationSchema = z.object({
   booker_name: z.string().min(2),
   booker_document: z.string().regex(/^\d{8}$/, 'Documento debe ser exactamente 8 dígitos'),
   booker_phone: z.string().optional(),
+  contact_email: z.string().email('Correo electrónico inválido').optional().or(z.literal('')).nullable(),
+  send_ticket_email: z.boolean().optional().default(false),
   passengers: z.array(z.object({
     seat_id: z.string().uuid(),
     name: z.string().min(2),
@@ -120,6 +122,10 @@ export class ReservationController {
         res.status(400).json({ error: 'Agency ID not found' });
         return;
       }
+      const contactEmail = data.contact_email && data.contact_email.trim()
+        ? data.contact_email.trim()
+        : null;
+
       const result = await reservationService.createAgencyReservation(
         data.trip_id,
         data.booker_name,
@@ -133,6 +139,8 @@ export class ReservationController {
         })),
         agencyId,
         req.ctx!.userId,
+        contactEmail,
+        data.send_ticket_email ?? false,
       );
       res.status(201).json(result);
     } catch (error) {
