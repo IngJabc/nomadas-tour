@@ -1199,7 +1199,6 @@ function NewReservationContent() {
                     <ReservationTicket ref={captureRef} reservation={successData} />
                     <div className="mt-4">
                       <ReservationTicketActions
-                        reservationId={reservationIdFromUrl}
                         onDownload={download}
                         onShare={shareWithText}
                       />

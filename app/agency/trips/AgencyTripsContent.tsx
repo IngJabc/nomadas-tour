@@ -241,7 +241,7 @@ export default function AgencyTripsContent() {
           </motion.div>
           <motion.div variants={staggerItem}>
             <div className="flex flex-col gap-3 mb-6">
-              <div className="flex justify-center">
+        <div className="flex justify-center">
                 <div className="flex gap-1.5 bg-slate-100 rounded-xl h-9 px-1 w-full sm:w-auto">
                   {[1, 2, 3, 4].map((i) => (
                     <div key={i} className="flex-1 sm:flex-none h-7 bg-slate-200 rounded-lg animate-pulse" style={{ width: i === 1 ? 64 : i === 2 ? 88 : i === 3 ? 88 : 80 }} />
@@ -303,14 +303,13 @@ export default function AgencyTripsContent() {
         transition={{ duration: 0.25, delay: 0.05 }}
       >
         {/* Row 1: Status tabs */}
-        <div className="flex justify-center">
-          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto">
-            {STATUS_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleStatusChange(opt.value)}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors ${
+        <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {STATUS_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleStatusChange(opt.value)}
+              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors whitespace-nowrap ${
                    statusFilter === opt.value
                      ? 'bg-[var(--color-brand-cyan)] text-white'
                      : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
@@ -320,7 +319,6 @@ export default function AgencyTripsContent() {
               </button>
             ))}
           </div>
-        </div>
 
         {/* Row 2: Search, Date */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">

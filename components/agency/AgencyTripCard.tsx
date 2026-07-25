@@ -143,7 +143,7 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             )}
-            {!isClosed && (
+            {!isClosed && !isFull && (
               <>
                 <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
                 <Link

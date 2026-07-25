@@ -229,7 +229,7 @@ export default function ReservationDetailPage() {
         name: p.name,
         document: p.document,
         phone: p.phone ?? null,
-        seat_code: p.seats?.seat_code ?? "—",
+        seat_code: p.seat_code ?? "—",
         reservation_id: id,
         reservation_status: p.status,
         booker_name: reservation?.booker_name ?? "",
@@ -263,7 +263,7 @@ export default function ReservationDetailPage() {
         id: p.id,
         name: p.name,
         document: p.document,
-        seat_code: p.seats?.seat_code ?? '—',
+        seat_code: p.seat_code ?? '—',
         boarded: p.boarded ?? false,
       })),
     };
@@ -431,7 +431,6 @@ export default function ReservationDetailPage() {
               </Badge>
               <div className="flex items-center gap-2">
                 <ReservationTicketActions
-                  reservationId={reservation.id}
                   onDownload={handleDownload}
                   onShare={handleShare}
                 />
@@ -675,7 +674,7 @@ export default function ReservationDetailPage() {
                 </span>
                 <span className="font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-navy)]">
                   {passengers
-                    .map((p) => p.seats?.seat_code)
+                    .map((p) => p.seat_code)
                     .filter(Boolean)
                     .join(", ") || "—"}
                 </span>
