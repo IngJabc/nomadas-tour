@@ -45,6 +45,7 @@ export default function RootLayout({
           position="bottom-right"
           toastOptions={{
             duration: 4000,
+            className: 'nt-toast',
             style: {
               borderRadius: "12px",
               padding: "12px 16px",

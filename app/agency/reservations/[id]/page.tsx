@@ -86,7 +86,14 @@ export default function ReservationDetailPage() {
     try {
       setFetchError(null);
       const data = await agencyApi.getReservation(id);
-      setReservation(data);
+      setReservation({
+        ...data,
+        id: data.reservation_id,
+        trips: data.trip
+          ? { ...data.trip, routes: { origin: data.trip.origin, destination: data.trip.destination } }
+          : null,
+        reservation_passengers: data.passengers,
+      });
     } catch {
       setFetchError("No se pudo cargar la reserva. Intenta de nuevo.");
     } finally {
