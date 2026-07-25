@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Poppins, Montserrat } from "next/font/google";
 import { Navbar } from "@/components/ui/Navbar";
-import { Toaster } from "react-hot-toast";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import "./globals.css";
 import "./design-tokens.css";
 
@@ -41,32 +41,7 @@ export default function RootLayout({
         {/* Global navbar */}
         <Navbar />
         {children}
-        <Toaster
-          position="bottom-right"
-          toastOptions={{
-            duration: 4000,
-            className: 'nt-toast',
-            style: {
-              borderRadius: "12px",
-              padding: "12px 16px",
-              fontSize: "14px",
-              background: "var(--color-brand-navy)",
-              color: "var(--color-brand-surface)",
-            },
-            success: {
-              iconTheme: {
-                primary: "var(--color-brand-cyan)",
-                secondary: "var(--color-brand-surface)",
-              },
-            },
-            error: {
-              iconTheme: {
-                primary: "#fb923c",
-                secondary: "var(--color-brand-surface)",
-              },
-            },
-          }}
-        />
+        <ToastProvider />
       </body>
     </html>
   );

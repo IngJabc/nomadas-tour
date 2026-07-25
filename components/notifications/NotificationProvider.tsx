@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { createClient } from '@/lib/supabase/client';
 import { subscribeToNotifications, type CleanupFn } from '@/lib/realtime/subscriptions';
 import { NOTIFICATION_ICONS } from './notification-config';
+import { BaseToast } from '@/components/ui/BaseToast';
 
 export interface Notification {
   id: string;
@@ -181,40 +182,33 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             const cfg = NOTIFICATION_ICONS[notif.type] || NOTIFICATION_ICONS.trip_created;
             const Icon = cfg.icon;
             return (
-              <button
-                type="button"
+              <BaseToast
+                variant="notification"
+                visible={t.visible}
+                icon={
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center"
+                    style={{ background: 'rgba(0,212,255,0.1)' }}
+                  >
+                    <Icon className="w-4 h-4 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
+                  </div>
+                }
                 onClick={() => {
                   toast.dismiss(t.id);
                   const route = notif.action_url || resolveNotificationRoute(notif, role);
                   router.push(route);
                 }}
-                className="w-full text-left flex items-start gap-3 p-3 rounded-xl bg-white shadow-lg border border-black/5 cursor-pointer hover:scale-[1.02]"
-                style={{
-                  fontFamily: 'var(--font-body)',
-                  maxWidth: '360px',
-                  opacity: t.visible ? 1 : 0,
-                  transform: `translateY(${t.visible ? '0' : '10px'}) scale(${t.visible ? '1' : '0.95'})`,
-                  transition: 'opacity 200ms ease, transform 200ms ease',
-                }}
               >
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ background: 'rgba(0,212,255,0.1)' }}
-                >
-                  <Icon className="w-4 h-4 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-[13px] text-[var(--color-brand-navy)] truncate m-0">
-                    {notif.title}
-                  </p>
-                  <p className="text-[12px] text-[var(--color-brand-muted)] line-clamp-2 mt-0.5 m-0">
-                    {notif.body}
-                  </p>
-                </div>
-              </button>
+                <p className="font-semibold text-[13px] text-[var(--color-brand-navy)] truncate m-0">
+                  {notif.title}
+                </p>
+                <p className="text-[12px] text-[var(--color-brand-muted)] line-clamp-2 mt-0.5 m-0">
+                  {notif.body}
+                </p>
+              </BaseToast>
             );
           },
-          { duration: 10000 },
+          { duration: 10000, removeDelay: 200 },
         );
       } else if (payload.eventType === 'UPDATE') {
         const notif = payload.notification as Notification;

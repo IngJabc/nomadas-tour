@@ -100,37 +100,3 @@ input, textarea, select {
     transform: translateY(0);
   }
 }
-
-/* ── Toast animations ── */
-
-@keyframes toastSlideIn {
-  from {
-    opacity: 0;
-    transform: translateX(24px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-}
-
-@keyframes toastSlideOut {
-  from {
-    opacity: 1;
-    transform: translateX(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateX(24px) scale(0.96);
-  }
-}
-
-.nt-toast {
-  animation: toastSlideIn 200ms cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
-  transition: transform 180ms ease, box-shadow 180ms ease !important;
-}
-
-.nt-toast:hover {
-  transform: translateY(-2px) scale(1.01) !important;
-  box-shadow: 0 8px 24px rgba(0, 0, 36, 0.18) !important;
-}
