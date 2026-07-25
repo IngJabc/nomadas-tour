@@ -380,13 +380,13 @@ export default function AdminTripsPage() {
       >
         {/* Row 1: Status centered */}
         <div className="flex justify-center">
-          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => handleStatusChange(opt.value)}
-                className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors ${
+                className={`shrink-0 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors ${
                    statusFilter === opt.value
                      ? 'bg-[var(--color-brand-cyan)] text-white'
                      : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'

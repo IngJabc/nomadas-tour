@@ -16,6 +16,10 @@ interface TripStatusBadgeProps {
 }
 
 export function TripStatusBadge({ status, postponed, size = 'sm' }: TripStatusBadgeProps) {
+  if (status === 'cancelled') {
+    const s = STATUS_MAP.cancelled;
+    return <Badge variant={s.variant} size={size}>{s.label}</Badge>;
+  }
   if (postponed || status === 'postponed') {
     return <Badge variant="warning" size={size}>Pospuesto</Badge>;
   }

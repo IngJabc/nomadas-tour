@@ -56,12 +56,14 @@ export function TripActions({
 
   const actions: Action[] = [];
 
-  actions.push({
-    key: 'view',
-    label: 'Ver detalle',
-    variant: 'secondary',
-    onClick: () => onAction(trip.id, 'view'),
-  });
+  if (trip.status !== 'cancelled') {
+    actions.push({
+      key: 'view',
+      label: 'Ver detalle',
+      variant: 'secondary',
+      onClick: () => onAction(trip.id, 'view'),
+    });
+  }
 
   if (isActive) {
     if (!hasReservations) {

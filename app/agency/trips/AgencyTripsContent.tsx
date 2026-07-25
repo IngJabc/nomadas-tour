@@ -303,22 +303,24 @@ export default function AgencyTripsContent() {
         transition={{ duration: 0.25, delay: 0.05 }}
       >
         {/* Row 1: Status tabs */}
-        <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => handleStatusChange(opt.value)}
-              className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors whitespace-nowrap ${
-                   statusFilter === opt.value
-                     ? 'bg-[var(--color-brand-cyan)] text-white'
-                     : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
-                 }`}
+        <div className="flex justify-center">
+          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] w-full sm:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleStatusChange(opt.value)}
+                className={`shrink-0 sm:flex-none px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors ${
+                     statusFilter === opt.value
+                       ? 'bg-[var(--color-brand-cyan)] text-white'
+                       : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
+                   }`}
               >
                 {opt.label}
               </button>
             ))}
           </div>
+        </div>
 
         {/* Row 2: Search, Date */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3">

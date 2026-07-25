@@ -728,72 +728,92 @@ export default function AdminBookingsPage() {
                                 </div>
                               </button>
 
-                              {/* Passenger grid */}
+                              {/* Reservation groups */}
                               <AnimatePresence initial={false}>
                                 {tripOpen && (
                                   <motion.div
-                                    className="px-4 pb-4 pt-1 bg-[var(--color-brand-surface)] overflow-hidden"
+                                    className="px-4 pb-4 pt-1 bg-[var(--color-brand-surface)] overflow-hidden space-y-3"
                                     variants={tripExpand}
                                     initial="hidden"
                                     animate="visible"
                                     exit="exit"
                                   >
-                                    <motion.div
-                                      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2"
-                                      variants={passengerGrid}
-                                      initial="hidden"
-                                      animate="visible"
-                                    >
-                                      {trip.reservations
-                                        .flatMap((res) =>
-                                          res.passengers.map((p) => ({ passenger: p, reservation: res }))
-                                        )
-                                        .map(({ passenger: p, reservation: res }) => {
-                                          const rs2 = RESERVATION_STATUS[res.status] ?? RESERVATION_STATUS.confirmed;
-                                          return (
-                                            <motion.button
-                                              key={p.rowId}
-                                              type="button"
-                                              variants={passengerCard}
-                                              onClick={() => router.push(`/admin/bookings/${res.reservationId}`)}
-                                              className="flex items-center gap-3 p-3 bg-white rounded-xl border border-[rgba(0,0,0,0.06)] text-left cursor-pointer transition-all duration-150 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-[var(--color-brand-cyan)] focus-visible:outline-offset-2"
-                                            >
-                                              <div className="w-9 h-9 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                                                <span className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-cyan)]">
-                                                  {p.seatCode ?? '—'}
+                                    {trip.reservations.map((res) => {
+                                      const rs2 = RESERVATION_STATUS[res.status] ?? RESERVATION_STATUS.confirmed;
+                                      return (
+                                        <div key={res.reservationId} className="rounded-xl border border-[rgba(0,0,0,0.06)] bg-white overflow-hidden">
+                                          {/* Reservation header */}
+                                          <button
+                                            type="button"
+                                            onClick={() => router.push(`/admin/bookings/${res.reservationId}`)}
+                                            className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2.5 text-left hover:bg-[rgba(0,0,0,0.02)] transition-colors duration-150"
+                                          >
+                                            <div className="flex-1 min-w-0">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-[family-name:var(--font-body)] font-semibold text-[12px] text-[var(--color-brand-navy)] shrink-0">
+                                                  #{res.reservationId.slice(0, 8)}
                                                 </span>
+                                                {res.agency && (
+                                                  <span className="font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)] truncate">
+                                                    {res.agency.name}
+                                                  </span>
+                                                )}
                                               </div>
+                                              <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)] sm:hidden">
+                                                {res.passengers.length} {res.passengers.length === 1 ? 'pasajero' : 'pasajeros'}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              <span className="hidden sm:inline font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)]">
+                                                {res.passengers.length} {res.passengers.length === 1 ? 'pasajero' : 'pasajeros'}
+                                              </span>
+                                              <Badge variant={rs2.variant} size="xs">{rs2.label}</Badge>
+                                            </div>
+                                          </button>
 
-                                              <div className="flex-1 min-w-0">
-                                                <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)] truncate">
-                                                  {p.name}
-                                                </p>
-                                                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2 mt-0.5">
+                                          {/* Passenger grid for this reservation */}
+                                          <motion.div
+                                            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 px-3 pb-3"
+                                            variants={passengerGrid}
+                                            initial="hidden"
+                                            animate="visible"
+                                          >
+                                            {res.passengers.map((p) => (
+                                              <motion.button
+                                                key={p.rowId}
+                                                type="button"
+                                                variants={passengerCard}
+                                                onClick={() => router.push(`/admin/bookings/${res.reservationId}`)}
+                                                className="flex items-center gap-3 p-3 bg-[var(--color-brand-surface)] rounded-xl border border-[rgba(0,0,0,0.06)] text-left cursor-pointer transition-all duration-150 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-[var(--color-brand-cyan)] focus-visible:outline-offset-2"
+                                              >
+                                                <div className="w-9 h-9 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                                                  <span className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-cyan)]">
+                                                    {p.seatCode ?? '—'}
+                                                  </span>
+                                                </div>
+
+                                                <div className="flex-1 min-w-0">
+                                                  <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)] truncate">
+                                                    {p.name}
+                                                  </p>
                                                   <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
                                                     {p.document || '—'}
                                                   </span>
-                                                  {res.agency && (
-                                                    <>
-                                                      <span className="hidden sm:inline text-[var(--color-brand-muted)]">·</span>
-                                                      <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)]">
-                                                        {res.agency.name}
-                                                      </span>
-                                                    </>
+                                                </div>
+
+                                                <div className="shrink-0">
+                                                  {p.boarded ? (
+                                                    <Badge variant="boarded" size="xs">Abordado</Badge>
+                                                  ) : (
+                                                    <Badge variant="inactive" size="xs">Pendiente</Badge>
                                                   )}
                                                 </div>
-                                              </div>
-
-                                              <div className="flex flex-col items-end gap-1 shrink-0">
-                                                {p.boarded ? (
-                                                  <Badge variant="boarded" size="xs">Abordado</Badge>
-                                                ) : (
-                                                  <Badge variant={rs2.variant} size="xs">{rs2.label}</Badge>
-                                                )}
-                                              </div>
-                                            </motion.button>
-                                          );
-                                        })}
-                                    </motion.div>
+                                              </motion.button>
+                                            ))}
+                                          </motion.div>
+                                        </div>
+                                      );
+                                    })}
                                   </motion.div>
                                 )}
                               </AnimatePresence>

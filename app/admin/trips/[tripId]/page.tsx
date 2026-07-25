@@ -1,14 +1,14 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useEffect, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
+import toast from "react-hot-toast";
 import {
   Bus,
   Calendar,
   Clock,
-  Users,
   MapPin,
   ArrowLeft,
-  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -63,6 +63,18 @@ export default function AdminTripDetailPage() {
     error,
   } = useTripRealtime(tripId);
 
+  const router = useRouter();
+  const redirectedRef = useRef(false);
+
+  useEffect(() => {
+    if (loading || error || !trip) return;
+    if (trip.status === "cancelled" && !redirectedRef.current) {
+      redirectedRef.current = true;
+      toast("Los viajes cancelados no tienen vista de detalle", { icon: "🚫" });
+      router.replace("/admin/trips");
+    }
+  }, [loading, error, trip, router]);
+
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -89,6 +101,8 @@ export default function AdminTripDetailPage() {
       </main>
     );
   }
+
+  if (trip.status === "cancelled") return null;
 
   const route = trip.routes;
   const s = STATUS_STYLES[trip.status] ?? STATUS_STYLES.active;

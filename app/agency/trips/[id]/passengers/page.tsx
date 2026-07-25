@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   Bus,
@@ -55,6 +55,14 @@ const VEHICLE_LABELS: Record<string, string> = {
   kia: "KIA",
   van: "Van",
   microbús: "Microbús",
+};
+
+const RESERVATION_STATUS: Record<string, { label: string; variant: "confirmed" | "cancelled" | "boarded" | "inactive" }> = {
+  confirmed: { label: "Confirmada", variant: "confirmed" },
+  cancelled: { label: "Cancelada", variant: "cancelled" },
+  boarded: { label: "Abordado", variant: "boarded" },
+  partial: { label: "Confirmada", variant: "confirmed" },
+  completed: { label: "Completada", variant: "inactive" },
 };
 
 const passengerGrid = {
@@ -131,6 +139,18 @@ export default function TripPassengersPage() {
         p.booker_name.toLowerCase().includes(q)
     );
   }, [data, search]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, { reservationId: string; status: string; bookerName: string; passengers: AgencyTripPassenger[] }>();
+    for (const p of filtered) {
+      const key = p.reservation_id;
+      if (!map.has(key)) {
+        map.set(key, { reservationId: key, status: p.reservation_status, bookerName: p.booker_name, passengers: [] });
+      }
+      map.get(key)!.passengers.push(p);
+    }
+    return Array.from(map.values());
+  }, [filtered]);
 
   const trip = data?.trip;
   const isClosed = trip?.status === "cancelled" || trip?.status === "completed";
@@ -396,18 +416,51 @@ export default function TripPassengersPage() {
           />
         </motion.div>
       ) : (
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2"
-          variants={passengerGrid}
-          initial="hidden"
-          animate="visible"
-        >
-          <AnimatePresence>
-            {filtered.map((passenger: AgencyTripPassenger) => (
-              <PassengerCard key={passenger.id} passenger={passenger} />
-            ))}
-          </AnimatePresence>
-        </motion.div>
+        <div className="space-y-3">
+          {grouped.map((group) => {
+            const rs = RESERVATION_STATUS[group.status] ?? RESERVATION_STATUS.confirmed;
+            return (
+              <motion.div
+                key={group.reservationId}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Link
+                  href={`/agency/reservations/${group.reservationId}`}
+                  className="block rounded-xl border border-[rgba(0,0,0,0.06)] bg-white overflow-hidden hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 transition-all duration-150 no-underline"
+                >
+                  <div className="flex items-center gap-2 sm:gap-3 px-3 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-[family-name:var(--font-body)] font-semibold text-[12px] text-[var(--color-brand-navy)] shrink-0">
+                          #{group.reservationId.slice(0, 8)}
+                        </span>
+                        <span className="font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)] truncate">
+                          {group.bookerName}
+                        </span>
+                      </div>
+                      <span className="font-[family-name:var(--font-body)] text-[10px] text-[var(--color-brand-muted)] sm:hidden">
+                        {group.passengers.length} {group.passengers.length === 1 ? 'pasajero' : 'pasajeros'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="hidden sm:inline font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)]">
+                        {group.passengers.length} {group.passengers.length === 1 ? 'pasajero' : 'pasajeros'}
+                      </span>
+                      <Badge variant={rs.variant} size="xs">{rs.label}</Badge>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 px-3 pb-3">
+                    {group.passengers.map((passenger) => (
+                      <PassengerCard key={passenger.id} passenger={passenger} />
+                    ))}
+                  </div>
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
       )}
     </main>
   );
