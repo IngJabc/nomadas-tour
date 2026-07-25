@@ -801,7 +801,9 @@ export class SuperadminService {
       )
       .eq("trip_id", id);
 
-    const resIds = (reservations || []).map((r) => r.id);
+    const resIds = (reservations || [])
+      .filter((r: any) => r.status !== "cancelled")
+      .map((r: any) => r.id);
     let passengers: any[] = [];
     if (resIds.length > 0) {
       const { data: pData } = await supabaseAdmin
