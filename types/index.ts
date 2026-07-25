@@ -115,6 +115,7 @@ export interface AgencyReservationPassenger {
   phone?: string | null;
   status: 'active' | 'cancelled';
   seat_id: string;
+  seat_code?: string;
   seats?: { seat_code: string };
   boarded?: boolean;
 }
