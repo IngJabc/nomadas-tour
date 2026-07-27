@@ -339,6 +339,96 @@ describe('notificationService.markAllAsRead', () => {
   });
 });
 
+describe('Preference filtering', () => {
+  function setAgencyPrefs(
+    rows: Array<{
+      agency_id: string;
+      category: string;
+      in_app_enabled: boolean;
+      email_enabled: boolean;
+    }>,
+  ) {
+    tableChains['agency_notification_preferences'] = createChainable(rows);
+  }
+
+  it('skips in-app rows for agencies that disabled the category', async () => {
+    tableChains['notifications'] = createChainable();
+    setAgencyPrefs([
+      {
+        agency_id: 'agency-a',
+        category: 'trip_assignments',
+        in_app_enabled: false,
+        email_enabled: false,
+      },
+    ]);
+
+    await notificationService.createForAgenciesAndAdmin({
+      type: 'trip_created',
+      title: 'Viaje creado',
+      body: 'Test body',
+      entityType: 'trip',
+      entityId: 'trip-pref-1',
+      agencyIds: ['agency-a', 'agency-b'],
+      actor: 'superadmin',
+    });
+
+    const rows = getInsertRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].agency_id).toBe('agency-b');
+  });
+
+  it('still inserts superadmin rows when all agencies opt out', async () => {
+    tableChains['notifications'] = createChainable();
+    setAgencyPrefs([
+      {
+        agency_id: 'agency-a',
+        category: 'trip_status_updates',
+        in_app_enabled: false,
+        email_enabled: false,
+      },
+    ]);
+
+    await notificationService.createForAgenciesAndAdmin({
+      type: 'trip_auto_completed',
+      title: 'Viaje completado automáticamente',
+      body: 'Test body',
+      entityType: 'trip',
+      entityId: 'trip-pref-2',
+      agencyIds: ['agency-a'],
+      actor: 'system',
+    });
+
+    const rows = getInsertRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0].recipient_role).toBe('superadmin');
+  });
+
+  it('does not insert when all agency rows are filtered and no superadmin row', async () => {
+    tableChains['notifications'] = createChainable();
+    setAgencyPrefs([
+      {
+        agency_id: 'agency-a',
+        category: 'trip_assignments',
+        in_app_enabled: false,
+        email_enabled: false,
+      },
+    ]);
+
+    await notificationService.createForAgenciesAndAdmin({
+      type: 'trip_created',
+      title: 'Viaje creado',
+      body: 'Test body',
+      entityType: 'trip',
+      entityId: 'trip-pref-3',
+      agencyIds: ['agency-a'],
+      actor: 'superadmin',
+    });
+
+    const chain = tableChains['notifications'];
+    expect(chain.insert).not.toHaveBeenCalled();
+  });
+});
+
 describe('notificationService.getUnreadCount', () => {
   it('returns count for agency', async () => {
     const chain = createChainable();

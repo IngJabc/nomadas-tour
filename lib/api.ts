@@ -2,6 +2,27 @@ import type { AgencyReservation, AgencyTripPassengersResponse } from '@/types';
 import { ApiError } from '@/lib/errors/api-error';
 import { logoutInactiveAgency } from '@/lib/auth/session-handler';
 
+export interface NotificationPreferenceCategory {
+  key: string;
+  label: string;
+  description: string;
+  locked: boolean;
+  channels: {
+    in_app: boolean;
+    email: boolean;
+  };
+}
+
+export interface NotificationPreferencesResponse {
+  preferences: {
+    trip_assignments: boolean;
+    trip_schedule_changes: boolean;
+    trip_status_updates: boolean;
+    trip_cancellations: boolean;
+  };
+  categories: NotificationPreferenceCategory[];
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface RequestOptions extends RequestInit {
@@ -241,5 +262,16 @@ export const agencyApi = {
     request<any>(`/agency/boarding/${passengerId}`, {
       method: 'PATCH',
       body: JSON.stringify({ boarded }),
+    }),
+
+  getNotificationPreferences: () =>
+    request<NotificationPreferencesResponse>('/agency/notification-preferences'),
+
+  updateNotificationPreferences: (
+    patch: Partial<NotificationPreferencesResponse['preferences']>,
+  ) =>
+    request<NotificationPreferencesResponse>('/agency/notification-preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
     }),
 };
