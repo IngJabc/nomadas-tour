@@ -4,6 +4,7 @@ import { authorize } from '../../middlewares/authorize.js';
 import { tenant } from '../../middlewares/tenant.js';
 import { reservationController } from '../../controllers/reservation.controller.js';
 import { notificationController } from '../../controllers/notification.controller.js';
+import { notificationPreferenceController } from '../../controllers/notification-preference.controller.js';
 
 const router = Router();
 
@@ -43,5 +44,13 @@ router.get('/notifications', (req, res, next) => notificationController.getNotif
 router.get('/notifications/unread-count', (req, res, next) => notificationController.getUnreadCount(req, res, next));
 router.patch('/notifications/:id/read', (req, res, next) => notificationController.markAsRead(req, res, next));
 router.patch('/notifications/read-all', (req, res, next) => notificationController.markAllAsRead(req, res, next));
+
+// Notification preferences
+router.get('/notification-preferences', (req, res, next) =>
+  notificationPreferenceController.getPreferences(req, res, next),
+);
+router.patch('/notification-preferences', (req, res, next) =>
+  notificationPreferenceController.updatePreferences(req, res, next),
+);
 
 export default router;

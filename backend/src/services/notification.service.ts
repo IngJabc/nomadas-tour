@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/database.js';
+import { notificationDeliveryPolicy } from './notification-delivery.policy.js';
 
 export type NotificationType =
   | 'trip_created'
@@ -27,31 +28,76 @@ interface CreateNotificationParams {
   metadata?: Record<string, unknown>;
 }
 
+interface NotificationInsertRow {
+  type: NotificationType;
+  title: string;
+  body: string;
+  entity_type: EntityType;
+  entity_id: string;
+  agency_id: string | null;
+  recipient_role: RecipientRole;
+  action_url: string | null;
+  metadata: Record<string, unknown>;
+}
+
 export class NotificationService {
-  async createNotification(params: CreateNotificationParams): Promise<void> {
-    const { error } = await supabaseAdmin
-      .from('notifications')
-      .insert({
-        type: params.type,
-        title: params.title,
-        body: params.body,
-        entity_type: params.entityType,
-        entity_id: params.entityId,
-        agency_id: params.agencyId || null,
-        recipient_role: params.recipientRole,
-        action_url: params.action_url ?? null,
-        metadata: params.metadata ?? {},
-      });
+  private async insertRows(
+    rows: NotificationInsertRow[],
+    context: {
+      event: string;
+      type: NotificationType;
+      entityType?: EntityType;
+      entityId?: string;
+      agencyCount?: number;
+      actor?: NotificationActor;
+      agencyId?: string;
+    },
+  ): Promise<void> {
+    if (rows.length === 0) return;
+
+    const filtered = await notificationDeliveryPolicy.filterAgencyNotificationRows(rows);
+    if (filtered.length === 0) return;
+
+    const { error } = await supabaseAdmin.from('notifications').insert(filtered);
 
     if (error) {
-      console.error(JSON.stringify({
+      console.error(
+        JSON.stringify({
+          event: context.event,
+          type: context.type,
+          entityType: context.entityType,
+          entityId: context.entityId,
+          agencyCount: context.agencyCount,
+          actor: context.actor,
+          agencyId: context.agencyId,
+          error: error.message,
+        }),
+      );
+    }
+  }
+
+  async createNotification(params: CreateNotificationParams): Promise<void> {
+    await this.insertRows(
+      [
+        {
+          type: params.type,
+          title: params.title,
+          body: params.body,
+          entity_type: params.entityType,
+          entity_id: params.entityId,
+          agency_id: params.agencyId || null,
+          recipient_role: params.recipientRole,
+          action_url: params.action_url ?? null,
+          metadata: params.metadata ?? {},
+        },
+      ],
+      {
         event: 'NOTIFICATION_INSERT_FAILED',
         type: params.type,
         entityType: params.entityType,
         entityId: params.entityId,
-        error: error.message,
-      }));
-    }
+      },
+    );
   }
 
   async createForAgenciesAndAdmin(params: {
@@ -65,7 +111,7 @@ export class NotificationService {
     action_url?: string;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    const rows = [];
+    const rows: NotificationInsertRow[] = [];
 
     for (const agencyId of params.agencyIds) {
       rows.push({
@@ -75,7 +121,7 @@ export class NotificationService {
         entity_type: params.entityType,
         entity_id: params.entityId,
         agency_id: agencyId,
-        recipient_role: 'agency' as const,
+        recipient_role: 'agency',
         action_url: params.action_url ?? null,
         metadata: params.metadata ?? {},
       });
@@ -89,29 +135,20 @@ export class NotificationService {
         entity_type: params.entityType,
         entity_id: params.entityId,
         agency_id: null,
-        recipient_role: 'superadmin' as const,
+        recipient_role: 'superadmin',
         action_url: params.action_url ?? null,
         metadata: params.metadata ?? {},
       });
     }
 
-    if (rows.length === 0) return;
-
-    const { error } = await supabaseAdmin
-      .from('notifications')
-      .insert(rows);
-
-    if (error) {
-      console.error(JSON.stringify({
-        event: 'NOTIFICATION_BULK_INSERT_FAILED',
-        type: params.type,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        agencyCount: params.agencyIds.length,
-        actor: params.actor,
-        error: error.message,
-      }));
-    }
+    await this.insertRows(rows, {
+      event: 'NOTIFICATION_BULK_INSERT_FAILED',
+      type: params.type,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      agencyCount: params.agencyIds.length,
+      actor: params.actor,
+    });
   }
 
   async createForAgency(params: {
@@ -125,7 +162,7 @@ export class NotificationService {
     action_url?: string;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    const rows = [];
+    const rows: NotificationInsertRow[] = [];
 
     if (params.actor === 'system') {
       rows.push({
@@ -135,7 +172,7 @@ export class NotificationService {
         entity_type: params.entityType,
         entity_id: params.entityId,
         agency_id: params.agencyId,
-        recipient_role: 'agency' as const,
+        recipient_role: 'agency',
         action_url: params.action_url ?? null,
         metadata: params.metadata ?? {},
       });
@@ -149,29 +186,20 @@ export class NotificationService {
         entity_type: params.entityType,
         entity_id: params.entityId,
         agency_id: null,
-        recipient_role: 'superadmin' as const,
+        recipient_role: 'superadmin',
         action_url: params.action_url ?? null,
         metadata: params.metadata ?? {},
       });
     }
 
-    if (rows.length === 0) return;
-
-    const { error } = await supabaseAdmin
-      .from('notifications')
-      .insert(rows);
-
-    if (error) {
-      console.error(JSON.stringify({
-        event: 'NOTIFICATION_INSERT_FAILED',
-        type: params.type,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        agencyId: params.agencyId,
-        actor: params.actor,
-        error: error.message,
-      }));
-    }
+    await this.insertRows(rows, {
+      event: 'NOTIFICATION_INSERT_FAILED',
+      type: params.type,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      agencyId: params.agencyId,
+      actor: params.actor,
+    });
   }
 
   async getAgencyNotifications(agencyId: string, limit: number = 20) {

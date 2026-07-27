@@ -10,6 +10,8 @@ import { generateToken } from "../utils/token.js";
 import { toUTC } from "../utils/timezone.js";
 import { emailService } from "./email.service.js";
 import { notificationService } from "./notification.service.js";
+import { notificationDeliveryPolicy } from "./notification-delivery.policy.js";
+import { notificationPreferenceService } from "./notification-preference.service.js";
 import {
   getTripOperationalContext,
   validateTripEditable,
@@ -107,6 +109,8 @@ export class SuperadminService {
       .insert({ token, agency_id: agency.id, email, expires_at: expiresAt });
 
     if (inviteError) throw new ValidationError(inviteError.message);
+
+    await notificationPreferenceService.seedDefaults(agency.id);
 
     emailService.sendInvitationEmail(email, name, token).catch((err) => {
       console.error(
@@ -446,6 +450,13 @@ export class SuperadminService {
     const agenciesWithEmail = await this.getAgenciesWithEmail(agencyIds);
     const departureFormatted = this.formatDateForEmail(trip.departure_time);
     for (const agency of agenciesWithEmail) {
+      const emailAllowed = await notificationDeliveryPolicy.shouldDeliver(
+        agency.id,
+        "trip_created",
+        "email",
+      );
+      if (!emailAllowed) continue;
+
       emailService
         .sendNewTripAssignedEmail(
           agency.email,
@@ -1013,6 +1024,13 @@ export class SuperadminService {
         const newFormatted = this.formatDateForEmail(toUTC(departureTime));
 
         for (const agency of agenciesWithEmail) {
+          const emailAllowed = await notificationDeliveryPolicy.shouldDeliver(
+            agency.id,
+            "trip_postponed",
+            "email",
+          );
+          if (!emailAllowed) continue;
+
           emailService
             .sendTripPostponedEmail(
               agency.email,
@@ -1206,6 +1224,13 @@ export class SuperadminService {
       if (route) {
         const departureFormatted = this.formatDateForEmail(trip.departure_time);
         for (const agency of agenciesWithEmail) {
+          const emailAllowed = await notificationDeliveryPolicy.shouldDeliver(
+            agency.id,
+            "trip_cancelled",
+            "email",
+          );
+          if (!emailAllowed) continue;
+
           emailService
             .sendTripCancelledEmail(
               agency.email,

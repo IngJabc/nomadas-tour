@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, ClipboardList, QrCode, Bus, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, QrCode, Bus, Bell, type LucideIcon } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
@@ -8,6 +8,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/agency/trips', label: 'Mis viajes', icon: Bus },
   { href: '/agency/reservations', label: 'Reservas', icon: ClipboardList },
   { href: '/agency/scan', label: 'Escáner QR', icon: QrCode },
+  { href: '/agency/settings/notifications', label: 'Notificaciones', icon: Bell },
 ];
 
 interface AgencySidebarProps {
