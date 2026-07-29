@@ -266,7 +266,6 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
   // ─── Realtime subscription for seat selection step ──────────────────
 
   useEffect(() => {
-    console.log('[RT:effect] selectedTrip?.id:', selectedTrip?.id, '| tripIdRef:', tripIdRef.current);
     if (!tripIdRef.current || !selectedTrip?.id) return;
     const tripId = tripIdRef.current;
 
@@ -282,15 +281,12 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
         try {
           const fresh: Trip = await agencyApi.getTrip(tid);
           const seats = fresh.seats || [];
-          const lockedSeats = seats.filter((s: any) => s.status === 'locked');
-          console.log('[RT:flush] trip:', tid, '| total_seats:', seats.length, '| locked_seats:', lockedSeats.length, lockedSeats.map((s: any) => `${s.seat_code}(${s.locked_by})`).join(', '));
           setSeatsMap(buildSeatsMap(seats));
         } catch { /* silent */ }
       }
     };
 
     const handleSeatUpdate = ({ seat }: { seat: any }) => {
-      console.log('[RT:handleSeatUpdate] seat_code:', seat?.seat_code, '| status:', seat?.status, '| locked_by:', seat?.locked_by, '| trip_id:', seat?.trip_id);
       const seatTripId = seat.trip_id as string;
       if (!seatTripId || seatTripId !== tripId) return;
 
@@ -298,7 +294,6 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
       const newSeat = seat as Seat;
       setSeatsMap((prev) => {
         const existing = prev[newSeat.seat_code];
-        console.log('[RT:setSeatsMap] seat_code:', newSeat.seat_code, '| exists:', !!existing, '| current_status:', existing?.status, '| new_status:', newSeat.status, '| locked_by:', newSeat.locked_by);
         if (!existing) return prev;
         return { ...prev, [newSeat.seat_code]: { ...existing, ...newSeat } };
       });
@@ -326,9 +321,7 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
     };
 
     cleanupChannel();
-    console.log('[RT:subscribing] tripId:', tripId, '| creating channel...');
     channelRef.current = subscribeToTripSeats([tripId], handleSeatUpdate);
-    console.log('[RT:subscribing] channel created:', typeof channelRef.current);
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
