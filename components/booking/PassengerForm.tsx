@@ -75,7 +75,7 @@ export function PassengerForm({
           />
           <Input
             label="Documento"
-            placeholder="8 dígitos"
+            placeholder="7 u 8 dígitos"
             value={bookerDocument}
             onChange={(e) => onBookerDocumentChange(filterDigits(e.target.value))}
             error={bookerErrors.document}
@@ -165,7 +165,7 @@ export function PassengerForm({
                 />
                 <Input
                   label="Documento"
-                  placeholder="8 dígitos"
+                  placeholder="7 u 8 dígitos"
                   value={passenger.document}
                   onChange={(e) => onUpdate(passenger.seat_id, 'document', filterDigits(e.target.value))}
                   error={errors[`${passenger.seat_id}_document`]}
