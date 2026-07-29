@@ -1551,7 +1551,7 @@ export class ReservationService {
       .from('trips')
       .select('*, routes(origin, destination), trip_agencies!inner(agency_id)')
       .eq('trip_agencies.agency_id', agencyId)
-      .neq('status', 'completed')
+      .in('status', ['active', 'cancelled'])
       .order('departure_time');
 
     if (error) throw new ValidationError(error.message);
@@ -1600,6 +1600,10 @@ export class ReservationService {
       .single();
 
     if (tripError || !trip) throw new NotFoundError('Trip not found');
+
+    if (trip.status === 'archived') {
+      throw new NotFoundError('Trip not found');
+    }
 
     const { data: assignment } = await supabaseAdmin
       .from('trip_agencies')

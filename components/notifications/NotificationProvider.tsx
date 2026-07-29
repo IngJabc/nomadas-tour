@@ -33,7 +33,7 @@ interface NotificationContextValue {
   refresh: () => Promise<void>;
 }
 
-const CRITICAL_TYPES = new Set(['trip_cancelled', 'trip_deleted', 'reservation_cancelled', 'passenger_cancelled']);
+const CRITICAL_TYPES = new Set(['trip_cancelled', 'trip_deleted', 'trip_archived', 'reservation_cancelled', 'passenger_cancelled']);
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
@@ -185,6 +185,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
               <BaseToast
                 variant="notification"
                 visible={t.visible}
+                onDismiss={() => toast.dismiss(t.id)}
                 icon={
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center"

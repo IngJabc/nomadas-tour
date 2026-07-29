@@ -61,6 +61,14 @@ export function toUTC(naiveDatetime: string): string {
   return correctUTC.toISOString();
 }
 
+export const DEPARTURE_MUST_BE_FUTURE_MESSAGE =
+  'La fecha y hora de salida debe ser posterior a la fecha y hora actual.';
+
+export function isDepartureTimeInFuture(departureTime: string): boolean {
+  const departure = new Date(toUTC(departureTime));
+  return !Number.isNaN(departure.getTime()) && departure.getTime() > Date.now();
+}
+
 /**
  * Format a UTC ISO string in the business timezone.
  * Uses Intl.DateTimeFormat with es-ES locale.

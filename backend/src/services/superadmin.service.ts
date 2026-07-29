@@ -20,6 +20,16 @@ import {
   validateNoActiveReservations,
 } from "./trip-edit-context.js";
 
+const DEPARTURE_MUST_BE_FUTURE_MESSAGE =
+  "La fecha y hora de salida debe ser posterior a la fecha y hora actual.";
+
+function assertDepartureTimeInFuture(departureTime: string): void {
+  const departure = new Date(toUTC(departureTime));
+  if (departure.getTime() <= Date.now()) {
+    throw new ValidationError(DEPARTURE_MUST_BE_FUTURE_MESSAGE);
+  }
+}
+
 export class SuperadminService {
   // ---- Agencies ----
   async listAgencies() {
@@ -401,6 +411,8 @@ export class SuperadminService {
       throw new ValidationError(
         "No se puede crear un viaje con una ruta inactiva. Activa la ruta primero."
       );
+
+    assertDepartureTimeInFuture(departureTime);
 
     const { data: trip, error: tripError } = await supabaseAdmin
       .from("trips")
@@ -872,12 +884,21 @@ export class SuperadminService {
     // Block: removing agencies that have active reservations
     validateAgencyRemoval(ctx, agencyIds);
 
+    const normalizedDeparture = toUTC(departureTime);
+    const isChangingDeparture =
+      new Date(normalizedDeparture).getTime() !==
+      new Date(ctx.trip.departure_time).getTime();
+
+    if (isChangingDeparture) {
+      assertDepartureTimeInFuture(departureTime);
+    }
+
     // ── Phase 2: Apply changes (sequential for consistency) ─────────
 
     // 2a. Update trip fields
     const updateFields: Record<string, any> = {
       route_id: routeId,
-      departure_time: toUTC(departureTime),
+      departure_time: normalizedDeparture,
       capacity,
       vehicle_type: vehicleType,
     };
@@ -1101,64 +1122,85 @@ export class SuperadminService {
     return trip;
   }
 
-  async deleteTrip(id: string) {
-    // Get agencies before deletion for notification
-    const { data: tripAgenciesForDelete } = await supabaseAdmin
+  async archiveTrip(id: string): Promise<{ id: string; status: "archived" }> {
+    const { data: trip, error: fetchError } = await supabaseAdmin
+      .from("trips")
+      .select("id, status, route_id")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !trip) {
+      throw new NotFoundError("Trip not found");
+    }
+
+    if (trip.status === "active") {
+      throw new ValidationError(
+        "No se puede archivar un viaje activo. Cancela o completa el viaje primero."
+      );
+    }
+
+    if (trip.status === "archived") {
+      throw new ValidationError("El viaje ya está archivado.");
+    }
+
+    if (trip.status !== "cancelled" && trip.status !== "completed") {
+      throw new ValidationError(
+        "Solo se pueden archivar viajes cancelados o completados."
+      );
+    }
+
+    const { data: tripAgencies } = await supabaseAdmin
       .from("trip_agencies")
       .select("agency_id")
       .eq("trip_id", id);
 
-    const deleteAgencyIds = (tripAgenciesForDelete || []).map(
+    const archiveAgencyIds = (tripAgencies || []).map(
       (ta: any) => ta.agency_id
     );
 
-    // Get route info before deletion
-    const { data: tripForDelete } = await supabaseAdmin
-      .from("trips")
-      .select("route_id")
-      .eq("id", id)
-      .single();
-
     let routeLabel = "viaje";
-    if (tripForDelete?.route_id) {
-      const { data: routeForDelete } = await supabaseAdmin
+    if (trip.route_id) {
+      const { data: route } = await supabaseAdmin
         .from("routes")
         .select("origin, destination")
-        .eq("id", tripForDelete.route_id)
+        .eq("id", trip.route_id)
         .single();
-      if (routeForDelete) {
-        routeLabel = `${routeForDelete.origin} → ${routeForDelete.destination}`;
+      if (route) {
+        routeLabel = `${route.origin} → ${route.destination}`;
       }
     }
 
-    await supabaseAdmin.from("trip_agencies").delete().eq("trip_id", id);
-    await supabaseAdmin.from("seats").delete().eq("trip_id", id);
-    const { error } = await supabaseAdmin.from("trips").delete().eq("id", id);
-    if (error) throw new ValidationError(error.message);
+    const { error: updateError } = await supabaseAdmin
+      .from("trips")
+      .update({ status: "archived" })
+      .eq("id", id);
 
-    // Notification: trip deleted → agencies only (superadmin is the actor)
-    if (deleteAgencyIds.length > 0) {
+    if (updateError) throw new ValidationError(updateError.message);
+
+    if (archiveAgencyIds.length > 0) {
       notificationService
         .createForAgenciesAndAdmin({
-          type: "trip_deleted",
-          title: "Viaje eliminado",
-          body: `El viaje ${routeLabel} fue eliminado del sistema`,
+          type: "trip_archived",
+          title: "Viaje archivado",
+          body: `El viaje ${routeLabel} fue archivado y ya no aparece en la vista principal`,
           entityType: "trip",
           entityId: id,
-          agencyIds: deleteAgencyIds,
+          agencyIds: archiveAgencyIds,
           actor: "superadmin",
         })
         .catch((err) => {
           console.error(
             JSON.stringify({
               event: "NOTIFICATION_FAILED",
-              type: "trip_deleted",
+              type: "trip_archived",
               tripId: id,
               error: err.message,
             })
           );
         });
     }
+
+    return { id, status: "archived" };
   }
 
   async updateTripStatus(id: string, status: "completed" | "cancelled") {
@@ -1169,6 +1211,10 @@ export class SuperadminService {
       .single();
 
     if (fetchError || !trip) throw new NotFoundError("Trip not found");
+    if (trip.status === "archived") {
+      throw new ValidationError("No se puede modificar un viaje archivado.");
+    }
+
     if (trip.status !== "active")
       throw new ValidationError("Trip is not active");
 

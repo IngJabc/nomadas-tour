@@ -6,6 +6,7 @@ const STATUS_MAP: Record<string, { label: string; variant: 'active' | 'completed
   active: { label: 'Activo', variant: 'active' },
   completed: { label: 'Completado', variant: 'completed' },
   cancelled: { label: 'Cancelado', variant: 'cancelled' },
+  archived: { label: 'Archivado', variant: 'completed' },
   postponed: { label: 'Pospuesto', variant: 'warning' },
 };
 

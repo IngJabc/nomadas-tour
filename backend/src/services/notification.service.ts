@@ -8,6 +8,7 @@ export type NotificationType =
   | 'trip_auto_completed'
   | 'trip_postponed'
   | 'trip_deleted'
+  | 'trip_archived'
   | 'reservation_created'
   | 'reservation_cancelled'
   | 'passenger_cancelled';

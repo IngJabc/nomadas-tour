@@ -72,6 +72,18 @@ vi.mock('./email.service.js', () => ({
   },
 }));
 
+vi.mock('./notification.service.js', () => ({
+  notificationService: {
+    createForAgenciesAndAdmin: vi.fn(() => Promise.resolve(undefined)),
+  },
+}));
+
+vi.mock('./notification-delivery.policy.js', () => ({
+  notificationDeliveryPolicy: {
+    shouldDeliver: vi.fn(() => Promise.resolve(false)),
+  },
+}));
+
 vi.mock('../utils/subdomain.js', () => ({
   generateUniqueSubdomain: vi.fn(),
 }));
@@ -204,7 +216,127 @@ function setupHappyPath(overrides: {
   tripAgenciesChain.insert.mockResolvedValue({ error: null });
 }
 
+function setupCreateTripHappyPath() {
+  const routesChain = createChainable({
+    id: 'route-1',
+    status: 'active',
+    origin: 'Caracas',
+    destination: 'Maracaibo',
+  });
+  tableChains['routes'] = routesChain;
+
+  const tripsChain = createChainable();
+  tripsChain.insert.mockImplementation(() => tripsChain);
+  tripsChain.select.mockImplementation(() => tripsChain);
+  tripsChain.single.mockResolvedValue({
+    data: {
+      id: 'trip-new',
+      route_id: 'route-1',
+      departure_time: FUTURE_DATE,
+      capacity: 31,
+      vehicle_type: 'bus',
+    },
+    error: null,
+  });
+  tableChains['trips'] = tripsChain;
+
+  const seatsChain = createChainable();
+  seatsChain.insert.mockResolvedValue({ error: null });
+  tableChains['seats'] = seatsChain;
+
+  const tripAgenciesChain = createChainable();
+  tripAgenciesChain.insert.mockResolvedValue({ error: null });
+  tableChains['trip_agencies'] = tripAgenciesChain;
+
+  tableChains['agencies'] = createChainable([]);
+}
+
+const DEPARTURE_FUTURE_MESSAGE = 'posterior a la fecha y hora actual';
+
 // ── Tests ───────────────────────────────────────────────────────────
+
+describe('createTrip departure validation', () => {
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('allows creating a trip with a future departure time', async () => {
+    setupCreateTripHappyPath();
+
+    const result = await superadminService.createTrip(
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      'user-1',
+    );
+
+    expect(result.id).toBe('trip-new');
+  });
+
+  it('rejects creating a trip with a past departure time', async () => {
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        PAST_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+      ),
+    ).rejects.toThrow(DEPARTURE_FUTURE_MESSAGE);
+  });
+
+  it('rejects creating a trip with departure equal to now', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-01T12:00:00.000Z'));
+
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        new Date().toISOString(),
+        'bus',
+        ['agency-1'],
+        'user-1',
+      ),
+    ).rejects.toThrow(DEPARTURE_FUTURE_MESSAGE);
+
+    vi.useRealTimers();
+  });
+});
+
+describe('updateTrip departure validation', () => {
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('rejects changing departure to a past time', async () => {
+    setupHappyPath();
+
+    await expect(
+      superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        PAST_DATE,
+        'bus',
+        ['agency-1'],
+      ),
+    ).rejects.toThrow(DEPARTURE_FUTURE_MESSAGE);
+  });
+
+  it('allows editing a trip while keeping the same future departure time', async () => {
+    setupHappyPath();
+
+    const result = await superadminService.updateTrip(
+      'trip-1',
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+    );
+
+    expect(result).toBeDefined();
+  });
+});
 
 describe('updateTrip', () => {
   beforeEach(() => {
@@ -449,5 +581,54 @@ describe('updateTrip', () => {
         superadminService.updateTrip('trip-1', 'route-1', FUTURE_DATE, 'kia', ['agency-1']),
       ).rejects.toThrow('reducir capacidad');
     });
+  });
+});
+
+describe('superadminService.archiveTrip', () => {
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('archives a cancelled trip', async () => {
+    const tripsChain = createChainable({
+      id: 'trip-1',
+      status: 'cancelled',
+      route_id: 'route-1',
+    });
+    tableChains['trips'] = tripsChain;
+
+    const tripAgenciesChain = createChainable([{ agency_id: 'agency-1' }]);
+    tableChains['trip_agencies'] = tripAgenciesChain;
+
+    const routesChain = createChainable({
+      origin: 'Caracas',
+      destination: 'Mérida',
+    });
+    tableChains['routes'] = routesChain;
+
+    const result = await superadminService.archiveTrip('trip-1');
+
+    expect(result).toEqual({ id: 'trip-1', status: 'archived' });
+    expect(tripsChain.update).toHaveBeenCalledWith({ status: 'archived' });
+  });
+
+  it('rejects archiving an active trip', async () => {
+    tableChains['trips'] = createChainable(
+      { id: 'trip-1', status: 'active', route_id: 'route-1' },
+    );
+
+    await expect(superadminService.archiveTrip('trip-1')).rejects.toThrow(
+      'No se puede archivar un viaje activo',
+    );
+  });
+
+  it('rejects archiving an already archived trip', async () => {
+    tableChains['trips'] = createChainable(
+      { id: 'trip-1', status: 'archived', route_id: 'route-1' },
+    );
+
+    await expect(superadminService.archiveTrip('trip-1')).rejects.toThrow(
+      'El viaje ya está archivado',
+    );
   });
 });

@@ -5,6 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, ArrowRight, AlertCircle } from 'lucide-react';
 import { useTripBuilderReducer, type TripBuilderState } from '@/hooks/useTripBuilderReducer';
 import { adminApi } from '@/lib/api';
+import {
+  DEPARTURE_MUST_BE_FUTURE_MESSAGE,
+  isDepartureTimeInFuture,
+} from '@/lib/timezone';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { CardSkeleton } from '@/components/ui/Skeleton';
@@ -75,10 +79,16 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
       setNavError('Completa todos los campos requeridos antes de continuar.');
       return;
     }
+
+    if (state.currentStep === 1 && !isDepartureTimeInFuture(state.departure_time)) {
+      setNavError(DEPARTURE_MUST_BE_FUTURE_MESSAGE);
+      return;
+    }
+
     setNavError(null);
     setSubmitError(null);
     dispatch({ type: 'NEXT_STEP' });
-  }, [canProceed, dispatch]);
+  }, [canProceed, dispatch, state.currentStep, state.departure_time]);
 
   const handlePrevious = useCallback(() => {
     setNavError(null);
