@@ -4,19 +4,6 @@ import { z } from 'zod';
 import { ValidationError } from '../errors/index.js';
 import { supabaseAdmin } from '../config/database.js';
 
-const createReservationSchema = z.object({
-  trip_id: z.string().uuid(),
-  customer_name: z.string().min(2),
-  passenger_cedula: z.string().min(5),
-  phone: z.string().optional(),
-  seat_codes: z.array(z.string()).min(1),
-});
-
-const cancelReservationSchema = z.object({
-  trip_id: z.string().uuid(),
-  transaction_id: z.string().min(1),
-});
-
 const boardPassengerSchema = z.object({
   trip_id: z.string().uuid(),
   qr_code: z.string().min(1),
@@ -38,65 +25,6 @@ const agencyReservationSchema = z.object({
 });
 
 export class ReservationController {
-  async listTrips(req: Request, res: Response, next: NextFunction) {
-    try {
-      const trips = await reservationService.listActiveTrips();
-      res.json(trips);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getTripWithSeats(req: Request, res: Response, next: NextFunction) {
-    try {
-      const trip = await reservationService.getTripWithSeats(req.params.tripId as string);
-      res.json(trip);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async getAvailableAgencies(req: Request, res: Response, next: NextFunction) {
-    try {
-      const agencies = await reservationService.getAvailableAgencies(req.params.tripId as string);
-      res.json(agencies);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  async createReservation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = createReservationSchema.parse(req.body);
-      const result = await reservationService.createReservation(
-        data.trip_id,
-        data.customer_name,
-        data.passenger_cedula,
-        data.phone || null,
-        data.seat_codes,
-        req.ctx?.userId || null,
-      );
-      res.status(201).json(result);
-    } catch (error) {
-      next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
-    }
-  }
-
-  async cancelReservation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = cancelReservationSchema.parse(req.body);
-      const result = await reservationService.cancelReservation(
-        data.trip_id,
-        data.transaction_id,
-        req.ctx?.agencyId || null,
-        req.ctx?.role === 'superadmin',
-      );
-      res.json(result);
-    } catch (error) {
-      next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
-    }
-  }
-
   async boardPassenger(req: Request, res: Response, next: NextFunction) {
     try {
       const data = boardPassengerSchema.parse(req.body);
@@ -233,51 +161,6 @@ export class ReservationController {
       }
       const id = req.params.id as string;
       const result = await reservationService.cancelAgencyReservation(id, agencyId);
-      res.json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // Agency: own reservations (legacy)
-  // Customer: cancel own reservation
-  async cancelUserReservation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = cancelReservationSchema.parse(req.body);
-      const result = await reservationService.cancelUserReservation(
-        data.trip_id,
-        data.transaction_id,
-        req.ctx!.userId,
-      );
-      res.json(result);
-    } catch (error) {
-      next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
-    }
-  }
-
-  // Customer: own reservations
-  async getUserReservations(req: Request, res: Response, next: NextFunction) {
-    try {
-      const reservations = await reservationService.getUserReservations(req.ctx!.userId);
-      res.json(reservations);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  // Superadmin: all reservations (paginated)
-  async getAllReservations(req: Request, res: Response, next: NextFunction) {
-    try {
-      const page = Math.max(1, parseInt(req.query.page as string) || 1);
-      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
-      const result = await reservationService.getAllReservations({
-        page,
-        limit,
-        status: req.query.status as string | undefined,
-        search: req.query.search as string | undefined,
-        agency_id: req.query.agency_id as string | undefined,
-        trip_id: req.query.trip_id as string | undefined,
-      });
       res.json(result);
     } catch (error) {
       next(error);

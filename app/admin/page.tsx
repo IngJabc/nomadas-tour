@@ -22,6 +22,7 @@ import { ActivityWidget } from "@/components/dashboard/ActivityWidget";
 import { Timeline } from "@/components/dashboard/Timeline";
 import { ReservationChart } from "@/components/dashboard/charts/ReservationChart";
 import { OccupancyChart } from "@/components/dashboard/charts/OccupancyChart";
+import { AdminDashboardLoadingSkeleton } from "@/components/admin/skeleton/AdminDashboardLoadingSkeleton";
 
 interface DashboardData {
   total_agencies: number;
@@ -141,6 +142,19 @@ export default function AdminDashboardPage() {
       cleanupBoarding();
     };
   }, [initialized, tripIdsKey]);
+
+  if (loading && !initialized) {
+    return (
+      <>
+        <Topbar
+          greeting={`${getGreeting()}, Administrador`}
+          subtext="Panel de Administración — NomadApp"
+          role="superadmin"
+        />
+        <AdminDashboardLoadingSkeleton />
+      </>
+    );
+  }
 
   return (
     <>

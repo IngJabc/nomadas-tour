@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import { BuilderLayout } from '@/components/admin/trip-builder/BuilderLayout';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { AdminSkeletonItem, AdminSkeletonShell } from '@/components/admin/skeleton/AdminSkeletonMotion';
+import { AdminTripCardSkeleton } from '@/components/admin/skeleton/AdminTripCardSkeleton';
 import { adminApi } from '@/lib/api';
 import { fromUTCToLocal } from '@/lib/timezone';
 import type { TripBuilderState } from '@/hooks/useTripBuilderReducer';
-import { staggerContainer, staggerItem } from '@/lib/motion/variants';
 
 export default function EditTripPage() {
   const params = useParams();
@@ -44,15 +43,11 @@ export default function EditTripPage() {
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          <motion.div variants={staggerItem}>
-            <CardSkeleton />
-          </motion.div>
-        </motion.div>
+        <AdminSkeletonShell>
+          <AdminSkeletonItem>
+            <AdminTripCardSkeleton />
+          </AdminSkeletonItem>
+        </AdminSkeletonShell>
       </div>
     );
   }

@@ -1,10 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const protectedPaths = ['/bookings', '/admin', '/agency'];
-const adminPaths = ['/admin'];
-const agencyPaths = ['/agency'];
-const publicPaths = ['/login', '/register', '/', '/trips'];
+const protectedPaths = ['/admin', '/agency'];
+const publicPaths = ['/login', '/register', '/accept-invitation', '/forgot-password', '/reset-password', '/'];
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });

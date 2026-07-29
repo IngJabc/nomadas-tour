@@ -8,7 +8,9 @@ import toast from 'react-hot-toast';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { AdminTripsLoadingSkeleton } from '@/components/admin/skeleton/AdminTripsLoadingSkeleton';
+import { AdminSkeletonItem, AdminSkeletonShell } from '@/components/admin/skeleton/AdminSkeletonMotion';
+import { AdminTripCardSkeleton } from '@/components/admin/skeleton/AdminTripCardSkeleton';
 import { Button } from '@/components/ui/Button';
 import { TripCard } from '@/components/admin/trips/TripCard';
 import { TripBuilderModal } from '@/components/admin/trip-builder/TripBuilderModal';
@@ -340,26 +342,7 @@ export default function AdminTripsPage() {
   const modalTrip = activeModal ? trips.find((t: any) => t.id === activeModal.tripId) : null;
 
   if (initialLoad) {
-    return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          <motion.div variants={staggerItem}>
-            <div className="h-8 w-32 bg-slate-200 rounded animate-pulse mb-6" />
-          </motion.div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <motion.div key={i} variants={staggerItem}>
-                <CardSkeleton />
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      </main>
-    );
+    return <AdminTripsLoadingSkeleton />;
   }
 
   return (
@@ -542,18 +525,15 @@ export default function AdminTripsPage() {
       )}
 
       {filterLoading ? (
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8"
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <motion.div key={i} variants={staggerItem}>
-              <CardSkeleton />
-            </motion.div>
-          ))}
-        </motion.div>
+        <AdminSkeletonShell>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <AdminSkeletonItem key={i}>
+                <AdminTripCardSkeleton />
+              </AdminSkeletonItem>
+            ))}
+          </div>
+        </AdminSkeletonShell>
       ) : trips.length === 0 ? (
         <EmptyState
           icon={<Calendar className="w-8 h-8" />}
