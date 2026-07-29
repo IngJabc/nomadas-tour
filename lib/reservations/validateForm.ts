@@ -10,6 +10,8 @@ export interface PassengerValidation {
 }
 
 const PHONE_STRIP_RE = /[\s\-]/g;
+const DOCUMENT_RE = /^\d{7,8}$/;
+const DOCUMENT_MSG = 'Debe tener 7 u 8 dígitos';
 
 function isValidPhone(phone: string): boolean {
   const stripped = phone.replace(PHONE_STRIP_RE, '');
@@ -35,8 +37,8 @@ export function validatePassengerForm(
 
   if (!bookerDocument.trim()) {
     bookerErrors.document = 'El documento es requerido';
-  } else if (!/^\d{8}$/.test(bookerDocument.trim())) {
-    bookerErrors.document = 'Debe ser exactamente 8 dígitos';
+  } else if (!DOCUMENT_RE.test(bookerDocument.trim())) {
+    bookerErrors.document = DOCUMENT_MSG;
   }
 
   const passengerErrors: PassengerValidation[] = passengers.map((p) => {
@@ -50,8 +52,8 @@ export function validatePassengerForm(
 
     if (!p.document.trim()) {
       errors.push({ field: 'document', message: 'Documento requerido' });
-    } else if (!/^\d{8}$/.test(p.document.trim())) {
-      errors.push({ field: 'document', message: 'Debe ser exactamente 8 dígitos' });
+    } else if (!DOCUMENT_RE.test(p.document.trim())) {
+      errors.push({ field: 'document', message: DOCUMENT_MSG });
     }
 
     if (p.phone && p.phone.trim() && !isValidPhone(p.phone.trim())) {

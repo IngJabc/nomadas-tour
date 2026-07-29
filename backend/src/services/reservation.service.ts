@@ -1507,7 +1507,7 @@ export class ReservationService {
         `id, trip_id, agency_id, booker_name, booker_document, qr_code, status, created_at,
          agencies(id, name),
          trips(id, departure_time, status, capacity, vehicle_type, route_id, routes(id, origin, destination)),
-         reservation_passengers(id, name, document, phone, boarded, boarded_at, seat_id, seats(seat_code))`
+         reservation_passengers(id, name, document, phone, boarded, boarded_at, status, seat_id, seats(seat_code))`
       )
       .order('created_at', { ascending: false });
 
@@ -1691,10 +1691,9 @@ export class ReservationService {
       }
       const resGroup = tripGroup.reservations.get(r.id)!;
 
-      // Add passengers
+      // Add passengers — show real rows for history; legacy fallback only for non-cancelled without rows
       if (r.reservation_passengers && r.reservation_passengers.length > 0) {
         for (const p of r.reservation_passengers) {
-          if (p.status === 'cancelled') continue;
           resGroup.passengers.push({
             rowId: p.id,
             passengerId: p.id,
@@ -1702,10 +1701,11 @@ export class ReservationService {
             document: p.document,
             seatCode: p.seats?.seat_code || null,
             boarded: p.boarded,
+            status: p.status ?? 'active',
           });
         }
-      } else {
-        // Legacy: reservation without passengers — use booker info
+      } else if (r.status !== 'cancelled') {
+        // Legacy: reservation without passenger rows — use booker info
         resGroup.passengers.push({
           rowId: `legacy-${r.id}`,
           passengerId: null,
@@ -1713,6 +1713,7 @@ export class ReservationService {
           document: r.booker_document,
           seatCode: null,
           boarded: false,
+          status: 'active',
         });
       }
     }
@@ -1729,13 +1730,17 @@ export class ReservationService {
           );
         }
 
-        // Compute trip stats
+        // Compute trip stats — occupancy counts only active reservations/passengers
         const allPassengers: any[] = [];
         let cancelled = 0;
         let boarded = 0;
         for (const [, res] of tg.reservations) {
-          if (res.status === 'cancelled') cancelled += res.passengers.length;
+          if (res.status === 'cancelled') {
+            cancelled += 1;
+            continue;
+          }
           for (const p of res.passengers) {
+            if (p.status === 'cancelled') continue;
             if (p.boarded) boarded++;
             allPassengers.push(p);
           }

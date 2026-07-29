@@ -33,6 +33,7 @@ type Passenger = {
   document: string;
   seatCode: string | null;
   boarded: boolean;
+  status?: string;
 };
 
 type ReservationGroup = {
@@ -267,11 +268,7 @@ export default function AdminBookingsPage() {
     const handleEvent = () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = setTimeout(async () => {
-        const raw = buildParamsRef.current;
-        const params: Record<string, string> = {};
-        for (const [k, v] of Object.entries(raw)) {
-          if (v) params[k] = v;
-        }
+        const params = buildParamsRef.current();
         try {
           const data = await adminApi.getPassengerTree(params);
           setTree(data || []);
@@ -714,8 +711,8 @@ export default function AdminBookingsPage() {
                                       </span>
                                     </Tooltip>
                                     {trip.stats.cancelled > 0 && (
-                                      <Tooltip content={`${trip.stats.cancelled} pasajeros en reservas canceladas`}>
-                                        <span className="inline-flex items-center gap-1" role="img" aria-label={`${trip.stats.cancelled} pasajeros en reservas canceladas`} tabIndex={0}>
+                                      <Tooltip content={`${trip.stats.cancelled} reservas canceladas`}>
+                                        <span className="inline-flex items-center gap-1" role="img" aria-label={`${trip.stats.cancelled} reservas canceladas`} tabIndex={0}>
                                           <AlertTriangle className="w-3 h-3 text-[#92400e]" />
                                           {trip.stats.cancelled}
                                         </span>
@@ -740,14 +737,23 @@ export default function AdminBookingsPage() {
                                   >
                                     {trip.reservations.map((res) => {
                                       const rs2 = RESERVATION_STATUS[res.status] ?? RESERVATION_STATUS.confirmed;
+                                      const goToReservation = () => router.push(`/admin/bookings/${res.reservationId}`);
                                       return (
-                                        <div key={res.reservationId} className="rounded-xl border border-[rgba(0,0,0,0.06)] bg-white overflow-hidden">
+                                        <div
+                                          key={res.reservationId}
+                                          role="button"
+                                          tabIndex={0}
+                                          onClick={goToReservation}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                              e.preventDefault();
+                                              goToReservation();
+                                            }
+                                          }}
+                                          className="rounded-xl border border-[rgba(0,0,0,0.06)] bg-white overflow-hidden cursor-pointer transition-all duration-150 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-[var(--color-brand-cyan)] focus-visible:outline-offset-2"
+                                        >
                                           {/* Reservation header */}
-                                          <button
-                                            type="button"
-                                            onClick={() => router.push(`/admin/bookings/${res.reservationId}`)}
-                                            className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2.5 text-left hover:bg-[rgba(0,0,0,0.02)] transition-colors duration-150"
-                                          >
+                                          <div className="w-full flex items-center gap-2 sm:gap-3 px-3 py-2.5 text-left hover:bg-[rgba(0,0,0,0.02)] transition-colors duration-150">
                                             <div className="flex-1 min-w-0">
                                               <div className="flex items-center gap-2">
                                                 <span className="font-[family-name:var(--font-body)] font-semibold text-[12px] text-[var(--color-brand-navy)] shrink-0">
@@ -769,7 +775,7 @@ export default function AdminBookingsPage() {
                                               </span>
                                               <Badge variant={rs2.variant} size="xs">{rs2.label}</Badge>
                                             </div>
-                                          </button>
+                                          </div>
 
                                           {/* Passenger grid for this reservation */}
                                           <motion.div
@@ -779,12 +785,10 @@ export default function AdminBookingsPage() {
                                             animate="visible"
                                           >
                                             {res.passengers.map((p) => (
-                                              <motion.button
+                                              <motion.div
                                                 key={p.rowId}
-                                                type="button"
                                                 variants={passengerCard}
-                                                onClick={() => router.push(`/admin/bookings/${res.reservationId}`)}
-                                                className="flex items-center gap-3 p-3 bg-[var(--color-brand-surface)] rounded-xl border border-[rgba(0,0,0,0.06)] text-left cursor-pointer transition-all duration-150 hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-[var(--color-brand-cyan)] focus-visible:outline-offset-2"
+                                                className="flex items-center gap-3 p-3 bg-[var(--color-brand-surface)] rounded-xl border border-[rgba(0,0,0,0.06)] text-left transition-all duration-150 hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5"
                                               >
                                                 <div className="w-9 h-9 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
                                                   <span className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-cyan)]">
@@ -802,13 +806,15 @@ export default function AdminBookingsPage() {
                                                 </div>
 
                                                 <div className="shrink-0">
-                                                  {p.boarded ? (
+                                                  {p.status === 'cancelled' ? (
+                                                    <Badge variant="cancelled" size="xs">Cancelado</Badge>
+                                                  ) : p.boarded ? (
                                                     <Badge variant="boarded" size="xs">Abordado</Badge>
                                                   ) : (
                                                     <Badge variant="inactive" size="xs">Pendiente</Badge>
                                                   )}
                                                 </div>
-                                              </motion.button>
+                                              </motion.div>
                                             ))}
                                           </motion.div>
                                         </div>

@@ -79,7 +79,11 @@ export function subscribeToReservations(
         });
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') {
+        console.warn('[Realtime] reservations channel status:', status);
+      }
+    });
 
   return () => {
     supabase.removeChannel(channel);
@@ -108,7 +112,11 @@ export function subscribeToReservationPassengers(
         });
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') {
+        console.warn('[Realtime] reservation_passengers channel status:', status);
+      }
+    });
 
   return () => {
     supabase.removeChannel(channel);
@@ -188,7 +196,11 @@ export function subscribeToBoardingLogs(
         }
       },
     )
-    .subscribe();
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') {
+        console.warn('[Realtime] boarding_logs channel status:', status);
+      }
+    });
 
   return () => {
     supabase.removeChannel(channel);

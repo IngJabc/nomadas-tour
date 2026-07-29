@@ -12,14 +12,14 @@ const boardPassengerSchema = z.object({
 const agencyReservationSchema = z.object({
   trip_id: z.string().uuid(),
   booker_name: z.string().min(2),
-  booker_document: z.string().regex(/^\d{8}$/, 'Documento debe ser exactamente 8 dígitos'),
+  booker_document: z.string().regex(/^\d{7,8}$/, 'Documento debe tener 7 u 8 dígitos'),
   booker_phone: z.string().optional(),
   contact_email: z.string().email('Correo electrónico inválido').optional().or(z.literal('')).nullable(),
   send_ticket_email: z.boolean().optional().default(false),
   passengers: z.array(z.object({
     seat_id: z.string().uuid(),
     name: z.string().min(2),
-    document: z.string().regex(/^\d{8}$/, 'Documento debe ser exactamente 8 dígitos'),
+    document: z.string().regex(/^\d{7,8}$/, 'Documento debe tener 7 u 8 dígitos'),
     phone: z.string().optional(),
   })).min(1),
 });
