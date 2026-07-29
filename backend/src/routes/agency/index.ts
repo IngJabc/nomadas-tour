@@ -18,7 +18,6 @@ router.get('/reservations', (req, res, next) => reservationController.getAgencyR
 router.get('/reservations/:id', (req, res, next) => reservationController.getAgencyReservationById(req, res, next));
 router.post('/reservations', (req, res, next) => reservationController.createAgencyReservation(req, res, next));
 router.post('/reservations/board', (req, res, next) => reservationController.boardPassenger(req, res, next));
-router.post('/reservations/cancel', (req, res, next) => reservationController.cancelReservation(req, res, next));
 router.patch('/reservations/:id/cancel', (req, res, next) => reservationController.cancelAgencyReservation(req, res, next));
 router.patch('/reservations/:id/passengers/:passengerId/cancel', (req, res, next) => reservationController.cancelPassenger(req, res, next));
 

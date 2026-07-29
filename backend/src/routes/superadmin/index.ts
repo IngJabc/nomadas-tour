@@ -66,9 +66,6 @@ router.patch("/trips/:id/status", (req, res, next) =>
 );
 
 // Reservations
-router.get("/reservations", (req, res, next) =>
-  reservationController.getAllReservations(req, res, next)
-);
 router.get("/reservations/tree", (req, res, next) =>
   reservationController.getPassengerTree(req, res, next)
 );

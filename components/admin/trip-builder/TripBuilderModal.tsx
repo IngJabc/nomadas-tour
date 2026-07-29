@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Modal, ModalHeader, ModalDivider, ModalBody } from '@/components/ui/Modal';
 import { BuilderLayout } from '@/components/admin/trip-builder/BuilderLayout';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { AdminTripCardSkeleton } from '@/components/admin/skeleton/AdminTripCardSkeleton';
 import { adminApi } from '@/lib/api';
 import { fromUTCToLocal } from '@/lib/timezone';
 
@@ -68,7 +68,7 @@ export function TripBuilderModal({ open, mode, tripId, onClose, onSuccess }: Tri
       <ModalBody>
         {loading ? (
           <div className="py-8">
-            <CardSkeleton />
+            <AdminTripCardSkeleton />
           </div>
         ) : (
           <BuilderLayout

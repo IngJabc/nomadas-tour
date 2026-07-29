@@ -7,7 +7,6 @@ import { errorHandler } from './middlewares/error-handler.js';
 import authRoutes from './routes/auth/index.js';
 import superadminRoutes from './routes/superadmin/index.js';
 import agencyRoutes from './routes/agency/index.js';
-import customerRoutes from './routes/customer/index.js';
 
 const app = express();
 
@@ -30,7 +29,6 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', superadminRoutes);       // superadmin only
 app.use('/api/agency', agencyRoutes);           // agency role
-app.use('/api', customerRoutes);                // public / optional auth
 
 // Error handler (must be last)
 app.use(errorHandler);

@@ -11,7 +11,7 @@ import {
 } from '@/lib/timezone';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { CardSkeleton } from '@/components/ui/Skeleton';
+import { AdminTripCardSkeleton } from '@/components/admin/skeleton/AdminTripCardSkeleton';
 import { StepIndicator } from '@/components/admin/trip-builder/StepIndicator';
 import { RouteStep } from '@/components/admin/trip-builder/RouteStep';
 import { ScheduleStep } from '@/components/admin/trip-builder/ScheduleStep';
@@ -128,7 +128,7 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
   if (loading) {
     return (
       <div className="p-6">
-        <CardSkeleton />
+        <AdminTripCardSkeleton />
       </div>
     );
   }

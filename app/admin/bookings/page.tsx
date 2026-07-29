@@ -402,7 +402,7 @@ export default function AdminBookingsPage() {
         >
           {[1, 2, 3].map((i) => (
             <motion.div key={i} variants={staggerItem}>
-              <Card className="animate-pulse">
+              <Card>
                 <div className="flex items-center gap-3">
                   <Skeleton className="w-10 h-10 rounded-xl shrink-0" />
                   <div className="flex-1 space-y-2">

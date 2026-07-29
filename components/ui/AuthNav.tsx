@@ -49,20 +49,12 @@ export function AuthNav() {
           </button>
         </>
       ) : (
-        <>
-          <Link
-            href="/login"
-            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white/70 hover:text-white transition-colors whitespace-nowrap"
-          >
-            Iniciar sesión
-          </Link>
-          <Link
-            href="/register"
-            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-blue transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
-          >
-            Registrarse
-          </Link>
-        </>
+        <Link
+          href="/login"
+          className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white bg-brand-cyan rounded-xl hover:bg-brand-blue transition-colors shadow-md shadow-brand-cyan/20 whitespace-nowrap"
+        >
+          Iniciar sesión
+        </Link>
       )}
     </div>
   );

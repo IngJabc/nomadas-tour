@@ -35,19 +35,3 @@ export async function auth(req: Request, _res: Response, next: NextFunction) {
   req.ctx = extractContext(user);
   next();
 }
-
-export async function optionalAuth(req: Request, _res: Response, next: NextFunction) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    next();
-    return;
-  }
-
-  const token = header.slice(7);
-  const { data: { user } } = await supabase.auth.getUser(token);
-
-  if (user) {
-    req.ctx = extractContext(user);
-  }
-  next();
-}

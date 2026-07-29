@@ -15,7 +15,8 @@ import { motion } from "framer-motion";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { CardSkeleton } from "@/components/ui/Skeleton";
+import { AdminSkeletonItem, AdminSkeletonShell } from "@/components/admin/skeleton/AdminSkeletonMotion";
+import { AdminTripCardSkeleton } from "@/components/admin/skeleton/AdminTripCardSkeleton";
 import { SectionTitle } from "@/components/ui/SectionTitle";
 import { BusLayout } from "@/components/bus/BusLayout";
 import { useTripRealtime } from "@/hooks/useTripRealtime";
@@ -78,15 +79,11 @@ export default function AdminTripDetailPage() {
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-        >
-          <motion.div variants={staggerItem}>
-            <CardSkeleton />
-          </motion.div>
-        </motion.div>
+        <AdminSkeletonShell>
+          <AdminSkeletonItem>
+            <AdminTripCardSkeleton />
+          </AdminSkeletonItem>
+        </AdminSkeletonShell>
       </main>
     );
   }

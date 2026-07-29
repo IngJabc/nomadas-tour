@@ -89,18 +89,6 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
-  /** @deprecated No hay endpoint backend para esta llamada.保留 para futura implementación de Customer. */
-  register: (email: string, password: string, full_name: string) =>
-    request<{ token: string; user: any }>('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ email, password, full_name }),
-    }),
-  /** @deprecated No hay endpoint backend para esta llamada.保留 para futura implementación de Customer. */
-  registerAgency: (data: { email: string; password: string; agency_name: string }) =>
-    request<{ token: string; user: any; agency: any }>('/auth/register-agency', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
   validateInvitation: (token: string) =>
     request<{ agency_name: string; email: string }>('/auth/validate-invitation', {
       method: 'POST',
@@ -120,29 +108,6 @@ export const authApi = {
     request<{ message: string }>('/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ ...identifier, password, confirm_password: password }),
-    }),
-};
-
-// Customer (public)
-export const customerApi = {
-  getTripWithSeats: (tripId: string) =>
-    request<any>(`/trips/${tripId}`),
-  createReservation: (data: {
-    trip_id: string;
-    customer_name: string;
-    passenger_cedula: string;
-    phone?: string;
-    seat_codes: string[];
-  }) =>
-    request<{
-      transaction_id: string;
-      qr_code: string;
-      qr_data_url: string;
-      reservations: any[];
-      total: number;
-    }>('/reservations', {
-      method: 'POST',
-      body: JSON.stringify(data),
     }),
 };
 
@@ -186,8 +151,6 @@ export const adminApi = {
     }),
   updateTripStatus: (id: string, status: string) =>
     request<any>(`/admin/trips/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
-  listReservations: (params?: { page?: number; limit?: number; status?: string; search?: string; agency_id?: string; trip_id?: string }) =>
-    request<any>('/admin/reservations', { params: params as any }),
   getPassengerTree: (params?: { status?: string; route_id?: string; trip_id?: string; agency_id?: string; date?: string; search?: string }) =>
     request<any>('/admin/reservations/tree', { params: params as any }),
   getReservation: (id: string) => request<any>(`/admin/reservations/${id}`),
@@ -226,11 +189,6 @@ export const agencyApi = {
     request<any>('/agency/reservations/board', {
       method: 'POST',
       body: JSON.stringify({ trip_id, qr_code }),
-    }),
-  cancelReservation: (trip_id: string, transaction_id: string) =>
-    request<any>('/agency/reservations/cancel', {
-      method: 'POST',
-      body: JSON.stringify({ trip_id, transaction_id }),
     }),
   getReservation: (id: string) => request<any>(`/agency/reservations/${id}`),
   cancelAgencyReservation: (id: string) =>
