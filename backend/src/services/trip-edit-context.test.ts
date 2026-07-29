@@ -51,6 +51,11 @@ describe('validateTripEditable', () => {
     expect(() => validateTripEditable(ctx)).not.toThrow();
   });
 
+  it('rejects archived trips', () => {
+    const ctx = makeContext({ trip: { ...makeContext().trip, status: 'archived' } });
+    expect(() => validateTripEditable(ctx)).toThrow('archivado');
+  });
+
   it('rejects completed trips', () => {
     const ctx = makeContext({ trip: { ...makeContext().trip, status: 'completed' } });
     expect(() => validateTripEditable(ctx)).toThrow('completado');

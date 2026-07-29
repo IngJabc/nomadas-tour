@@ -112,6 +112,10 @@ export async function getTripOperationalContext(tripId: string): Promise<TripOpe
  * and trips with active boarding.
  */
 export function validateTripEditable(ctx: TripOperationalContext): void {
+  if (ctx.trip.status === 'archived') {
+    throw new ValidationError('No se puede modificar un viaje archivado');
+  }
+
   if (ctx.trip.status === 'completed') {
     throw new ValidationError('No se puede modificar un viaje completado');
   }

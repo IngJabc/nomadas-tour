@@ -15,15 +15,21 @@ import { TripBuilderModal } from '@/components/admin/trip-builder/TripBuilderMod
 import { ContextualModal } from '@/components/ui/ContextualModal';
 import { subscribeToTripSeats, subscribeToReservationPassengers } from '@/lib/realtime/subscriptions';
 import { adminApi } from '@/lib/api';
+import { getApiErrorMessage } from '@/lib/errors/api-error';
+import {
+  DEPARTURE_MUST_BE_FUTURE_MESSAGE,
+  isDepartureTimeInFuture,
+} from '@/lib/timezone';
 import type { Route } from '@/types';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 interface AgencyOption { id: string; name: string; }
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
-  { value: 'active', label: 'Activo' },
-  { value: 'completed', label: 'Completado' },
-  { value: 'cancelled', label: 'Cancelado' },
+  { value: 'active', label: 'Activos' },
+  { value: 'completed', label: 'Completados' },
+  { value: 'cancelled', label: 'Cancelados' },
+  { value: 'archived', label: 'Archivados' },
 ] as const;
 
 function canComplete(departureTime: string) {
@@ -45,7 +51,7 @@ function syncUrl(page: number, status: string, routeId: string, agencyId: string
   window.history.replaceState(null, '', `/admin/trips?${params.toString()}`);
 }
 
-type ModalAction = 'complete' | 'cancel' | 'delete' | 'postpone';
+type ModalAction = 'complete' | 'cancel' | 'archive' | 'postpone';
 
 export default function AdminTripsPage() {
   const searchParams = useSearchParams();
@@ -60,7 +66,7 @@ export default function AdminTripsPage() {
   const [editingTripId, setEditingTripId] = useState<string | undefined>(undefined);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || '');
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'active');
   const [routeFilter, setRouteFilter] = useState(searchParams.get('route_id') || '');
   const [searchFilter, setSearchFilter] = useState(searchParams.get('search') || '');
   const [searchInput, setSearchInput] = useState(searchParams.get('search') || '');
@@ -212,7 +218,7 @@ export default function AdminTripsPage() {
       return;
     }
 
-    if (action === 'complete' || action === 'cancel' || action === 'delete' || action === 'postpone') {
+    if (action === 'complete' || action === 'cancel' || action === 'archive' || action === 'postpone') {
       setPostponeDate('');
       setActiveModal({ tripId, action, anchorRect });
     }
@@ -224,6 +230,11 @@ export default function AdminTripsPage() {
 
     if (action === 'postpone' && !postponeDate) return;
 
+    if (action === 'postpone' && !isDepartureTimeInFuture(postponeDate)) {
+      toast.error(DEPARTURE_MUST_BE_FUTURE_MESSAGE);
+      return;
+    }
+
     setActionLoading(tripId);
     try {
       if (action === 'complete') {
@@ -234,10 +245,10 @@ export default function AdminTripsPage() {
         await adminApi.updateTripStatus(tripId, 'cancelled');
         setTrips((prev) => prev.map((t: any) => t.id === tripId ? { ...t, status: 'cancelled' } : t));
         toast.success('Viaje cancelado');
-      } else if (action === 'delete') {
-        await adminApi.deleteTrip(tripId);
+      } else if (action === 'archive') {
+        await adminApi.archiveTrip(tripId);
         setTrips((prev) => prev.filter((t: any) => t.id !== tripId));
-        toast.success('Viaje eliminado');
+        toast.success('Viaje archivado');
       } else if (action === 'postpone') {
         const trip = trips.find((t: any) => t.id === tripId);
         if (trip) {
@@ -253,12 +264,12 @@ export default function AdminTripsPage() {
           toast.success('Viaje pospuesto');
         }
       }
-    } catch {
-      toast.error('No se pudo completar la acción');
-    } finally {
-      setActionLoading(null);
       setActiveModal(null);
       setPostponeDate('');
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'No se pudo completar la acción'));
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -466,7 +477,7 @@ export default function AdminTripsPage() {
           </div>
 
           <AnimatePresence>
-            {(statusFilter || searchFilter || routeFilter || agencyFilter || dateFilter) && (
+            {(statusFilter !== 'active' || searchFilter || routeFilter || agencyFilter || dateFilter) && (
               <motion.button
                 initial={{ opacity: 0, width: 0, scaleX: 0 }}
                 animate={{ opacity: 1, width: 'auto', scaleX: 1 }}
@@ -476,11 +487,12 @@ export default function AdminTripsPage() {
                 onClick={() => {
                   setSearchInput('');
                   setSearchFilter('');
-                  setStatusFilter('');
+                  setStatusFilter('active');
                   setRouteFilter('');
                   setAgencyFilter('');
                   setDateFilter('');
-                  doFetch(1, '', '', '', '', '');
+                  doFetch(1, 'active', '', '', '', '');
+                  syncUrl(1, 'active', '', '', '', '');
                 }}
                 className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
               >
@@ -614,15 +626,16 @@ export default function AdminTripsPage() {
               </>
             )}
 
-            {activeModal.action === 'delete' && (
+            {activeModal.action === 'archive' && (
               <>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 bg-red-50">
                   <AlertTriangle className="w-5 h-5 text-red-400" strokeWidth={1.75} />
                 </div>
-                <p className="text-lg font-bold text-[var(--color-brand-navy)] text-center mb-2">Eliminar viaje</p>
+                <p className="text-lg font-bold text-[var(--color-brand-navy)] text-center mb-2">Archivar viaje</p>
                 <p className="text-sm text-[var(--color-brand-muted)] text-center mb-6">
-                  {modalTrip ? `¿Estás seguro de eliminar el viaje a ${modalTrip.route?.destination}?` : '¿Estás seguro de eliminar este viaje?'}
-                  Esta acción no se puede deshacer.
+                  {modalTrip
+                    ? `El viaje a ${modalTrip.route?.destination} será archivado y dejará de aparecer en la vista principal. El historial de reservas, pasajeros y registros se conservará.`
+                    : 'El viaje será archivado y dejará de aparecer en la vista principal. El historial de reservas, pasajeros y registros se conservará.'}
                 </p>
               </>
             )}
@@ -659,7 +672,7 @@ export default function AdminTripsPage() {
                 onClick={handleModalConfirm}
                 disabled={actionLoading === activeModal.tripId || (activeModal.action === 'postpone' && !postponeDate)}
                 className={`flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors shadow-md disabled:opacity-40 ${
-                  activeModal.action === 'cancel' || activeModal.action === 'delete'
+                  activeModal.action === 'cancel' || activeModal.action === 'archive'
                     ? 'bg-red-400 hover:bg-red-500'
                     : activeModal.action === 'postpone'
                     ? 'bg-[#f59e0b] hover:bg-[#d97706]'
@@ -672,8 +685,8 @@ export default function AdminTripsPage() {
                   ? 'Confirmar'
                   : activeModal.action === 'cancel'
                   ? 'Cancelar viaje'
-                  : activeModal.action === 'delete'
-                  ? 'Eliminar'
+                  : activeModal.action === 'archive'
+                  ? 'Archivar'
                   : 'Guardar'}
               </button>
             </div>

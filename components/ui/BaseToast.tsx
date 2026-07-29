@@ -1,4 +1,5 @@
 import { useState, useEffect, type CSSProperties, type ReactNode } from "react";
+import { X } from "lucide-react";
 
 // ── Variant ────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,7 @@ const VARIANT_STYLES: Record<ToastVariant, VariantStyle> = {
     theme: "bg-[var(--color-brand-navy)] text-[var(--color-brand-surface)]",
   },
   notification: {
-    layout: "flex items-start gap-3 p-3 cursor-pointer text-left",
+    layout: "flex items-start gap-3 p-3 text-left",
     theme: "bg-white text-[var(--color-brand-navy)]",
   },
 };
@@ -73,7 +74,24 @@ interface BaseToastProps {
   visible: boolean;
   icon?: ReactNode;
   onClick?: () => void;
+  onDismiss?: () => void;
   children: ReactNode;
+}
+
+function DismissButton({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onDismiss();
+      }}
+      aria-label="Cerrar notificación"
+      className="shrink-0 p-1 rounded-lg text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)] hover:bg-[#f1f5f9] transition-colors"
+    >
+      <X className="w-4 h-4" strokeWidth={1.75} />
+    </button>
+  );
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -83,6 +101,7 @@ export function BaseToast({
   visible,
   icon,
   onClick,
+  onDismiss,
   children,
 }: BaseToastProps) {
   const [hasMounted, setHasMounted] = useState(false);
@@ -95,13 +114,38 @@ export function BaseToast({
   }, []);
 
   const cfg = VARIANT_STYLES[variant];
+  const style = { maxWidth: TOAST_MAX_WIDTH, ...toastAnimation(hasMounted, visible) };
+
+  if (onDismiss) {
+    return (
+      <div className={`${BASE_CLASSES} ${cfg.layout} ${cfg.theme}`} style={style}>
+        {onClick ? (
+          <button
+            type="button"
+            onClick={onClick}
+            className="flex items-start gap-3 flex-1 min-w-0 text-left bg-transparent border-0 p-0 cursor-pointer"
+          >
+            {icon && <span className="shrink-0">{icon}</span>}
+            <span className="flex-1 min-w-0">{children}</span>
+          </button>
+        ) : (
+          <>
+            {icon && <span className="shrink-0">{icon}</span>}
+            <span className="flex-1 min-w-0">{children}</span>
+          </>
+        )}
+        <DismissButton onDismiss={onDismiss} />
+      </div>
+    );
+  }
+
   const Tag = onClick ? "button" : "div";
 
   return (
     <Tag
       {...(onClick ? { type: "button" as const, onClick } : {})}
-      className={`${BASE_CLASSES} ${cfg.layout} ${cfg.theme}`}
-      style={{ maxWidth: TOAST_MAX_WIDTH, ...toastAnimation(hasMounted, visible) }}
+      className={`${BASE_CLASSES} ${cfg.layout} ${cfg.theme}${onClick ? " cursor-pointer" : ""}`}
+      style={style}
     >
       {icon && <span className="shrink-0">{icon}</span>}
       <span className="flex-1 min-w-0">{children}</span>

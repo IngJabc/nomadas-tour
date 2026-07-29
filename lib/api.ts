@@ -180,7 +180,10 @@ export const adminApi = {
     agency_ids: string[];
     postpone?: boolean;
   }) => request<any>(`/admin/trips/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-  deleteTrip: (id: string) => request<void>(`/admin/trips/${id}`, { method: 'DELETE' }),
+  archiveTrip: (id: string) =>
+    request<{ id: string; status: 'archived' }>(`/admin/trips/${id}/archive`, {
+      method: 'PATCH',
+    }),
   updateTripStatus: (id: string, status: string) =>
     request<any>(`/admin/trips/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   listReservations: (params?: { page?: number; limit?: number; status?: string; search?: string; agency_id?: string; trip_id?: string }) =>

@@ -158,6 +158,10 @@ export class ReservationController {
         return;
       }
       const trip = await reservationService.getTripWithSeats(tripId);
+      if (trip.status === 'archived') {
+        res.status(404).json({ error: 'Trip not found' });
+        return;
+      }
       const { data: assignment } = await supabaseAdmin
         .from('trip_agencies')
         .select('agency_id')

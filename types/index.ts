@@ -16,7 +16,7 @@ export interface Trip {
   departure_time: string;
   capacity: number;
   vehicle_type: 'bus' | 'kia';
-  status: 'active' | 'cancelled' | 'completed';
+  status: 'active' | 'cancelled' | 'completed' | 'archived';
   route?: Route | null;
   routes?: Route | null;
   seats?: Seat[];

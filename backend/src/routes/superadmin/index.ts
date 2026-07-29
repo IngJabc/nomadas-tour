@@ -58,8 +58,8 @@ router.post("/trips", (req, res, next) =>
 router.patch("/trips/:id", (req, res, next) =>
   superadminController.updateTrip(req, res, next)
 );
-router.delete("/trips/:id", (req, res, next) =>
-  superadminController.deleteTrip(req, res, next)
+router.patch("/trips/:id/archive", (req, res, next) =>
+  superadminController.archiveTrip(req, res, next)
 );
 router.patch("/trips/:id/status", (req, res, next) =>
   superadminController.updateTripStatus(req, res, next)

@@ -101,12 +101,14 @@ export function TripActions({
       });
     }
   }
-  actions.push({
-    key: 'delete',
-    label: 'Eliminar',
-    variant: 'destructive',
-    onClick: () => onAction(trip.id, 'delete'),
-  });
+  if (trip.status === 'cancelled' || trip.status === 'completed') {
+    actions.push({
+      key: 'archive',
+      label: 'Archivar',
+      variant: 'destructive',
+      onClick: () => onAction(trip.id, 'archive'),
+    });
+  }
 
   const renderButton = (action: Action) => (
     <Button

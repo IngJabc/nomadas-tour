@@ -42,7 +42,7 @@ export default function AgencyTripsContent() {
   }, [searchParams, router]);
 
   // Filters (client-side)
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [searchInput, setSearchInput] = useState('');
   const [searchFilter, setSearchFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
@@ -225,7 +225,7 @@ export default function AgencyTripsContent() {
     };
   }, [tripIds, doFetch]);
 
-  const hasActiveFilters = statusFilter || searchFilter || dateFilter;
+  const hasActiveFilters = statusFilter !== 'active' || searchFilter || dateFilter;
 
   // ─── Loading skeleton ─────────────────────────────────────────────────
   if (initialLoad) {
@@ -374,7 +374,7 @@ export default function AgencyTripsContent() {
                 onClick={() => {
                   setSearchInput('');
                   setSearchFilter('');
-                  setStatusFilter('');
+                  setStatusFilter('active');
                   setDateFilter('');
                 }}
                 className="shrink-0 h-10 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"

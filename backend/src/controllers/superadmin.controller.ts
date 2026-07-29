@@ -216,10 +216,10 @@ export class SuperadminController {
     }
   }
 
-  async deleteTrip(req: Request, res: Response, next: NextFunction) {
+  async archiveTrip(req: Request, res: Response, next: NextFunction) {
     try {
-      await superadminService.deleteTrip(req.params.id as string);
-      res.status(204).send();
+      const result = await superadminService.archiveTrip(req.params.id as string);
+      res.json(result);
     } catch (error) {
       next(error);
     }
