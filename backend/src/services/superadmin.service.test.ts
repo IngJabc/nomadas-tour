@@ -20,6 +20,7 @@ function createChainable(defaultResult: any = [], defaultError: any = null) {
 
   // Terminal methods that return promises
   chain.single = vi.fn(() => Promise.resolve({ data: defaultResult, error: defaultError }));
+  chain.maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
 
   // update/insert/delete return a chainable that also has .eq() etc.
   chain.update = vi.fn((_data?: any) => {
@@ -95,6 +96,7 @@ vi.mock('../utils/token.js', () => ({
 // ── Import after mocks ──────────────────────────────────────────────
 
 import { superadminService } from './superadmin.service.js';
+import { DUPLICATE_TRIP_MESSAGE } from './trip-duplicate.guard.js';
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -140,6 +142,7 @@ function setupHappyPath(overrides: {
 
   // TRIPS: initial single() returns existing trip, update succeeds, final single returns full trip
   const trips = buildTableChain('trips');
+  trips.maybeSingle.mockResolvedValue({ data: null, error: null });
   trips.single
     .mockResolvedValueOnce({ data: makeTripRow(tripOverrides), error: null })   // context fetch
     .mockResolvedValueOnce({                                                      // final fetch
@@ -226,6 +229,7 @@ function setupCreateTripHappyPath() {
   tableChains['routes'] = routesChain;
 
   const tripsChain = createChainable();
+  tripsChain.maybeSingle.mockResolvedValue({ data: null, error: null });
   tripsChain.insert.mockImplementation(() => tripsChain);
   tripsChain.select.mockImplementation(() => tripsChain);
   tripsChain.single.mockResolvedValue({
@@ -581,6 +585,62 @@ describe('updateTrip', () => {
         superadminService.updateTrip('trip-1', 'route-1', FUTURE_DATE, 'kia', ['agency-1']),
       ).rejects.toThrow('reducir capacidad');
     });
+  });
+});
+
+describe('trip duplicate protection', () => {
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('rejects creating a duplicate trip for the same route and departure time', async () => {
+    setupCreateTripHappyPath();
+    tableChains['trips'].maybeSingle.mockResolvedValue({
+      data: { id: 'existing-trip' },
+      error: null,
+    });
+
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+      ),
+    ).rejects.toThrow(DUPLICATE_TRIP_MESSAGE);
+  });
+
+  it('allows creating a trip at the same time on a different route', async () => {
+    setupCreateTripHappyPath();
+
+    const result = await superadminService.createTrip(
+      'route-2',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      'user-1',
+    );
+
+    expect(result.id).toBe('trip-new');
+  });
+
+  it('rejects updating a trip to an occupied route and departure slot', async () => {
+    setupHappyPath();
+    tableChains['trips'].maybeSingle.mockResolvedValue({
+      data: { id: 'other-trip' },
+      error: null,
+    });
+
+    await expect(
+      superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        new Date(Date.now() + 172_800_000).toISOString(),
+        'bus',
+        ['agency-1'],
+      ),
+    ).rejects.toThrow(DUPLICATE_TRIP_MESSAGE);
   });
 });
 

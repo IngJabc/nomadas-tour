@@ -19,6 +19,7 @@ import {
   validateAgencyRemoval,
   validateNoActiveReservations,
 } from "./trip-edit-context.js";
+import { assertNoDuplicateTrip } from "./trip-duplicate.guard.js";
 
 const DEPARTURE_MUST_BE_FUTURE_MESSAGE =
   "La fecha y hora de salida debe ser posterior a la fecha y hora actual.";
@@ -413,6 +414,8 @@ export class SuperadminService {
       );
 
     assertDepartureTimeInFuture(departureTime);
+
+    await assertNoDuplicateTrip(routeId, departureTime);
 
     const { data: trip, error: tripError } = await supabaseAdmin
       .from("trips")
@@ -885,12 +888,17 @@ export class SuperadminService {
     validateAgencyRemoval(ctx, agencyIds);
 
     const normalizedDeparture = toUTC(departureTime);
+    const isChangingRoute = routeId !== ctx.trip.route_id;
     const isChangingDeparture =
       new Date(normalizedDeparture).getTime() !==
       new Date(ctx.trip.departure_time).getTime();
 
     if (isChangingDeparture) {
       assertDepartureTimeInFuture(departureTime);
+    }
+
+    if (isChangingRoute || isChangingDeparture) {
+      await assertNoDuplicateTrip(routeId, departureTime, id);
     }
 
     // ── Phase 2: Apply changes (sequential for consistency) ─────────
