@@ -144,7 +144,10 @@ export const adminApi = {
     vehicle_type: 'bus' | 'kia';
     agency_ids: string[];
     postpone?: boolean;
-  }) => request<any>(`/admin/trips/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  }) => request<{
+    trip: Record<string, unknown>;
+    action: 'POSTPONED' | 'UPDATED';
+  }>(`/admin/trips/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   archiveTrip: (id: string) =>
     request<{ id: string; status: 'archived' }>(`/admin/trips/${id}/archive`, {
       method: 'PATCH',

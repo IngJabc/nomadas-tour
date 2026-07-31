@@ -20,6 +20,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
@@ -349,13 +350,6 @@ export default function AdminBookingsPage() {
     doFetch({ status: statusFilter || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, date: value || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
   };
 
-  const clearDate = () => {
-    setDateFilter('');
-    resetAccordion();
-    setLoading(true);
-    doFetch({ status: statusFilter || undefined, search: searchFilter || undefined, route_id: routeFilter || undefined, agency_id: agencyFilter || undefined, trip_id: tripFilter || undefined }).finally(() => setLoading(false));
-  };
-
   const handleTripChange = (value: string) => {
     setTripFilter(value);
     resetAccordion();
@@ -503,23 +497,11 @@ export default function AdminBookingsPage() {
             )}
           </div>
 
-          <div className="relative w-full sm:w-44 sm:shrink-0">
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
-            />
-            {dateFilter && (
-              <button
-                type="button"
-                onClick={clearDate}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          <DatePicker
+            value={dateFilter}
+            onChange={handleDateChange}
+            className="w-full sm:w-44 sm:shrink-0"
+          />
 
           <select
             value={agencyFilter}

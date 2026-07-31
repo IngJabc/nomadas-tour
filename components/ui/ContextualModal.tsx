@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 let modalCount = 0;
+
+const VIEWPORT_PADDING = 16;
+const ANCHOR_GAP = 12;
 
 function getFocusable(container: HTMLElement | null) {
   if (!container) return [] as HTMLElement[];
@@ -17,6 +20,42 @@ function getFocusable(container: HTMLElement | null) {
 
 function getScrollbarWidth() {
   return window.innerWidth - document.documentElement.clientWidth;
+}
+
+function computeDialogPosition(anchorRect: DOMRect, dialogEl: HTMLElement) {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const maxWidth = Math.min(384, vw - VIEWPORT_PADDING * 2);
+  const dialogHeight = dialogEl.getBoundingClientRect().height || dialogEl.scrollHeight;
+  const dialogWidth = maxWidth;
+
+  let left = anchorRect.left + anchorRect.width / 2 - dialogWidth / 2;
+  left = Math.max(VIEWPORT_PADDING, Math.min(left, vw - dialogWidth - VIEWPORT_PADDING));
+
+  const anchorCenterY = anchorRect.top + anchorRect.height / 2;
+  const spaceBelow = vh - VIEWPORT_PADDING - anchorCenterY;
+  const spaceAbove = anchorCenterY - VIEWPORT_PADDING;
+
+  let top: number;
+
+  if (dialogHeight / 2 <= spaceBelow && dialogHeight / 2 <= spaceAbove) {
+    top = anchorCenterY - dialogHeight / 2;
+  } else if (spaceBelow < dialogHeight && spaceAbove >= spaceBelow) {
+    top = anchorRect.top - ANCHOR_GAP - dialogHeight;
+  } else if (spaceBelow < dialogHeight) {
+    top = vh - VIEWPORT_PADDING - dialogHeight;
+  } else {
+    top = anchorCenterY - dialogHeight / 2;
+  }
+
+  top = Math.max(VIEWPORT_PADDING, Math.min(top, vh - VIEWPORT_PADDING - dialogHeight));
+
+  return {
+    top,
+    left,
+    width: dialogWidth,
+    maxHeight: Math.min(vh * 0.8, vh - VIEWPORT_PADDING * 2),
+  };
 }
 
 interface ContextualModalProps {
@@ -41,10 +80,45 @@ export function ContextualModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
+  const [dialogPosition, setDialogPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
 
   useEffect(() => {
     setPortalNode(document.body);
   }, []);
+
+  const updatePosition = useCallback(() => {
+    if (!anchorRect || !dialogRef.current) return;
+    setDialogPosition(computeDialogPosition(anchorRect, dialogRef.current));
+  }, [anchorRect]);
+
+  useLayoutEffect(() => {
+    if (!open || !anchorRect) {
+      setDialogPosition(null);
+      return;
+    }
+
+    updatePosition();
+
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const ro = new ResizeObserver(updatePosition);
+    ro.observe(dialog);
+
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, anchorRect, updatePosition, children]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -118,35 +192,42 @@ export function ContextualModal({
               height: anchorRect.height,
             }}
           />
-          <div
-            style={{
-              position: 'fixed',
-              top: anchorRect.top,
-              left: anchorRect.left,
-              width: anchorRect.width,
-              height: anchorRect.height,
-            }}
-            className="flex items-center justify-center z-10 pointer-events-none"
+          <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={descriptionId}
+            initial={{ opacity: 0, scale: 0.95, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+            style={
+              dialogPosition
+                ? {
+                    position: 'fixed',
+                    top: dialogPosition.top,
+                    left: dialogPosition.left,
+                    width: dialogPosition.width,
+                    maxHeight: dialogPosition.maxHeight,
+                  }
+                : {
+                    position: 'fixed',
+                    top: VIEWPORT_PADDING,
+                    left: VIEWPORT_PADDING,
+                    width: 384,
+                    maxHeight: '80vh',
+                    visibility: 'hidden' as const,
+                  }
+            }
+            className={cn(
+              'bg-white rounded-2xl shadow-xl border border-slate-200/60 overflow-y-auto flex flex-col pointer-events-auto z-10',
+              className,
+            )}
+            onClick={(e) => e.stopPropagation()}
           >
-            <motion.div
-              ref={dialogRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby={titleId}
-              aria-describedby={descriptionId}
-              initial={{ opacity: 0, scale: 0.95, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 8 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-              className={cn(
-                'bg-white rounded-2xl shadow-xl border border-slate-200/60 w-full max-w-sm max-h-[80vh] overflow-y-auto flex flex-col pointer-events-auto',
-                className,
-              )}
-              onClick={(e) => e.stopPropagation()}
-            >
-              {children}
-            </motion.div>
-          </div>
+            {children}
+          </motion.div>
         </div>
       )}
     </AnimatePresence>,

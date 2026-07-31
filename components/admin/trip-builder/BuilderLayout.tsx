@@ -36,9 +36,9 @@ const stepVariants = {
 };
 
 const errorVariants = {
-  initial: { opacity: 0, y: -8, scale: 0.96 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, y: -8, scale: 0.96 },
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderLayoutProps) {
@@ -134,6 +134,7 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
   }
 
   const isValid = canProceed();
+  const activeError = navError ?? submitError;
 
   return (
     <div className="flex flex-col">
@@ -161,8 +162,8 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
         </AnimatePresence>
       </div>
 
-      <div className="h-[380px] overflow-hidden flex flex-col">
-        <Card className="flex-1 relative flex items-center justify-center">
+      <div className="h-[min(380px,calc(100dvh-332px))] shrink-0">
+        <Card className="h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain !shadow-none border-[rgba(0,0,0,0.06)]">
           <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={state.currentStep}
@@ -172,85 +173,67 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
               animate="center"
               exit="exit"
               transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="w-full flex flex-col items-center justify-center"
+              className="min-h-full w-full flex"
             >
-              <div className="mx-auto w-full max-w-lg">
-                  {state.currentStep === 0 && (
-                    <RouteStep
-                      routes={routes}
-                      selectedRouteId={state.route_id}
-                      onSelect={(id) => dispatch({ type: 'SET_ROUTE', payload: id })}
-                    />
-                  )}
-                  {state.currentStep === 1 && (
-                    <ScheduleStep
-                      departureTime={state.departure_time}
-                      onChange={(v) => dispatch({ type: 'SET_DEPARTURE_TIME', payload: v })}
-                    />
-                  )}
-                  {state.currentStep === 2 && (
-                    <VehicleStep
-                      selectedType={state.vehicle_type as 'bus' | 'kia' | ''}
-                      onSelect={(v) => dispatch({ type: 'SET_VEHICLE', payload: v })}
-                    />
-                  )}
-                  {state.currentStep === 3 && (
-                    <AgenciesStep
-                      agencies={agencies}
-                      selectedIds={state.agency_ids}
-                      onChange={(ids) => dispatch({ type: 'SET_AGENCIES', payload: ids })}
-                    />
-                  )}
-                  {state.currentStep === 4 && (
-                    <ReviewStep state={state} routes={routes} agencies={agencies} />
-                  )}
-                </div>
-              </motion.div>
-            </AnimatePresence>
-
-          <div className="absolute bottom-0 left-0 right-0 px-6 pb-5 space-y-2">
-            <AnimatePresence>
-              {navError && (
-                <motion.div
-                  key="nav-error"
-                  variants={errorVariants}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="flex items-center gap-2 p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
-                >
-                  <AlertCircle className="w-4 h-4 text-[#ef4444] shrink-0" />
-                  <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">{navError}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {submitError && (
-                <motion.div
-                  key="submit-error"
-                  variants={errorVariants}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className="flex items-center gap-2 p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
-                >
-                  <AlertCircle className="w-4 h-4 text-[#ef4444] shrink-0" />
-                  <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">{submitError}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+              <div className="m-auto w-full max-w-lg py-2">
+                {state.currentStep === 0 && (
+                  <RouteStep
+                    routes={routes}
+                    selectedRouteId={state.route_id}
+                    onSelect={(id) => dispatch({ type: 'SET_ROUTE', payload: id })}
+                  />
+                )}
+                {state.currentStep === 1 && (
+                  <ScheduleStep
+                    departureTime={state.departure_time}
+                    onChange={(v) => dispatch({ type: 'SET_DEPARTURE_TIME', payload: v })}
+                  />
+                )}
+                {state.currentStep === 2 && (
+                  <VehicleStep
+                    selectedType={state.vehicle_type as 'bus' | 'kia' | ''}
+                    onSelect={(v) => dispatch({ type: 'SET_VEHICLE', payload: v })}
+                  />
+                )}
+                {state.currentStep === 3 && (
+                  <AgenciesStep
+                    agencies={agencies}
+                    selectedIds={state.agency_ids}
+                    onChange={(ids) => dispatch({ type: 'SET_AGENCIES', payload: ids })}
+                  />
+                )}
+                {state.currentStep === 4 && (
+                  <ReviewStep state={state} routes={routes} agencies={agencies} />
+                )}
+              </div>
+            </motion.div>
+          </AnimatePresence>
         </Card>
       </div>
 
-      <motion.div
-        layout
-        transition={{ duration: 0.25, ease: 'easeInOut' }}
-        className="flex items-center justify-between pt-4 border-t border-[rgba(0,0,0,0.06)] shrink-0"
+      <div
+        className="validation-slot h-[52px] shrink-0 flex items-center"
+        aria-live="polite"
       >
+        <AnimatePresence mode="wait">
+          {activeError && (
+            <motion.div
+              key={navError ? 'nav-error' : 'submit-error'}
+              variants={errorVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ duration: 0.15, ease: 'easeOut' }}
+              className="w-full flex items-center gap-2 p-3 rounded-xl bg-[#fef2f2] border border-[#fee2e2]"
+            >
+              <AlertCircle className="w-4 h-4 text-[#ef4444] shrink-0" />
+              <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">{activeError}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="flex items-center justify-between pt-4 border-t border-[rgba(0,0,0,0.06)] shrink-0">
         <Button
           variant="secondary"
           onClick={handlePrevious}
@@ -290,7 +273,7 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
             )}
           </motion.div>
         </AnimatePresence>
-      </motion.div>
+      </div>
     </div>
   );
 }
