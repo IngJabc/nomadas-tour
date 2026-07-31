@@ -21,6 +21,16 @@ import {
 } from "./trip-edit-context.js";
 import { assertNoDuplicateTrip } from "./trip-duplicate.guard.js";
 
+export enum TripUpdateAction {
+  POSTPONED = "POSTPONED",
+  UPDATED = "UPDATED",
+}
+
+export interface TripUpdateResult {
+  trip: Record<string, unknown>;
+  action: TripUpdateAction;
+}
+
 const DEPARTURE_MUST_BE_FUTURE_MESSAGE =
   "La fecha y hora de salida debe ser posterior a la fecha y hora actual.";
 
@@ -598,11 +608,11 @@ export class SuperadminService {
         : tripIdFilterFromAgency;
     }
 
-    // Date filter range
+    // Date filter range (business date → UTC range in BUSINESS_TIMEZONE)
     let dateStart: string | undefined;
     let dateEnd: string | undefined;
     if (filters?.departure_date) {
-      const start = new Date(`${filters.departure_date}T00:00:00`);
+      const start = new Date(toUTC(`${filters.departure_date}T00:00`));
       const end = new Date(start.getTime() + 86400000);
       dateStart = start.toISOString();
       dateEnd = end.toISOString();
@@ -892,6 +902,7 @@ export class SuperadminService {
     const isChangingDeparture =
       new Date(normalizedDeparture).getTime() !==
       new Date(ctx.trip.departure_time).getTime();
+    const isRealPostpone = postpone && isChangingDeparture;
 
     if (isChangingDeparture) {
       assertDepartureTimeInFuture(departureTime);
@@ -1031,8 +1042,8 @@ export class SuperadminService {
         );
     }
 
-    // 2d. If postpone, save old departure_time and send emails
-    if (postpone) {
+    // 2d. Real postpone: save old departure_time, emails, notifications
+    if (isRealPostpone) {
       await supabaseAdmin
         .from("trips")
         .update({ postponed_from: ctx.trip.departure_time })
@@ -1127,7 +1138,14 @@ export class SuperadminService {
       .eq("id", id)
       .single();
 
-    return trip;
+    if (!trip) throw new NotFoundError("Trip not found");
+
+    return {
+      trip,
+      action: isRealPostpone
+        ? TripUpdateAction.POSTPONED
+        : TripUpdateAction.UPDATED,
+    };
   }
 
   async archiveTrip(id: string): Promise<{ id: string; status: "archived" }> {

@@ -16,8 +16,12 @@ export function Field({ label, children, error, helperText, required, htmlFor }:
     <div className="flex flex-col gap-1.5">
       <Label htmlFor={htmlFor} required={required}>{label}</Label>
       {children}
-      {helperText && !error && <HelperText>{helperText}</HelperText>}
-      {error && <ErrorText>{error}</ErrorText>}
+      {(error || helperText) && (
+        <div className="min-h-[18px]">
+          {error && <ErrorText>{error}</ErrorText>}
+          {helperText && !error && <HelperText>{helperText}</HelperText>}
+        </div>
+      )}
     </div>
   );
 }

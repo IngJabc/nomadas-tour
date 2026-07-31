@@ -3,6 +3,7 @@ import { env } from '../config/env.js';
 import { NotFoundError, ValidationError, ConflictError, ForbiddenError } from '../errors/index.js';
 import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
 import { sortBySeatCode } from '../utils/sort.js';
+import { toUTC } from '../utils/timezone.js';
 import { validateBoardingAllowed } from './boarding.guard.js';
 import { notificationService } from './notification.service.js';
 import { emailService } from './email.service.js';
@@ -1470,9 +1471,11 @@ export class ReservationService {
       let tripQ = supabaseAdmin.from('trips').select('id');
       if (params.route_id) tripQ = tripQ.eq('route_id', params.route_id);
       if (params.date) {
+        const start = new Date(toUTC(`${params.date}T00:00`));
+        const end = new Date(start.getTime() + 86400000);
         tripQ = tripQ
-          .gte('departure_time', `${params.date}T00:00:00Z`)
-          .lte('departure_time', `${params.date}T23:59:59.999Z`);
+          .gte('departure_time', start.toISOString())
+          .lt('departure_time', end.toISOString());
       }
       const { data: trips } = await tripQ;
       tripFilterIds = (trips || []).map((t: any) => t.id);

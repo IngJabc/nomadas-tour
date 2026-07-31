@@ -152,7 +152,7 @@ export class SuperadminController {
   async updateTrip(req: Request, res: Response, next: NextFunction) {
     try {
       const data = createTripSchema.parse(req.body);
-      const trip = await superadminService.updateTrip(
+      const result = await superadminService.updateTrip(
         req.params.id as string,
         data.route_id,
         data.departure_time,
@@ -160,7 +160,7 @@ export class SuperadminController {
         data.agency_ids,
         data.postpone ?? false,
       );
-      res.json(trip);
+      res.json(result);
     } catch (error) {
       next(
         error instanceof z.ZodError

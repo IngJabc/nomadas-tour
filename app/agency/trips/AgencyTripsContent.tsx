@@ -12,8 +12,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { AgencyTripCardSkeleton } from '@/components/ui/Skeleton';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { AgencyTripCard, type AgencyTrip } from '@/components/agency/AgencyTripCard';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
+import { toBusinessDateString } from '@/lib/timezone';
 import toast from 'react-hot-toast';
 
 const STATUS_OPTIONS = [
@@ -91,7 +93,7 @@ export default function AgencyTripsContent() {
 
     if (dateFilter) {
       result = result.filter((t) => {
-        const tripDate = new Date(t.departure_time).toISOString().slice(0, 10);
+        const tripDate = toBusinessDateString(t.departure_time);
         return tripDate === dateFilter;
       });
     }
@@ -118,10 +120,6 @@ export default function AgencyTripsContent() {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearchInput('');
     setSearchFilter('');
-  };
-
-  const clearDate = () => {
-    setDateFilter('');
   };
 
   useEffect(() => {
@@ -345,23 +343,11 @@ export default function AgencyTripsContent() {
             )}
           </div>
 
-          <div className="relative w-full sm:w-44 sm:shrink-0">
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
-            />
-            {dateFilter && (
-              <button
-                type="button"
-                onClick={clearDate}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          <DatePicker
+            value={dateFilter}
+            onChange={setDateFilter}
+            className="w-full sm:w-44 sm:shrink-0"
+          />
 
           <AnimatePresence>
             {hasActiveFilters && (

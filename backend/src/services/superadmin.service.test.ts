@@ -15,6 +15,9 @@ function createChainable(defaultResult: any = [], defaultError: any = null) {
   chain.eq = vi.fn(() => chain);
   chain.in = vi.fn(() => chain);
   chain.neq = vi.fn(() => chain);
+  chain.gte = vi.fn(() => chain);
+  chain.lt = vi.fn(() => chain);
+  chain.range = vi.fn(() => chain);
   chain.order = vi.fn(() => chain);
   chain.ilike = vi.fn(() => chain);
 
@@ -95,8 +98,10 @@ vi.mock('../utils/token.js', () => ({
 
 // ── Import after mocks ──────────────────────────────────────────────
 
-import { superadminService } from './superadmin.service.js';
+import { superadminService, TripUpdateAction } from './superadmin.service.js';
 import { DUPLICATE_TRIP_MESSAGE } from './trip-duplicate.guard.js';
+import { emailService } from './email.service.js';
+import { notificationService } from './notification.service.js';
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -423,6 +428,123 @@ describe('updateTrip', () => {
     });
   });
 
+  describe('postponed_from', () => {
+    const OLD_DEPARTURE = FUTURE_DATE;
+    const NEW_DEPARTURE = new Date(Date.now() + 172_800_000).toISOString();
+
+    beforeEach(() => {
+      vi.mocked(emailService.sendTripPostponedEmail).mockClear();
+      vi.mocked(notificationService.createForAgenciesAndAdmin).mockClear();
+    });
+
+    function captureTripUpdates(overrides: Parameters<typeof setupHappyPath>[0] = {}) {
+      setupHappyPath(overrides);
+      const updateCalls: Record<string, unknown>[] = [];
+      const updateChain = createChainable();
+      updateChain.eq.mockImplementation(() => ({
+        then: (resolve: any) => resolve({ error: null }),
+      }));
+      tableChains['trips'].update.mockImplementation((data: Record<string, unknown>) => {
+        updateCalls.push(data);
+        return updateChain;
+      });
+      tableChains['routes'] = createChainable({
+        origin: 'Caracas',
+        destination: 'Maracaibo',
+      });
+      return updateCalls;
+    }
+
+    it('sets postponed_from when postponing to a new departure time', async () => {
+      const updateCalls = captureTripUpdates({
+        tripOverrides: { departure_time: OLD_DEPARTURE },
+      });
+
+      await superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        NEW_DEPARTURE,
+        'bus',
+        ['agency-1'],
+        true,
+      );
+
+      expect(updateCalls).toContainEqual({ postponed_from: OLD_DEPARTURE });
+    });
+
+    it('does not set postponed_from when postpone=true but departure time is unchanged', async () => {
+      const updateCalls = captureTripUpdates({
+        tripOverrides: { departure_time: OLD_DEPARTURE },
+      });
+
+      await superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        OLD_DEPARTURE,
+        'bus',
+        ['agency-1'],
+        true,
+      );
+
+      expect(updateCalls.some((c) => 'postponed_from' in c)).toBe(false);
+      expect(emailService.sendTripPostponedEmail).not.toHaveBeenCalled();
+      expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
+    });
+
+    it('does not set postponed_from on a normal edit without postpone', async () => {
+      const updateCalls = captureTripUpdates({
+        tripOverrides: { departure_time: OLD_DEPARTURE },
+      });
+
+      await superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        NEW_DEPARTURE,
+        'bus',
+        ['agency-1'],
+        false,
+      );
+
+      expect(updateCalls.some((c) => 'postponed_from' in c)).toBe(false);
+    });
+
+    it('returns POSTPONED when postponing to a new departure time', async () => {
+      captureTripUpdates({
+        tripOverrides: { departure_time: OLD_DEPARTURE },
+      });
+
+      const result = await superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        NEW_DEPARTURE,
+        'bus',
+        ['agency-1'],
+        true,
+      );
+
+      expect(result.action).toBe(TripUpdateAction.POSTPONED);
+      expect(result.trip).toBeDefined();
+    });
+
+    it('returns UPDATED when postpone=true but departure time is unchanged', async () => {
+      captureTripUpdates({
+        tripOverrides: { departure_time: OLD_DEPARTURE },
+      });
+
+      const result = await superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        OLD_DEPARTURE,
+        'bus',
+        ['agency-1'],
+        true,
+      );
+
+      expect(result.action).toBe(TripUpdateAction.UPDATED);
+      expect(result.trip).toBeDefined();
+    });
+  });
+
   // ─── Vehicle change ─────────────────────────────────────────────
   describe('vehicle change validation', () => {
     it('allows changing from bus to kia when no activity', async () => {
@@ -641,6 +763,28 @@ describe('trip duplicate protection', () => {
         ['agency-1'],
       ),
     ).rejects.toThrow(DUPLICATE_TRIP_MESSAGE);
+  });
+});
+
+describe('superadminService.listTrips date filter', () => {
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('filters by business date converted to a UTC range in America/Caracas', async () => {
+    tableChains['trips'] = createChainable([]);
+
+    await superadminService.listTrips(1, 12, { departure_date: '2026-07-20' });
+
+    // Business midnight (Caracas, UTC-4) → 04:00Z; range is [04:00Z, +24h)
+    expect(tableChains['trips'].gte).toHaveBeenCalledWith(
+      'departure_time',
+      '2026-07-20T04:00:00.000Z',
+    );
+    expect(tableChains['trips'].lt).toHaveBeenCalledWith(
+      'departure_time',
+      '2026-07-21T04:00:00.000Z',
+    );
   });
 });
 

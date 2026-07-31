@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/Button';
 import { TripCard } from '@/components/admin/trips/TripCard';
 import { TripBuilderModal } from '@/components/admin/trip-builder/TripBuilderModal';
 import { ContextualModal } from '@/components/ui/ContextualModal';
+import { DateTimePicker } from '@/components/ui/DateTimePicker';
+import { DatePicker } from '@/components/ui/DatePicker';
 import { subscribeToTripSeats, subscribeToReservationPassengers } from '@/lib/realtime/subscriptions';
 import { adminApi } from '@/lib/api';
 import { getApiErrorMessage } from '@/lib/errors/api-error';
@@ -261,9 +263,13 @@ export default function AdminTripsPage() {
             agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),
             postpone: true,
           };
-          await adminApi.updateTrip(tripId, data);
+          const result = await adminApi.updateTrip(tripId, data);
           doFetch(page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter);
-          toast.success('Viaje pospuesto');
+          toast.success(
+            result.action === 'POSTPONED'
+              ? 'Viaje pospuesto'
+              : 'No hubo cambios en la fecha de salida',
+          );
         }
       }
       setActiveModal(null);
@@ -325,10 +331,6 @@ export default function AdminTripsPage() {
 
   const handleDateChange = (value: string) => {
     updateFilter(statusFilter, routeFilter, agencyFilter, searchFilter, value);
-  };
-
-  const clearDate = () => {
-    updateFilter(statusFilter, routeFilter, agencyFilter, searchFilter, '');
   };
 
   const handlePageChange = (newPage: number) => {
@@ -441,23 +443,11 @@ export default function AdminTripsPage() {
             ))}
           </select>
 
-          <div className="relative w-full sm:w-44 sm:shrink-0">
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="w-full h-10 border-[1.5px] border-[#e5e7eb] rounded-xl px-3 pr-8 text-xs sm:text-sm font-[family-name:var(--font-body)] font-normal text-[var(--color-brand-muted)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] [&::-webkit-calendar-picker-indicator]:opacity-40 [&::-webkit-calendar-picker-indicator]:hover:opacity-70"
-            />
-            {dateFilter && (
-              <button
-                type="button"
-                onClick={clearDate}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
+          <DatePicker
+            value={dateFilter}
+            onChange={handleDateChange}
+            className="w-full sm:w-44 sm:shrink-0"
+          />
 
           <AnimatePresence>
             {(statusFilter !== 'active' || searchFilter || routeFilter || agencyFilter || dateFilter) && (
@@ -629,12 +619,12 @@ export default function AdminTripsPage() {
                 <p className="text-sm text-[var(--color-brand-muted)] text-center mb-4">
                   {modalTrip ? `Selecciona la nueva fecha para el viaje a ${modalTrip.route?.destination}.` : 'Selecciona la nueva fecha y hora de salida.'}
                 </p>
-                <input
-                  type="datetime-local"
-                  value={postponeDate}
-                  onChange={(e) => setPostponeDate(e.target.value)}
-                  className="w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3 py-2.5 text-sm font-[family-name:var(--font-body)] text-[var(--color-brand-navy)] bg-white outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] mb-6"
-                />
+                <div className="mb-6">
+                  <DateTimePicker
+                    value={postponeDate}
+                    onChange={setPostponeDate}
+                  />
+                </div>
               </>
             )}
 

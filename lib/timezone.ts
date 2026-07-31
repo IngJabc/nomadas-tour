@@ -173,3 +173,16 @@ export function fromUTCToLocal(utcString: string): string {
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
   return `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}`;
 }
+
+/**
+ * Extract YYYY-MM-DD from a UTC ISO string in BUSINESS_TIMEZONE.
+ * Used for client-side date filtering without UTC drift.
+ */
+export function toBusinessDateString(dateString: string): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(dateString));
+}
