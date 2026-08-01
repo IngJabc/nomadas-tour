@@ -32,7 +32,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { ActivityWidget } from "@/components/dashboard/ActivityWidget";
 import { Timeline } from "@/components/dashboard/Timeline";
 import { OccupancyChart } from "@/components/dashboard/charts/OccupancyChart";
-import { createClient } from "@/lib/supabase/client";
+import { useAuthUser } from '@/hooks/useAuthUser';
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
 interface AgencyDashboardData {
@@ -98,15 +98,8 @@ export default function AgencyDashboardPage() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [initialized, setInitialized] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [agencyId, setAgencyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const id = (user?.user_metadata?.agency_id as string) ?? null;
-      setAgencyId(id);
-    });
-  }, []);
+  const { user } = useAuthUser();
+  const agencyId = user?.agency_id ?? null;
 
   const fetchDashboard = useCallback(async () => {
     try {

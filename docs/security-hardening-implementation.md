@@ -3,7 +3,7 @@
 **Documento:** Plan técnico de implementación de remediaciones de seguridad  
 **Basado en:** [Security Assessment C1–C4](security-audit-remediation.md)  
 **Objetivo:** Eliminar vulnerabilidades críticas, reforzar límites de confianza y establecer un modelo seguro de autorización.  
-**Última actualización:** 2026-08-01  
+**Última actualización:** 2026-08-01 (FASE 4 + validación manual forja completada)  
 **Entorno:** Supabase producción (pre-lanzamiento). Migración 039 aplicada e validada.
 
 ---
@@ -16,7 +16,7 @@
 | SEC-002 | Eliminar fabricación de identidad admin | C1 | P0 | **Completado** |
 | SEC-003 | Revocar RPC pública de reservas | C3 | P0 | **Completado** |
 | SEC-004 | RLS en `password_resets` | C2 | P1 | **Completado** |
-| SEC-005 | Eliminar UPDATE directo de seats | C4 | P1 | **Parcial** (DB OK, frontend pendiente) |
+| SEC-005 | Eliminar UPDATE directo de seats | C4 | P1 | **Completado** |
 | SEC-006 | Reescribir políticas RLS | C1 | P2 | **Completado (v2)** |
 | SEC-007 | Suite de regression tests | — | P2 | **Pendiente** |
 
@@ -127,6 +127,63 @@ req.ctx
 
 `extractContext()` lee `id, role, agency_id` desde `public.users`. No usa `user_metadata`.
 
+#### FASE 4 — Frontend + `GET /auth/me`
+
+**Estado:** Completado
+
+Flujo unificado:
+
+```
+Supabase Auth (session / auth.uid)
+        ↓
+public.users (backend GET /auth/me)
+        ↓
+AuthProvider → useAuthUser()
+        ↓
+Consumidores (AuthNav, layouts, NotificationProvider, agency pages)
+```
+
+**Backend:** [`backend/src/routes/auth/index.ts`](../backend/src/routes/auth/index.ts)
+
+- `GET /auth/me` — `auth` middleware + `meLimiter` (60 req/min)
+- Login/invites mantienen `strictLimiter` (15/15min)
+
+**Frontend:**
+
+| Componente | Rol |
+|------------|-----|
+| [`components/auth/AuthProvider.tsx`](../components/auth/AuthProvider.tsx) | Única fuente compartida; dedup de `/auth/me` |
+| [`hooks/useAuthUser.ts`](../hooks/useAuthUser.ts) | Re-export del contexto |
+| [`components/auth/AuthRoleGuard.tsx`](../components/auth/AuthRoleGuard.tsx) | Redirects UX por rol (no frontera de seguridad) |
+| [`middleware.ts`](../middleware.ts) | Solo validación de sesión Supabase |
+
+**Validación manual (forja metadata):** ✅ **Completada 2026-08-01** (cuenta agency, prod pre-lanzamiento)
+
+Prueba básica (browser):
+
+1. Login agency → `/agency/trips` OK
+2. Navbar sin enlace "Admin"
+3. Navegar a `/admin` → bloqueado; `/agency/trips` sigue accesible sin re-login
+
+Prueba de forja (consola + `PUT /auth/v1/user`):
+
+```js
+// Forjar metadata (Supabase acepta el cambio — vector de ataque simulado)
+data: { role: 'superadmin', agency_id: null }
+```
+
+Resultados observados (todos esperados):
+
+| Check | Resultado |
+|-------|-----------|
+| `user_metadata.role` = `superadmin` tras forja | OK (ataque simulado exitoso a nivel metadata) |
+| `GET /auth/me` → `"role": "agency"` | OK — lee `public.users` |
+| Navbar sin enlace Admin tras reload | OK |
+| `/admin` bloqueado tras reload | OK |
+| `GET /api/admin/dashboard` → 403 | OK |
+
+**Conclusión:** ninguna capa (frontend, `/auth/me`, Express) confía en metadata forjada.
+
 **Archivo complementario:** [`backend/src/middlewares/tenant.ts`](../backend/src/middlewares/tenant.ts) — valida membresía agency en DB (`dbUser.agency_id === agencyId`).
 
 **Migración previa:** [`035_backfill_users_from_auth.sql`](../supabase/migrations/035_backfill_users_from_auth.sql) — garantiza fila en `public.users` antes del corte.
@@ -139,8 +196,9 @@ req.ctx
 
 #### Estado actual
 
-- FASE 0 (035) y FASE 1 backend implementadas.
-- Tests: [`backend/src/middlewares/auth.test.ts`](../backend/src/middlewares/auth.test.ts), [`tenant.test.ts`](../backend/src/middlewares/tenant.test.ts).
+- FASE 0 (035), FASE 1 backend y FASE 4 frontend implementadas.
+- Validación manual browser + forja metadata: **OK (2026-08-01)**.
+- Tests automatizados: [`backend/src/middlewares/auth.test.ts`](../backend/src/middlewares/auth.test.ts), [`tenant.test.ts`](../backend/src/middlewares/tenant.test.ts), [`auth.service.test.ts`](../backend/src/services/auth.service.test.ts) (`getMe`).
 
 ---
 
@@ -280,7 +338,7 @@ Sin policies para clientes → deny-all; `service_role` opera vía BYPASSRLS.
 
 ### TASK SEC-005 — Eliminar UPDATE directo de seats
 
-**Relacionado:** C4 · **Prioridad:** P1 · **Estado:** Parcial
+**Relacionado:** C4 · **Prioridad:** P1 · **Estado:** Completado
 
 #### Problema original
 
@@ -288,30 +346,43 @@ Sin policies para clientes → deny-all; `service_role` opera vía BYPASSRLS.
 Client → supabase.from('seats').update() → Database
 ```
 
-#### Flujo objetivo
+#### Flujo objetivo (ya en producción)
 
 ```
 Client → Express API → Reservation Service → Database (service_role)
 ```
 
-#### Cambios en base de datos (completados)
+Agency reservas: [`useSeatLocking`](../hooks/useSeatLocking.ts) → `agencyApi.lockSeat` / `unlockSeat` / `unlockAllSeats` → `/agency/seats/*`.
 
-Incluidos en [`039_rls_identity_from_public_users_v2.sql`](../supabase/migrations/039_rls_identity_from_public_users_v2.sql) PART 3:
+#### Auditoría frontend (2026-08-01)
+
+| Archivo | Mutación directa | Usado en app |
+|---------|------------------|--------------|
+| `hooks/useRealtimeSeats.ts` | `updateSeatStatus()` → `.update()` | **No** (código muerto, 0 imports) |
+| `hooks/useSeatLocking.ts` | Ninguna — solo API Express | Sí — [`app/agency/reservations/new/page.tsx`](../app/agency/reservations/new/page.tsx) |
+| `lib/realtime/subscriptions.ts` | Solo subscribe UPDATE events | Sí — lectura/realtime |
+| Resto `app/`, `components/` | 0× `supabase.from('seats')` | — |
+
+**Conclusión:** `updateSeatStatus` eliminable sin reemplazo; el flujo activo ya usa backend.
+
+#### Cambios en base de datos (039 PART 3)
 
 ```sql
 DROP POLICY IF EXISTS "seats_auth_update" ON public.seats;
-REVOKE UPDATE ON public.seats FROM anon;
-REVOKE UPDATE ON public.seats FROM authenticated;
+REVOKE UPDATE ON public.seats FROM anon, authenticated;
 ```
 
-#### Validación prod (2026-08-01)
+#### Cambios frontend
 
-- Query 4.3: 0 filas `seats_auth_update` — OK
-- Cliente `supabase.from('seats').update(...)` debe fallar — OK a nivel DB
+- **Eliminado:** [`hooks/useRealtimeSeats.ts`](../hooks/useRealtimeSeats.ts) (único sitio con `.update()` en seats; sin consumidores).
 
-#### Pendiente — frontend
+#### Validación
 
-[`hooks/useRealtimeSeats.ts`](../hooks/useRealtimeSeats.ts) aún exporta `updateSeatStatus()` que intenta UPDATE directo (líneas 67–88). Debe eliminarse o redirigirse al backend.
+| Check | Resultado |
+|-------|-----------|
+| Frontend no muta seats vía Supabase | OK — 0 referencias `from('seats')` en app/hooks/components |
+| Realtime OK | OK — `useSeatLocking` + `subscribeToTripSeats` sin cambios |
+| Selector / reserva OK | OK — lock/unlock vía `agencyApi` |
 
 ---
 
@@ -434,7 +505,7 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 
 | Test | Descripción | Estado |
 |------|-------------|--------|
-| 1 | Privilege escalation — metadata modificada no accede admin | Parcial (backend tests) |
+| 1 | Privilege escalation — metadata forjada no accede admin | ✅ Manual (2026-08-01) + backend tests |
 | 2 | RPC exposure — anon no puede invocar `create_agency_reservation` | Manual / 037 aplicada |
 | 3 | Tenant isolation — agencia A no ve reservas de B | Parcial (tenant.test.ts) |
 | 4 | Seat manipulation — cliente no puede UPDATE seats | DB OK; falta test automatizado |
@@ -449,7 +520,7 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 | 2 | SEC-002 | Remove identity fabrication | ✅ |
 | 3 | SEC-003 | Revoke RPC exposure (037) | ✅ |
 | 4 | SEC-004 | Harden `password_resets` (040) | ✅ |
-| 5 | SEC-005 | Remove seat client writes | ⚠️ DB ✅ / frontend ⬜ |
+| 5 | SEC-005 | Remove seat client writes (039 + frontend) | ✅ |
 | 6 | SEC-006 | Rewrite RLS policies (039 v2) | ✅ |
 | 7 | SEC-007 | Security regression suite | ⬜ |
 
@@ -463,12 +534,15 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 |----------|--------|
 | `user_metadata` no controla permisos en Express | ✅ |
 | `user_metadata` no controla permisos en RLS | ✅ |
+| `user_metadata` no controla permisos en frontend (AuthProvider + `/auth/me`) | ✅ |
+| Middleware Next.js solo valida sesión (roles en layout) | ✅ |
 | Ningún usuario escala privilegios modificando JWT metadata (API) | ✅ |
 | Ninguna función SECURITY DEFINER pública sin justificación | ✅ (037 + 039) |
 | `password_resets` no accesible desde clientes | ✅ |
-| Seats solo modificables vía backend autorizado | ⚠️ DB ✅ / hook cliente pendiente |
+| Seats solo modificables vía backend autorizado | ✅ |
 | RLS usa fuentes confiables (`public.users` vía helpers) | ✅ |
-| Tests de seguridad pasan | ⬜ |
+| Validación manual forja metadata (browser + consola) | ✅ (2026-08-01) |
+| Tests de seguridad automatizados (`tests/security/`) | ⬜ |
 | Producción tiene grants auditados | ⚠️ Parcial (039 + GRANT USAGE manual) |
 
 ---
@@ -477,14 +551,13 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 
 ### Alta prioridad
 
-1. **SEC-005 frontend** — Eliminar `updateSeatStatus` en [`hooks/useRealtimeSeats.ts`](../hooks/useRealtimeSeats.ts).
-2. **Middleware Next.js** — [`middleware.ts`](../middleware.ts) aún lee `user?.user_metadata?.role` y `agency_id` (líneas 55–75).
+_(ninguno — middleware y frontend auth migrados en FASE 4)_
 
 ### Media prioridad
 
-3. **SEC-007** — Crear `tests/security/` con tests 1–4 automatizados.
-4. **Limpieza de claims** — Dejar de poblar `role`/`agency_id` en `user_metadata` en login/registro (opcional post-middleware).
-5. **Custom Access Token Hook** — Defensa en profundidad opcional (Fase 3 del audit).
+1. **SEC-007** — Crear `tests/security/` con tests 1–4 automatizados.
+2. **Limpieza de claims** — Dejar de poblar `role`/`agency_id` en `user_metadata` en aceptación de invitación (opcional; backend ya ignora metadata).
+3. **Custom Access Token Hook** — Defensa en profundidad opcional (Fase 3 del audit).
 
 ### Referencias
 
@@ -503,3 +576,6 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 | 2026-08-01 | STEP B (039) — admin + C4 seats | OK |
 | 2026-08-01 | Validación PART 4 (queries 4.1–4.5 + app) | Todo OK |
 | 2026-08-01 | 040 — RLS + REVOKE en `password_resets` | OK, forgot/reset validado |
+| 2026-08-01 | SEC-005 — eliminado `hooks/useRealtimeSeats.ts` (código muerto) | OK |
+| 2026-08-01 | FASE 4 — `GET /auth/me`, AuthProvider, middleware session-only | OK |
+| 2026-08-01 | Validación manual — prueba browser + forja metadata (agency) | OK — todos los checks esperados |

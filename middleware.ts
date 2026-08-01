@@ -50,37 +50,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect non-superadmin away from /admin
-  if (pathname.startsWith('/admin')) {
-    const role = user?.user_metadata?.role ?? '';
-    if (role !== 'superadmin') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/';
-      return NextResponse.redirect(url);
-    }
-  }
-
-  // Redirect non-agency away from /agency
-  if (pathname.startsWith('/agency')) {
-    const role = user?.user_metadata?.role ?? '';
-    if (role !== 'agency') {
-      const url = request.nextUrl.clone();
-      url.pathname = '/';
-      return NextResponse.redirect(url);
-    }
-
-    // Validate agency_id from email link against session
-    const agencyParam = request.nextUrl.searchParams.get('agency');
-    if (agencyParam) {
-      const userAgencyId = user?.user_metadata?.agency_id;
-      if (userAgencyId !== agencyParam) {
-        const url = request.nextUrl.clone();
-        url.pathname = '/agency/trips';
-        url.searchParams.set('error', 'wrong-agency');
-        return NextResponse.redirect(url);
-      }
-    }
-  }
+  // Role checks and agency param validation: UX redirects in layout via /auth/me (AuthRoleGuard)
 
   // Pass subdomain to Express via header
   if (subdomain) {

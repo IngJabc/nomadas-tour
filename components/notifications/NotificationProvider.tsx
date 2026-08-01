@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { subscribeToNotifications, type CleanupFn } from '@/lib/realtime/subscriptions';
 import { NOTIFICATION_ICONS } from './notification-config';
 import { BaseToast } from '@/components/ui/BaseToast';
+import { useAuthUser } from '@/hooks/useAuthUser';
 
 export interface Notification {
   id: string;
@@ -96,11 +97,12 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { user: authUser, loading: authLoading } = useAuthUser();
+  const role = authUser?.role ?? null;
+  const agencyId = authUser?.agency_id ?? null;
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<string | null>(null);
-  const [agencyId, setAgencyId] = useState<string | null>(null);
   const cleanupRef = useRef<CleanupFn | null>(null);
   const seenIdsRef = useRef<Set<string>>(new Set());
 
@@ -125,17 +127,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [fetchNotifications]);
 
   useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      const userRole = user?.user_metadata?.role as string | undefined;
-      const userAgencyId = user?.user_metadata?.agency_id as string | undefined;
-      setRole(userRole || null);
-      setAgencyId(userAgencyId || null);
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!role) return;
+    if (authLoading || !role) return;
 
     let cancelled = false;
 
@@ -148,10 +140,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     init();
 
     return () => { cancelled = true; };
-  }, [role, fetchNotifications]);
+  }, [role, authLoading, fetchNotifications]);
 
   useEffect(() => {
-    if (!role) return;
+    if (authLoading || !role) return;
     if (loading) return;
 
     cleanupRef.current?.();
@@ -232,7 +224,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, [role, agencyId, loading]);
+  }, [role, agencyId, loading, authLoading, router]);
 
   const markAsRead = useCallback(async (id: string) => {
     setNotifications((prev) =>

@@ -92,6 +92,36 @@ export class AuthService {
     });
   }
 
+  async getMe(userId: string) {
+    const { data: dbUser, error } = await supabaseAdmin
+      .from('users')
+      .select('id, email, role, agency_id')
+      .eq('id', userId)
+      .single();
+
+    if (error || !dbUser) {
+      throw new UnauthorizedError('Usuario no encontrado');
+    }
+
+    if (dbUser.role !== 'superadmin' && dbUser.role !== 'agency') {
+      throw new UnauthorizedError('Usuario no registrado');
+    }
+
+    if (dbUser.agency_id) {
+      const { data: agency } = await supabaseAdmin
+        .from('agencies')
+        .select('status')
+        .eq('id', dbUser.agency_id)
+        .single();
+
+      if (agency && agency.status !== 'active') {
+        throw new AgencyInactiveError();
+      }
+    }
+
+    return dbUser;
+  }
+
   async resetPassword(identifier: { token?: string; code?: string }, password: string) {
     let record: any = null;
 

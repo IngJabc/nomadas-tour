@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins, Montserrat } from "next/font/google";
 import { Navbar } from "@/components/ui/Navbar";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { RootProviders } from "@/components/auth/RootProviders";
 import "./globals.css";
 import "./design-tokens.css";
 
@@ -38,10 +39,11 @@ export default function RootLayout({
       className={`${poppins.variable} ${montserrat.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-brand-surface text-brand-navy">
-        {/* Global navbar */}
-        <Navbar />
-        {children}
-        <ToastProvider />
+        <RootProviders>
+          <Navbar />
+          {children}
+          <ToastProvider />
+        </RootProviders>
       </body>
     </html>
   );
