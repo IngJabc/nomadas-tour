@@ -20,25 +20,17 @@ export class AuthService {
       throw new UnauthorizedError('Correo o contraseña incorrectos');
     }
 
-    const { data: dbUser } = await supabaseAdmin
+    const { data: dbUser, error: userError } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', data.user.id)
       .single();
 
-    let user: any;
-
-    if (dbUser) {
-      user = dbUser;
-    } else if (data.user.user_metadata?.role === 'superadmin') {
-      user = {
-        id: data.user.id,
-        role: 'superadmin',
-        agency_id: null,
-      };
-    } else {
+    if (userError || !dbUser) {
       throw new UnauthorizedError('Usuario no encontrado');
     }
+
+    const user = dbUser;
 
     if (user.agency_id) {
       const { data: agency } = await supabaseAdmin
