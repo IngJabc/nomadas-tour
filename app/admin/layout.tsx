@@ -1,10 +1,12 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { AdminSidebar } from '@/components/layout/AdminSidebar';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { NotificationProvider } from '@/components/notifications/NotificationProvider';
+import { AuthRoleGuard } from '@/components/auth/AuthRoleGuard';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -16,10 +18,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <NotificationProvider>
-      <DashboardLayout sidebar={<AdminSidebar onLogout={handleLogout} />}>
-        {children}
-      </DashboardLayout>
-    </NotificationProvider>
+    <Suspense fallback={null}>
+      <AuthRoleGuard requiredRole="superadmin">
+        <NotificationProvider>
+          <DashboardLayout sidebar={<AdminSidebar onLogout={handleLogout} />}>
+            {children}
+          </DashboardLayout>
+        </NotificationProvider>
+      </AuthRoleGuard>
+    </Suspense>
   );
 }

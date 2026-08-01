@@ -1,4 +1,5 @@
 import type { AgencyReservation, AgencyTripPassengersResponse } from '@/types';
+import type { AppUser } from '@/lib/auth/types';
 import { ApiError } from '@/lib/errors/api-error';
 import { logoutInactiveAgency } from '@/lib/auth/session-handler';
 
@@ -109,6 +110,7 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ ...identifier, password, confirm_password: password }),
     }),
+  me: () => request<{ user: AppUser }>('/auth/me'),
 };
 
 // Superadmin

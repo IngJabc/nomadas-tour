@@ -1,35 +1,22 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { User } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
+import { useAuthUser } from '@/hooks/useAuthUser';
 
 export function AuthNav() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user, loading, signOut } = useAuthUser();
   const router = useRouter();
-  const supabase = createClient();
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user ?? null);
-    });
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => {
-      listener?.subscription.unsubscribe();
-    };
-  }, [supabase]);
+  if (loading) {
+    return null;
+  }
 
   return (
     <div className="flex gap-2 sm:gap-3 items-center">
       {user ? (
         <>
-          {user.user_metadata?.role === 'superadmin' && (
+          {user.role === 'superadmin' && (
             <Link
               href="/admin"
               className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-amber-300 hover:text-amber-200 transition-colors whitespace-nowrap"
@@ -39,7 +26,7 @@ export function AuthNav() {
           )}
           <button
             onClick={async () => {
-              await supabase.auth.signOut();
+              await signOut();
               router.push('/login');
               router.refresh();
             }}

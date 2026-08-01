@@ -6,7 +6,7 @@ import { Bus, AlertTriangle, Search, X } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { agencyApi } from '@/lib/api';
 import { subscribeToTripSeats, subscribeToTripAgencies, subscribeToTrips } from '@/lib/realtime/subscriptions';
-import { createClient } from '@/lib/supabase/client';
+import { useAuthUser } from '@/hooks/useAuthUser';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { AgencyTripCardSkeleton } from '@/components/ui/Skeleton';
@@ -30,7 +30,8 @@ export default function AgencyTripsContent() {
   const [initialLoad, setInitialLoad] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [tripIds, setTripIds] = useState<string[]>([]);
-  const [agencyId, setAgencyId] = useState<string | null>(null);
+  const { user } = useAuthUser();
+  const agencyId = user?.agency_id ?? null;
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -49,13 +50,6 @@ export default function AgencyTripsContent() {
   const [searchFilter, setSearchFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setAgencyId((user?.user_metadata?.agency_id as string) ?? null);
-    });
-  }, []);
 
   const doFetch = useCallback(async () => {
     try {

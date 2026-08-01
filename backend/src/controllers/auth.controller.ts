@@ -49,6 +49,15 @@ export class AuthController {
     }
   }
 
+  async me(req: Request, res: Response, next: NextFunction) {
+    try {
+      const user = await authService.getMe(req.ctx!.userId);
+      res.json({ user });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async validateInvitation(req: Request, res: Response, next: NextFunction) {
     try {
       const data = validateInvitationSchema.parse(req.body);

@@ -3,10 +3,10 @@
 **Documento:** Entrega de auditoría de seguridad — Sección de remediación
 **Alcance:** Hallazgos Críticos C1–C4 (verificados contra el código actual)
 **Audiencia:** Cliente técnico (Supabase/Postgres + Next.js + Express)
-**Estado de verificación previo:** C1 VERIFIED · C2 PARTIALLY VERIFIED · C3 VERIFIED · C4 PARTIALLY VERIFIED
+**Estado de verificación previo:** C1 VERIFIED · C2 PARTIALLY VERIFIED · C3 VERIFIED · C4 PARTIALLY VERIFIED  
+**Estado de remediación (2026-08-01):** C1–C4 remediados en prod pre-lanzamiento. Validación manual checklist §5.1 completada (forja metadata, cuenta agency).
 
-> Este documento solo contiene remediación y validación. Los fixes no se han aplicado.
-> Todos los cambios propuestos son accionables y específicos para la arquitectura real del proyecto (Express con `supabaseAdmin` service-role como única vía de escritura, Next.js App Router con `middleware.ts`, y RLS en Supabase).
+> Este documento describe remediación y validación. **Los fixes C1–C4 están aplicados** (migraciones 035–040, FASE 4 frontend). Pendiente: automatizar checklist en `tests/security/` (SEC-007).
 
 ---
 
@@ -478,17 +478,44 @@ CREATE POLICY "seats_auth_update_scoped" ON seats
 
 Ejecutar en este orden, tras aplicar las migraciones y desplegar el backend. Las pruebas 1–4 deben ejecutarse en el entorno de producción pre-corte y post-corte.
 
+### Estado de validación (2026-08-01)
+
+| Prueba | Descripción | Estado |
+|--------|-------------|--------|
+| 5.1 | Forja `role` desde cliente | ✅ Validada manualmente (agency + consola) |
+| 5.2 | JWT manipulado → rechazo | Parcial (backend tests) |
+| 5.3 | RPC sin autorización | 037 aplicada; sin re-test manual documentado |
+| 5.4 | UPDATE seats desde cliente | 039 aplicada; sin re-test manual documentado |
+| 5.5–5.8 | SQL + regresión E2E | Parcial / pendiente SEC-007 |
+
+Detalle de 5.1: ver [`security-hardening-implementation.md`](security-hardening-implementation.md) — sección FASE 4 validación manual.
+
+---
+
 ### 5.1 Forjar `role` desde el cliente → NO debe otorgar privilegios
 
+**Estado:** ✅ Validada 2026-08-01 (cuenta agency, prod pre-lanzamiento)
+
 ```js
-// Consola del browser, con una cuenta de usuario normal (rol 'user') autenticada:
-await supabase.auth.updateUser({ data: { role: 'superadmin' } });
-// Resultado esperado tras el fix:
-//  1. GET /api/admin/dashboard (lib/api.ts usa session.access_token) → 403 FORBIDDEN
-//  2. POST /rest/v1/rpc/create_agency_reservation con anon key → 404/403
-//  3. GET /rest/v1/agencies → 0 filas de otras agencias
-// Si alguna de las tres responde 200 con datos → fix incompleto.
+// Consola del browser, con cuenta agency autenticada:
+// PUT /auth/v1/user con data: { role: 'superadmin', agency_id: null }
+// (equivalente a supabase.auth.updateUser({ data: { role: 'superadmin' } }))
 ```
+
+Resultado observado tras el fix:
+
+| Check | Esperado | Resultado |
+|-------|----------|-----------|
+| Metadata forjada aceptada por Supabase | 200 | OK |
+| `GET /auth/me` | `"role": "agency"` | OK |
+| Navbar | Sin enlace Admin | OK |
+| `/admin` | Bloqueado | OK |
+| `GET /api/admin/dashboard` | 403 FORBIDDEN | OK |
+
+Checks adicionales del audit original (sin re-validar en esta sesión):
+
+- POST `/rest/v1/rpc/create_agency_reservation` con anon key → 404/403 (037)
+- GET `/rest/v1/agencies` → sin filas de otras agencias
 
 ### 5.2 JWT manipulado → rechazo
 
@@ -574,7 +601,7 @@ ORDER BY table_name, grantee, privilege_type;
 |---|---|
 | Login superadmin → `/admin` | OK, dashboard con datos |
 | Login agencia → `/agency` | OK, scope de su agencia |
-| Forjar role y re-login | Sigue sin poder acceder a `/admin` (middleware DB-backed) |
+| Forjar role y reload | Sigue sin poder acceder a admin ni APIs superadmin | ✅ Validado 2026-08-01 |
 | Crear reserva de agencia (Express + RPC) | OK (service-role conserva ejecución) |
 | Lock/unlock de asientos (agencia) | OK, propagación realtime |
 | Reset de contraseña (código y token) | OK; 5+ intentos fallidos bloquean (lockout activo) |

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { AgencySidebar } from '@/components/layout/AgencySidebar';
@@ -9,10 +9,13 @@ import { subscribeToAgencies } from '@/lib/realtime/subscriptions';
 import { logoutInactiveAgency } from '@/lib/auth/session-handler';
 import { agencyApi } from '@/lib/api';
 import { NotificationProvider } from '@/components/notifications/NotificationProvider';
+import { AuthRoleGuard } from '@/components/auth/AuthRoleGuard';
+import { useAuthUser } from '@/hooks/useAuthUser';
 import type { CleanupFn } from '@/lib/realtime/subscriptions';
 
-export default function AgencyLayout({ children }: { children: React.ReactNode }) {
+function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { user } = useAuthUser();
   const cleanupRef = useRef<CleanupFn | null>(null);
 
   const handleLogout = async () => {
@@ -29,28 +32,21 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
   };
 
   useEffect(() => {
-    let cancelled = false;
-    const supabase = createClient();
+    const agencyId = user?.agency_id;
+    if (!agencyId) return;
 
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return;
-      const agencyId = data.user?.user_metadata?.agency_id;
-      if (!agencyId) return;
-
-      cleanupRef.current = subscribeToAgencies((payload) => {
-        if (payload.eventType !== 'UPDATE') return;
-        if (payload.agency.id !== agencyId) return;
-        if (payload.agency.status !== 'inactive') return;
-        logoutInactiveAgency();
-      }, agencyId);
-    });
+    cleanupRef.current = subscribeToAgencies((payload) => {
+      if (payload.eventType !== 'UPDATE') return;
+      if (payload.agency.id !== agencyId) return;
+      if (payload.agency.status !== 'inactive') return;
+      logoutInactiveAgency();
+    }, agencyId);
 
     return () => {
-      cancelled = true;
       cleanupRef.current?.();
       cleanupRef.current = null;
     };
-  }, []);
+  }, [user?.agency_id]);
 
   return (
     <NotificationProvider>
@@ -58,5 +54,15 @@ export default function AgencyLayout({ children }: { children: React.ReactNode }
         {children}
       </DashboardLayout>
     </NotificationProvider>
+  );
+}
+
+export default function AgencyLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={null}>
+      <AuthRoleGuard requiredRole="agency">
+        <AgencyLayoutInner>{children}</AgencyLayoutInner>
+      </AuthRoleGuard>
+    </Suspense>
   );
 }

@@ -52,6 +52,7 @@ import { ReservationTicket } from "@/components/reservations/ReservationTicket";
 import { ReservationTicketActions } from "@/components/reservations/ReservationTicketActions";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 import { isForcedLogout } from "@/lib/auth/session-handler";
+import { useAuthUser } from "@/hooks/useAuthUser";
 
 // ─── Page wrapper ────────────────────────────────────────────────────
 export default function NewAgencyReservationPage() {
@@ -79,23 +80,8 @@ function NewReservationContent() {
       ? "agency_trips"
       : "new_reservation";
 
-  // ─── Auth ─────────────────────────────────────────────────────────
-  const [userId, setUserId] = useState<string | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const { createClient } = await import("@/lib/supabase/client");
-        const supabase = createClient();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        setUserId(session?.user?.id ?? null);
-      } catch {
-        /* silent */
-      }
-    })();
-  }, []);
+  const { user } = useAuthUser();
+  const userId = user?.id ?? null;
 
   // ─── beforeunload — only show dialog if user has locked seats ──────
   const selectedSeatsCountRef = useRef(0);
