@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../config/database.js';
+import { supabase, supabaseAdmin } from '../config/database.js';
 import { UnauthorizedError } from '../errors/index.js';
 import { RequestContext } from '../types/index.js';
 
@@ -11,11 +11,25 @@ declare global {
   }
 }
 
-function extractContext(user: { id: string; user_metadata?: Record<string, unknown> }): RequestContext {
+async function extractContext(user: { id: string }): Promise<RequestContext> {
+  const { data: dbUser, error } = await supabaseAdmin
+    .from('users')
+    .select('id, role, agency_id')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (error || !dbUser) {
+    throw new UnauthorizedError('Usuario no registrado');
+  }
+
+  if (dbUser.role !== 'superadmin' && dbUser.role !== 'agency') {
+    throw new UnauthorizedError('Usuario no registrado');
+  }
+
   return {
-    userId: user.id,
-    role: (user.user_metadata?.role as RequestContext['role']),
-    agencyId: (user.user_metadata?.agency_id as string) ?? null,
+    userId: dbUser.id,
+    role: dbUser.role as RequestContext['role'],
+    agencyId: dbUser.agency_id ?? null,
   };
 }
 
@@ -32,6 +46,6 @@ export async function auth(req: Request, _res: Response, next: NextFunction) {
     throw new UnauthorizedError('Token inválido o expirado');
   }
 
-  req.ctx = extractContext(user);
+  req.ctx = await extractContext(user);
   next();
 }
