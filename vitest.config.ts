@@ -12,11 +12,6 @@ export default defineConfig({
       'tests/security/**/*.test.ts',
       'tests/security/**/*.test.tsx',
     ],
-    environmentMatchGlobs: [
-      ['tests/security/**/*.backend.test.ts', 'node'],
-      ['tests/security/no-user-metadata-in-source.test.ts', 'node'],
-      ['tests/security/rls-active-migrations.test.ts', 'node'],
-    ],
     env: {
       TZ: 'UTC',
     },
