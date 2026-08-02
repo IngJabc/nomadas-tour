@@ -3,7 +3,7 @@
 **Documento:** Plan técnico de implementación de remediaciones de seguridad  
 **Basado en:** [Security Assessment C1–C4](security-audit-remediation.md)  
 **Objetivo:** Eliminar vulnerabilidades críticas, reforzar límites de confianza y establecer un modelo seguro de autorización.  
-**Última actualización:** 2026-08-01 (FASE 4 + validación manual forja completada)  
+**Última actualización:** 2026-08-01 (SEC-007 suite automatizada completada)  
 **Entorno:** Supabase producción (pre-lanzamiento). Migración 039 aplicada e validada.
 
 ---
@@ -18,7 +18,7 @@
 | SEC-004 | RLS en `password_resets` | C2 | P1 | **Completado** |
 | SEC-005 | Eliminar UPDATE directo de seats | C4 | P1 | **Completado** |
 | SEC-006 | Reescribir políticas RLS | C1 | P2 | **Completado (v2)** |
-| SEC-007 | Suite de regression tests | — | P2 | **Pendiente** |
+| SEC-007 | Suite de regression tests | — | P2 | **Completado** |
 
 **Migraciones relacionadas:**
 
@@ -451,9 +451,45 @@ AND agency_id = (SELECT private.auth_app_agency_id())
 
 ---
 
-### TASK SEC-007 — Auditoría automática de SECURITY DEFINER
+### TASK SEC-007 — Security regression test suite
 
-**Prioridad:** P2 · **Estado:** Pendiente
+**Prioridad:** P2 · **Estado:** Completado (2026-08-01)
+
+#### Ubicación
+
+[`tests/security/`](../tests/security/) — ejecutar con `npm run test:security`
+
+#### Cobertura automatizada
+
+| Archivo | Qué protege |
+|---------|-------------|
+| `identity-forgery.backend.test.ts` | Cadena crítica: JWT `user_metadata.role=superadmin` + `public.users.role=agency` → `req.ctx` y `/auth/me` mantienen `agency`; `authorize('superadmin')` rechaza |
+| `identity-forgery.frontend.test.tsx` | Contrato `useAuthUser().user.role` (desde `/auth/me`) — AuthNav y AuthRoleGuard |
+| `no-user-metadata-in-source.test.ts` | Regresión estática: ningún `user_metadata` en `app/`, `components/`, `hooks/`, `lib/`, `middleware.ts`, `backend/src/` (allowlist: `auth.service.ts` accept-invitation) |
+| `rls-active-migrations.test.ts` | Solo `039_rls_identity_from_public_users_v2.sql`: sin `user_metadata` en policies; usa `private.auth_app_role()` / `private.auth_app_agency_id()` |
+
+#### Resultados (2026-08-01)
+
+```bash
+npm run test:security   # 4 files, 14 tests — PASS
+npm test --prefix backend  # 12 files, 137 tests — PASS
+npm test                # incluye tests/security + __tests__; 1 fallo preexistente en lib/__tests__/utils.test.ts (timezone/formato, no relacionado con SEC-007)
+```
+
+#### C1 — validación manual + automatizada
+
+| Capa | Manual (2026-08-01) | Automatizado (SEC-007) |
+|------|---------------------|------------------------|
+| Backend auth / `/auth/me` | ✅ forja metadata | ✅ `identity-forgery.backend.test.ts` |
+| Frontend UI / guards | ✅ browser + forja | ✅ `identity-forgery.frontend.test.tsx` |
+| Sin `user_metadata` en código app | ✅ grep manual | ✅ `no-user-metadata-in-source.test.ts` |
+| RLS policies activas (039) | ✅ SQL en prod | ✅ `rls-active-migrations.test.ts` |
+
+---
+
+### TASK SEC-007 (legacy) — Auditoría automática de SECURITY DEFINER
+
+**Nota:** La revisión manual de funciones SECURITY DEFINER sigue documentada abajo; la suite `tests/security/` cubre regresión C1/identidad.
 
 #### Revisión obligatoria
 
@@ -467,8 +503,8 @@ WHERE prosecdef = true;
 
 #### Estado actual
 
-- Revisión manual realizada para `create_agency_reservation` (037) y helpers `private.auth_app_*` (039).
-- No existe suite automatizada ni carpeta `tests/security/`.
+- Suite [`tests/security/`](../tests/security/) implementada y passing.
+- Revisión manual de funciones SECURITY DEFINER: `create_agency_reservation` (037), helpers `private.auth_app_*` (039).
 
 ---
 
@@ -501,14 +537,15 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 
 ## 6. Security regression tests
 
-**Estado:** Pendiente — no existe `tests/security/`.
+**Estado:** Completado — [`tests/security/`](../tests/security/)
 
 | Test | Descripción | Estado |
 |------|-------------|--------|
-| 1 | Privilege escalation — metadata forjada no accede admin | ✅ Manual (2026-08-01) + backend tests |
-| 2 | RPC exposure — anon no puede invocar `create_agency_reservation` | Manual / 037 aplicada |
-| 3 | Tenant isolation — agencia A no ve reservas de B | Parcial (tenant.test.ts) |
-| 4 | Seat manipulation — cliente no puede UPDATE seats | DB OK; falta test automatizado |
+| 1 | Privilege escalation — metadata forjada no accede admin | ✅ Manual + [`identity-forgery.*`](tests/security/) |
+| 2 | RPC exposure — anon no puede invocar `create_agency_reservation` | ✅ 037 + manual; scanner opcional futuro |
+| 3 | Tenant isolation — agencia A no ve reservas de B | Parcial (`tenant.test.ts`) |
+| 4 | Seat manipulation — cliente no puede UPDATE seats | ✅ DB 039 + manual; scanner RLS en 039 |
+| 5 | Regresión estática `user_metadata` en código | ✅ `no-user-metadata-in-source.test.ts` |
 
 ---
 
@@ -522,7 +559,7 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 | 4 | SEC-004 | Harden `password_resets` (040) | ✅ |
 | 5 | SEC-005 | Remove seat client writes (039 + frontend) | ✅ |
 | 6 | SEC-006 | Rewrite RLS policies (039 v2) | ✅ |
-| 7 | SEC-007 | Security regression suite | ⬜ |
+| 7 | SEC-007 | Security regression suite (`tests/security/`) | ✅ |
 
 **Nota:** SEC-005 y SEC-006 se consolidaron en la migración 039 (no en archivos separados como `039_remove_client_seat_update.sql` del plan original).
 
@@ -542,7 +579,8 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 | Seats solo modificables vía backend autorizado | ✅ |
 | RLS usa fuentes confiables (`public.users` vía helpers) | ✅ |
 | Validación manual forja metadata (browser + consola) | ✅ (2026-08-01) |
-| Tests de seguridad automatizados (`tests/security/`) | ⬜ |
+| Tests de seguridad automatizados (`tests/security/`) | ✅ (14 tests, 2026-08-01) |
+| C1 cubierto manual + automatizado | ✅ |
 | Producción tiene grants auditados | ⚠️ Parcial (039 + GRANT USAGE manual) |
 
 ---
@@ -555,9 +593,9 @@ _(ninguno — middleware y frontend auth migrados en FASE 4)_
 
 ### Media prioridad
 
-1. **SEC-007** — Crear `tests/security/` con tests 1–4 automatizados.
-2. **Limpieza de claims** — Dejar de poblar `role`/`agency_id` en `user_metadata` en aceptación de invitación (opcional; backend ya ignora metadata).
-3. **Custom Access Token Hook** — Defensa en profundidad opcional (Fase 3 del audit).
+1. **Limpieza de claims** — Dejar de poblar `role`/`agency_id` en `user_metadata` en aceptación de invitación; quitar allowlist en `no-user-metadata-in-source.test.ts`.
+2. **Custom Access Token Hook** — Defensa en profundidad opcional (Fase 3 del audit).
+3. **Tenant isolation test** — Automatizar checklist 5.3 en `tests/security/` (opcional).
 
 ### Referencias
 
@@ -579,3 +617,4 @@ _(ninguno — middleware y frontend auth migrados en FASE 4)_
 | 2026-08-01 | SEC-005 — eliminado `hooks/useRealtimeSeats.ts` (código muerto) | OK |
 | 2026-08-01 | FASE 4 — `GET /auth/me`, AuthProvider, middleware session-only | OK |
 | 2026-08-01 | Validación manual — prueba browser + forja metadata (agency) | OK — todos los checks esperados |
+| 2026-08-01 | SEC-007 — `tests/security/` (14 tests) | OK — `npm run test:security` |

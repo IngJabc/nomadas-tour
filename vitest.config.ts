@@ -6,6 +6,17 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: [],
+    include: [
+      '__tests__/**/*.test.ts',
+      'lib/**/__tests__/**/*.test.ts',
+      'tests/security/**/*.test.ts',
+      'tests/security/**/*.test.tsx',
+    ],
+    environmentMatchGlobs: [
+      ['tests/security/**/*.backend.test.ts', 'node'],
+      ['tests/security/no-user-metadata-in-source.test.ts', 'node'],
+      ['tests/security/rls-active-migrations.test.ts', 'node'],
+    ],
     env: {
       TZ: 'UTC',
     },
