@@ -3,7 +3,7 @@
 **Documento:** Plan técnico de implementación de remediaciones de seguridad  
 **Basado en:** [Security Assessment C1–C4](security-audit-remediation.md)  
 **Objetivo:** Eliminar vulnerabilidades críticas, reforzar límites de confianza y establecer un modelo seguro de autorización.  
-**Última actualización:** 2026-08-01 (SEC-007 suite automatizada completada)  
+**Última actualización:** 2026-08-02 (SEC-008 — eliminado user_metadata de accept-invitation)  
 **Entorno:** Supabase producción (pre-lanzamiento). Migración 039 aplicada e validada.
 
 ---
@@ -19,6 +19,7 @@
 | SEC-005 | Eliminar UPDATE directo de seats | C4 | P1 | **Completado** |
 | SEC-006 | Reescribir políticas RLS | C1 | P2 | **Completado (v2)** |
 | SEC-007 | Suite de regression tests | — | P2 | **Completado** |
+| SEC-008 | Eliminar user_metadata de accept-invitation | C1 | P2 | **Completado** |
 
 **Migraciones relacionadas:**
 
@@ -27,10 +28,10 @@
 | [`035_backfill_users_from_auth.sql`](../supabase/migrations/035_backfill_users_from_auth.sql) | FASE 0 — backfill `public.users` | Aplicada |
 | [`037_revoke_rpc_public_execute.sql`](../supabase/migrations/037_revoke_rpc_public_execute.sql) | SEC-003 | Aplicada |
 | [`036_rls_identity_from_public_users.sql`](../supabase/migrations/036_rls_identity_from_public_users.sql) | Intento RLS inline | **NO APLICAR** (42P17) |
-| [`038_revert_036_rls.sql`](../supabase/migrations/038_revert_036_rls.sql) | Rollback de 036 | Aplicada |
+| [`038_revert_036_rls.sql`](../supabase/rollbacks/038_revert_036_rls.sql) | Rollback manual de 036 | **No auto-aplicar** — ver `supabase/rollbacks/` |
 | [`039_rls_identity_from_public_users_v2.sql`](../supabase/migrations/039_rls_identity_from_public_users_v2.sql) | SEC-005 + SEC-006 (v2) | **Aplicada en prod** |
 | [`040_harden_password_resets.sql`](../supabase/migrations/040_harden_password_resets.sql) | SEC-004 — RLS + REVOKE en `password_resets` | **Aplicada en prod** |
-| [`039_rollback_restore_metadata_rls.sql`](../supabase/migrations/039_rollback_restore_metadata_rls.sql) | Rollback de emergencia 039 | Disponible, no usado |
+| [`039_rollback_restore_metadata_rls.sql`](../supabase/rollbacks/039_rollback_restore_metadata_rls.sql) | Rollback manual de emergencia 039 | **No auto-aplicar** — ver `supabase/rollbacks/` |
 
 ---
 
@@ -420,7 +421,7 @@ AND agency_id = (SELECT private.auth_app_agency_id())
 | Archivo | Estado |
 |---------|--------|
 | [`039_rls_identity_from_public_users_v2.sql`](../supabase/migrations/039_rls_identity_from_public_users_v2.sql) | Aplicada (incremental: PART 0→1→2→3) |
-| [`039_rollback_restore_metadata_rls.sql`](../supabase/migrations/039_rollback_restore_metadata_rls.sql) | Rollback disponible |
+| [`039_rollback_restore_metadata_rls.sql`](../supabase/rollbacks/039_rollback_restore_metadata_rls.sql) | Rollback manual (fuera de migrations) |
 | [`036_rls_identity_from_public_users.sql`](../supabase/migrations/036_rls_identity_from_public_users.sql) | **NO APLICAR** |
 
 #### Helpers PART 1
@@ -465,14 +466,17 @@ AND agency_id = (SELECT private.auth_app_agency_id())
 |---------|-------------|
 | `identity-forgery.backend.test.ts` | Cadena crítica: JWT `user_metadata.role=superadmin` + `public.users.role=agency` → `req.ctx` y `/auth/me` mantienen `agency`; `authorize('superadmin')` rechaza |
 | `identity-forgery.frontend.test.tsx` | Contrato `useAuthUser().user.role` (desde `/auth/me`) — AuthNav y AuthRoleGuard |
-| `no-user-metadata-in-source.test.ts` | Regresión estática: ningún `user_metadata` en `app/`, `components/`, `hooks/`, `lib/`, `middleware.ts`, `backend/src/` (allowlist: `auth.service.ts` accept-invitation) |
+| `no-user-metadata-in-source.test.ts` | Regresión estática: ningún `user_metadata` / `raw_user_meta_data` en código ejecutable |
+| `no-auth-metadata-writes.test.ts` | Regresión: sin escrituras Auth metadata para role/agency_id |
+| `no-rollback-in-migrations.test.ts` | Sin rollback/revert SQL auto-aplicable en `supabase/migrations/` |
+| `no-dist-user-metadata.test.ts` | `backend/dist` gitignored; auth compilado sin metadata |
 | `rls-active-migrations.test.ts` | Solo `039_rls_identity_from_public_users_v2.sql`: sin `user_metadata` en policies; usa `private.auth_app_role()` / `private.auth_app_agency_id()` |
 
 #### Resultados (2026-08-01)
 
 ```bash
-npm run test:security   # 4 files, 14 tests — PASS
-npm test --prefix backend  # 12 files, 137 tests — PASS
+npm run test:security   # 5 files, 14 tests — PASS
+npm test --prefix backend  # 12 files, 139 tests — PASS
 npm test                # incluye tests/security + __tests__; 1 fallo preexistente en lib/__tests__/utils.test.ts (timezone/formato, no relacionado con SEC-007)
 ```
 
@@ -484,6 +488,32 @@ npm test                # incluye tests/security + __tests__; 1 fallo preexisten
 | Frontend UI / guards | ✅ browser + forja | ✅ `identity-forgery.frontend.test.tsx` |
 | Sin `user_metadata` en código app | ✅ grep manual | ✅ `no-user-metadata-in-source.test.ts` |
 | RLS policies activas (039) | ✅ SQL en prod | ✅ `rls-active-migrations.test.ts` |
+
+---
+
+### TASK SEC-008 — Eliminar user_metadata de accept-invitation
+
+**Relacionado:** C1 · **Prioridad:** P2 · **Estado:** Completado (2026-08-02)
+
+#### Cambio
+
+[`backend/src/services/auth.service.ts`](../backend/src/services/auth.service.ts) — `acceptInvitation`:
+
+- **Antes:** `createUser` / `updateUserById` escribían `user_metadata: { role, agency_id }`
+- **Después:** Auth solo crea/actualiza credenciales (`email`, `password`, `email_confirm`); rol y agencia vía `public.users.upsert`
+
+#### Scanner SEC-007
+
+- Allowlist de `auth.service.ts` **eliminada**
+- Nuevo test: `no-auth-metadata-writes.test.ts`
+- Tests unitarios: `authService.acceptInvitation` verifica ausencia de `user_metadata` en llamadas admin
+
+#### Validación
+
+```bash
+npm run test:security   # PASS (sin allowlist)
+npm test --prefix backend  # 139 tests PASS
+```
 
 ---
 
@@ -531,7 +561,7 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 
 ### Rollback
 
-[`039_rollback_restore_metadata_rls.sql`](../supabase/migrations/039_rollback_restore_metadata_rls.sql) — restaura estado post-038 + elimina helpers.
+[`039_rollback_restore_metadata_rls.sql`](../supabase/rollbacks/039_rollback_restore_metadata_rls.sql) — restaura estado post-038 + elimina helpers. **Solo ejecución manual** (SQL Editor).
 
 ---
 
@@ -580,7 +610,11 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 | RLS usa fuentes confiables (`public.users` vía helpers) | ✅ |
 | Validación manual forja metadata (browser + consola) | ✅ (2026-08-01) |
 | Tests de seguridad automatizados (`tests/security/`) | ✅ (14 tests, 2026-08-01) |
+| Sin user_metadata en código ejecutable (SEC-008) | ✅ |
 | C1 cubierto manual + automatizado | ✅ |
+| `backend/dist` fuera de Git + rebuild en `npm start` | ✅ (2026-08-02) |
+| Rollback 039 fuera de `supabase/migrations/` | ✅ |
+| `login()` sin `select('*')` / sin `password_hash` | ✅ |
 | Producción tiene grants auditados | ⚠️ Parcial (039 + GRANT USAGE manual) |
 
 ---
@@ -593,14 +627,15 @@ _(ninguno — middleware y frontend auth migrados en FASE 4)_
 
 ### Media prioridad
 
-1. **Limpieza de claims** — Dejar de poblar `role`/`agency_id` en `user_metadata` en aceptación de invitación; quitar allowlist en `no-user-metadata-in-source.test.ts`.
-2. **Custom Access Token Hook** — Defensa en profundidad opcional (Fase 3 del audit).
-3. **Tenant isolation test** — Automatizar checklist 5.3 en `tests/security/` (opcional).
+1. **Custom Access Token Hook** — Defensa en profundidad opcional (Fase 3 del audit).
+2. **Tenant isolation test** — Automatizar checklist 5.3 en `tests/security/` (opcional).
+3. **Fix preexistente** — `lib/__tests__/utils.test.ts` (timezone/formato en `formatDateTime`).
 
 ### Referencias
 
 - Audit detallado: [`docs/security-audit-remediation.md`](security-audit-remediation.md)
-- Rollback 039: [`supabase/migrations/039_rollback_restore_metadata_rls.sql`](../supabase/migrations/039_rollback_restore_metadata_rls.sql)
+- Rollback 039 (manual): [`supabase/rollbacks/039_rollback_restore_metadata_rls.sql`](../supabase/rollbacks/039_rollback_restore_metadata_rls.sql)
+- Backend deploy: [`docs/backend-deploy.md`](backend-deploy.md)
 
 ---
 
@@ -618,3 +653,5 @@ _(ninguno — middleware y frontend auth migrados en FASE 4)_
 | 2026-08-01 | FASE 4 — `GET /auth/me`, AuthProvider, middleware session-only | OK |
 | 2026-08-01 | Validación manual — prueba browser + forja metadata (agency) | OK — todos los checks esperados |
 | 2026-08-01 | SEC-007 — `tests/security/` (14 tests) | OK — `npm run test:security` |
+| 2026-08-02 | SEC-008 — accept-invitation sin user_metadata; scanner sin allowlist | OK |
+| 2026-08-02 | C1 cierre operacional — dist untracked, prestart build, rollback movido, login select | OK |

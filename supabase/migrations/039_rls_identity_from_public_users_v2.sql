@@ -8,7 +8,7 @@
 
 -- RCA confirmado: 036 inline EXISTS(public.users) → SQLSTATE 42P17 → Realtime roto.
 
--- Rollback de emergencia: 039_rollback_restore_metadata_rls.sql
+-- Rollback de emergencia (manual): supabase/rollbacks/039_rollback_restore_metadata_rls.sql
 
 --
 

@@ -22,7 +22,7 @@ export class AuthService {
 
     const { data: dbUser, error: userError } = await supabaseAdmin
       .from('users')
-      .select('*')
+      .select('id, email, role, agency_id')
       .eq('id', data.user.id)
       .single();
 
@@ -213,7 +213,6 @@ export class AuthService {
 
       await supabase.auth.admin.updateUserById(userId, {
         password,
-        user_metadata: { role: 'agency', agency_id: agencyId },
         email_confirm: true,
       });
     } else {
@@ -221,7 +220,6 @@ export class AuthService {
         email,
         password,
         email_confirm: true,
-        user_metadata: { role: 'agency', agency_id: agencyId },
       });
 
       if (signUpError) throw new ValidationError(signUpError.message);

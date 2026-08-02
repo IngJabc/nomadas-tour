@@ -15,13 +15,30 @@ const SCAN_FILES = ['middleware.ts'] as const;
 
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
-/** Temporary until accept-invitation metadata cleanup (post SEC-007). */
-export const USER_METADATA_ALLOWLIST = new Set([
-  'backend/src/services/auth.service.ts',
-]);
-
-const FORBIDDEN_PATTERNS: { name: string; regex: RegExp }[] = [
+export const FORBIDDEN_PATTERNS: { name: string; regex: RegExp }[] = [
   { name: 'user_metadata', regex: /user_metadata/ },
+  { name: 'raw_user_meta_data', regex: /raw_user_meta_data/ },
+];
+
+/** Auth admin/client metadata writes — role/agency_id must live in public.users only. */
+export const FORBIDDEN_AUTH_WRITE_PATTERNS: { name: string; regex: RegExp }[] = [
+  ...FORBIDDEN_PATTERNS,
+  {
+    name: 'updateUserById with user_metadata',
+    regex: /updateUserById\s*\([^)]*\{[\s\S]*?user_metadata/s,
+  },
+  {
+    name: 'createUser with user_metadata',
+    regex: /createUser\s*\(\s*\{[\s\S]*?user_metadata/s,
+  },
+  {
+    name: 'updateUser with data.role or data.agency_id',
+    regex: /(?:auth\.)?updateUser\s*\(\s*\{[\s\S]*?data\s*:\s*\{[\s\S]*?(?:role|agency_id)/s,
+  },
+  {
+    name: 'admin.updateUserById with data.role or data.agency_id',
+    regex: /admin\.updateUserById\s*\([^)]*\{[\s\S]*?data\s*:\s*\{[\s\S]*?(?:role|agency_id)/s,
+  },
 ];
 
 function normalizeRelative(filePath: string): string {
@@ -31,11 +48,27 @@ function normalizeRelative(filePath: string): string {
 function shouldScanFile(relativePath: string): boolean {
   if (!/\.(ts|tsx|js|jsx)$/.test(relativePath)) return false;
   if (/\.test\.(ts|tsx)$/.test(relativePath)) return false;
-  if (USER_METADATA_ALLOWLIST.has(relativePath)) return false;
   return true;
 }
 
-function walkDir(absDir: string, hits: string[]): void {
+function scanFileContent(
+  relativePath: string,
+  content: string,
+  patterns: { name: string; regex: RegExp }[],
+  hits: string[],
+): void {
+  for (const { name, regex } of patterns) {
+    if (regex.test(content)) {
+      hits.push(`${relativePath} (matched: ${name})`);
+    }
+  }
+}
+
+function walkDir(
+  absDir: string,
+  patterns: { name: string; regex: RegExp }[],
+  hits: string[],
+): void {
   if (!fs.existsSync(absDir)) return;
 
   for (const entry of fs.readdirSync(absDir, { withFileTypes: true })) {
@@ -44,7 +77,7 @@ function walkDir(absDir: string, hits: string[]): void {
 
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name === 'dist') continue;
-      walkDir(absPath, hits);
+      walkDir(absPath, patterns, hits);
       continue;
     }
 
@@ -54,19 +87,15 @@ function walkDir(absDir: string, hits: string[]): void {
     if (!SOURCE_EXTENSIONS.has(ext)) continue;
 
     const content = fs.readFileSync(absPath, 'utf8');
-    for (const { name, regex } of FORBIDDEN_PATTERNS) {
-      if (regex.test(content)) {
-        hits.push(`${relativePath} (matched: ${name})`);
-      }
-    }
+    scanFileContent(relativePath, content, patterns, hits);
   }
 }
 
-export function findForbiddenUserMetadataInSource(): string[] {
+function scanRoots(patterns: { name: string; regex: RegExp }[]): string[] {
   const hits: string[] = [];
 
   for (const root of SCAN_ROOTS) {
-    walkDir(path.join(REPO_ROOT, root), hits);
+    walkDir(path.join(REPO_ROOT, root), patterns, hits);
   }
 
   for (const file of SCAN_FILES) {
@@ -75,12 +104,16 @@ export function findForbiddenUserMetadataInSource(): string[] {
     const relativePath = normalizeRelative(file);
     if (!shouldScanFile(relativePath)) continue;
     const content = fs.readFileSync(absPath, 'utf8');
-    for (const { name, regex } of FORBIDDEN_PATTERNS) {
-      if (regex.test(content)) {
-        hits.push(`${relativePath} (matched: ${name})`);
-      }
-    }
+    scanFileContent(relativePath, content, patterns, hits);
   }
 
   return hits;
+}
+
+export function findForbiddenUserMetadataInSource(): string[] {
+  return scanRoots(FORBIDDEN_PATTERNS);
+}
+
+export function findForbiddenAuthMetadataWrites(): string[] {
+  return scanRoots(FORBIDDEN_AUTH_WRITE_PATTERNS);
 }
