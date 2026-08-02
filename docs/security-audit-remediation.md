@@ -482,7 +482,7 @@ Ejecutar en este orden, tras aplicar las migraciones y desplegar el backend. Las
 
 | Prueba | Descripción | Estado |
 |--------|-------------|--------|
-| 5.1 | Forja `role` desde cliente | ✅ Validada manualmente (agency + consola) |
+| 5.1 | Forja `role` desde cliente | ✅ Validada manualmente + automatizada (`tests/security/identity-forgery.*`) |
 | 5.2 | JWT manipulado → rechazo | Parcial (backend tests) |
 | 5.3 | RPC sin autorización | 037 aplicada; sin re-test manual documentado |
 | 5.4 | UPDATE seats desde cliente | 039 aplicada; sin re-test manual documentado |
@@ -494,7 +494,7 @@ Detalle de 5.1: ver [`security-hardening-implementation.md`](security-hardening-
 
 ### 5.1 Forjar `role` desde el cliente → NO debe otorgar privilegios
 
-**Estado:** ✅ Validada 2026-08-01 (cuenta agency, prod pre-lanzamiento)
+**Estado:** ✅ Validada 2026-08-01 (manual + [`tests/security/`](../tests/security/))
 
 ```js
 // Consola del browser, con cuenta agency autenticada:
