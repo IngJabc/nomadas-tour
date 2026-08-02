@@ -2,7 +2,7 @@
 -- 036_rls_identity_from_public_users.sql
 -- *** NO APLICAR — superseded by 039_rls_identity_from_public_users_v2.sql ***
 -- Causa confirmada en instancia: recursión RLS 42P17 en public.users.
--- Rollback aplicado: 038_revert_036_rls.sql
+-- Rollback manual (no auto-aplicar): supabase/rollbacks/038_revert_036_rls.sql
 -- ============================================================
 -- FASE 2 — Security Hardening Sprint (SEC-001 RLS)
 --
