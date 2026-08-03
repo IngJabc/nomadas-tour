@@ -5,6 +5,7 @@ import { tenant } from '../../middlewares/tenant.js';
 import { reservationController } from '../../controllers/reservation.controller.js';
 import { notificationController } from '../../controllers/notification.controller.js';
 import { notificationPreferenceController } from '../../controllers/notification-preference.controller.js';
+import { agencySettingsController } from '../../controllers/agency-settings.controller.js';
 
 const router = Router();
 
@@ -50,6 +51,17 @@ router.get('/notification-preferences', (req, res, next) =>
 );
 router.patch('/notification-preferences', (req, res, next) =>
   notificationPreferenceController.updatePreferences(req, res, next),
+);
+
+// Agency branding settings (tenant identity remains in public.agencies)
+router.get('/settings/branding', (req, res, next) =>
+  agencySettingsController.getBranding(req, res, next),
+);
+router.patch('/settings/branding', (req, res, next) =>
+  agencySettingsController.updateBranding(req, res, next),
+);
+router.post('/settings/logo', (req, res, next) =>
+  agencySettingsController.uploadLogo(req, res, next),
 );
 
 export default router;

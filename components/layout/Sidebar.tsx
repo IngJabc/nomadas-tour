@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { X, Menu, LogOut, ArrowLeft, type LucideIcon } from "lucide-react";
+import { X, Menu, LogOut, type LucideIcon } from "lucide-react";
+import { SidebarBrand } from "./SidebarBrand";
 
 interface NavItem {
   href: string;
@@ -12,19 +13,22 @@ interface NavItem {
   icon: LucideIcon;
 }
 
-interface SidebarProps {
+export interface SidebarProps {
   navItems: NavItem[];
-  brandLabel: string;
   onLogout: () => void;
   basePath: string;
+  logo?: React.ReactNode;
+  brandTitle?: string;
+  brandSubtitle?: string;
 }
 
 export function Sidebar({
   navItems,
-  brandLabel,
   onLogout,
-
   basePath,
+  logo,
+  brandTitle,
+  brandSubtitle,
 }: SidebarProps) {
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -77,17 +81,11 @@ export function Sidebar({
           <X className="w-5 h-5" />
         </button>
 
-        {/* Logo */}
-        <div className="px-6 pt-8 pb-4 flex flex-col items-center">
-          <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white font-bold text-lg font-[family-name:var(--font-heading)]">
-            N
-          </div>
-          <div className="mt-2 px-2 py-0.5 rounded bg-[rgba(0,212,255,0.2)]">
-            <span className="font-[family-name:var(--font-body)] font-semibold text-[10px] text-[var(--color-brand-cyan)] uppercase tracking-wider">
-              {brandLabel}
-            </span>
-          </div>
-        </div>
+        <SidebarBrand
+          logo={logo}
+          brandTitle={brandTitle}
+          brandSubtitle={brandSubtitle}
+        />
 
         {/* Nav */}
         <nav className="flex-1 px-3 py-2 flex flex-col gap-1">

@@ -621,19 +621,22 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 
 ## 9. Pendientes pre-lanzamiento
 
+**Estado:** Hardening de seguridad cerrado (C1 PASS, 2026-08-02). Ítems opcionales movidos a [`TASKS.md`](../TASKS.md) → *Ideas futuras* y [`ROADMAP.md`](ROADMAP.md).
+
 ### Alta prioridad
 
-_(ninguno — middleware y frontend auth migrados en FASE 4)_
+_(ninguno)_
 
-### Media prioridad
+### Media prioridad (opcional)
 
-1. **Custom Access Token Hook** — Defensa en profundidad opcional (Fase 3 del audit).
-2. **Tenant isolation test** — Automatizar checklist 5.3 en `tests/security/` (opcional).
+1. **Custom Access Token Hook** — Defensa en profundidad opcional.
+2. **Tenant isolation test** — Automatizar checklist 5.3 en `tests/security/`.
 3. **Fix preexistente** — `lib/__tests__/utils.test.ts` (timezone/formato en `formatDateTime`).
 
 ### Referencias
 
 - Audit detallado: [`docs/security-audit-remediation.md`](security-audit-remediation.md)
+- Roadmap de producto: [`docs/ROADMAP.md`](ROADMAP.md)
 - Rollback 039 (manual): [`supabase/rollbacks/039_rollback_restore_metadata_rls.sql`](../supabase/rollbacks/039_rollback_restore_metadata_rls.sql)
 - Backend deploy: [`docs/backend-deploy.md`](backend-deploy.md)
 

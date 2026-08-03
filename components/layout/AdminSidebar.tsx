@@ -8,6 +8,7 @@ import {
   Building2,
   type LucideIcon,
 } from "lucide-react";
+import { PlatformLogoMark } from "@/components/brand/PlatformLogoMark";
 import { Sidebar } from "./Sidebar";
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
@@ -26,7 +27,8 @@ export function AdminSidebar({ onLogout }: AdminSidebarProps) {
   return (
     <Sidebar
       navItems={NAV_ITEMS}
-      brandLabel="Panel Admin"
+      logo={<PlatformLogoMark size={40} priority />}
+      brandSubtitle="Panel Admin"
       onLogout={onLogout}
       basePath="/admin"
     />

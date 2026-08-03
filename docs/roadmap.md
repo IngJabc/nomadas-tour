@@ -1,217 +1,233 @@
-# Roadmap
+# Nómadas Tour — Roadmap de producto
+
+**Visión:** Convertir Nómadas Tour en un SaaS comercializable para agencias de viajes.  
+**Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
+**Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
+
+**Última actualización:** 2026-08-02
 
 ---
 
-# Fase 1 — Alineación Backend con nuevo modelo
+## Estado actual
 
-Objetivo:
-Actualizar backend para trabajar con el nuevo schema de Supabase.
+Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma opera como un **centro de operaciones multi-tenant** con capacidades de producción validadas:
 
-Cambios:
+| Capacidad | Estado |
+|-----------|--------|
+| Multi-tenant (subdominios, aislamiento por agencia) | Operativo |
+| Reservas por agencia (wizard, pasajeros, QR) | Operativo |
+| Seat locks + concurrencia + idempotencia | Operativo |
+| Scanner / Boarding por pasajero | Operativo |
+| Realtime (asientos, reservas, dashboards) | Operativo |
+| Seguridad endurecida (RLS desde `public.users`, suite SEC-007/008) | Operativo |
+| Notificaciones (in-app + email) | Operativo |
+| Deploy estabilizado (`dist` fuera de Git, build en Render) | Operativo |
+| Cancelación de viajes con reservas | Operativo |
+| Agencia desactivada con logout forzado | Operativo |
+| Edición de viajes con reservas existentes | Operativo |
+| Estados inválidos protegidos | Operativo |
 
-- Actualizar types/interfaces.
-- Actualizar roles:
-  - superadmin
-  - agency
+**Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
-Eliminar:
-
-- customer
-- user customer
-- allocated seats
-- trip_agency_allocations
-
-Mantener:
-
-- Supabase Auth
-- agencyId como contexto multi-tenant
-
-Actualizar:
-
-- middleware auth
-- middleware authorization
-- tenant context
+El producto ya no es únicamente un proyecto de portafolio: entra en fase de **comercialización y valor para agencias**.
 
 ---
 
-# Fase 2 — Superadmin Domain
+## Principios del producto
 
-Objetivo:
-Adaptar administración global al nuevo modelo.
+Estos principios guían decisiones de producto, arquitectura y priorización:
 
-Implementar:
+1. **Seguridad primero** — Autorización desde fuentes confiables (`public.users`, RLS, backend). Nunca delegar permisos a metadata del cliente ni al frontend.
 
-- Crear agencias.
-- Crear rutas.
-- Crear viajes.
-- Asignar agencias autorizadas a viajes.
+2. **Integridad de reservas** — Una reserva es un contrato operativo: asientos, pasajeros y estados deben ser consistentes bajo concurrencia, cancelaciones y cambios de viaje.
 
-Eliminar:
+3. **Multi-tenancy desde el diseño** — Cada agencia ve solo su espacio. El superadmin gestiona la plataforma; las agencias operan sin fricción ni fugas de datos.
 
-- distribución de cupos
-- reserved_seats
-- allocated_seats
+4. **Automatizar antes que aumentar carga operativa** — Si una tarea se repite diariamente (recordatorios, limpieza, alertas), debe tender a automatizarse, no a depender de memoria humana.
 
-Nuevo modelo:
+5. **Configuración antes que personalización mediante código** — Branding, datos comerciales y preferencias deben ser editables por la agencia sin despliegues ni forks por cliente.
 
-Trip
-
-↓
-
-Trip Agencies
+6. **Escalabilidad y mantenibilidad** — Preferir procesos en segundo plano, observabilidad y límites claros sobre parches ad hoc en request/response.
 
 ---
 
-# Fase 3 — Sistema de reservas por agencia
+## Roadmap por fases
 
-Objetivo:
-Permitir que las agencias creen reservas.
-
-Implementar:
-
-POST /api/agency/reservations
-
-Flujo:
-
-Agencia selecciona:
-
-- viaje
-- plazas
-
-Ingresa:
-
-Responsable de reserva:
-
-- nombre
-- documento
-- teléfono
-
-Ingresa pasajeros:
-
-Cada pasajero:
-
-- nombre
-- documento
-- teléfono
-- seat_id
-
-Crear:
-
-- reservations
-- reservation_passengers
-
-Generar:
-
-QR único por reserva
+Las fases están numeradas a partir de la fundación ya completada. Cada fase construye sobre la anterior.
 
 ---
 
-# Fase 4 — Abordaje QR por plazas
+### Fase 2 — Personalización de agencias
 
-Objetivo:
-Controlar abordaje parcial.
+**Prioridad:** Primera.
 
-Flujo:
+**Objetivo:** Permitir que cada agencia personalice su espacio dentro de la plataforma, incrementando la percepción de **producto propio** para cada cliente B2B.
 
-Agencia escanea QR.
+**Primera versión propuesta:**
 
-Mostrar:
+#### Branding
 
-- información del viaje
-- nombre de quien reservó
-- cantidad total pasajeros
-- plazas disponibles
+- Logo
+- Color primario
+- Color secundario
+- Color de acento
 
-NO mostrar:
+Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agencia configura variantes dentro de un marco seguro y consistente.
 
-- nombres de pasajeros
 
-La agencia selecciona mediante switches:
+#### Regla de negocio
 
-A1
-A2
-A3
+**El nombre de la agencia no es editable por la agencia.** Solo el superadmin puede modificarlo. Esto evita suplantación de identidad y mantiene coherencia contractual con la plataforma.
 
-Registrar:
-
-- passenger boarded
-- boarded_at
-- boarded_by
-
-Crear:
-
-boarding_logs
+**Valor:** Las agencias presentan la herramienta como suya ante pasajeros y operadores, sin perder el modelo SaaS centralizado.
 
 ---
 
-# Fase 5 — Dashboard Agencia
+### Fase 3 — Sistema de Workers
 
-Implementar:
+**Prioridad:** Segunda.
 
-Mis viajes:
+**Objetivo:** Incorporar procesamiento asíncrono y tareas programadas. Introducir una arquitectura moderna basada en **procesos en segundo plano**, desacoplada del ciclo HTTP.
 
-- viajes autorizados
+**Nota:** No se elige aún implementación concreta (cola, cron distribuido, Supabase Edge Functions + scheduler, etc.). Esta fase documenta la **necesidad** y los casos iniciales.
 
-Mis reservas:
+**Casos iniciales:**
 
-- reservas propias
+- Recordatorios de viajes para pasajeros
+- Recordatorios de viajes para agencias
+- Recordatorios al administrador para completar viajes
+- Limpieza automática (locks expirados, datos temporales)
+- Emails diferidos (no bloquear requests)
+- Alertas operativas (ocupación, viajes próximos, anomalías)
 
-Pasajeros:
-
-Mostrar:
-
-- nombre
-- documento
-- teléfono
-- responsable de reserva
-
-Abordaje:
-
-Mostrar progreso:
-
-8/8 pasajeros abordados
+**Valor:** Reduce carga manual, mejora puntualidad operativa y prepara el terreno para automatizaciones de producto.
 
 ---
 
-# Fase 6 — Eliminar legacy customer
+### Fase 4 — Automatizaciones
 
-Eliminar:
+**Prioridad:** Tercera (construida sobre Workers).
 
-- customer routes
-- customer dashboard
-- optionalAuth donde no aplique
-- lógica antigua de reservas públicas
+**Objetivo:** Reglas de negocio y comunicaciones que se ejecutan solas según configuración o umbrales.
 
-Limpiar:
+**Ejemplos:**
 
-- componentes
-- tipos
-- servicios obsoletos
+- Recordatorios automáticos (T-24h, T-2h)
+- Digest diario para agencias y superadmin
+- Alertas de ocupación (viaje casi lleno / subocupado)
+- Viajes próximos sin acción
+- Limpieza programada
+- Métricas nocturnas (agregados para dashboards)
+
+**Valor:** El producto pasa de reactivo a **proactivo** — avisa antes de que algo falle en operación.
 
 ---
 
-# Fase 7 — Auditoría y mejoras
+### Fase 5 — Audit Trail
 
-Implementar:
+**Prioridad:** Cuarta.
 
-Correcciones de abordaje:
+**Objetivo:** Registrar acciones administrativas y eventos relevantes para soporte, auditoría y trazabilidad.
 
-- correction logs
+**Eventos a registrar (ejemplos):**
 
-Historial:
+- Crear / editar / cancelar viaje
+- Crear / cancelar reserva
+- Boarding (marcar / desmarcar pasajero)
+- Cambios de usuarios e invitaciones
+- Cambios de configuración de agencia
 
-- quién marcó pasajeros
-- cuándo
-- qué plazas
+**Por evento:**
 
-Optimización:
+- **Actor** (usuario, rol, agencia)
+- **Fecha** (timestamp con timezone)
+- **Antes / después** (diff estructurado cuando aplique)
+- **Metadata** (IP, origen, correlación)
 
-- lookup QR directo
+**Valor:** Resuelve disputas operativas, cumplimiento interno y debugging sin depender de logs crudos.
 
-Tests:
+---
 
-- creación de reservas
-- abordaje parcial
-- aislamiento multi-tenant
+### Fase 6 — Reportes
 
-Documentación técnica final.
+**Prioridad:** Quinta.
+
+**Objetivo:** Visibilidad de negocio y operación para superadmin y agencias.
+
+**Alcance:**
+
+- KPIs (ocupación, reservas, abordaje, cancelaciones)
+- Exportaciones (CSV / Excel según necesidad)
+- Dashboard operativo enriquecido
+- Métricas por agencia (superadmin) y comparativas agregadas
+
+**Valor:** Decisiones basadas en datos; argumento de venta para agencias que miden su operación.
+
+---
+
+### Fase 7 — UX
+
+**Prioridad:** Sexta (continua, no exclusiva).
+
+**Objetivo:** Experiencia premium coherente con la filosofía de diseño (`AGENTS.md`).
+
+**Alcance:**
+
+- Responsive en todos los flujos críticos (scanner, reservas, dashboards)
+- Accesibilidad (landmarks, teclado, contraste)
+- Estados vacíos con CTA
+- Skeletons en lugar de spinners aislados
+- Feedback visual (toast, loading, success/error en acciones async)
+- Consistencia del design system en pantallas legacy
+
+**Valor:** Percepción de SaaS profesional; menor fricción en operación diaria bajo presión (abordaje, ventanilla).
+
+---
+
+### Fase 8 — Escalabilidad
+
+**Prioridad:** Séptima (paralela a crecimiento de clientes).
+
+**Objetivo:** Sostener más agencias, más viajes concurrentes y más tráfico Realtime sin degradación.
+
+**Alcance:**
+
+- Observabilidad (logs estructurados, trazas, métricas)
+- Performance (queries, N+1, índices)
+- Caché donde aporte (dashboards, listados)
+- Rate limiting refinado por ruta y tenant
+- Monitoreo y alertas de infraestructura
+- Optimización de costos (Supabase, email, compute)
+
+**Valor:** Confianza para escalar comercialmente sin sorpresas operativas.
+
+---
+
+## Relación con documentación técnica
+
+| Documento | Rol |
+|-----------|-----|
+| [`TASKS.md`](../TASKS.md) | Sprint actual y backlog inmediato |
+| [`TASKS-HISTORY.md`](TASKS-HISTORY.md) | Historial de sprints completados |
+| [`documentation-guide.md`](documentation-guide.md) | Cómo mantener docs organizadas |
+| [`architecture.md`](architecture.md) | Arquitectura técnica actual |
+| [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones de seguridad (cerradas) |
+| [`system-spec.md`](system-spec.md) | Especificación funcional base |
+| [`AGENTS.md`](../AGENTS.md) | Reglas de diseño e implementación |
+
+---
+
+## Historial — Fases técnicas originales (1–7)
+
+Las fases iniciales del producto (backend, reservas, abordaje, dashboards, legacy cleanup) están **completadas**. Detalle por sprint: [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
+
+---
+
+## Fuera de alcance (por ahora)
+
+- Pagos y facturación
+- Portal de pasajeros con login
+- Marketplace entre agencias
+- App móvil nativa
+
+Estos ítems pueden evaluarse en roadmap futuro según demanda comercial.

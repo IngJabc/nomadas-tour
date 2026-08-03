@@ -12,6 +12,7 @@ import { NotificationProvider } from '@/components/notifications/NotificationPro
 import { AuthRoleGuard } from '@/components/auth/AuthRoleGuard';
 import { useAuthUser } from '@/hooks/useAuthUser';
 import type { CleanupFn } from '@/lib/realtime/subscriptions';
+import { AgencyBrandingProvider } from '@/components/branding/AgencyBrandingProvider';
 
 function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -49,11 +50,13 @@ function AgencyLayoutInner({ children }: { children: React.ReactNode }) {
   }, [user?.agency_id]);
 
   return (
-    <NotificationProvider>
-      <DashboardLayout sidebar={<AgencySidebar onLogout={handleLogout} />}>
-        {children}
-      </DashboardLayout>
-    </NotificationProvider>
+    <AgencyBrandingProvider>
+      <NotificationProvider>
+        <DashboardLayout sidebar={<AgencySidebar onLogout={handleLogout} />}>
+          {children}
+        </DashboardLayout>
+      </NotificationProvider>
+    </AgencyBrandingProvider>
   );
 }
 

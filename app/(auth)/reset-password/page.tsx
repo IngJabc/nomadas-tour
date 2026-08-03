@@ -7,6 +7,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, KeyRound, ArrowLeft, CheckCircle } from "lucide-react";
 import { authApi } from "@/lib/api";
+import { AuthMobileLogo } from "@/components/brand/AuthMobileLogo";
 
 export default function ResetPasswordPage() {
   return (
@@ -175,11 +176,7 @@ function ResetPasswordContent() {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="w-full max-w-sm"
         >
-          <div className="lg:hidden flex justify-center mb-5">
-            <div className="w-9 h-9 bg-brand-navy rounded-xl flex items-center justify-center">
-              <span className="font-['Montserrat',sans-serif] font-extrabold text-base text-white">N</span>
-            </div>
-          </div>
+          <AuthMobileLogo />
 
           <Link
             href="/login"

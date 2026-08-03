@@ -221,14 +221,6 @@ function AcceptInvitationContent() {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="w-full max-w-sm"
         >
-          <div className="lg:hidden flex justify-center mb-5">
-            <div className="w-9 h-9 bg-brand-navy rounded-xl flex items-center justify-center">
-              <span className="font-['Montserrat',sans-serif] font-extrabold text-base text-white">
-                N
-              </span>
-            </div>
-          </div>
-
           <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[24px] sm:text-[28px] text-brand-navy">
             Aceptar invitación
           </h1>
