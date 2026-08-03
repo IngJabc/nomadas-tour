@@ -10,7 +10,7 @@ const badgeVariants = cva(
         inactive: 'bg-[#f1f5f9] text-[var(--color-brand-muted)]',
         cancelled: 'bg-[#fef2f2] text-[#ef4444]',
         warning: 'bg-[#fffbeb] text-[#92400e]',
-        info: 'bg-[rgba(0,212,255,0.1)] text-[var(--color-brand-cyan)]',
+        info: 'bg-[var(--color-cyan-bg)] text-[var(--color-brand-cyan)]',
         boarded: 'bg-blue-50 text-blue-600',
         confirmed: 'bg-emerald-50 text-emerald-600',
         completed: 'bg-[#f1f5f9] text-[var(--color-brand-muted)]',

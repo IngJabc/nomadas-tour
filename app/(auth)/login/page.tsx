@@ -8,8 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { authApi } from "@/lib/api";
 import { ApiError } from "@/lib/errors/api-error";
 import { showAgencyInactiveToast, clearForcedLogout } from "@/lib/auth/session-handler";
-import Image from "next/image";
 import Link from "next/link";
+import Image from "next/image";
 import toast from "react-hot-toast";
 
 export default function LoginPage() {
@@ -131,7 +131,7 @@ function LoginContent() {
             height={80}
             priority
           />
-          <div className="mt-4             w-16 h-1 bg-brand-cyan rounded-sm" />
+          <div className="mt-4 w-16 h-1 bg-brand-cyan rounded-sm" />
         </div>
 
         {/* Tagline */}
@@ -227,17 +227,6 @@ function LoginContent() {
           transition={{ duration: 0.4, ease: "easeOut" }}
           className="w-full max-w-sm"
         >
-          {/* Mobile-only small logo */}
-          <div className="lg:hidden flex justify-center mb-5">
-            <div className="w-9 h-9 bg-brand-navy rounded-xl flex items-center justify-center">
-              <span className="font-['Montserrat',sans-serif] font-extrabold text-base text-white">
-                N
-              </span>
-            </div>
-          </div>
-
-          {/* Back link */}
-          {/* Title */}
           <h1 className="font-['Montserrat',sans-serif] font-extrabold text-[24px] sm:text-[28px] text-brand-navy">
             Bienvenido de vuelta
           </h1>

@@ -1,0 +1,20 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "types": ["node", "vitest/globals"],
+    "paths": {
+      "@/*": ["../*"],
+      "express": ["../backend/node_modules/@types/express/index.d.ts"]
+    },
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "./**/*.ts",
+    "./**/*.tsx"
+  ],
+  "exclude": [
+    "../node_modules"
+  ]
+}

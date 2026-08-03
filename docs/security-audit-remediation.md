@@ -6,7 +6,7 @@
 **Estado de verificación previo:** C1 VERIFIED · C2 PARTIALLY VERIFIED · C3 VERIFIED · C4 PARTIALLY VERIFIED  
 **Estado de remediación (2026-08-01):** C1–C4 remediados en prod pre-lanzamiento. Validación manual checklist §5.1 completada (forja metadata, cuenta agency).
 
-> Este documento describe remediación y validación. **Los fixes C1–C4 están aplicados** (migraciones 035–040, FASE 4 frontend). Pendiente: automatizar checklist en `tests/security/` (SEC-007).
+> Este documento describe remediación y validación. **Los fixes C1–C4 están aplicados** (migraciones 035–040, FASE 4 frontend). SEC-007/008 y cierre operacional C1 completados (2026-08-02). Evolución de producto: [`ROADMAP.md`](ROADMAP.md).
 
 ---
 
@@ -486,7 +486,7 @@ Ejecutar en este orden, tras aplicar las migraciones y desplegar el backend. Las
 | 5.2 | JWT manipulado → rechazo | Parcial (backend tests) |
 | 5.3 | RPC sin autorización | 037 aplicada; sin re-test manual documentado |
 | 5.4 | UPDATE seats desde cliente | 039 aplicada; sin re-test manual documentado |
-| 5.5–5.8 | SQL + regresión E2E | Parcial / pendiente SEC-007 |
+| 5.5–5.8 | SQL + regresión E2E | Parcial; suite `tests/security/` activa (SEC-007, 19 tests) |
 
 Detalle de 5.1: ver [`security-hardening-implementation.md`](security-hardening-implementation.md) — sección FASE 4 validación manual.
 

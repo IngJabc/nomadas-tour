@@ -24,6 +24,15 @@ export interface NotificationPreferencesResponse {
   categories: NotificationPreferenceCategory[];
 }
 
+export interface AgencyBrandingSettings {
+  logo_url: string | null;
+  primary_color: string;
+  secondary_color: string;
+  accent_color: string;
+}
+
+export type AgencyBrandingPatch = Partial<AgencyBrandingSettings>;
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface RequestOptions extends RequestInit {
@@ -81,6 +90,48 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   return data;
+}
+
+export async function requestForm<T>(
+  path: string,
+  formData: FormData,
+  options: Omit<RequestInit, 'body'> = {},
+): Promise<T> {
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+
+  try {
+    const { createClient } = await import('./supabase/client');
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers.Authorization = `Bearer ${session.access_token}`;
+    }
+  } catch {
+    // Ignore if running server-side without window.
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    body: formData,
+    headers,
+  });
+  const data = res.status === 204 ? undefined : await res.json();
+
+  if (!res.ok) {
+    const errorObj = data?.error;
+    const code = errorObj?.code;
+    const message = errorObj?.message || data?.error || 'API request failed';
+
+    if (code === 'AGENCY_INACTIVE' && !path.startsWith('/auth/login')) {
+      logoutInactiveAgency();
+    }
+
+    throw new ApiError(message, code || 'UNKNOWN', res.status);
+  }
+
+  return data as T;
 }
 
 // Auth
@@ -165,6 +216,22 @@ export const adminApi = {
 
 // Agency
 export const agencyApi = {
+  getBranding: () =>
+    request<AgencyBrandingSettings>('/agency/settings/branding'),
+  updateBranding: (patch: AgencyBrandingPatch) =>
+    request<AgencyBrandingSettings>('/agency/settings/branding', {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  uploadLogo: (file: File) => {
+    const formData = new FormData();
+    formData.append('logo', file);
+    return requestForm<AgencyBrandingSettings>(
+      '/agency/settings/logo',
+      formData,
+      { method: 'POST' },
+    );
+  },
   getDashboard: () => request<any>('/agency/dashboard'),
   listTrips: () => request<any[]>('/agency/trips'),
   getTrips: () => request<any[]>('/agency/trips'),

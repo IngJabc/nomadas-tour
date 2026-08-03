@@ -663,4 +663,4 @@ Antes de comenzar cualquier tarea:
 
 Durante la tarea: 5. Usar solo las variables y valores definidos aquí 6. Si algo no está definido aquí, usar el criterio más cercano que sí esté 7. Si hay ambigüedad real, hacer UNA sola pregunta antes de continuar
 
-Al terminar: 8. Correr el servidor y revisar la consola de errores 9. Si hay errores, corregirlos sin preguntar 10. Verificar contra el checklist de la tarea (ver TASKS.md) 11. Solo reportar "listo" cuando el servidor corra sin errores
+Al terminar: 8. Correr el servidor y revisar la consola de errores 9. Si hay errores, corregirlos sin preguntar 10. Verificar contra el checklist de la tarea (ver [`TASKS.md`](TASKS.md); visión de producto en [`docs/ROADMAP.md`](docs/ROADMAP.md)) 11. Solo reportar "listo" cuando el servidor corra sin errores
