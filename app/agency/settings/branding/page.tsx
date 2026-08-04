@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { ImageIcon, Palette, RotateCcw } from 'lucide-react';
 import {
@@ -8,7 +8,6 @@ import {
   type AgencyBrandingPatch,
   type AgencyBrandingSettings,
 } from '@/lib/api';
-import { ApiError } from '@/lib/errors/api-error';
 import {
   buildAgencyBrandingStyle,
   useAgencyBranding,
@@ -84,39 +83,29 @@ function validateBranding(
 }
 
 export default function AgencyBrandingSettingsPage() {
-  const { updateBranding: updateRuntimeBranding } = useAgencyBranding();
+  const {
+    branding: loadedBranding,
+    loading,
+    error: loadError,
+    updateBranding: updateRuntimeBranding,
+    refresh,
+  } = useAgencyBranding();
   const [branding, setBranding] = useState<AgencyBrandingSettings>(
-    NOMADAS_BRANDING_DEFAULTS,
+    () => normalizeBranding(loadedBranding),
   );
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<'success' | 'error' | null>(null);
   const [fieldErrors, setFieldErrors] = useState<BrandingFieldErrors>({});
   const [logoPreviewFailed, setLogoPreviewFailed] = useState(false);
   const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const loadBranding = useCallback(async () => {
-    setLoading(true);
-    setLoadError(false);
-
-    try {
-      const response = await agencyApi.getBranding();
-      setBranding(normalizeBranding(response));
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 404) {
-        setBranding(NOMADAS_BRANDING_DEFAULTS);
-      } else {
-        setLoadError(true);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    loadBranding();
-  }, [loadBranding]);
+    if (loadedBranding) {
+      setBranding(normalizeBranding(loadedBranding));
+    } else if (!loading && !loadError) {
+      setBranding(NOMADAS_BRANDING_DEFAULTS);
+    }
+  }, [loadedBranding, loading, loadError]);
 
   useEffect(() => {
     return () => {
@@ -233,7 +222,7 @@ export default function AgencyBrandingSettingsPage() {
               No se pudo cargar el branding. Intenta de nuevo.
             </p>
           </div>
-          <Button variant="secondary" onClick={loadBranding}>
+          <Button variant="secondary" onClick={refresh}>
             Reintentar
           </Button>
         </Card>
@@ -262,8 +251,8 @@ export default function AgencyBrandingSettingsPage() {
               </Card>
 
               <Card>
-                <div className="flex items-center justify-between gap-4 mb-6">
-                  <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                  <div className="min-w-0">
                     <h2 className="font-[family-name:var(--font-heading)] font-bold text-lg text-[var(--color-brand-navy)]">
                       Colores
                     </h2>
@@ -276,6 +265,7 @@ export default function AgencyBrandingSettingsPage() {
                     variant="secondary"
                     disabled={saving}
                     onClick={restoreNomadasColors}
+                    className="w-full sm:w-auto px-4 sm:px-5 whitespace-normal text-center leading-snug"
                   >
                     <RotateCcw className="w-4 h-4" strokeWidth={1.75} />
                     Restaurar colores Nómadas
@@ -325,7 +315,7 @@ export default function AgencyBrandingSettingsPage() {
                 style={buildAgencyBrandingStyle(branding)}
                 className="rounded-2xl overflow-hidden border border-[rgba(0,0,0,0.06)] bg-[var(--color-page-bg)]"
               >
-                <div className="bg-[var(--color-brand-dark)] p-6 flex items-center gap-4">
+                <div className="bg-[var(--color-brand-dark)] p-4 sm:p-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
                     {previewLogoUrl ? (
                       <img
@@ -340,7 +330,7 @@ export default function AgencyBrandingSettingsPage() {
                       <PlatformLogoMark size={40} />
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-[family-name:var(--font-heading)] font-bold text-white">
                       Nombre de tu agencia
                     </p>
@@ -350,8 +340,8 @@ export default function AgencyBrandingSettingsPage() {
                   </div>
                 </div>
 
-                <div className="p-6">
-                  <div className="rounded-2xl bg-[var(--color-brand-surface)] border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+                <div className="p-4 sm:p-6">
+                  <div className="rounded-2xl bg-[var(--color-brand-surface)] border border-[rgba(0,0,0,0.06)] p-4 sm:p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="font-[family-name:var(--font-heading)] font-bold text-[var(--color-brand-navy)]">
@@ -372,7 +362,7 @@ export default function AgencyBrandingSettingsPage() {
             </Card>
           </div>
 
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex justify-center sm:justify-end">
             <Button
               type="submit"
               size="lg"

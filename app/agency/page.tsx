@@ -36,7 +36,6 @@ import { useAuthUser } from '@/hooks/useAuthUser';
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
 interface AgencyDashboardData {
-  agency_name?: string;
   total_trips: number;
   active_trips: number;
   total_reservations: number;
@@ -100,6 +99,10 @@ export default function AgencyDashboardPage() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const { user } = useAuthUser();
   const agencyId = user?.agency_id ?? null;
+  const agencyName =
+    user?.role === "agency" && user.agency_name?.trim()
+      ? user.agency_name.trim()
+      : "Agencia";
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -186,7 +189,7 @@ export default function AgencyDashboardPage() {
     return (
       <>
         <Topbar
-          greeting={`${getGreeting()}, Agencia`}
+          greeting={`${getGreeting()}, ${agencyName}`}
           subtext="Panel de Agencia — NomadApp"
           role="agency"
         />
@@ -281,7 +284,7 @@ export default function AgencyDashboardPage() {
     return (
       <>
         <Topbar
-          greeting={`${getGreeting()}, Agencia`}
+          greeting={`${getGreeting()}, ${agencyName}`}
           subtext="Panel de Agencia — NomadApp"
           role="agency"
         />
@@ -313,7 +316,7 @@ export default function AgencyDashboardPage() {
   return (
     <>
       <Topbar
-        greeting={`${getGreeting()}, ${data?.agency_name ?? "Agencia"}`}
+        greeting={`${getGreeting()}, ${agencyName}`}
         subtext="Panel de Agencia — NomadApp"
         role="agency"
       />
