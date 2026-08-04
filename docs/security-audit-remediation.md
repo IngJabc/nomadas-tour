@@ -8,6 +8,12 @@
 
 > Este documento describe remediación y validación. **Los fixes C1–C4 están aplicados** (migraciones 035–040, FASE 4 frontend). SEC-007/008 y cierre operacional C1 completados (2026-08-02). Evolución de producto: [`ROADMAP.md`](ROADMAP.md).
 
+> **Estado documental — histórico.** Los hallazgos, snippets y pasos
+> procedimentales conservan el diagnóstico y el plan original; no son
+> instrucciones vigentes para volver a aplicar cambios. El estado implementado
+> y sus validaciones están en
+> [`security-hardening-implementation.md`](security-hardening-implementation.md).
+
 ---
 
 ## 0. Resumen ejecutivo y matriz de prioridades

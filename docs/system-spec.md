@@ -1,8 +1,8 @@
 # SYSTEM SPEC — MULTI-TENANT TRAVEL PLATFORM
 
-Este documento define la arquitectura completa del sistema antes de cualquier implementación.
-
-NO implementar nada sin seguir este spec.
+Este documento resume la arquitectura y las reglas vigentes del sistema. Las
+decisiones ADR y las migraciones aplicadas prevalecen cuando exista una
+diferencia con descripciones históricas.
 
 ---
 
@@ -28,42 +28,41 @@ Los pasajeros NO tienen usuario ni acceso al sistema.
 
 # 3. MULTI-TENANCY (REGLA CENTRAL)
 
-El sistema es multi-tenant basado en subdominios.
-
-Ejemplo:
-
-```
-expres.tuapp.com → agencyId = 12
-```
+La identidad de aplicación se resuelve desde `public.users` después de validar
+la sesión de Supabase Auth. Para usuarios AGENCY, `public.users.agency_id`
+determina el tenant.
 
 Reglas:
 
-- Todo request debe resolver tenant desde subdominio
-- Toda query debe filtrar por agencyId (excepto superadmin)
-- Frontend nunca es fuente de seguridad
+- El frontend nunca es fuente de autorización.
+- Roles y `agency_id` provienen de `public.users`, no de `user_metadata`.
+- Los flujos comerciales filtran por el `agencyId` confiable del request.
+- SUPERADMIN opera sin filtro de agencia cuando el caso de uso lo requiere.
+- Boarding usa la pertenencia del tenant al viaje como frontera operacional,
+  según [ADR-001](decisions/ADR-001-boarding-cross-agency.md).
 
 ---
 
 # 4. REQUEST LIFECYCLE (OBLIGATORIO)
 
-Flujo de cualquier request:
+Flujo protegido:
 
-1. Resolve tenant (subdomain → agencyId)
-2. Authenticate JWT
-3. Apply RBAC
-4. Inject context:
+1. Validar el access token con Supabase Auth.
+2. Resolver usuario, rol y agencia desde `public.users`.
+3. Aplicar RBAC.
+4. Validar estado del tenant.
+5. Inyectar contexto:
    ```ts
    {
      userId,
      role,
-     agencyId,
-     tenantId
+     agencyId
    }
    ```
-5. Controller
-6. Service layer
-7. Repository layer (FILTERED QUERY)
-8. Response
+6. Controller.
+7. Service layer con autorización comercial u operacional.
+8. Acceso a datos.
+9. Response.
 
 ---
 
@@ -71,15 +70,13 @@ Flujo de cualquier request:
 
 Roles finales del sistema:
 
-- superadmin → control total
-- agency → operador multi-tenant
+- SUPERADMIN → control global.
+- AGENCY → operador de un tenant.
 
 IMPORTANTE:
 
-- NO existe rol "customer" ni "user"
-- NO existe rol "admin"
-- "agency" reemplaza cualquier admin anterior
-- Los pasajeros NO tienen rol ni login
+- No existen roles `admin`, `customer` ni `user`.
+- Los pasajeros no tienen rol ni login.
 
 ---
 
@@ -91,7 +88,9 @@ Cada viaje tiene:
 
 - route
 - capacity total
-- price global (definido por superadmin)
+- departure_time
+- vehicle_type
+- status
 
 ---
 
@@ -105,7 +104,7 @@ Un viaje NO puede existir sin agencias asignadas.
 
 1. Superadmin crea Trip
 2. Debe asignar al menos 1 agencia
-3. Cada agencia recibe cupos
+3. Cada agencia recibe una asignación en `trip_agencies`
 4. Si no hay asignación → request inválido
 
 ---
@@ -118,215 +117,79 @@ SUM(allocated_seats) <= trip.capacity
 
 ---
 
-# 7. CORE CONCEPTO: CUPOS (NO ASIENTOS FÍSICOS)
+# 7. PUESTOS Y CAPACIDAD
 
-El sistema NO maneja asientos físicos.
+El sistema mantiene puestos identificados por `seat_code` y layouts físicos
+fijos según el tipo de vehículo.
 
-Los "asientos" son CUPOS VIRTUALES.
-
-- Sirven solo para control de inventario
-- No representan ubicación real en el bus
-- El pasajero puede sentarse libremente
-
----
-
-# 8. AISLAMIENTO DE AGENCIAS (CRÍTICO)
-
-Una agencia NUNCA puede ver:
-
-- otras agencias
-- reservas de otras agencias
-- pasajeros de otras agencias
-- QR de otras agencias
-- cupos de otras agencias
-- boarding_logs de otras agencias
-- métricas globales
-
-Todo debe filtrarse en backend.
+- Los puestos controlan inventario y asignación de pasajeros.
+- Pueden estar disponibles, bloqueados temporalmente, reservados o bloqueados
+  operativamente.
+- La capacidad y las asignaciones por agencia limitan las reservas.
 
 ---
 
-# 9. BASE DE DATOS (SUPABASE SCHEMA)
+# 8. AISLAMIENTO COMERCIAL Y OPERACIÓN COMPARTIDA
 
-## users
+Una agencia no puede administrar ni listar reservas, pasajeros, cupos o
+métricas comerciales de otras agencias. Todo acceso comercial se filtra en
+backend por el contexto confiable de agencia.
 
-Solo para superadmin y agencias.
+Boarding es una excepción operacional: una agencia asignada mediante
+`trip_agencies` puede consultar el contexto necesario y abordar pasajeros de
+cualquier reserva del mismo viaje. Esta capacidad no concede permisos CRUD
+sobre la reserva externa.
 
-```sql
-- id              UUID PK (1:1 auth.users)
-- email           TEXT
-- role            'superadmin' | 'agency'
-- agency_id       UUID FK → agencies (nullable)
-- full_name       TEXT
-```
-
----
-
-## agencies
-
-```sql
-- id              UUID PK
-- name            TEXT
-- subdomain       TEXT UNIQUE
-- email           TEXT
-- phone           TEXT
-- status          'active' | 'inactive'
-- created_by      UUID FK → auth.users
-```
+La regla completa está en
+[ADR-001 — Boarding cross-agency](decisions/ADR-001-boarding-cross-agency.md).
 
 ---
 
-## routes
+# 9. BASE DE DATOS
 
-```sql
-- id              UUID PK
-- origin          TEXT
-- destination     TEXT
-- created_by      UUID FK → auth.users
-```
+La fuente de verdad del schema es `supabase/migrations/`, aplicada en orden. Los
+modelos copiados en documentación no son normativos porque pueden quedar
+obsoletos frente a constraints, columnas, funciones y políticas posteriores.
 
----
+Referencias vigentes relevantes:
 
-## trips
+- Roles: `superadmin` y `agency` en `public.users`.
+- Trip: `active`, `cancelled`, `completed`, `archived`.
+- Reservation: `confirmed`, `cancelled`, `partial`, `completed`, `boarded`.
+- Reservation passenger: `active`, `cancelled`, con boarding representado por
+  `boarded` y `boarded_at`.
+- Seats: consultar la constraint vigente en migraciones.
+- Asignación de agencias a viajes: `trip_agencies`.
 
-```sql
-- id              UUID PK
-- route_id        UUID FK → routes
-- departure_time  TIMESTAMPTZ
-- capacity        INT
-- price           NUMERIC
-- vehicle_type    'bus' | 'kia'
-- status          'active' | 'cancelled' | 'completed'
-- postponed_from  TIMESTAMPTZ (nullable)
-- created_by      UUID FK → auth.users
-```
+`trips.postponed_from` conserva la fecha previa cuando un viaje se posterga. No
+representa un estado adicional del viaje.
 
----
-
-## trip_agency_allocations
-
-```sql
-- id              UUID PK
-- trip_id         UUID FK → trips
-- agency_id       UUID FK → agencies
-- allocated_seats INT (>0)
-- reserved_seats  INT (>=0)
-```
-
-UNIQUE(trip_id, agency_id)
-
----
-
-## seats
-
-```sql
-- id              UUID PK
-- trip_id         UUID FK → trips
-- seat_code       TEXT (A1, A2...)
-- status          'available' | 'locked' | 'reserved' | 'blocked' | 'guide'
-- locked_by       UUID FK → auth.users (nullable)
-- locked_at       TIMESTAMPTZ (nullable)
-```
-
-UNIQUE(trip_id, seat_code)
-
----
-
-## reservations (HEADER)
-
-Una reserva es un grupo de pasajeros bajo un mismo QR.
-
-```sql
-- id               UUID PK
-- trip_id          UUID FK → trips
-- agency_id        UUID FK → agencies
-- transaction_id   TEXT UUID (único por grupo)
-- customer_name    TEXT (quién reserva)
-- phone            TEXT
-- total_passengers INT
-- status           'confirmed' | 'cancelled'
-- qr_code          TEXT (único por grupo)
-- created_at       TIMESTAMPTZ
-```
-
----
-
-## passengers
-
-Cada fila es un pasajero individual dentro de una reserva.
-
-```sql
-- id               UUID PK
-- transaction_id   TEXT UUID FK → reservations.transaction_id
-- trip_id          UUID FK → trips
-- agency_id        UUID FK → agencies
-- seat_code        TEXT (cupo asignado, ej: A1)
-- full_name        TEXT
-- document         TEXT (cédula)
-- phone            TEXT
-- boarding_status  'pending' | 'boarded'
-- created_at       TIMESTAMPTZ
-```
-
----
-
-## boarding_logs
-
-Registro de auditoría para cada acción de abordaje.
-
-```sql
-- id               UUID PK
-- transaction_id   TEXT UUID FK → reservations.transaction_id
-- trip_id          UUID FK → trips
-- agency_id        UUID FK → agencies
-- scanned_by       UUID FK → users
-- seat_codes       TEXT[] (plazas marcadas en esta acción)
-- action           'board' | 'correction'
-- created_at       TIMESTAMPTZ
-```
-
----
-
-## agency_invitations
-
-```sql
-- id              UUID PK
-- token           TEXT UNIQUE
-- agency_id       UUID FK → agencies
-- email           TEXT
-- created_by      UUID FK → auth.users
-- expires_at      TIMESTAMPTZ
-- used_at         TIMESTAMPTZ (nullable)
-- used_by         UUID FK → auth.users (nullable)
-```
+Para cambios de schema se debe crear una nueva migración; este documento solo
+describe semántica de alto nivel.
 
 ---
 
 # 10. RESERVAS + QR FLOW
 
-1. Agencia crea reserva (customer_name + lista de pasajeros)
-2. Backend asigna cupos, genera QR, inserta reservation header + filas en passengers
-3. QR se entrega al pasajero
-4. Agencia escanea QR en terminal
-5. Sistema muestra: viaje, customer_name, total pasajeros, plazas con checkbox
-6. Agencia selecciona plazas abordadas
-7. Backend actualiza boarding_status en passengers + registra boarding_log
-8. Múltiples escaneos hasta que todos estén boarded
+1. AGENCY crea una reserva propia con booker y pasajeros.
+2. Backend valida asignación y cupos, reserva puestos y genera un QR de grupo.
+3. El QR se entrega al booker.
+4. Una agencia asignada al viaje presenta o escanea el QR en terminal.
+5. Backend autoriza boarding mediante `trip_agencies`.
+6. La agencia opera pasajeros activos del viaje.
+7. Backend actualiza `boarded`, `boarded_at` y el estado agregado de la reserva.
+8. Cada cambio crea un registro de boarding con actor y agencia operadora.
 
 ---
 
-# 11. LANDING PAGE (/)
+# 11. ENTRY ROUTE (/)
 
-Catálogo público de viajes disponibles.
+La ruta `/` redirige a `/login`.
 
-Muestra:
-- ruta
-- fecha
-- precio
-- cupos disponibles
-
-NO requiere autenticación.
-NO muestra agencias, distribución interna ni asignaciones.
+No existe catálogo público, reserva pública, registro abierto ni portal de
+pasajeros. El acceso autenticado está reservado para SUPERADMIN y AGENCY; las
+cuentas de agencia se crean mediante los flujos administrativos y de
+invitación autorizados.
 
 ---
 
@@ -345,20 +208,24 @@ NO muestra agencias, distribución interna ni asignaciones.
 ## Agency dashboard
 
 - Solo viajes asignados
-- Solo sus reservas
-- Solo sus pasajeros
-- Estado de abordajes
+- Reservas, pasajeros y métricas comerciales propias
+- Estado operacional de sus viajes
+- Boarding compartido únicamente dentro del flujo autorizado
 
-NO existe dashboard de customer.
+No existe dashboard para pasajeros.
 
 ---
 
 # 13. SECURITY RULES
 
-- Backend es la única capa confiable
-- Frontend nunca filtra datos sensibles
-- Todas las queries deben validar agency context
-- JWT siempre incluye role + agencyId (si aplica)
+- Backend es la única capa confiable.
+- Frontend no decide autorización ni aislamiento.
+- La sesión identifica al usuario de Auth; rol y agencia se resuelven desde
+  `public.users`.
+- Los flujos comerciales validan `agency_id`.
+- Boarding valida `trip_agencies`, estado del viaje y estado de
+  reserva/pasajero.
+- El uso de clientes privilegiados exige controles explícitos en servicios.
 
 ---
 
@@ -368,8 +235,10 @@ NO existe dashboard de customer.
 - reserved_seats <= allocated_seats
 - Trip siempre tiene al menos 1 agency
 - No existe estado "trip sin agencia"
-- boarding_logs es append-only (nunca se eliminan registros)
-- Las correcciones de abordaje son nuevos registros con action='correction'
+- La propiedad comercial de una reserva no cambia durante boarding.
+- Boarding cross-agency requiere asignación al viaje.
+- Cada acción de boarding registra `board` o `unboard` con actor y agencia
+  operadora.
 
 ---
 

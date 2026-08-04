@@ -4,7 +4,7 @@
 
 **Cuándo usar este documento:** Al cerrar un sprint, al iniciar una fase del roadmap, al agregar documentación nueva o cuando un agente/humano no sepa dónde escribir algo.
 
-**Última actualización:** 2026-08-02
+**Última actualización:** 2026-08-04
 
 ---
 
@@ -37,10 +37,9 @@ docs/
 ├── system-spec.md          → Spec funcional base
 ├── business-rules.md       → Reglas de negocio
 ├── permissions.md          → Permisos por rol
-├── database.md             → Modelo de datos
 ├── backend-deploy.md       → Build y deploy del backend
-├── admin-patterns.md       → Patrones UI admin
-├── ui-design.md            → Referencia de diseño
+├── decisions/              → Decisiones arquitectónicas aceptadas
+├── archive/README.md       → Índice de documentación histórica no vigente
 ├── security-*.md           → Hardening (referencia cerrada)
 ```
 
@@ -93,6 +92,7 @@ Seguir este flujo:
 | Misma info en TASKS y ROADMAP | ROADMAP = *qué/por qué*; TASKS = *cómo/cuándo*. |
 | Tarea completada hace meses en TASKS | Mover a TASKS-HISTORY; no borrar sin archivar. |
 | Doc de seguridad con pendientes de producto | Mover pendientes a TASKS → *Ideas futuras* o ROADMAP. |
+| Documento contradice las fuentes vigentes | Mover a `archive/` y registrarlo en `archive/README.md`. |
 
 ---
 

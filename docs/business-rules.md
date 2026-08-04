@@ -1,122 +1,137 @@
 # Reglas de negocio
 
----
-
 ## Roles
 
 Solo existen dos roles con acceso al sistema:
 
 ### SUPERADMIN
 
-- Control total del sistema
-- Crea rutas, viajes, asigna cupos a agencias
+- Tiene control global del sistema.
+- Administra agencias, rutas, viajes y asignaciones.
+- Puede consultar y gestionar reservas de cualquier agencia.
 
 ### AGENCY
 
-- Opera viajes autorizados por superadmin
-- Crea reservas para sus pasajeros
-- Gestiona abordaje
-- Solo ve sus propios datos
+- Administra comercialmente sus propias reservas y pasajeros.
+- Opera los viajes donde está asignada mediante `trip_agencies`.
+- Puede ejecutar boarding del viaje compartido según
+  [ADR-001](decisions/ADR-001-boarding-cross-agency.md).
 
-NO existe rol "customer" ni "user". Los pasajeros no inician sesión.
-
----
+No existen roles `admin`, `customer` ni `user`. Los pasajeros no inician
+sesión.
 
 ## Viajes
 
-Cada viaje tiene:
+Cada viaje tiene ruta, fecha de salida, capacidad, tipo de vehículo y estado.
+Sus estados persistidos son:
 
-- Ruta (origen → destino)
-- Capacidad total (cupos disponibles)
-- Precio global
+- `active`
+- `cancelled`
+- `completed`
+- `archived`
 
-El Superadmin asigna cupos a las agencias vía trip_agency_allocations.
-SUM(allocated_seats) <= trip.capacity
+Un viaje puede estar asignado a varias agencias mediante `trip_agencies`. La
+suma de sus cupos asignados no puede superar la capacidad del viaje.
 
----
-
-## Cupos (no asientos físicos)
-
-Los "asientos" son CUPOS VIRTUALES:
-
-- Representan plazas disponibles en el viaje
-- No representan ubicación física real
-- El pasajero puede sentarse libremente
-- Sirven exclusivamente para control de inventario
-
----
+Cuando un viaje se pospone, `postponed_from` conserva la fecha de salida
+anterior. Solo se actualiza cuando la operación de edición se marca como
+postergación y la fecha realmente cambia.
 
 ## Reservas
 
-Una reserva representa un GRUPO de pasajeros bajo un mismo QR.
+Una reserva agrupa pasajeros bajo un mismo QR y pertenece comercialmente a una
+agencia mediante `agency_id`.
 
-### Contiene
+Estados persistidos de una reserva:
 
-- Nombre de quien reserva (customer_name)
-- QR único (compartido por todo el grupo)
-- Múltiples pasajeros, cada uno con:
-  - nombre
-  - documento
-  - teléfono
-  - seat_code (cupo asignado)
-  - boarding_status: pending | boarded
+- `confirmed`: reserva activa sin abordajes.
+- `partial`: parte de sus pasajeros activos fue abordada.
+- `completed`: todos sus pasajeros activos fueron abordados.
+- `boarded`: estado legado soportado por el schema.
+- `cancelled`: reserva cancelada.
 
-### Ejemplo
+Los servicios pueden recalcular `confirmed`, `partial` o `completed` según el
+boarding de los pasajeros activos. No todos los comandos aceptan transiciones
+desde cualquier estado; cada flujo valida su subconjunto permitido.
 
-Reserva: Juan Pérez
-QR: NT-SANTIAGO-ABC123
+### Cancelación de reserva
 
-Pasajeros:
-```
-A1 | Juan Pérez    | pending
-A2 | María García  | pending
-A3 | Pedro López   | pending
-```
+- Una agencia solo puede cancelar una reserva propia.
+- El flujo de cancelación de agencia acepta reservas en estado `confirmed`.
+- No se permite cancelar si el viaje está `cancelled` o `completed`.
+- La cancelación cambia la reserva a `cancelled` y libera sus puestos.
 
----
+### Reactivación
 
-## Abordaje
+- La reactivación administrativa permitida es `cancelled → confirmed`.
+- La transición inversa administrativa es `confirmed → cancelled`.
+- Reactivar la cabecera de una reserva no reactiva pasajeros cancelados ni
+  reconstruye automáticamente sus puestos; esos registros conservan su estado.
 
-### Flujo
+## Pasajeros
 
-1. Agencia escanea QR de la reserva
-2. El sistema muestra: viaje, nombre de quien reservó, total pasajeros, lista de plazas
-3. La agencia marca las plazas que están abordando
-4. El sistema registra la acción en boarding_logs
+Estados persistidos:
 
-### Reglas
+- `active`
+- `cancelled`
 
-- No se muestran nombres de pasajeros durante el escaneo
-- El QR es compartido por toda la reserva
-- Se pueden hacer múltiples escaneos (abordaje parcial)
-- Cada escaneo registra qué plazas se marcaron
+El boarding se representa además mediante `boarded` y `boarded_at`.
 
-### Ejemplo
+### Cancelación individual
 
-Primera parada: se marcan A1, A2, A3 → 3/8 abordados
-Segunda parada: se marcan A4, A5, A6, A7, A8 → 8/8 abordados
+- Solo la agencia propietaria de la reserva puede cancelar uno de sus
+  pasajeros.
+- La reserva y el pasajero no pueden estar ya cancelados.
+- No se permite modificar pasajeros si el viaje está `cancelled` o
+  `completed`.
+- Cancelar un pasajero lo cambia a `cancelled`, limpia su boarding y libera su
+  puesto.
+- El estado de la reserva se recalcula usando únicamente pasajeros activos.
+- Si no queda ningún pasajero activo, la reserva se cancela automáticamente.
 
----
+## Boarding
 
-## Historial de abordaje
+Boarding es una operación del viaje y constituye una excepción acotada al
+aislamiento comercial.
 
-Cada acción de abordaje se registra en boarding_logs:
+1. La agencia presenta o escanea el QR.
+2. El backend obtiene el viaje de la reserva.
+3. La autorización verifica que la agencia operadora pertenezca al viaje
+   mediante `trip_agencies`.
+4. La agencia puede abordar o desabordar pasajeros activos de cualquier reserva
+   de ese viaje, aunque otra agencia sea la propietaria comercial.
+5. Cada cambio actualiza el estado agregado de la reserva y registra la acción.
 
-- transaction_id (UUID de la reserva)
-- user_id (agente que escaneó)
-- seat_codes (plazas marcadas)
-- action: 'board' | 'correction'
-- created_at
+No se permite boarding antes de la salida ni en viajes `cancelled` o
+`completed`. Tampoco se permite sobre reservas o pasajeros cancelados.
 
-Permite correcciones manteniendo auditoría completa.
+La interfaz debe limitar la información mostrada a los datos operacionales
+necesarios. Los riesgos de PII y lookup parcial están documentados en
+[ADR-001](decisions/ADR-001-boarding-cross-agency.md).
 
----
+## Historial de boarding
 
-## Aislamiento
+Cada cambio registra, entre otros datos:
 
-Una agencia NUNCA puede ver:
+- reserva y pasajero afectados;
+- usuario que ejecutó la acción;
+- agencia operadora (`scanned_by_agency_id`);
+- acción `board` o `unboard`;
+- puestos afectados;
+- fecha de ejecución.
 
-- Reservas de otras agencias
-- Pasajeros de otras agencias
-- QR de otras agencias
-- Asignaciones de otras agencias
+La agencia operadora puede ser distinta de la agencia propietaria de la
+reserva.
+
+## Aislamiento comercial y excepción operacional
+
+Una agencia no puede administrar, listar, modificar ni cancelar reservas o
+pasajeros de otras agencias. Tampoco obtiene acceso general a sus métricas,
+cupos o asignaciones.
+
+La excepción es el flujo de boarding: una agencia asignada al viaje puede
+consultar la información operacional necesaria y cambiar el estado de boarding
+de pasajeros del mismo viaje. Esta capacidad no transfiere propiedad comercial
+ni habilita otros endpoints sobre datos externos.
+
+Fuente normativa: [ADR-001 — Boarding cross-agency](decisions/ADR-001-boarding-cross-agency.md).

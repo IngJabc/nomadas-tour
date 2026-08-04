@@ -314,22 +314,39 @@ Solo usar tablas cuando existan grandes cantidades de registros.
 
 ## 🗺️ Estructura de pantallas
 
-### Área pública (usuario)
+### Entrada y autenticación
 
+- `/` → redirige a `/login`
 - `/login` → Login 2 columnas (hero + formulario)
-- `/register` → Registro 2 columnas (mismo hero)
-- `/` → Lista de viajes disponibles
-- `/trips/[id]` → Selección de asientos
-- `/dashboard` → Mis reservas
+- `/forgot-password` → Solicitud de recuperación
+- `/reset-password` → Restablecimiento de contraseña
+- `/accept-invitation` → Activación de usuarios invitados
+
+No existe portal, catálogo, registro abierto ni dashboard para pasajeros. Los
+pasajeros no autentican en la plataforma.
 
 ### Área admin
 
 - `/admin` → Panel con sidebar navy izquierdo
+- `/admin/agencies` → Gestión de agencias
 - `/admin/trips` → Gestión de viajes
 - `/admin/routes` → Gestión de rutas
+- `/admin/bookings` → Supervisión de reservas
 - El admin SIEMPRE tiene sidebar, nunca navbar horizontal
 
-### Navbar (área pública)
+### Área agencia
+
+- `/agency` → Centro de operaciones de la agencia
+- `/agency/trips` → Viajes asignados
+- `/agency/trips/[id]/passengers` → Pasajeros del viaje
+- `/agency/reservations` → Reservas propias
+- `/agency/reservations/new` → Wizard de nueva reserva
+- `/agency/reservations/[id]` → Detalle de reserva
+- `/agency/scan` → Scanner y boarding
+- `/agency/settings/notifications` → Preferencias de notificación
+- `/agency/settings/branding` → Branding de agencia
+
+### Navbar global
 
 fondo: --color-brand-navy
 

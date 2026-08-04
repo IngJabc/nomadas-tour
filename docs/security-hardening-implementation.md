@@ -3,7 +3,7 @@
 **Documento:** Plan técnico de implementación de remediaciones de seguridad  
 **Basado en:** [Security Assessment C1–C4](security-audit-remediation.md)  
 **Objetivo:** Eliminar vulnerabilidades críticas, reforzar límites de confianza y establecer un modelo seguro de autorización.  
-**Última actualización:** 2026-08-02 (SEC-008 — eliminado user_metadata de accept-invitation)  
+**Última actualización:** 2026-08-04 (incluye referencia a migraciones de producto 041–042)
 **Entorno:** Supabase producción (pre-lanzamiento). Migración 039 aplicada e validada.
 
 ---
@@ -31,7 +31,14 @@
 | [`038_revert_036_rls.sql`](../supabase/rollbacks/038_revert_036_rls.sql) | Rollback manual de 036 | **No auto-aplicar** — ver `supabase/rollbacks/` |
 | [`039_rls_identity_from_public_users_v2.sql`](../supabase/migrations/039_rls_identity_from_public_users_v2.sql) | SEC-005 + SEC-006 (v2) | **Aplicada en prod** |
 | [`040_harden_password_resets.sql`](../supabase/migrations/040_harden_password_resets.sql) | SEC-004 — RLS + REVOKE en `password_resets` | **Aplicada en prod** |
+| [`041_agency_settings.sql`](../supabase/migrations/041_agency_settings.sql) | Agency branding schema | Secuencia de producto — **no es fix de seguridad** |
+| [`042_agency_logo_bucket.sql`](../supabase/migrations/042_agency_logo_bucket.sql) | Agency branding asset constraints | Secuencia de producto — **no es fix de seguridad** |
 | [`039_rollback_restore_metadata_rls.sql`](../supabase/rollbacks/039_rollback_restore_metadata_rls.sql) | Rollback manual de emergencia 039 | **No auto-aplicar** — ver `supabase/rollbacks/` |
+
+Las migraciones 041 y 042 continúan la secuencia aplicable de
+`supabase/migrations/`, pero pertenecen a Fase 2 Branding. Se incluyen aquí
+solo para mantener completo el inventario posterior al hardening; no remedian
+hallazgos SEC ni cambian el cierre C1.
 
 ---
 
@@ -571,7 +578,7 @@ Policies sobre `public.users` que consultan `public.users` inline crean un ciclo
 
 | Test | Descripción | Estado |
 |------|-------------|--------|
-| 1 | Privilege escalation — metadata forjada no accede admin | ✅ Manual + [`identity-forgery.*`](tests/security/) |
+| 1 | Privilege escalation — metadata forjada no accede admin | ✅ Manual + [`identity-forgery.*`](../tests/security/) |
 | 2 | RPC exposure — anon no puede invocar `create_agency_reservation` | ✅ 037 + manual; scanner opcional futuro |
 | 3 | Tenant isolation — agencia A no ve reservas de B | Parcial (`tenant.test.ts`) |
 | 4 | Seat manipulation — cliente no puede UPDATE seats | ✅ DB 039 + manual; scanner RLS en 039 |
