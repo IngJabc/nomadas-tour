@@ -1,19 +1,19 @@
 # TASKS
 
-> Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.  
-> **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)  
-> **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)  
+> Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
+> **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
+> **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
 
 ---
 
-## Sprint actual
+## Sprint actual — completado
 
 **Fase 2 — Personalización de agencias (branding)**
 
-- [ ] Configuración de agencias — branding (logo, colores primario/secundario/acento)
-- [ ] Regla: nombre de agencia solo editable por superadmin (no por la agencia)
-- [ ] UI de settings en panel agencia + endpoints backend correspondientes
+- [x] Configuración de agencias — branding (logo, colores primario/secundario/acento)
+- [x] Regla: nombre de agencia solo editable por superadmin (no por la agencia)
+- [x] UI de settings en panel agencia + endpoints backend correspondientes
 
 ---
 

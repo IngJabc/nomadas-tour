@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-02
+**Última actualización:** 2026-08-04
 
 ---
 
@@ -14,7 +14,7 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 
 | Capacidad | Estado |
 |-----------|--------|
-| Multi-tenant (subdominios, aislamiento por agencia) | Operativo |
+| Multi-tenant (aislamiento comercial + operación compartida controlada) | Operativo |
 | Reservas por agencia (wizard, pasajeros, QR) | Operativo |
 | Seat locks + concurrencia + idempotencia | Operativo |
 | Scanner / Boarding por pasajero | Operativo |
@@ -26,6 +26,7 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Agencia desactivada con logout forzado | Operativo |
 | Edición de viajes con reservas existentes | Operativo |
 | Estados inválidos protegidos | Operativo |
+| Branding configurable por agencia (logo + colores runtime) | Operativo |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -41,7 +42,7 @@ Estos principios guían decisiones de producto, arquitectura y priorización:
 
 2. **Integridad de reservas** — Una reserva es un contrato operativo: asientos, pasajeros y estados deben ser consistentes bajo concurrencia, cancelaciones y cambios de viaje.
 
-3. **Multi-tenancy desde el diseño** — Cada agencia ve solo su espacio. El superadmin gestiona la plataforma; las agencias operan sin fricción ni fugas de datos.
+3. **Multi-tenancy desde el diseño** — Los datos comerciales permanecen aislados por agencia. Las excepciones operacionales, como boarding en viajes compartidos, requieren autorización explícita y acotada según [ADR-001](decisions/ADR-001-boarding-cross-agency.md).
 
 4. **Automatizar antes que aumentar carga operativa** — Si una tarea se repite diariamente (recordatorios, limpieza, alertas), debe tender a automatizarse, no a depender de memoria humana.
 
@@ -59,21 +60,28 @@ Las fases están numeradas a partir de la fundación ya completada. Cada fase co
 
 ### Fase 2 — Personalización de agencias
 
-**Prioridad:** Primera.
+**Estado:** Completada.
 
 **Objetivo:** Permitir que cada agencia personalice su espacio dentro de la plataforma, incrementando la percepción de **producto propio** para cada cliente B2B.
 
-**Primera versión propuesta:**
+**Primera versión implementada:**
 
 #### Branding
 
-- Logo
-- Color primario
-- Color secundario
-- Color de acento
+- Logo configurable por agencia mediante Storage.
+- Color primario.
+- Color secundario.
+- Color de acento.
+- Aplicación runtime y reactiva mediante `AgencyBrandingProvider`.
+- Settings visuales con preview, validación y actualización sin refresh.
 
 Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agencia configura variantes dentro de un marco seguro y consistente.
 
+**Persistencia e infraestructura:**
+
+- Migración `041_agency_settings.sql`: schema 1:1 de branding por agencia, RLS y defaults.
+- Migración `042_agency_logo_bucket.sql`: bucket y restricciones para assets de logo.
+- El branding visual vive en `agency_settings`; la identidad y el nombre del tenant permanecen en `agencies`.
 
 #### Regla de negocio
 
