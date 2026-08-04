@@ -23,6 +23,7 @@ interface AgencyBrandingContextValue {
   loading: boolean;
   error: boolean;
   updateBranding: (branding: AgencyBrandingSettings) => void;
+  refresh: () => Promise<void>;
 }
 
 const AgencyBrandingContext =
@@ -74,6 +75,8 @@ export function AgencyBrandingProvider({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const runtimeRevisionRef = useRef(0);
+  const requestSequenceRef = useRef(0);
+  const mountedRef = useRef(false);
 
   const updateBranding = useCallback((nextBranding: AgencyBrandingSettings) => {
     runtimeRevisionRef.current += 1;
@@ -82,41 +85,60 @@ export function AgencyBrandingProvider({
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    let active = true;
+  const refresh = useCallback(async () => {
+    const requestSequence = ++requestSequenceRef.current;
     const requestRevision = runtimeRevisionRef.current;
+    setLoading(true);
+    setError(false);
 
-    agencyApi
-      .getBranding()
-      .then((settings) => {
-        if (!active || runtimeRevisionRef.current !== requestRevision) return;
-        setBranding(settings);
-        setError(false);
-      })
-      .catch(() => {
-        if (!active || runtimeRevisionRef.current !== requestRevision) return;
-        // No inline overrides means all platform defaults remain inherited.
-        setBranding(null);
-        setError(true);
-      })
-      .finally(() => {
-        if (active && runtimeRevisionRef.current === requestRevision) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+    try {
+      const settings = await agencyApi.getBranding();
+      if (
+        !mountedRef.current ||
+        requestSequenceRef.current !== requestSequence ||
+        runtimeRevisionRef.current !== requestRevision
+      ) {
+        return;
+      }
+      setBranding(settings);
+      setError(false);
+    } catch {
+      if (
+        !mountedRef.current ||
+        requestSequenceRef.current !== requestSequence ||
+        runtimeRevisionRef.current !== requestRevision
+      ) {
+        return;
+      }
+      // No inline overrides means all platform defaults remain inherited.
+      setBranding(null);
+      setError(true);
+    } finally {
+      if (
+        mountedRef.current &&
+        requestSequenceRef.current === requestSequence &&
+        runtimeRevisionRef.current === requestRevision
+      ) {
+        setLoading(false);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void refresh();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [refresh]);
 
   const style = useMemo(
     () => buildAgencyBrandingStyle(branding),
     [branding],
   );
   const value = useMemo(
-    () => ({ branding, loading, error, updateBranding }),
-    [branding, loading, error, updateBranding],
+    () => ({ branding, loading, error, updateBranding, refresh }),
+    [branding, loading, error, updateBranding, refresh],
   );
 
   return (

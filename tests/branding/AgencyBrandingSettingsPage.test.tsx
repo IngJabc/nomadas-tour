@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { ApiError } from '@/lib/errors/api-error';
 
 const {
   mockGetBranding,
   mockUpdateBranding,
   mockUploadLogo,
   mockRuntimeUpdate,
+  mockRefreshBranding,
+  mockUseAgencyBranding,
   mockToastSuccess,
   mockToastError,
 } = vi.hoisted(() => ({
@@ -14,6 +15,8 @@ const {
   mockUpdateBranding: vi.fn(),
   mockUploadLogo: vi.fn(),
   mockRuntimeUpdate: vi.fn(),
+  mockRefreshBranding: vi.fn(),
+  mockUseAgencyBranding: vi.fn(),
   mockToastSuccess: vi.fn(),
   mockToastError: vi.fn(),
 }));
@@ -25,12 +28,7 @@ vi.mock('@/components/branding/AgencyBrandingProvider', async () => {
 
   return {
     ...actual,
-    useAgencyBranding: () => ({
-      branding: null,
-      loading: false,
-      error: false,
-      updateBranding: mockRuntimeUpdate,
-    }),
+    useAgencyBranding: () => mockUseAgencyBranding(),
   };
 });
 
@@ -68,12 +66,17 @@ const STORED_BRANDING = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockUseAgencyBranding.mockReturnValue({
+    branding: STORED_BRANDING,
+    loading: false,
+    error: false,
+    updateBranding: mockRuntimeUpdate,
+    refresh: mockRefreshBranding,
+  });
 });
 
 describe('AgencyBrandingSettingsPage', () => {
-  it('loads and displays existing branding', async () => {
-    mockGetBranding.mockResolvedValue(STORED_BRANDING);
-
+  it('uses existing branding from the provider without another GET', async () => {
     render(<AgencyBrandingSettingsPage />);
 
     const logo = await screen.findByAltText('Logo actual de la agencia');
@@ -93,12 +96,17 @@ describe('AgencyBrandingSettingsPage', () => {
       'value',
       '#778899',
     );
+    expect(mockGetBranding).not.toHaveBeenCalled();
   });
 
-  it('uses Nómadas defaults when branding does not exist', async () => {
-    mockGetBranding.mockRejectedValue(
-      new ApiError('Not found', 'NOT_FOUND', 404),
-    );
+  it('uses Nómadas defaults when the provider has no branding', async () => {
+    mockUseAgencyBranding.mockReturnValue({
+      branding: null,
+      loading: false,
+      error: false,
+      updateBranding: mockRuntimeUpdate,
+      refresh: mockRefreshBranding,
+    });
 
     render(<AgencyBrandingSettingsPage />);
 
@@ -110,10 +118,10 @@ describe('AgencyBrandingSettingsPage', () => {
     });
     expect(screen.getAllByTestId('platform-logo')).toHaveLength(2);
     expect(screen.queryByText('No se pudo cargar el branding.')).toBeNull();
+    expect(mockGetBranding).not.toHaveBeenCalled();
   });
 
   it('sends only branding fields in the update payload', async () => {
-    mockGetBranding.mockResolvedValue(STORED_BRANDING);
     mockUpdateBranding.mockImplementation(async (patch) => ({
       ...STORED_BRANDING,
       ...patch,
@@ -144,8 +152,6 @@ describe('AgencyBrandingSettingsPage', () => {
   });
 
   it('restores Nómadas colors locally without saving', async () => {
-    mockGetBranding.mockResolvedValue(STORED_BRANDING);
-
     render(<AgencyBrandingSettingsPage />);
 
     await screen.findByLabelText('Color primario');
@@ -169,7 +175,6 @@ describe('AgencyBrandingSettingsPage', () => {
   });
 
   it('shows toast feedback when the update API fails', async () => {
-    mockGetBranding.mockResolvedValue(STORED_BRANDING);
     mockUpdateBranding.mockRejectedValue(new Error('network failure'));
 
     render(<AgencyBrandingSettingsPage />);
@@ -191,7 +196,6 @@ describe('AgencyBrandingSettingsPage', () => {
       logo_url:
         'https://project.supabase.co/storage/v1/object/public/agency-assets/agency-1/logo.png?v=1',
     };
-    mockGetBranding.mockResolvedValue(STORED_BRANDING);
     mockUploadLogo.mockResolvedValue(uploadedBranding);
 
     render(<AgencyBrandingSettingsPage />);
@@ -204,5 +208,21 @@ describe('AgencyBrandingSettingsPage', () => {
       expect(mockUploadLogo).toHaveBeenCalledWith(file);
       expect(mockRuntimeUpdate).toHaveBeenCalledWith(uploadedBranding);
     });
+  });
+
+  it('uses provider refresh when retrying a branding load error', () => {
+    mockUseAgencyBranding.mockReturnValue({
+      branding: null,
+      loading: false,
+      error: true,
+      updateBranding: mockRuntimeUpdate,
+      refresh: mockRefreshBranding,
+    });
+
+    render(<AgencyBrandingSettingsPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+    expect(mockRefreshBranding).toHaveBeenCalledTimes(1);
+    expect(mockGetBranding).not.toHaveBeenCalled();
   });
 });

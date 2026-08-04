@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 const { mockGetBranding, mockUpdateBranding } = vi.hoisted(() => ({
@@ -59,6 +59,10 @@ function RuntimeUpdateProbe({
     </button>
   );
 }
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('AgencyBrandingProvider', () => {
   it('applies tenant colors and derived variables to its scope', async () => {
@@ -205,6 +209,7 @@ describe('AgencyBrandingProvider', () => {
         '#00D4FF',
       );
     });
+    expect(mockGetBranding).toHaveBeenCalledTimes(1);
 
     const accentInput = await screen.findByLabelText('Color de acento');
     fireEvent.change(accentInput, { target: { value: '#AA00CC' } });

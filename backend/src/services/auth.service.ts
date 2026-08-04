@@ -107,19 +107,24 @@ export class AuthService {
       throw new UnauthorizedError('Usuario no registrado');
     }
 
+    let agencyName: string | null = null;
     if (dbUser.agency_id) {
       const { data: agency } = await supabaseAdmin
         .from('agencies')
-        .select('status')
+        .select('name, status')
         .eq('id', dbUser.agency_id)
         .single();
 
       if (agency && agency.status !== 'active') {
         throw new AgencyInactiveError();
       }
+      agencyName = agency?.name ?? null;
     }
 
-    return dbUser;
+    return {
+      ...dbUser,
+      agency_name: agencyName,
+    };
   }
 
   async resetPassword(identifier: { token?: string; code?: string }, password: string) {

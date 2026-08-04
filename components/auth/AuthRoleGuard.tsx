@@ -39,7 +39,7 @@ export function AuthRoleGuard({ requiredRole, children }: AuthRoleGuardProps) {
     }
   }, [loading, user, requiredRole, router, searchParams]);
 
-  if (loading || !user || user.role !== requiredRole) {
+  if (!user || user.role !== requiredRole) {
     return null;
   }
 

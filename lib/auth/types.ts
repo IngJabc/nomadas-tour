@@ -6,4 +6,5 @@ export interface AppUser {
   email: string;
   role: AppRole;
   agency_id: string | null;
+  agency_name: string | null;
 }

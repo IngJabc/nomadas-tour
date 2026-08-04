@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { LayoutDashboard, ClipboardList, QrCode, Bus, Bell, Palette, type LucideIcon } from 'lucide-react';
 import { PlatformLogoMark } from '@/components/brand/PlatformLogoMark';
 import { useAgencyBranding } from '@/components/branding/AgencyBrandingProvider';
-import { agencyApi } from '@/lib/api';
+import { useAuthUser } from '@/hooks/useAuthUser';
 import { Sidebar } from './Sidebar';
 
 const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
@@ -44,27 +43,11 @@ function AgencySidebarLogo({
 
 export function AgencySidebar({ onLogout }: AgencySidebarProps) {
   const { branding } = useAgencyBranding();
-  const [agencyName, setAgencyName] = useState('Agencia');
-
-  useEffect(() => {
-    let active = true;
-
-    agencyApi
-      .getDashboard()
-      .then((dashboard) => {
-        const name = dashboard?.agency_name;
-        if (active && typeof name === 'string' && name.trim()) {
-          setAgencyName(name.trim());
-        }
-      })
-      .catch(() => {
-        // Keep the stable fallback when identity cannot be loaded.
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
+  const { user } = useAuthUser();
+  const agencyName =
+    user?.role === 'agency' && user.agency_name?.trim()
+      ? user.agency_name.trim()
+      : 'Agencia';
 
   return (
     <Sidebar

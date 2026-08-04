@@ -136,16 +136,15 @@ export function LogoUploader({
           )}
         </div>
 
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-navy)]">
-            Sube una imagen cuadrada o apaisada. Se mostrará en el sidebar de
-            la agencia.
+            Sube el logo de tu agencia.
           </p>
           <p className="mt-2 font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)]">
             PNG, JPEG o WEBP. Tamaño máximo: 1MB.
           </p>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
             <input
               id="agency-logo-file"
               type="file"
@@ -158,7 +157,7 @@ export function LogoUploader({
               htmlFor="agency-logo-file"
               aria-disabled={busy}
               className={[
-                'inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5',
+                'inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl px-4 sm:px-5 py-2.5',
                 'font-[family-name:var(--font-body)] font-semibold text-sm',
                 'bg-slate-100 text-[var(--color-brand-navy)] hover:bg-slate-200 transition-colors',
                 busy
@@ -179,6 +178,7 @@ export function LogoUploader({
               variant="destructive"
               disabled={busy || !currentLogoUrl}
               onClick={() => setConfirmOpen(true)}
+              className="w-full sm:w-auto"
             >
               <Trash2 className="w-4 h-4" strokeWidth={1.75} />
               Eliminar logo

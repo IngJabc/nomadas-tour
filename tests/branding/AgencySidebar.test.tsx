@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 const {
   mockGetBranding,
   mockGetDashboard,
   mockUseAgencyBranding,
+  mockUseAuthUser,
   mockPathname,
 } = vi.hoisted(() => ({
   mockGetBranding: vi.fn(),
   mockGetDashboard: vi.fn(),
   mockUseAgencyBranding: vi.fn(),
+  mockUseAuthUser: vi.fn(),
   mockPathname: vi.fn(() => '/agency'),
 }));
 
@@ -26,6 +28,10 @@ vi.mock('@/lib/api', () => ({
 
 vi.mock('@/components/branding/AgencyBrandingProvider', () => ({
   useAgencyBranding: () => mockUseAgencyBranding(),
+}));
+
+vi.mock('@/hooks/useAuthUser', () => ({
+  useAuthUser: () => mockUseAuthUser(),
 }));
 
 vi.mock('@/components/brand/PlatformLogoMark', () => ({
@@ -45,10 +51,14 @@ beforeEach(() => {
     loading: true,
     error: false,
   });
+  mockUseAuthUser.mockReturnValue({
+    user: null,
+    loading: true,
+  });
 });
 
 describe('AgencySidebar branding', () => {
-  it('uses logo_url from the branding context and agencies.name from the existing dashboard endpoint', async () => {
+  it('uses logo_url from branding and agency_name from auth context', () => {
     mockUseAgencyBranding.mockReturnValue({
       branding: {
         logo_url: 'https://cdn.example.com/agency-logo.png',
@@ -59,11 +69,20 @@ describe('AgencySidebar branding', () => {
       loading: false,
       error: false,
     });
-    mockGetDashboard.mockResolvedValue({ agency_name: 'Mi Agencia XYZ' });
+    mockUseAuthUser.mockReturnValue({
+      user: {
+        id: 'user-1',
+        email: 'agency@example.com',
+        role: 'agency',
+        agency_id: 'agency-1',
+        agency_name: 'Mi Agencia XYZ',
+      },
+      loading: false,
+    });
 
     render(<AgencySidebar onLogout={vi.fn()} />);
 
-    expect(await screen.findByText('Mi Agencia XYZ')).toBeTruthy();
+    expect(screen.getByText('Mi Agencia XYZ')).toBeTruthy();
     const logo = screen.getByRole('img', {
       name: 'Logo de Mi Agencia XYZ',
     });
@@ -73,20 +92,17 @@ describe('AgencySidebar branding', () => {
     expect(screen.getByText('Panel Agencia')).toBeTruthy();
     expect(screen.queryByTestId('platform-logo')).toBeNull();
     expect(mockGetBranding).not.toHaveBeenCalled();
+    expect(mockGetDashboard).not.toHaveBeenCalled();
   });
 
-  it('keeps the platform logo and stable agency fallback while data is unavailable', async () => {
-    mockGetDashboard.mockRejectedValue(new Error('network failure'));
-
+  it('keeps a stable fallback while auth identity is loading', () => {
     render(<AgencySidebar onLogout={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(mockGetDashboard).toHaveBeenCalledTimes(1);
-    });
     expect(screen.getByTestId('platform-logo')).toBeTruthy();
     expect(screen.getByText('Agencia')).toBeTruthy();
     expect(screen.getByText('Panel Agencia')).toBeTruthy();
     expect(mockGetBranding).not.toHaveBeenCalled();
+    expect(mockGetDashboard).not.toHaveBeenCalled();
   });
 
   it('keeps admin on platform branding without tenant data', () => {

@@ -110,14 +110,17 @@ describe('authService.login', () => {
 });
 
 describe('authService.getMe', () => {
-  it('returns identity from public.users only', async () => {
+  it('returns user identity with the agency name from public.agencies', async () => {
     tableChains.users = createChainable({
       id: 'user-1',
       email: 'agent@example.com',
       role: 'agency',
       agency_id: 'agency-1',
     });
-    tableChains.agencies = createChainable({ status: 'active' });
+    tableChains.agencies = createChainable({
+      name: 'Agencia Demo',
+      status: 'active',
+    });
 
     const user = await authService.getMe('user-1');
 
@@ -126,7 +129,9 @@ describe('authService.getMe', () => {
       email: 'agent@example.com',
       role: 'agency',
       agency_id: 'agency-1',
+      agency_name: 'Agencia Demo',
     });
+    expect(tableChains.agencies.select).toHaveBeenCalledWith('name, status');
   });
 
   it('throws when user is missing in public.users', async () => {
@@ -158,6 +163,7 @@ describe('authService.getMe', () => {
     const user = await authService.getMe('admin-1');
 
     expect(user.role).toBe('superadmin');
+    expect(user.agency_name).toBeNull();
   });
 });
 

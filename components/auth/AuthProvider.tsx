@@ -69,7 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadProfile();
 
     const supabase = createClient();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'TOKEN_REFRESHED') return;
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       loadProfile();
     });

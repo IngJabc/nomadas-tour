@@ -26,6 +26,7 @@ const AGENCY_USER: AppUser = {
   email: 'agent@example.com',
   role: 'agency',
   agency_id: 'agency-1',
+  agency_name: 'Agencia Demo',
 };
 
 const SUPERADMIN_USER: AppUser = {
@@ -33,6 +34,7 @@ const SUPERADMIN_USER: AppUser = {
   email: 'admin@example.com',
   role: 'superadmin',
   agency_id: null,
+  agency_name: null,
 };
 
 beforeEach(() => {
