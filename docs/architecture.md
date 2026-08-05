@@ -81,6 +81,29 @@ El backend genera notificaciones in-app y por email según eventos de negocio y
 preferencias de la agencia. El frontend recibe las notificaciones in-app
 autorizadas mediante API y Realtime.
 
+### Outbox y workers
+
+La plataforma usa **Transactional Outbox** (`outbox_events`) para hechos de
+dominio. El primer evento es `reservation.created.v1`; un proceso worker
+separado del HTTP (relay + EmailWorker) consume el outbox con retries e
+idempotencia. Diseño: serie `docs/WKR-00x-*.md`.
+
+**Observabilidad:**
+
+```text
+Worker
+  → Structured Logs (JSON stdout)
+  → Metrics (in-memory)
+  → Heartbeat
+  → Sentry (próximo — WKR-006.2)
+```
+
+Runtime actual (WKR-006.1): correlación `event_id` / aggregate / agency /
+handler, heartbeat con uptime/pid/versión, recovery
+`recover_stuck_outbox_events` (migración 051). Diseño Sentry:
+[`WKR-006.2-sentry-foundation-design.md`](WKR-006.2-sentry-foundation-design.md).
+Implementación SDK pendiente (WKR-006.2). No mezclar con SEC-009.
+
 ### Branding por agencia
 
 `agency_settings` almacena logo y colores sin mezclar branding con la identidad

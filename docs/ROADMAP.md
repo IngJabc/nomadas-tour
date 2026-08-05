@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-04
+**Última actualización:** 2026-08-05
 
 ---
 
@@ -27,6 +27,7 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Edición de viajes con reservas existentes | Operativo |
 | Estados inválidos protegidos | Operativo |
 | Branding configurable por agencia (logo + colores runtime) | Operativo |
+| Transactional Outbox + EmailWorker (`reservation.created.v1`) | Operativo (WKR-004/005) |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -49,6 +50,39 @@ Estos principios guían decisiones de producto, arquitectura y priorización:
 5. **Configuración antes que personalización mediante código** — Branding, datos comerciales y preferencias deben ser editables por la agencia sin despliegues ni forks por cliente.
 
 6. **Escalabilidad y mantenibilidad** — Preferir procesos en segundo plano, observabilidad y límites claros sobre parches ad hoc en request/response.
+
+---
+
+## Roadmap visual — secuencia actual
+
+```text
+FASE 2 — Branding                          ✅ Completada
+
+FASE 3 — Workers
+  WKR-001  Event inventory audit           ✅
+  WKR-002  Events/workers architecture ADR ✅
+  WKR-003  Outbox design (+ 003.1 / 003.2) ✅
+  WKR-004  Transactional outbox foundation ✅
+  WKR-005  Outbox relay + EmailWorker      ✅
+  WKR-006  Observability foundation (docs) ✅
+  WKR-006.1 Worker observability (runtime) ✅
+  WKR-006.2.1 Sentry foundation design (docs) ✅
+  WKR-006.2 Sentry wiring → siguiente
+  WKR-006.3 Retention + DLQ runbook
+  WKR-007  Trip / notification event workers
+  WKR-008  Reminder workers
+  WKR-009  Retention / automation bridge
+
+FASE Seguridad continua
+  SEC-001 … SEC-008                        ✅ (hardening cerrado)
+  SEC-009  Continuous security validation  → futura
+
+FASE 4 — Automatizaciones (producto)
+FASE 5 — Audit Trail
+FASE 6 — Reportes
+FASE 7 — UX
+FASE 8 — Escalabilidad (amplía observabilidad)
+```
 
 ---
 
@@ -93,28 +127,101 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 3 — Sistema de Workers
 
-**Prioridad:** Segunda.
+**Prioridad:** En curso (outbox/email + observabilidad local listos; diseño Sentry documentado; wiring WKR-006.2 siguiente).
 
-**Objetivo:** Incorporar procesamiento asíncrono y tareas programadas. Introducir una arquitectura moderna basada en **procesos en segundo plano**, desacoplada del ciclo HTTP.
+**Objetivo:** Procesamiento asíncrono y tareas programadas desacopladas del ciclo HTTP, mediante **Transactional Outbox + Workers** ([WKR-002](WKR-002-events-workers-architecture-adr.md)).
 
-**Nota:** No se elige aún implementación concreta (cola, cron distribuido, Supabase Edge Functions + scheduler, etc.). Esta fase documenta la **necesidad** y los casos iniciales.
+#### Progreso WKR
 
-**Casos iniciales:**
+| Ticket | Tema | Estado |
+|--------|------|--------|
+| [WKR-001](WKR-001-event-inventory-audit.md) | Inventario de eventos | ✅ |
+| [WKR-002](WKR-002-events-workers-architecture-adr.md) | ADR arquitectura events/workers | ✅ |
+| [WKR-003](WKR-003-transactional-outbox-foundation-design.md) | Diseño outbox (+ readiness / boundaries) | ✅ |
+| [WKR-004](WKR-004-outbox-foundation-implementation.md) | Tabla `outbox_events` + `reservation.created.v1` | ✅ |
+| [WKR-005](WKR-005-email-worker-implementation.md) | Relay + EmailWorker | ✅ |
+| [WKR-006](WKR-006-worker-observability-foundation.md) | Observability foundation (auditoría + diseño) | ✅ |
+| [WKR-006.1](WKR-006.1-worker-observability-implementation.md) | Worker observability (logs, metrics, heartbeat, stuck reaper) | ✅ |
+| [WKR-006.2.1](WKR-006.2-sentry-foundation-design.md) | Sentry foundation design (docs only) | ✅ |
+| **WKR-006.2** | **Sentry wiring (API + worker; sin frontend aún)** | **Siguiente** |
+| WKR-006.3 | Retention + DLQ runbook | Pendiente |
+| WKR-007 | Trip / notification event workers | Pendiente |
+| WKR-008 | Reminder workers | Pendiente |
+| WKR-009 | Retention / automation bridge → Fase 4 | Pendiente |
 
-- Recordatorios de viajes para pasajeros
-- Recordatorios de viajes para agencias
-- Recordatorios al administrador para completar viajes
-- Limpieza automática (locks expirados, datos temporales)
-- Emails diferidos (no bloquear requests)
-- Alertas operativas (ocupación, viajes próximos, anomalías)
+#### Capacidades ya en el sistema (WKR-004/005)
 
-**Valor:** Reduce carga manual, mejora puntualidad operativa y prepara el terreno para automatizaciones de producto.
+- Tabla `outbox_events` y emisión transaccional de `reservation.created.v1`
+- Proceso worker separado del HTTP (`npm run worker`)
+- Retries básicos, claim `SKIP LOCKED`, idempotencia `ticket_email_sent_at`
+- Feature flag `EMAIL_VIA_OUTBOX`
+- Logs JSON estructurados + métricas + heartbeat + stuck recovery (WKR-006.1)
+
+#### WKR-006 / 006.1 — Worker Observability ✅
+
+- Diseño: [`WKR-006-worker-observability-foundation.md`](WKR-006-worker-observability-foundation.md)
+- Runtime: [`WKR-006.1-worker-observability-implementation.md`](WKR-006.1-worker-observability-implementation.md)
+
+#### WKR-006.2.1 — Sentry Foundation Design ✅
+
+**Documento:** [`WKR-006.2-sentry-foundation-design.md`](WKR-006.2-sentry-foundation-design.md)
+
+Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** — sin SDK.
+
+#### WKR-006.2 → 006.3 (siguiente)
+
+1. **006.2** — Wiring Sentry API + worker (tags de correlación; sin frontend / Performance / Replay) ← **siguiente**
+2. **006.3** — Retención `completed` + runbook DLQ (`failed`)
+
+**Separación conceptual (no mezclar en el mismo ticket):**
+
+| Capacidad | Rol | Ticket |
+|-----------|-----|--------|
+| **Logs / métricas / health / Sentry** | Observabilidad y operación en producción | **WKR-006.x** |
+| **Strix** / SAST / scanners | Seguridad ofensiva/preventiva, vulnerabilidades, validación continua | **SEC-009** |
+
+#### WKR-007 → WKR-009 (posteriores)
+
+- **WKR-007 — Trip / notification event workers:** fan-out desde eventos de dominio (desacoplar efectos del request HTTP).
+- **WKR-008 — Reminder workers:** ventanas T-24h / T-2h.
+- **WKR-009 — Retention / automation bridge:** retención outbox + puente a Fase 4.
+
+**Valor de la fase:** reduce acoplamiento HTTP↔efectos secundarios, mejora confiabilidad de emails y prepara automatizaciones de producto.
+
+---
+
+### Fase Seguridad continua
+
+**Prioridad:** Paralela a Workers / Escalabilidad (no bloquea WKR-006.x).
+
+El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implementation.md](security-hardening-implementation.md)). La siguiente capa es **validación continua**, no un re-hardening ad hoc.
+
+#### SEC-009 — Continuous Security Validation
+
+**Objetivo:** Automatizar parte de las auditorías de seguridad que hoy son manuales o semi-manuales.
+
+**Alcance (futuro, sin elegir herramienta definitiva):**
+
+- Análisis automatizado de vulnerabilidades
+- SAST (static application security testing)
+- Dependency scanning
+- Regresiones de seguridad (ampliar suite tipo SEC-007)
+- Validaciones multi-tenant / aislamiento
+- Revisión continua de permisos y RLS
+
+**Herramientas candidatas (evaluación abierta):**
+
+- Strix u equivalentes de security testing asistido
+- GitHub security tooling (Dependabot, CodeQL, secret scanning)
+- Scanners SAST del ecosistema JS/TS
+
+**No mezclar con WKR-006.x:** SEC-009 no es observabilidad de runtime; Sentry no sustituye SAST ni pentest asistido.
 
 ---
 
 ### Fase 4 — Automatizaciones
 
-**Prioridad:** Tercera (construida sobre Workers).
+**Prioridad:** Tras WKR-007/008/009 (construida sobre Workers endurecidos).
 
 **Objetivo:** Reglas de negocio y comunicaciones que se ejecutan solas según configuración o umbrales.
 
@@ -133,7 +240,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 5 — Audit Trail
 
-**Prioridad:** Cuarta.
+**Prioridad:** Tras automatizaciones iniciales (o en paralelo selectivo con outbox).
 
 **Objetivo:** Registrar acciones administrativas y eventos relevantes para soporte, auditoría y trazabilidad.
 
@@ -175,7 +282,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 7 — UX
 
-**Prioridad:** Sexta (continua, no exclusiva).
+**Prioridad:** Continua, no exclusiva.
 
 **Objetivo:** Experiencia premium coherente con la filosofía de diseño (`AGENTS.md`).
 
@@ -194,13 +301,13 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 8 — Escalabilidad
 
-**Prioridad:** Séptima (paralela a crecimiento de clientes).
+**Prioridad:** Paralela a crecimiento de clientes.
 
 **Objetivo:** Sostener más agencias, más viajes concurrentes y más tráfico Realtime sin degradación.
 
 **Alcance:**
 
-- Observabilidad (logs estructurados, trazas, métricas)
+- Observabilidad avanzada (amplía WKR-006.x: trazas distribuidas, alertas SLO)
 - Performance (queries, N+1, índices)
 - Caché donde aporte (dashboards, listados)
 - Rate limiting refinado por ruta y tenant
@@ -219,7 +326,8 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 | [`TASKS-HISTORY.md`](TASKS-HISTORY.md) | Historial de sprints completados |
 | [`documentation-guide.md`](documentation-guide.md) | Cómo mantener docs organizadas |
 | [`architecture.md`](architecture.md) | Arquitectura técnica actual |
-| [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones de seguridad (cerradas) |
+| [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones SEC-001…008 (cerradas); SEC-009 futura |
+| Serie `WKR-00x-*.md` | Workers/outbox (incl. [WKR-006.1](WKR-006.1-worker-observability-implementation.md), [Sentry design](WKR-006.2-sentry-foundation-design.md)) |
 | [`system-spec.md`](system-spec.md) | Especificación funcional base |
 | [`AGENTS.md`](../AGENTS.md) | Reglas de diseño e implementación |
 
