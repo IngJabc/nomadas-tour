@@ -7,9 +7,36 @@
 
 ---
 
-## Sprint actual — completado
+## Sprint actual — siguiente
 
-**Fase 2 — Personalización de agencias (branding)**
+**Fase 3 — WKR-007 — Trip / notification event workers**
+
+Infra workers cerrada (outbox → email → observability → Sentry → retention runbook).
+
+- [ ] Definir / emitir eventos de dominio siguientes (sin romper `reservation.created.v1`)
+- [ ] Handlers de notificación desacoplados del request HTTP
+- [ ] Reutilizar outbox + observabilidad + política DLQ de WKR-006.3
+
+Runbook ops outbox: [`docs/WKR-006.3-outbox-retention-dlq-runbook.md`](docs/WKR-006.3-outbox-retention-dlq-runbook.md)
+
+---
+
+## Completado recientemente — Fase 3 (Workers + observability)
+
+- [x] WKR-001 — Event inventory audit
+- [x] WKR-002 — Events/workers architecture ADR
+- [x] WKR-003 — Outbox design (+ readiness / boundaries)
+- [x] WKR-004 — Transactional outbox foundation
+- [x] WKR-005 — Outbox relay + EmailWorker (`reservation.created.v1`)
+- [x] WKR-006 — Worker Observability Foundation (docs)
+- [x] WKR-006.1 — Structured logs + metrics + heartbeat + stuck reaper
+- [x] WKR-006.2.1 — Sentry Foundation Design (docs)
+- [x] WKR-006.2 — Sentry wiring (API + worker, opcional)
+- [x] WKR-006.3 — Outbox Retention & DLQ Operational Runbook (docs)
+
+---
+
+## Completado — Fase 2 Branding
 
 - [x] Configuración de agencias — branding (logo, colores primario/secundario/acento)
 - [x] Regla: nombre de agencia solo editable por superadmin (no por la agencia)
@@ -17,30 +44,33 @@
 
 ---
 
-## Próximo sprint
+## Después (Fase 3 restante → producto)
 
-**Fase 3 — Infraestructura de Workers**
+| Orden | Ticket / Fase | Tema | Estado |
+|-------|---------------|------|--------|
+| 1 | **WKR-007** | Trip / notification event workers | **Siguiente** |
+| 2 | WKR-008 | Reminder workers | Pendiente |
+| 3 | WKR-009 | Retention worker (purga completed) / automation bridge | Pendiente |
+| 4 | Fase 4 | Automatizaciones de producto | Pendiente |
+| — | **SEC-009** | Continuous security validation (≠ Sentry) | Futura |
 
-- [ ] Definir arquitectura de procesamiento asíncrono (evaluación, no implementación acelerada)
-- [ ] Casos piloto: recordatorios, limpieza programada, emails diferidos
+Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
-## Después
+## Separación Observabilidad vs Seguridad continua
 
-| Orden | Fase | Tema |
-|-------|------|------|
-| 3 | Fase 4 | Automatizaciones (sobre Workers) |
-| 4 | Fase 5 | Audit Trail |
-| 5 | Fase 6 | Reportes |
-
-Detalle de alcance por fase: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+| | WKR-006.x (Sentry / logs / métricas / DLQ runbook) | SEC-009 (Strix / SAST / scanners) |
+|--|-----------------------------------------------------|-------------------------------------|
+| Propósito | Operación y errores en producción | Vulnerabilidades / regresiones seguridad |
+| Momento | 006.1–006.3 ✅ | Futura, paralela |
+| No es | Pentest / SAST | APM / error tracking |
 
 ---
 
 ## Bloqueadores
 
-_Ninguno al cierre del hardening (2026-08-02)._
+_Ninguno al cierre de WKR-006.3 (docs only; sin cambios de código)._
 
 ---
 
@@ -49,7 +79,9 @@ _Ninguno al cierre del hardening (2026-08-02)._
 Ítems útiles que no pertenecen al sprint inmediato:
 
 - **UX continua** — responsive, accesibilidad, skeletons (ROADMAP Fase 7)
-- **Escalabilidad** — observabilidad, caché, monitoreo (ROADMAP Fase 8)
+- **Escalabilidad** — caché, índices, costos; Prometheus (ROADMAP Fase 8)
+- **Sentry frontend / Performance / Replay** — fuera de WKR-006.2
+- **Índice `(status, processed_at)`** — evaluar en WKR-009 si la purga lo necesita
 - **Custom Access Token Hook** — defensa en profundidad opcional post-RLS
-- **Tenant isolation test** — automatizar checklist multi-tenant en `tests/security/`
+- **Tenant isolation test** — automatizar checklist multi-tenant (alimenta SEC-009)
 - **Fix preexistente** — `lib/__tests__/utils.test.ts` (`formatDateTime`, timezone)

@@ -219,8 +219,8 @@ export class ReservationService {
         .eq('id', reservationId);
     }
 
-    // Send ticket email if requested (fire-and-forget, idempotent via ticket_email_sent_at)
-    if (sendTicketEmail && contactEmail) {
+    // Ticket email: HTTP fire-and-forget unless EMAIL_VIA_OUTBOX (WKR-005 worker).
+    if (sendTicketEmail && contactEmail && !env.EMAIL_VIA_OUTBOX) {
       this.getTicketData(reservationId).then((ticketData) => {
         emailService.sendReservationConfirmationEmail(contactEmail, ticketData).then(async () => {
           await supabaseAdmin

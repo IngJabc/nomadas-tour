@@ -5,8 +5,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 
-const mockRpc = vi.fn();
-const mockRecordBoardingAttempt = vi.fn(async () => undefined);
+const { mockRpc, mockRecordBoardingAttempt } = vi.hoisted(() => ({
+  mockRpc: vi.fn(),
+  mockRecordBoardingAttempt: vi.fn(async () => undefined),
+}));
+
 const callQueues: Record<string, Array<() => any>> = {};
 
 function nextFrom(table: string) {
@@ -57,6 +60,20 @@ vi.mock('../config/env.js', () => ({
     EMAIL_FROM: 'test@example.com',
     FRONTEND_URL: 'http://localhost:3000',
     LOCK_TTL_SECONDS: 300,
+    EMAIL_VIA_OUTBOX: false,
+    OUTBOX_POLL_MS: 2000,
+    OUTBOX_BATCH_SIZE: 10,
+    OUTBOX_MAX_ATTEMPTS: 10,
+    OUTBOX_SETTLE_MS: 5000,
+    OUTBOX_RETRY_BASE_MS: 2000,
+    OUTBOX_HEARTBEAT_MS: 30_000,
+    OUTBOX_STALE_PROCESSING_MS: 300_000,
+    OUTBOX_STALE_RECOVERY_LIMIT: 50,
+    OUTBOX_RECOVERY_INTERVAL_MS: 60_000,
+    SENTRY_ENABLED: false,
+    SENTRY_DSN: '',
+    SENTRY_ENVIRONMENT: '',
+    SENTRY_RELEASE: '',
   },
 }));
 
