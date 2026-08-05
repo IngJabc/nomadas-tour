@@ -2,7 +2,7 @@
 
 import toast from 'react-hot-toast';
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatDateLong, formatDateShort, formatTime12h } from "@/lib/timezone";
+import { formatDateLong, formatTime12h } from "@/lib/timezone";
 import { Html5Qrcode } from "html5-qrcode";
 import type { Html5QrcodeResult } from "html5-qrcode";
 import { AnimatePresence, motion } from "framer-motion";
@@ -17,9 +17,19 @@ import {
   UserCheck,
   ChevronRight,
 } from "lucide-react";
-import { agencyApi } from "@/lib/api";
+import {
+  agencyApi,
+  type BoardingLookupDTO,
+  type BoardingLookupPassenger,
+} from "@/lib/api";
 import { subscribeToBoardingLogs, subscribeToTrips } from "@/lib/realtime/subscriptions";
-import { validateQrInput, normalizeQrCode } from "@/lib/qr";
+import { normalizeQrCode, validateBoardingCredential, isTicketCode } from "@/lib/qr";
+import {
+  applyPassengerToggle,
+  getBoardingOperatorMessage,
+  getLookupFailureOperatorMessage,
+  toggleFeedback,
+} from "@/lib/boarding/scan";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -35,32 +45,12 @@ import {
   slideUp,
 } from "@/lib/motion/variants";
 
-type PassengerInfo = {
-  id: string;
-  name: string;
-  document: string;
-  seat_id: string;
-  seat_code: string | null;
-  boarded: boolean;
-  boarded_at: string | null;
-};
+type ScanLookupResult = BoardingLookupDTO;
 
-type ScanLookupResult = {
-  reservation_id: string;
-  trip_id: string;
-  trip_status: string | null;
-  booker_name: string;
-  booker_document: string;
-  qr_code: string;
-  reservation_status: string;
-  reservation_agency_name: string;
-  departure_time: string | null;
-  boarding_allowed: boolean;
-  route: { origin: string; destination: string } | null;
-  passengers: PassengerInfo[];
-};
-
-function computeBadge(passengers: PassengerInfo[], reservationStatus: string): {
+function computeBadge(
+  passengers: BoardingLookupPassenger[],
+  reservationStatus: string,
+): {
   label: string;
   variant: "confirmed" | "boarded" | "cancelled";
 } {
@@ -131,7 +121,7 @@ function AgencyScanContent() {
   const onScanSuccessRef = useRef<
     ((decodedText: string, result: Html5QrcodeResult) => void) | null
   >(null!);
-  const currentQrRef = useRef<string | null>(null);
+  const currentCredentialRef = useRef<string | null>(null);
   const [initialLoad, setInitialLoad] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [initializingCamera, setInitializingCamera] = useState(false);
@@ -139,6 +129,7 @@ function AgencyScanContent() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraFacingError, setCameraFacingError] = useState(false);
   const [scanResult, setScanResult] = useState<ScanLookupResult | null>(null);
+  const [activeCredential, setActiveCredential] = useState<string | null>(null);
   const [loadingBooking, setLoadingBooking] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
@@ -182,49 +173,58 @@ function AgencyScanContent() {
     setCameraFacingError(false);
   }, []);
 
-  const lookupByQR = useCallback(async (qrCode: string, silent = false) => {
+  const clearCurrentLookupState = useCallback(() => {
+    setScanResult(null);
+    setActiveCredential(null);
+    currentCredentialRef.current = null;
+    setSearchResults([]);
+    setShowSearchResults(false);
+  }, []);
+
+  const lookupByQR = useCallback(async (credential: string, silent = false) => {
     setLookupError(null);
     if (!silent) setLoadingBooking(true);
 
     setSearchResults([]);
     setShowSearchResults(false);
 
-    const normalized = normalizeQrCode(qrCode);
+    const normalized = normalizeQrCode(credential);
 
     try {
-      const results = await agencyApi.lookupPassengerByQR(normalized);
+      const response = await agencyApi.lookupPassengerByQR(normalized);
 
-      if (!results || results.length === 0) {
-        setLookupError("No se encontraron reservas para esa búsqueda");
-        setScanResult(null);
-        currentQrRef.current = null;
+      if (!response.allowed) {
+        setLookupError(getLookupFailureOperatorMessage(response.failure_code));
+        clearCurrentLookupState();
         return;
       }
 
-      const sorted = results.map((r: ScanLookupResult) => ({
-        ...r,
-        passengers: [...(r.passengers || [])].sort((a: PassengerInfo, b: PassengerInfo) =>
-          (a.seat_code || '\uffff').localeCompare(b.seat_code || '\uffff', undefined, { numeric: true })
-        ),
-      }));
-
-      if (sorted.length === 1) {
-        currentQrRef.current = sorted[0].qr_code || normalized;
-        setScanResult(sorted[0]);
-      } else {
-        setSearchResults(sorted);
-        setShowSearchResults(true);
-        setScanResult(null);
-        currentQrRef.current = null;
+      if (!response.result) {
+        setLookupError(getLookupFailureOperatorMessage(null));
+        clearCurrentLookupState();
+        return;
       }
-    } catch (err: any) {
-      setLookupError(err?.message || "Error al buscar reserva");
-      setScanResult(null);
-      currentQrRef.current = null;
+
+      const sorted: ScanLookupResult = {
+        ...response.result,
+        passengers: [...(response.result.passengers || [])].sort((a, b) =>
+          (a.seat_code || '\uffff').localeCompare(b.seat_code || '\uffff', undefined, {
+            numeric: true,
+          }),
+        ),
+      };
+
+      currentCredentialRef.current = normalized;
+      setActiveCredential(normalized);
+      setScanResult(sorted);
+      setShowSearchResults(false);
+    } catch (err) {
+      setLookupError(getBoardingOperatorMessage(err, 'lookup'));
+      clearCurrentLookupState();
     } finally {
       if (!silent) setLoadingBooking(false);
     }
-  }, []);
+  }, [clearCurrentLookupState]);
 
   const onScanSuccess = useCallback(
     async (decodedText: string, _result: Html5QrcodeResult) => {
@@ -304,51 +304,51 @@ function AgencyScanContent() {
     };
   }, [scanning]);
 
-  // ─── Realtime: refetch when boarding changes on current reservation ──
+  // ─── Realtime: refetch when boarding changes on current trip ────────
   useEffect(() => {
-    if (!scanResult) return;
-    const reservationId = scanResult.reservation_id;
+    if (!scanResult?.trip.id) return;
+    const tripId = scanResult.trip.id;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const cleanup = subscribeToBoardingLogs((log) => {
-      if (log.reservation_id !== reservationId) return;
+    const cleanup = subscribeToBoardingLogs(() => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        if (currentQrRef.current) {
-          lookupByQR(currentQrRef.current, true);
+        if (currentCredentialRef.current) {
+          lookupByQR(currentCredentialRef.current, true);
         }
       }, 500);
-    });
+    }, tripId);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       cleanup();
     };
-  }, [scanResult?.reservation_id, lookupByQR]);
+  }, [scanResult?.trip.id, lookupByQR]);
 
   // ─── Realtime: refetch when trip status changes ─────────────────────
   useEffect(() => {
-    if (!scanResult?.trip_id) return;
+    if (!scanResult?.trip.id) return;
+    const tripId = scanResult.trip.id;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     const cleanup = subscribeToTrips((payload) => {
-      if (payload.trip.id !== scanResult.trip_id) return;
+      if (payload.trip.id !== tripId) return;
       if (payload.eventType !== 'UPDATE') return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        if (currentQrRef.current) {
-          lookupByQR(currentQrRef.current, true);
+        if (currentCredentialRef.current) {
+          lookupByQR(currentCredentialRef.current, true);
         }
       }, 500);
-    }, [scanResult.trip_id]);
+    }, [tripId]);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       cleanup();
     };
-  }, [scanResult?.trip_id, lookupByQR]);
+  }, [scanResult?.trip.id, lookupByQR]);
 
   const handleStartCamera = () => {
     setCameraError(null);
@@ -363,10 +363,9 @@ function AgencyScanContent() {
 
   const handleManualLookup = async () => {
     if (lookupRef.current) return;
-    const qr = manualQrValue.trim();
-    if (!qr) return;
-    if (qr.length < 2) {
-      setQrValidationError("Ingresa al menos 2 caracteres para buscar");
+    const validation = validateBoardingCredential(manualQrValue);
+    if (!validation.valid) {
+      setQrValidationError(validation.error || "Código inválido");
       return;
     }
     setQrValidationError(null);
@@ -374,14 +373,13 @@ function AgencyScanContent() {
     lookupRef.current = true;
     try {
       await stopCamera();
-      await lookupByQR(qr);
+      await lookupByQR(manualQrValue);
     } finally {
       lookupRef.current = false;
     }
   };
 
   const handleSelectResult = (result: ScanLookupResult) => {
-    currentQrRef.current = result.qr_code || null;
     setScanResult(result);
     setSearchResults([]);
     setShowSearchResults(false);
@@ -394,34 +392,34 @@ function AgencyScanContent() {
       setTogglingIds((prev) => new Set(prev).add(passengerId));
       setLookupError(null);
 
-
       try {
-        await agencyApi.toggleBoarding(passengerId, !currentlyBoarded);
+        const result = await agencyApi.toggleBoarding(
+          passengerId,
+          !currentlyBoarded,
+        );
+        const feedback = toggleFeedback(result);
+
         setScanResult((prev) => {
           if (!prev) return prev;
           return {
             ...prev,
-            passengers: prev.passengers.map((p) =>
-              p.id === passengerId
-                ? {
-                    ...p,
-                    boarded: !currentlyBoarded,
-                    boarded_at: !currentlyBoarded
-                      ? new Date().toISOString()
-                      : null,
-                  }
-                : p
-            ),
+            reservation_status: result.reservation_status || prev.reservation_status,
+            passengers: applyPassengerToggle(prev.passengers, result),
           };
         });
-        if (!currentlyBoarded) {
-          toast.success('Abordaje confirmado');
-        } else {
-          toast.success('Abordaje cancelado');
+
+        if (feedback.kind === 'changed') {
+          if (feedback.boarded) {
+            toast.success('Abordaje confirmado');
+          } else {
+            toast.success('Abordaje cancelado');
+          }
         }
-      } catch (err: any) {
-        setLookupError(err?.message || "Error al actualizar abordaje");
-        toast.error(err?.message || 'Error al actualizar abordaje');
+        // changed=false → no-op exitoso: sincroniza UI, sin error ni toast
+      } catch (err) {
+        const message = getBoardingOperatorMessage(err, 'toggle');
+        setLookupError(message);
+        toast.error(message);
       } finally {
         togglingRefs.current.delete(passengerId);
         setTogglingIds((prev) => {
@@ -443,23 +441,36 @@ function AgencyScanContent() {
     setLookupError(null);
 
     try {
-      const now = new Date().toISOString();
-      await Promise.all(
-        unboarded.map((p) => agencyApi.toggleBoarding(p.id, true))
+      const results = await Promise.all(
+        unboarded.map((p) => agencyApi.toggleBoarding(p.id, true)),
       );
+      const changedCount = results.filter((r) => r.changed).length;
+
       setScanResult((prev) => {
         if (!prev) return prev;
+        let passengers = prev.passengers;
+        let reservationStatus = prev.reservation_status;
+        for (const result of results) {
+          passengers = applyPassengerToggle(passengers, result);
+          if (result.reservation_status) {
+            reservationStatus = result.reservation_status;
+          }
+        }
         return {
           ...prev,
-          passengers: prev.passengers.map((p) =>
-            p.boarded ? p : { ...p, boarded: true, boarded_at: now }
-          ),
+          reservation_status: reservationStatus,
+          passengers,
         };
       });
-      toast.success(`${unboarded.length} pasajero(s) abordado(s)`);
-    } catch (err: any) {
-      setLookupError(err?.message || "Error al abordar pasajeros");
-      toast.error(err?.message || 'Error al abordar pasajeros');
+
+      if (changedCount > 0) {
+        toast.success(`${changedCount} pasajero(s) abordado(s)`);
+      }
+      // all no-op → silent success
+    } catch (err) {
+      const message = getBoardingOperatorMessage(err, 'bulk');
+      setLookupError(message);
+      toast.error(message);
     } finally {
       bulkBoardingRef.current = false;
       setBulkLoading(false);
@@ -468,6 +479,7 @@ function AgencyScanContent() {
 
   const handleReset = () => {
     setScanResult(null);
+    setActiveCredential(null);
     setLookupError(null);
 
     setCameraError(null);
@@ -476,7 +488,7 @@ function AgencyScanContent() {
     setQrValidationError(null);
     setSearchResults([]);
     setShowSearchResults(false);
-    currentQrRef.current = null;
+    currentCredentialRef.current = null;
     setScanning(true);
   };
 
@@ -487,6 +499,12 @@ function AgencyScanContent() {
   };
 
   const badge = scanResult ? computeBadge(scanResult.passengers, scanResult.reservation_status) : null;
+  const tripStatus = scanResult?.trip.status ?? null;
+  const boardingAllowed = Boolean(
+    scanResult &&
+      scanResult.reservation_status !== 'cancelled' &&
+      tripStatus === 'active',
+  );
 
   if (initialLoad) {
     return (
@@ -692,8 +710,8 @@ function AgencyScanContent() {
                   <div className="mt-3 flex gap-2">
                     <div className="flex-1">
                       <Input
-                        label="Búsqueda de reserva"
-                        placeholder="Escribe para buscar..."
+                        label="Código de ticket o QR"
+                        placeholder="Ej: 6BBD52E9 o NT-…"
                         value={manualQrValue}
                         onChange={(e) => {
                           setManualQrValue(e.target.value);
@@ -720,7 +738,7 @@ function AgencyScanContent() {
                   )}
                   {!qrValidationError && (
                     <p className="font-[family-name:var(--font-body)] font-normal text-[11px] text-[var(--color-brand-muted)] mt-2">
-                      Busca por código QR completo o fragmento (ej: OLLA, NT-LA, 00025)
+                      Ingresa código de ticket de 8 caracteres o QR completo
                     </p>
                   )}
                 </Card>
@@ -797,9 +815,10 @@ function AgencyScanContent() {
                   {searchResults.map((result) => {
                     const badgeInfo = computeBadge(result.passengers, result.reservation_status);
                     const boardedCount = result.passengers.filter((p) => p.boarded).length;
+                    const resultKey = `${result.trip.id}-${result.passengers.map((p) => p.id).join(',')}`;
                     return (
                       <button
-                        key={result.reservation_id}
+                        key={resultKey}
                         onClick={() => handleSelectResult(result)}
                         className="w-full text-left p-3 rounded-xl bg-[#f8fafc] border border-[#e5e7eb] hover:border-[var(--color-brand-cyan)] hover:shadow-[0_0_0_3px_rgba(0,212,255,0.1)] transition-all duration-200"
                       >
@@ -807,17 +826,17 @@ function AgencyScanContent() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1">
                               <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[#000024] truncate">
-                                {result.booker_name}
+                                {result.trip.route.destination || "—"}
                               </p>
                               <Badge variant={badgeInfo.variant} size="sm">
                                 {badgeInfo.label}
                               </Badge>
                             </div>
                             <p className="font-[family-name:var(--font-body)] text-xs text-[#6b7280] truncate">
-                              {result.route?.destination ?? "—"} · {result.passengers.length} pasajeros · {boardedCount} abordados
-                            </p>
-                            <p className="font-[family-name:var(--font-mono)] text-[10px] text-[#6b7280] mt-0.5 truncate">
-                              {result.qr_code}
+                              {result.passengers.length} pasajeros · {boardedCount} abordados
+                              {result.reservation_agency_name
+                                ? ` · ${result.reservation_agency_name}`
+                                : ""}
                             </p>
                           </div>
                           <ChevronRight className="w-5 h-5 text-[#6b7280] shrink-0" />
@@ -873,7 +892,7 @@ function AgencyScanContent() {
                   </motion.div>
                 )}
 
-                {scanResult.trip_status === 'cancelled' && scanResult.reservation_status !== 'cancelled' && (
+                {tripStatus === 'cancelled' && scanResult.reservation_status !== 'cancelled' && (
                   <motion.div variants={staggerItem} className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
                     <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
                     <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-red-700">
@@ -882,34 +901,12 @@ function AgencyScanContent() {
                   </motion.div>
                 )}
 
-                {scanResult.trip_status === 'completed' && scanResult.reservation_status !== 'cancelled' && (
+                {tripStatus === 'completed' && scanResult.reservation_status !== 'cancelled' && (
                   <motion.div variants={staggerItem} className="mb-4 p-3 rounded-xl bg-green-50 border border-green-200 flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-600 shrink-0" />
                     <span className="font-[family-name:var(--font-body)] font-semibold text-sm text-green-700">
                       Este viaje ya fue completado. No es posible realizar boarding.
                     </span>
-                  </motion.div>
-                )}
-
-                {!scanResult.boarding_allowed && scanResult.trip_status !== 'cancelled' && scanResult.trip_status !== 'completed' && scanResult.reservation_status !== 'cancelled' && (
-                  <motion.div variants={staggerItem} className="mb-4 p-4 rounded-xl bg-[#fffbeb] border border-[#fde68a]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="w-5 h-5 text-[#92400e] shrink-0" />
-                      <span className="font-[family-name:var(--font-heading)] font-bold text-[14px] text-[#92400e]">
-                        Boarding no disponible
-                      </span>
-                    </div>
-                    <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[#92400e] mb-1">
-                      Este viaje aún no ha iniciado.
-                    </p>
-                    <p className="font-[family-name:var(--font-body)] font-normal text-[13px] text-[#92400e]">
-                      El boarding estará disponible a partir de la hora programada de salida.
-                    </p>
-                    {scanResult.departure_time && (
-                      <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[#92400e] mt-2">
-                        Salida: {formatDateShort(scanResult.departure_time)} {formatTime12h(scanResult.departure_time)}
-                      </p>
-                    )}
                   </motion.div>
                 )}
 
@@ -919,35 +916,34 @@ function AgencyScanContent() {
                       Destino
                     </label>
                     <p className="font-[family-name:var(--font-body)] font-semibold text-[15px] text-[var(--color-brand-navy)]">
-                      {scanResult.route?.destination ?? "—"}
+                      {scanResult.trip.route.destination || "—"}
                     </p>
                     <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
-                      {scanResult.departure_time
-                        ? `${formatDateLong(scanResult.departure_time)} · ${formatTime12h(scanResult.departure_time)}`
+                      {scanResult.trip.departure_time
+                        ? `${formatDateLong(scanResult.trip.departure_time)} · ${formatTime12h(scanResult.trip.departure_time)}`
                         : ""}
                     </p>
                   </div>
-                  <div>
-                    <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
-                      Reservado por
-                    </label>
-                    <p className="font-[family-name:var(--font-body)] font-semibold text-[15px] text-[var(--color-brand-navy)]">
-                      {scanResult.booker_name} · {scanResult.booker_document}
-                    </p>
-                    {scanResult.reservation_agency_name && (
-                      <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)]">
-                        Agencia: {scanResult.reservation_agency_name}
+                  {scanResult.reservation_agency_name && (
+                    <div>
+                      <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+                        Agencia
+                      </label>
+                      <p className="font-[family-name:var(--font-body)] font-semibold text-[15px] text-[var(--color-brand-navy)]">
+                        {scanResult.reservation_agency_name}
                       </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
-                      Código
-                    </label>
-                    <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
-                      {scanResult.qr_code?.split('-').pop()?.slice(0, 8)?.toUpperCase() || scanResult.qr_code}
-                    </p>
-                  </div>
+                    </div>
+                  )}
+                  {activeCredential && isTicketCode(activeCredential) && (
+                    <div>
+                      <label className="block font-[family-name:var(--font-body)] font-medium text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wider mb-1">
+                        Código de ticket
+                      </label>
+                      <p className="font-[family-name:var(--font-heading)] font-bold text-sm text-[var(--color-brand-navy)]">
+                        {activeCredential}
+                      </p>
+                    </div>
+                  )}
                 </motion.div>
 
                 <motion.div variants={staggerItem} className="border-t border-[#e5e7eb] pt-4">
@@ -972,9 +968,11 @@ function AgencyScanContent() {
                             <p className="font-[family-name:var(--font-body)] font-semibold text-sm text-[#000024]">
                               {passenger.name}
                             </p>
-                            <p className="font-[family-name:var(--font-body)] text-xs text-[#6b7280]">
-                              {passenger.document}
-                            </p>
+                            {passenger.seat_code && (
+                              <p className="font-[family-name:var(--font-body)] text-xs text-[#6b7280]">
+                                Asiento {passenger.seat_code}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
@@ -989,7 +987,7 @@ function AgencyScanContent() {
                           </span>
                           <button
                             type="button"
-                            disabled={togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed' || !scanResult.boarding_allowed}
+                            disabled={togglingIds.has(passenger.id) || !boardingAllowed}
                             onClick={() =>
                               handleToggleBoarding(
                                 passenger.id,
@@ -1001,7 +999,7 @@ function AgencyScanContent() {
                           transition-colors duration-200 ease-in-out
                           ${passenger.boarded ? "bg-[#10b981]" : "bg-[#e5e7eb]"}
                           ${
-                            togglingIds.has(passenger.id) || scanResult.reservation_status === 'cancelled' || scanResult.trip_status === 'cancelled' || scanResult.trip_status === 'completed' || !scanResult.boarding_allowed
+                            togglingIds.has(passenger.id) || !boardingAllowed
                               ? "opacity-50 cursor-not-allowed"
                               : ""
                           }
@@ -1029,7 +1027,7 @@ function AgencyScanContent() {
 
                 <motion.div variants={staggerItem} className="border-t border-[#e5e7eb] pt-4 mt-4 flex flex-wrap gap-3">
                   <AnimatePresence>
-                    {scanResult.passengers.some((p) => !p.boarded) && scanResult.reservation_status !== 'cancelled' && scanResult.trip_status !== 'cancelled' && scanResult.trip_status !== 'completed' && scanResult.boarding_allowed && (
+                    {scanResult.passengers.some((p) => !p.boarded) && boardingAllowed && (
                       <motion.div
                         key="bulk-btn"
                         initial={{ opacity: 0, scale: 0.9 }}
