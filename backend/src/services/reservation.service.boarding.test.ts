@@ -64,7 +64,7 @@ vi.mock('../config/database.js', () => ({
   get supabaseAdmin() {
     return {
       from: (table: string) => nextFrom(table),
-      rpc: (...args: unknown[]) => mockRpc(...args),
+      rpc: mockRpc,
     };
   },
 }));
@@ -73,7 +73,7 @@ vi.mock('./boarding-attempts.service.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./boarding-attempts.service.js')>();
   return {
     ...actual,
-    recordBoardingAttempt: (...args: unknown[]) => mockRecordBoardingAttempt(...args),
+    recordBoardingAttempt: mockRecordBoardingAttempt,
   };
 });
 
