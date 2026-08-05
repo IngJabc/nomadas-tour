@@ -184,7 +184,7 @@ export function assertBlockedLookupHasNoPii(
 ): boolean {
   if (response.allowed) return true;
   if (response.result !== null) return false;
-  const root = response as Record<string, unknown>;
+  const root = response as unknown as Record<string, unknown>;
   for (const key of PII_KEYS) {
     if (key in root) return false;
   }
@@ -193,12 +193,12 @@ export function assertBlockedLookupHasNoPii(
 
 /** True when a lookup payload has no legacy PII fields. */
 export function assertNoBoardingPii(dto: BoardingLookupDTO): boolean {
-  const root = dto as Record<string, unknown>;
+  const root = dto as unknown as Record<string, unknown>;
   for (const key of PII_KEYS) {
     if (key in root) return false;
   }
   for (const passenger of dto.passengers) {
-    const row = passenger as Record<string, unknown>;
+    const row = passenger as unknown as Record<string, unknown>;
     if ('document' in row || 'phone' in row || 'seat_id' in row) return false;
   }
   return true;
