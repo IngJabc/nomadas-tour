@@ -5,8 +5,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash } from 'node:crypto';
 
-const mockRpc = vi.fn();
-const mockRecordBoardingAttempt = vi.fn(async () => undefined);
+const { mockRpc, mockRecordBoardingAttempt } = vi.hoisted(() => ({
+  mockRpc: vi.fn(),
+  mockRecordBoardingAttempt: vi.fn(async () => undefined),
+}));
+
 const callQueues: Record<string, Array<() => any>> = {};
 
 function nextFrom(table: string) {
