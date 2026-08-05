@@ -70,6 +70,10 @@ vi.mock('../config/env.js', () => ({
     OUTBOX_STALE_PROCESSING_MS: 300_000,
     OUTBOX_STALE_RECOVERY_LIMIT: 50,
     OUTBOX_RECOVERY_INTERVAL_MS: 60_000,
+    SENTRY_ENABLED: false,
+    SENTRY_DSN: '',
+    SENTRY_ENVIRONMENT: '',
+    SENTRY_RELEASE: '',
   },
 }));
 

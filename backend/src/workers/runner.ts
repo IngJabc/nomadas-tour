@@ -1,4 +1,10 @@
 import 'dotenv/config';
+import { initSentryFromEnv } from '../observability/init-from-env.js';
+import {
+  captureException,
+  flushSentry,
+  fingerprintWorkerFailure,
+} from '../observability/sentry.js';
 import { getWorkerRuntimeConfig } from './config.js';
 import {
   claimOutboxEvents,
@@ -24,6 +30,10 @@ const workerName = DEFAULT_WORKER_NAME;
 const workerVersion = getWorkerVersion();
 const startedAt = new Date();
 
+initSentryFromEnv('worker', {
+  worker_name: workerName,
+});
+
 const logger = createWorkerLogger({ workerName });
 const metrics = createWorkerMetrics();
 const heartbeat = createHeartbeatController({
@@ -41,7 +51,7 @@ const recoveryScheduler = createRecoveryScheduler({
 const controller = new AbortController();
 let shuttingDown = false;
 
-function shutdown(signal: string, exitCode = 0) {
+async function shutdown(signal: string, exitCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   logger.info('worker_shutdown', {
@@ -50,12 +60,17 @@ function shutdown(signal: string, exitCode = 0) {
     metrics: metrics.snapshot(),
   });
   controller.abort();
+  await flushSentry(2000);
   // Allow the loop to unwind; force exit if it hangs.
   setTimeout(() => process.exit(exitCode), 5_000).unref?.();
 }
 
-process.on('SIGINT', () => shutdown('SIGINT', 0));
-process.on('SIGTERM', () => shutdown('SIGTERM', 0));
+process.on('SIGINT', () => {
+  void shutdown('SIGINT', 0);
+});
+process.on('SIGTERM', () => {
+  void shutdown('SIGTERM', 0);
+});
 
 process.on('uncaughtException', (err) => {
   metrics.markError();
@@ -64,8 +79,16 @@ process.on('uncaughtException', (err) => {
     error: err instanceof Error ? err.message : String(err),
     metrics: metrics.snapshot(),
   });
-  shutdown('uncaughtException', 1);
-  process.exit(1);
+  captureException(err, {
+    tags: {
+      service: 'worker',
+      worker_name: workerName,
+      status: 'fatal',
+    },
+    fingerprint: fingerprintWorkerFailure(workerName, 'lifecycle'),
+    level: 'fatal',
+  });
+  void flushSentry(2000).finally(() => process.exit(1));
 });
 
 process.on('unhandledRejection', (reason) => {
@@ -77,8 +100,16 @@ process.on('unhandledRejection', (reason) => {
     error,
     metrics: metrics.snapshot(),
   });
-  shutdown('unhandledRejection', 1);
-  process.exit(1);
+  captureException(reason, {
+    tags: {
+      service: 'worker',
+      worker_name: workerName,
+      status: 'fatal',
+    },
+    fingerprint: fingerprintWorkerFailure(workerName, 'lifecycle'),
+    level: 'fatal',
+  });
+  void flushSentry(2000).finally(() => process.exit(1));
 });
 
 logger.info('worker_started', {
@@ -131,19 +162,30 @@ runOutboxRelayLoop(
     },
   },
 )
-  .then(() => {
+  .then(async () => {
     logger.info('worker_stopped', {
       status: 'stopped',
       metrics: metrics.snapshot(),
     });
-    process.exit(shuttingDown ? 0 : 0);
+    await flushSentry(2000);
+    process.exit(0);
   })
-  .catch((err) => {
+  .catch(async (err) => {
     metrics.markError();
     logger.error('worker_fatal', {
       status: 'fatal',
       error: err instanceof Error ? err.message : String(err),
       metrics: metrics.snapshot(),
     });
+    captureException(err, {
+      tags: {
+        service: 'worker',
+        worker_name: workerName,
+        status: 'fatal',
+      },
+      fingerprint: fingerprintWorkerFailure(workerName, 'lifecycle'),
+      level: 'fatal',
+    });
+    await flushSentry(2000);
     process.exit(1);
   });

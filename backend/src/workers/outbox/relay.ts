@@ -1,8 +1,33 @@
 import type { OutboxEventRow } from '../../events/types.js';
+import {
+  captureException,
+  fingerprintWorkerFailure,
+} from '../../observability/sentry.js';
 import { correlationFromRow } from '../observability/context.js';
+import { DEFAULT_WORKER_NAME } from '../observability/index.js';
 import type { WorkerLogger } from '../observability/logger.js';
 import { retryDelayMs } from './retry.js';
 import type { RelayDeps, RelayLoopOptions } from './types.js';
+
+function reportWorkerFailure(
+  error: unknown,
+  area: 'relay' | 'handler' | 'recovery',
+  tags: Record<string, string | number | null | undefined>,
+): void {
+  const workerName =
+    typeof tags.worker_name === 'string'
+      ? tags.worker_name
+      : DEFAULT_WORKER_NAME;
+  const handler =
+    typeof tags.handler === 'string' ? tags.handler : undefined;
+  captureException(error, {
+    tags: {
+      service: 'worker',
+      ...tags,
+    },
+    fingerprint: fingerprintWorkerFailure(workerName, area, handler),
+  });
+}
 
 function resolveLogger(deps: RelayDeps): WorkerLogger | null {
   if (deps.logger) return deps.logger;
@@ -54,6 +79,16 @@ export async function processClaimedEvent(
       ...finish('failed'),
       reason: 'no_handler',
     });
+    reportWorkerFailure(
+      new Error(`No handler for ${corr.handler}`),
+      'handler',
+      {
+        worker_name: DEFAULT_WORKER_NAME,
+        ...corr,
+        status: 'failed',
+        reason: 'no_handler',
+      },
+    );
     return;
   }
 
@@ -75,6 +110,7 @@ export async function processClaimedEvent(
     }
 
     if (outcome.kind === 'failed' && outcome.permanent) {
+      // Domain/permanent outcomes stay in logs + outbox failed — not Sentry noise.
       await deps.markFailed(row.id, outcome.reason);
       metrics?.incFailed();
       logger?.error('outbox_failed', {
@@ -87,17 +123,24 @@ export async function processClaimedEvent(
 
     // requeue or non-permanent failed
     if (row.attempts >= deps.maxAttempts) {
+      const failReason =
+        outcome.kind === 'requeue' ? outcome.reason : outcome.reason;
       await deps.markFailed(
         row.id,
-        `Max attempts (${deps.maxAttempts}): ${outcome.kind === 'requeue' ? outcome.reason : outcome.reason}`,
+        `Max attempts (${deps.maxAttempts}): ${failReason}`,
       );
       metrics?.incFailed();
       logger?.error('outbox_failed', {
         ...corr,
         ...finish('failed'),
         reason: 'max_attempts',
-        error:
-          outcome.kind === 'requeue' ? outcome.reason : outcome.reason,
+        error: failReason,
+      });
+      reportWorkerFailure(new Error(failReason), 'handler', {
+        worker_name: DEFAULT_WORKER_NAME,
+        ...corr,
+        status: 'failed',
+        reason: 'max_attempts',
       });
       return;
     }
@@ -139,8 +182,16 @@ export async function processClaimedEvent(
         reason: 'max_attempts',
         error: message,
       });
+      // Unexpected failure exhausted retries — report once (not on each requeue).
+      reportWorkerFailure(err, 'handler', {
+        worker_name: DEFAULT_WORKER_NAME,
+        ...corr,
+        status: 'failed',
+        reason: 'max_attempts',
+      });
       return;
     }
+    // Normal retry path — logs/metrics only; do not send to Sentry.
     const delayMs = retryDelayMs(row.attempts, deps.retryBaseMs);
     const availableAt = new Date(
       (deps.now?.() ?? new Date()).getTime() + delayMs,
@@ -180,6 +231,10 @@ export async function runOutboxRelayOnce(
       logger?.error('outbox_recover_stuck_error', {
         status: 'error',
         error: message,
+      });
+      reportWorkerFailure(err, 'recovery', {
+        worker_name: DEFAULT_WORKER_NAME,
+        status: 'error',
       });
     }
   }
@@ -235,6 +290,10 @@ export async function runOutboxRelayLoop(
       logger?.error('outbox_relay_loop_error', {
         status: 'error',
         error: message,
+      });
+      reportWorkerFailure(err, 'relay', {
+        worker_name: DEFAULT_WORKER_NAME,
+        status: 'error',
       });
       await sleep(deps.pollMs, options.signal);
     }

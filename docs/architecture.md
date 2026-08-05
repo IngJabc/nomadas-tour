@@ -91,18 +91,17 @@ idempotencia. Diseño: serie `docs/WKR-00x-*.md`.
 **Observabilidad:**
 
 ```text
-Worker
+API / Worker
   → Structured Logs (JSON stdout)
-  → Metrics (in-memory)
-  → Heartbeat
-  → Sentry (próximo — WKR-006.2)
+  → Metrics (in-memory) + Heartbeat
+  → Sentry (opcional — SENTRY_ENABLED; errores inesperados)
 ```
 
-Runtime actual (WKR-006.1): correlación `event_id` / aggregate / agency /
-handler, heartbeat con uptime/pid/versión, recovery
-`recover_stuck_outbox_events` (migración 051). Diseño Sentry:
-[`WKR-006.2-sentry-foundation-design.md`](WKR-006.2-sentry-foundation-design.md).
-Implementación SDK pendiente (WKR-006.2). No mezclar con SEC-009.
+Runtime (WKR-006.1 + WKR-006.2): correlación en logs; recovery stuck;
+wrapper `backend/src/observability/sentry.ts` (sin Performance/Replay/frontend).
+Retención / DLQ lógica (`status = failed`): runbook
+[`WKR-006.3-outbox-retention-dlq-runbook.md`](WKR-006.3-outbox-retention-dlq-runbook.md)
+(purga automática de `completed` → WKR-009). No mezclar con SEC-009.
 
 ### Branding por agencia
 

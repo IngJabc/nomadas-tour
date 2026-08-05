@@ -67,11 +67,11 @@ FASE 3 — Workers
   WKR-006  Observability foundation (docs) ✅
   WKR-006.1 Worker observability (runtime) ✅
   WKR-006.2.1 Sentry foundation design (docs) ✅
-  WKR-006.2 Sentry wiring → siguiente
-  WKR-006.3 Retention + DLQ runbook
-  WKR-007  Trip / notification event workers
+  WKR-006.2 Sentry wiring (API + worker) ✅
+  WKR-006.3 Retention + DLQ runbook ✅
+  WKR-007  Trip / notification event workers → siguiente
   WKR-008  Reminder workers
-  WKR-009  Retention / automation bridge
+  WKR-009  Retention worker / automation bridge
 
 FASE Seguridad continua
   SEC-001 … SEC-008                        ✅ (hardening cerrado)
@@ -127,7 +127,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 3 — Sistema de Workers
 
-**Prioridad:** En curso (outbox/email + observabilidad local listos; diseño Sentry documentado; wiring WKR-006.2 siguiente).
+**Prioridad:** En curso (infra workers cerrada hasta 006.3; siguientes consumers WKR-007+).
 
 **Objetivo:** Procesamiento asíncrono y tareas programadas desacopladas del ciclo HTTP, mediante **Transactional Outbox + Workers** ([WKR-002](WKR-002-events-workers-architecture-adr.md)).
 
@@ -143,11 +143,11 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 | [WKR-006](WKR-006-worker-observability-foundation.md) | Observability foundation (auditoría + diseño) | ✅ |
 | [WKR-006.1](WKR-006.1-worker-observability-implementation.md) | Worker observability (logs, metrics, heartbeat, stuck reaper) | ✅ |
 | [WKR-006.2.1](WKR-006.2-sentry-foundation-design.md) | Sentry foundation design (docs only) | ✅ |
-| **WKR-006.2** | **Sentry wiring (API + worker; sin frontend aún)** | **Siguiente** |
-| WKR-006.3 | Retention + DLQ runbook | Pendiente |
-| WKR-007 | Trip / notification event workers | Pendiente |
+| [WKR-006.2](WKR-006.2-sentry-foundation-implementation.md) | Sentry wiring (API + worker; sin frontend) | ✅ |
+| [WKR-006.3](WKR-006.3-outbox-retention-dlq-runbook.md) | Retention + DLQ runbook (docs) | ✅ |
+| **WKR-007** | **Trip / notification event workers** | **Siguiente** |
 | WKR-008 | Reminder workers | Pendiente |
-| WKR-009 | Retention / automation bridge → Fase 4 | Pendiente |
+| WKR-009 | Retention worker / automation bridge → Fase 4 | Pendiente |
 
 #### Capacidades ya en el sistema (WKR-004/005)
 
@@ -168,10 +168,13 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** — sin SDK.
 
-#### WKR-006.2 → 006.3 (siguiente)
+#### WKR-006.2 ✅ / WKR-006.3 ✅
 
-1. **006.2** — Wiring Sentry API + worker (tags de correlación; sin frontend / Performance / Replay) ← **siguiente**
-2. **006.3** — Retención `completed` + runbook DLQ (`failed`)
+1. **006.2** — Wiring Sentry API + worker (opcional vía `SENTRY_ENABLED`) ✅
+   Doc: [`WKR-006.2-sentry-foundation-implementation.md`](WKR-006.2-sentry-foundation-implementation.md)
+2. **006.3** — Retención + DLQ lógica (`failed`) + runbook ops ✅
+   Doc: [`WKR-006.3-outbox-retention-dlq-runbook.md`](WKR-006.3-outbox-retention-dlq-runbook.md)
+   Purga automática de `completed` → **WKR-009** (no en este ticket).
 
 **Separación conceptual (no mezclar en el mismo ticket):**
 
@@ -184,7 +187,7 @@ Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** —
 
 - **WKR-007 — Trip / notification event workers:** fan-out desde eventos de dominio (desacoplar efectos del request HTTP).
 - **WKR-008 — Reminder workers:** ventanas T-24h / T-2h.
-- **WKR-009 — Retention / automation bridge:** retención outbox + puente a Fase 4.
+- **WKR-009 — Retention worker / automation bridge:** purga `completed` (política 006.3) + puente a Fase 4.
 
 **Valor de la fase:** reduce acoplamiento HTTP↔efectos secundarios, mejora confiabilidad de emails y prepara automatizaciones de producto.
 

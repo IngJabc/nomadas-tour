@@ -31,6 +31,13 @@ const envSchema = z.object({
    * Default 60s so recovery is not on every poll tick.
    */
   OUTBOX_RECOVERY_INTERVAL_MS: z.coerce.number().default(60_000),
+  /** WKR-006.2 — Sentry error monitoring (off by default). */
+  SENTRY_ENABLED: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
+  SENTRY_DSN: z.string().default(""),
+  SENTRY_ENVIRONMENT: z.string().default(""),
+  SENTRY_RELEASE: z.string().default(""),
 });
 
 function loadEnv() {
