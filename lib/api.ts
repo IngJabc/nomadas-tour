@@ -33,6 +33,57 @@ export interface AgencyBrandingSettings {
 
 export type AgencyBrandingPatch = Partial<AgencyBrandingSettings>;
 
+/** Minimal boarding lookup DTO (AUD-020). No documents, phones, or QR. */
+export interface BoardingLookupPassenger {
+  id: string;
+  name: string;
+  seat_code: string | null;
+  boarded: boolean;
+  boarded_at: string | null;
+}
+
+export interface BoardingLookupDTO {
+  trip: {
+    id: string;
+    status: string;
+    departure_time: string;
+    route: {
+      origin: string;
+      destination: string;
+    };
+  };
+  reservation_status: string;
+  reservation_agency_name: string;
+  passengers: BoardingLookupPassenger[];
+}
+
+export type BoardingLookupFailureCode =
+  | 'EMPTY_INPUT'
+  | 'CREDENTIAL_NOT_FOUND'
+  | 'AGENCY_NOT_ASSIGNED'
+  | 'TRIP_NOT_DEPARTED'
+  | 'TRIP_INVALID'
+  | 'TRIP_NOT_FOUND'
+  | 'RESERVATION_CANCELLED';
+
+/** Single-result boarding lookup envelope (exact credential). */
+export interface BoardingLookupResponse {
+  found: boolean;
+  allowed: boolean;
+  failure_code: BoardingLookupFailureCode | null;
+  result: BoardingLookupDTO | null;
+}
+
+export interface BoardingToggleResult {
+  passenger_id: string;
+  boarded: boolean;
+  boarded_at: string | null;
+  changed: boolean;
+  reservation_status: string;
+  boarded_count: number;
+  total_count: number;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
 
 interface RequestOptions extends RequestInit {
@@ -257,11 +308,6 @@ export const agencyApi = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
-  boardPassenger: (trip_id: string, qr_code: string) =>
-    request<any>('/agency/reservations/board', {
-      method: 'POST',
-      body: JSON.stringify({ trip_id, qr_code }),
-    }),
   getReservation: (id: string) => request<any>(`/agency/reservations/${id}`),
   cancelAgencyReservation: (id: string) =>
     request<any>(`/agency/reservations/${id}/cancel`, { method: 'PATCH' }),
@@ -287,12 +333,14 @@ export const agencyApi = {
       method: 'POST',
     }),
 
-  // Sprint 13 — Boarding por pasajero individual
-  lookupPassengerByQR: (qrCode: string) =>
-    request<any>(`/agency/boarding/${encodeURIComponent(qrCode)}`),
+  // Boarding — exact ticket_code / full QR lookup + RPC toggle
+  lookupPassengerByQR: (credential: string) =>
+    request<BoardingLookupResponse>(
+      `/agency/boarding/${encodeURIComponent(credential)}`,
+    ),
 
   toggleBoarding: (passengerId: string, boarded: boolean) =>
-    request<any>(`/agency/boarding/${passengerId}`, {
+    request<BoardingToggleResult>(`/agency/boarding/${passengerId}`, {
       method: 'PATCH',
       body: JSON.stringify({ boarded }),
     }),

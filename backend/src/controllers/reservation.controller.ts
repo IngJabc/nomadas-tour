@@ -4,11 +4,6 @@ import { z } from 'zod';
 import { ValidationError } from '../errors/index.js';
 import { supabaseAdmin } from '../config/database.js';
 
-const boardPassengerSchema = z.object({
-  trip_id: z.string().uuid(),
-  qr_code: z.string().min(1),
-});
-
 const agencyReservationSchema = z.object({
   trip_id: z.string().uuid(),
   booker_name: z.string().min(2),
@@ -25,22 +20,6 @@ const agencyReservationSchema = z.object({
 });
 
 export class ReservationController {
-  async boardPassenger(req: Request, res: Response, next: NextFunction) {
-    try {
-      const data = boardPassengerSchema.parse(req.body);
-      const result = await reservationService.boardPassenger(
-        data.trip_id,
-        data.qr_code,
-        req.ctx!.userId,
-        req.ctx?.agencyId || null,
-        req.ctx?.role === 'superadmin',
-      );
-      res.json(result);
-    } catch (error) {
-      next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
-    }
-  }
-
   // Agency: create reservation
   async createAgencyReservation(req: Request, res: Response, next: NextFunction) {
     try {
@@ -206,55 +185,18 @@ export class ReservationController {
     }
   }
 
-  // ---------- Scanner / Boarding parcial ----------
-
-  async lookupReservation(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { qr_code } = z.object({ qr_code: z.string().min(1) }).parse(req.body);
-      const agencyId = req.ctx!.agencyId;
-      if (!agencyId) {
-        res.status(400).json({ error: 'Agency ID not found' });
-        return;
-      }
-      const result = await reservationService.lookupReservationByQR(qr_code, agencyId);
-      res.json(result);
-    } catch (error) {
-      next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
-    }
-  }
-
-  async boardPassengers(req: Request, res: Response, next: NextFunction) {
-    try {
-      const schema = z.object({
-        qr_code: z.string().min(1),
-        seat_ids: z.array(z.string().uuid()).min(1),
-      });
-      const data = schema.parse(req.body);
-      const agencyId = req.ctx!.agencyId;
-      if (!agencyId) {
-        res.status(400).json({ error: 'Agency ID not found' });
-        return;
-      }
-      const result = await reservationService.boardPassengers(
-        data.qr_code,
-        data.seat_ids,
-        req.ctx!.userId,
-        agencyId,
-      );
-      res.json(result);
-    } catch (error) {
-      next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);
-    }
-  }
-
-  // ─── Sprint 13 — Boarding por pasajero individual ──────────────────────
+  // ─── Boarding (exact lookup + RPC toggle) ──────────────────────────────
 
   async lookupPassengerByQR(req: Request, res: Response, next: NextFunction) {
     try {
       const qrCode = req.params.qrCode as string;
       const agencyId = req.ctx!.agencyId;
       if (!agencyId) { res.status(400).json({ error: 'Agency ID not found' }); return; }
-      const result = await reservationService.lookupPassengerByQR(qrCode, agencyId);
+      const result = await reservationService.lookupPassengerByQR(
+        qrCode,
+        agencyId,
+        req.ctx!.userId,
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -270,7 +212,12 @@ export class ReservationController {
       const { boarded } = schema.parse(req.body);
       const agencyId = req.ctx!.agencyId;
       if (!agencyId) { res.status(400).json({ error: 'Agency ID not found' }); return; }
-      const result = await reservationService.toggleBoarding(passengerId, boarded, req.ctx!.userId, agencyId);
+      const result = await reservationService.toggleBoarding(
+        passengerId,
+        boarded,
+        req.ctx!.userId,
+        agencyId,
+      );
       res.json(result);
     } catch (error) {
       next(error instanceof z.ZodError ? new ValidationError('Invalid input', (error as any).issues) : error);

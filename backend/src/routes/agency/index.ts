@@ -18,7 +18,6 @@ router.get('/trips/:tripId/passengers', (req, res, next) => reservationControlle
 router.get('/reservations', (req, res, next) => reservationController.getAgencyReservations(req, res, next));
 router.get('/reservations/:id', (req, res, next) => reservationController.getAgencyReservationById(req, res, next));
 router.post('/reservations', (req, res, next) => reservationController.createAgencyReservation(req, res, next));
-router.post('/reservations/board', (req, res, next) => reservationController.boardPassenger(req, res, next));
 router.patch('/reservations/:id/cancel', (req, res, next) => reservationController.cancelAgencyReservation(req, res, next));
 router.patch('/reservations/:id/passengers/:passengerId/cancel', (req, res, next) => reservationController.cancelPassenger(req, res, next));
 
@@ -28,11 +27,7 @@ router.post('/seats/unlock', (req, res, next) => reservationController.unlockSea
 router.post('/seats/unlock-all', (req, res, next) => reservationController.unlockAllSeats(req, res, next));
 router.post('/seats/unlock-all-user', (req, res, next) => reservationController.unlockAllUserSeats(req, res, next));
 
-// Scanner endpoints (boarding parcial con QR)
-router.post('/scanner/lookup', (req, res, next) => reservationController.lookupReservation(req, res, next));
-router.post('/scanner/board', (req, res, next) => reservationController.boardPassengers(req, res, next));
-
-// Sprint 13 — Boarding por pasajero individual
+// Boarding — sole agency surface (lookup exact + toggle via RPC)
 router.get('/boarding/:qrCode', (req, res, next) => reservationController.lookupPassengerByQR(req, res, next));
 router.patch('/boarding/:passengerId', (req, res, next) => reservationController.toggleBoarding(req, res, next));
 

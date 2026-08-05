@@ -1,13 +1,62 @@
 import { supabaseAdmin } from '../config/database.js';
 import { env } from '../config/env.js';
-import { NotFoundError, ValidationError, ConflictError, ForbiddenError } from '../errors/index.js';
+import {
+  NotFoundError,
+  ValidationError,
+  ConflictError,
+  ForbiddenError,
+  AppError,
+} from '../errors/index.js';
 import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
 import { sortBySeatCode } from '../utils/sort.js';
 import { toUTC } from '../utils/timezone.js';
-import { validateBoardingAllowed } from './boarding.guard.js';
+import {
+  hashBoardingCredential,
+  recordBoardingAttempt,
+} from './boarding-attempts.service.js';
 import { notificationService } from './notification.service.js';
 import { emailService } from './email.service.js';
 import type { TicketData, TicketTrip, TicketPassenger } from '../types/reservation.js';
+import type {
+  BoardingLookupDTO,
+  BoardingLookupFailureCode,
+  BoardingLookupResponse,
+  BoardingToggleResult,
+} from '../types/boarding.js';
+
+const TICKET_CODE_RE = /^[A-F0-9]{8}$/;
+
+function mapBoardingToggleError(message: string): AppError {
+  const msg = message || 'Error de boarding';
+
+  if (/Pasajero no encontrado/i.test(msg) || /Reserva no encontrada/i.test(msg)) {
+    return new NotFoundError(msg.includes('Reserva') ? 'Reserva no encontrada' : 'Pasajero no encontrado');
+  }
+  if (/Viaje no encontrado/i.test(msg)) {
+    return new NotFoundError('Viaje no encontrado');
+  }
+  if (/no está asignada/i.test(msg)) {
+    return new ForbiddenError('Tu agencia no está asignada a este viaje');
+  }
+  if (/no pertenece a la agencia operadora/i.test(msg)) {
+    return new ForbiddenError('El actor no pertenece a la agencia operadora');
+  }
+  if (/Actor no encontrado/i.test(msg)) {
+    return new ForbiddenError('Actor no encontrado');
+  }
+  if (
+    /cancelado/i.test(msg) ||
+    /completado/i.test(msg) ||
+    /archivado/i.test(msg) ||
+    /aún no ha salido/i.test(msg) ||
+    /no permite boarding/i.test(msg) ||
+    /Parámetros de boarding incompletos/i.test(msg)
+  ) {
+    return new ValidationError(msg);
+  }
+
+  return new ValidationError(msg);
+}
 
 export class ReservationService {
   async getTripWithSeats(tripId: string) {
@@ -31,108 +80,6 @@ export class ReservationService {
       .eq('trip_id', tripId);
 
     return { ...trip, seats: seats || [], allocations: allocations || [] };
-  }
-
-  async boardPassenger(tripId: string, qrCode: string, scannedBy: string, agencyId: string | null, isSuperadmin: boolean) {
-    if (agencyId) {
-      await validateBoardingAllowed({ tripId, agencyId });
-    }
-
-    let query = supabaseAdmin
-      .from('reservations')
-      .select('id')
-      .eq('qr_code', qrCode)
-      .eq('trip_id', tripId)
-      .in('status', ['confirmed', 'partial']);
-
-    if (!isSuperadmin && agencyId) {
-      query = query.eq('agency_id', agencyId);
-    }
-
-    const { data: reservations, error } = await query;
-
-    if (error || !reservations || reservations.length === 0) {
-      throw new NotFoundError('No confirmed reservations found with this QR code');
-    }
-
-    const reservation = reservations[0];
-
-    const { data: passengers } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('id, seat_id, boarded')
-      .eq('reservation_id', reservation.id)
-      .eq('status', 'active');
-
-    if (!passengers || passengers.length === 0) {
-      throw new NotFoundError('No passengers found for this reservation');
-    }
-
-    const seatIds = passengers.filter(p => !p.boarded).map(p => p.seat_id);
-    if (seatIds.length === 0) {
-      throw new ConflictError('All passengers are already boarded');
-    }
-
-    const now = new Date().toISOString();
-
-    const { error: updateError } = await supabaseAdmin
-      .from('reservation_passengers')
-      .update({ boarded: true, boarded_at: now })
-      .eq('reservation_id', reservation.id)
-      .in('seat_id', seatIds);
-
-    if (updateError) throw new ValidationError(updateError.message);
-
-    const { data: allPassengers } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('boarded')
-      .eq('reservation_id', reservation.id)
-      .eq('status', 'active');
-
-    const totalCount = allPassengers?.length ?? 0;
-    const boardedCount = allPassengers?.filter(p => p.boarded).length ?? 0;
-
-    let newStatus: string;
-    if (boardedCount >= totalCount) {
-      newStatus = 'completed';
-    } else if (boardedCount > 0) {
-      newStatus = 'partial';
-    } else {
-      newStatus = 'confirmed';
-    }
-
-    const { error: statusError } = await supabaseAdmin
-      .from('reservations')
-      .update({ status: newStatus })
-      .eq('id', reservation.id);
-
-    if (statusError) throw new ValidationError(statusError.message);
-
-    const { data: seatRows } = await supabaseAdmin
-      .from('seats')
-      .select('seat_code')
-      .in('id', seatIds);
-
-    const seatCodes = (seatRows ?? []).map(s => s.seat_code);
-
-    const { error: seatError } = await supabaseAdmin
-      .from('seats')
-      .update({ status: 'blocked', updated_at: now })
-      .in('id', seatIds);
-
-    if (seatError) throw new ValidationError(seatError.message);
-
-    const { error: logError } = await supabaseAdmin
-      .from('boarding_logs')
-      .insert({
-        reservation_id: reservation.id,
-        scanned_by: scannedBy,
-        action: 'board',
-        seat_ids: seatIds,
-      });
-
-    if (logError) throw new ValidationError(logError.message);
-
-    return { boarded: true, seat_codes: seatCodes };
   }
 
   async createAgencyReservation(
@@ -462,135 +409,41 @@ export class ReservationService {
     return { cancelled: true, reservation_id: id, freed_seats: seatIds.length };
   }
 
-  // ---------- Scanner / Boarding parcial ----------
+  // ─── Boarding — exact lookup + RPC toggle (AUD-020) ─────────────────────
 
-  async lookupReservationByQR(qrCode: string, agencyId: string) {
-    const { data: reservation, error } = await supabaseAdmin
+  private async findReservationByExactCredential(normalized: string) {
+    const select =
+      'id, trip_id, status, ticket_code, qr_code, agencies!inner(name)';
+
+    if (TICKET_CODE_RE.test(normalized)) {
+      const { data, error } = await supabaseAdmin
+        .from('reservations')
+        .select(select)
+        .eq('ticket_code', normalized)
+        .maybeSingle();
+
+      if (error) throw new ValidationError(error.message);
+      if (data) return data;
+    }
+
+    const { data, error } = await supabaseAdmin
       .from('reservations')
-      .select('id, trip_id, booker_name, status, trips!inner(departure_time, routes(origin, destination))')
-      .eq('qr_code', qrCode)
-      .eq('agency_id', agencyId)
-      .single();
+      .select(select)
+      .eq('qr_code', normalized)
+      .maybeSingle();
 
-    if (error || !reservation) throw new NotFoundError('Reservation not found');
-
-    const { data: passengers } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('id, seat_id, boarded')
-      .eq('reservation_id', reservation.id)
-      .eq('status', 'active');
-
-    const totalPassengers = passengers?.length ?? 0;
-    const boardedCount = passengers?.filter(p => p.boarded).length ?? 0;
-    const seatIds = (passengers ?? [])
-      .filter(p => !p.boarded)
-      .map(p => p.seat_id);
-
-    return {
-      reservation_id: reservation.id,
-      trip_id: reservation.trip_id,
-      booker_name: reservation.booker_name,
-      status: reservation.status,
-      total_passengers: totalPassengers,
-      boarded_count: boardedCount,
-      seat_ids: seatIds,
-      trip: (reservation as any).trips,
-    };
+    if (error) throw new ValidationError(error.message);
+    return data;
   }
 
-  async boardPassengers(
-    qrCode: string,
-    seatIds: string[],
-    scannedBy: string,
+  private async buildBoardingLookupDTO(
+    reservation: any,
     agencyId: string,
-  ) {
-    const { data: reservation, error } = await supabaseAdmin
-      .from('reservations')
-      .select('id, status, trip_id')
-      .eq('qr_code', qrCode)
-      .eq('agency_id', agencyId)
-      .single();
-
-    if (error || !reservation) throw new NotFoundError('Reservation not found');
-
-    await validateBoardingAllowed({ tripId: reservation.trip_id, agencyId });
-
-    const { data: passengers } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('id, seat_id, boarded')
-      .eq('reservation_id', reservation.id)
-      .eq('status', 'active')
-      .in('seat_id', seatIds);
-
-    if (!passengers || passengers.length === 0) {
-      throw new NotFoundError('No passengers found for the provided seats');
+  ): Promise<{ dto: BoardingLookupDTO | null; failureCode: BoardingLookupFailureCode | null }> {
+    if (reservation.status === 'cancelled') {
+      return { dto: null, failureCode: 'RESERVATION_CANCELLED' };
     }
 
-    const alreadyBoarded = passengers.filter(p => p.boarded);
-    if (alreadyBoarded.length > 0) {
-      throw new ConflictError(
-        `Seats ${alreadyBoarded.map(p => p.seat_id).join(', ')} are already boarded`,
-      );
-    }
-
-    const now = new Date().toISOString();
-
-    const { error: updateError } = await supabaseAdmin
-      .from('reservation_passengers')
-      .update({ boarded: true, boarded_at: now })
-      .eq('reservation_id', reservation.id)
-      .eq('status', 'active')
-      .in('seat_id', seatIds);
-
-    if (updateError) throw new ValidationError(updateError.message);
-
-    const { data: allPassengers } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('boarded')
-      .eq('reservation_id', reservation.id)
-      .eq('status', 'active');
-
-    const totalCount = allPassengers?.length ?? 0;
-    const boardedCount = allPassengers?.filter(p => p.boarded).length ?? 0;
-
-    let newStatus: string;
-    if (boardedCount >= totalCount) {
-      newStatus = 'completed';
-    } else if (boardedCount > 0) {
-      newStatus = 'partial';
-    } else {
-      newStatus = 'confirmed';
-    }
-
-    const { error: statusError } = await supabaseAdmin
-      .from('reservations')
-      .update({ status: newStatus })
-      .eq('id', reservation.id);
-
-    if (statusError) throw new ValidationError(statusError.message);
-
-    const { error: logError } = await supabaseAdmin
-      .from('boarding_logs')
-      .insert({
-        reservation_id: reservation.id,
-        scanned_by: scannedBy,
-        action: 'board',
-        seat_ids: seatIds,
-      });
-
-    if (logError) throw new ValidationError(logError.message);
-
-    return {
-      boarded: seatIds.length,
-      reservation_status: newStatus,
-      total_passengers: totalCount,
-      boarded_count: boardedCount,
-    };
-  }
-
-  // ─── Sprint 13 — Boarding por pasajero individual ─────────────────────────
-
-  private async buildLookupDetail(reservation: any, agencyId: string) {
     const tripId = reservation.trip_id;
 
     const { data: assignment } = await supabaseAdmin
@@ -600,139 +453,218 @@ export class ReservationService {
       .eq('agency_id', agencyId)
       .maybeSingle();
 
-    if (!assignment) return null;
+    if (!assignment) {
+      return { dto: null, failureCode: 'AGENCY_NOT_ASSIGNED' };
+    }
 
     const { data: trip } = await supabaseAdmin
       .from('trips')
-      .select('departure_time, status, routes(origin, destination)')
+      .select('id, departure_time, status, routes(origin, destination)')
       .eq('id', tripId)
       .single();
 
-    if (trip?.status === 'cancelled' || trip?.status === 'completed') return null;
+    if (!trip) {
+      return { dto: null, failureCode: 'TRIP_NOT_FOUND' };
+    }
+
+    if (
+      trip.status === 'cancelled' ||
+      trip.status === 'completed' ||
+      trip.status === 'archived' ||
+      trip.status !== 'active'
+    ) {
+      return { dto: null, failureCode: 'TRIP_INVALID' };
+    }
+
+    if (!trip.departure_time || new Date(trip.departure_time) > new Date()) {
+      return { dto: null, failureCode: 'TRIP_NOT_DEPARTED' };
+    }
 
     const { data: passengers } = await supabaseAdmin
       .from('reservation_passengers')
-      .select('id, name, document, seat_id, boarded, boarded_at, seats(seat_code)')
+      .select('id, name, boarded, boarded_at, seats(seat_code)')
       .eq('reservation_id', reservation.id)
       .eq('status', 'active');
 
-    return {
-      reservation_id: reservation.id,
-      trip_id: tripId,
-      trip_status: (trip as any)?.status || null,
-      booker_name: reservation.booker_name,
-      booker_document: reservation.booker_document,
-      qr_code: reservation.qr_code,
+    const route = (trip as any).routes || { origin: '', destination: '' };
+
+    const dto: BoardingLookupDTO = {
+      trip: {
+        id: trip.id,
+        status: trip.status,
+        departure_time: trip.departure_time,
+        route: {
+          origin: route.origin ?? '',
+          destination: route.destination ?? '',
+        },
+      },
       reservation_status: reservation.status,
-      reservation_agency_name: (reservation as any).agencies?.name || '',
-      departure_time: (trip as any)?.departure_time || null,
-      route: (trip as any)?.routes || null,
-      boarding_allowed: (trip as any)?.departure_time
-        ? new Date((trip as any).departure_time) <= new Date()
-        : false,
+      reservation_agency_name: reservation.agencies?.name || '',
       passengers: (passengers || []).map((p: any) => ({
         id: p.id,
         name: p.name,
-        document: p.document,
-        seat_id: p.seat_id,
         seat_code: p.seats?.seat_code ?? null,
         boarded: p.boarded,
         boarded_at: p.boarded_at,
       })),
     };
+
+    return { dto, failureCode: null };
   }
 
-  async lookupPassengerByQR(qrCode: string, agencyId: string) {
-    const normalizedQr = qrCode.trim().toUpperCase();
-    const safePattern = normalizedQr.replace(/%/g, '\\%').replace(/_/g, '\\_');
+  async lookupPassengerByQR(
+    rawInput: string,
+    agencyId: string,
+    actorUserId: string,
+  ): Promise<BoardingLookupResponse> {
+    const normalized = rawInput.trim().toUpperCase();
+    const credentialHash = normalized
+      ? hashBoardingCredential(normalized)
+      : null;
 
-    const { data: reservations, error } = await supabaseAdmin
-      .from('reservations')
-      .select('id, trip_id, booker_name, booker_document, qr_code, status, agencies!inner(name)')
-      .ilike('qr_code', `%${safePattern}%`);
+    const denied = (
+      found: boolean,
+      failure_code: BoardingLookupFailureCode,
+    ): BoardingLookupResponse => ({
+      found,
+      allowed: false,
+      failure_code,
+      result: null,
+    });
 
-    if (error) throw new ValidationError(error.message);
-    if (!reservations || reservations.length === 0) return [];
+    try {
+      if (!normalized) {
+        await recordBoardingAttempt({
+          actor_user_id: actorUserId,
+          operator_agency_id: agencyId,
+          operation: 'lookup',
+          outcome: 'not_found',
+          failure_code: 'EMPTY_INPUT',
+          credential_hash: credentialHash,
+        });
+        return denied(false, 'EMPTY_INPUT');
+      }
 
-    const results: any[] = [];
-    for (const r of reservations) {
-      const detail = await this.buildLookupDetail(r, agencyId);
-      if (detail) results.push(detail);
-    }
+      const reservation = await this.findReservationByExactCredential(normalized);
 
-    return results;
-  }
+      if (!reservation) {
+        await recordBoardingAttempt({
+          actor_user_id: actorUserId,
+          operator_agency_id: agencyId,
+          operation: 'lookup',
+          outcome: 'not_found',
+          failure_code: 'CREDENTIAL_NOT_FOUND',
+          credential_hash: credentialHash,
+        });
+        return denied(false, 'CREDENTIAL_NOT_FOUND');
+      }
 
-  async toggleBoarding(passengerId: string, boarded: boolean, userId: string, agencyId: string) {
-    const { data: passenger, error: pErr } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('id, reservation_id, boarded, seat_id, status, reservations!inner(trip_id, status)')
-      .eq('id', passengerId)
-      .single();
+      const { dto, failureCode } = await this.buildBoardingLookupDTO(
+        reservation,
+        agencyId,
+      );
 
-    if (pErr || !passenger) throw new NotFoundError('Pasajero no encontrado');
-    if ((passenger as any).status === 'cancelled') throw new ValidationError('No se puede abordar un pasajero cancelado');
-    const reservation = passenger as any;
-    if (reservation.reservations.status === 'cancelled') throw new ValidationError('La reserva fue cancelada');
-    const tripId = reservation.reservations.trip_id;
+      if (!dto) {
+        const code = failureCode ?? 'TRIP_INVALID';
+        await recordBoardingAttempt({
+          actor_user_id: actorUserId,
+          operator_agency_id: agencyId,
+          trip_id: reservation.trip_id,
+          reservation_id: reservation.id,
+          operation: 'lookup',
+          outcome: 'denied',
+          failure_code: code,
+          credential_hash: credentialHash,
+        });
+        return denied(true, code);
+      }
 
-    await validateBoardingAllowed({ tripId, agencyId });
-
-    const now = new Date().toISOString();
-
-    const { error: updateError } = await supabaseAdmin
-      .from('reservation_passengers')
-      .update({ boarded, boarded_at: boarded ? now : null })
-      .eq('id', passengerId);
-
-    if (updateError) throw new ValidationError(updateError.message);
-
-    const { data: allPassengers } = await supabaseAdmin
-      .from('reservation_passengers')
-      .select('boarded')
-      .eq('reservation_id', reservation.reservation_id)
-      .eq('status', 'active');
-
-    const totalCount = allPassengers?.length ?? 0;
-    const boardedCount = allPassengers?.filter((p: any) => p.boarded).length ?? 0;
-
-    let newStatus: string;
-    if (boardedCount >= totalCount) {
-      newStatus = 'completed';
-    } else if (boardedCount > 0) {
-      newStatus = 'partial';
-    } else {
-      newStatus = 'confirmed';
-    }
-
-    const { error: statusError } = await supabaseAdmin
-      .from('reservations')
-      .update({ status: newStatus })
-      .eq('id', reservation.reservation_id);
-
-    if (statusError) throw new ValidationError(statusError.message);
-
-    const { error: logError } = await supabaseAdmin
-      .from('boarding_logs')
-      .insert({
-        reservation_id: reservation.reservation_id,
-        scanned_by: userId,
-        scanned_by_agency_id: agencyId,
-        reservation_passenger_id: passengerId,
-        action: boarded ? 'board' : 'unboard',
-        seat_ids: [reservation.seat_id],
+      await recordBoardingAttempt({
+        actor_user_id: actorUserId,
+        operator_agency_id: agencyId,
+        trip_id: dto.trip.id,
+        reservation_id: reservation.id,
+        operation: 'lookup',
+        outcome: 'success',
+        credential_hash: credentialHash,
       });
 
-    if (logError) throw new ValidationError(logError.message);
+      return {
+        found: true,
+        allowed: true,
+        failure_code: null,
+        result: dto,
+      };
+    } catch (err: any) {
+      await recordBoardingAttempt({
+        actor_user_id: actorUserId,
+        operator_agency_id: agencyId,
+        operation: 'lookup',
+        outcome: 'error',
+        failure_code: err?.code ?? 'LOOKUP_ERROR',
+        credential_hash: credentialHash,
+      });
+      throw err;
+    }
+  }
 
-    return {
-      passenger_id: passengerId,
-      boarded,
-      boarded_at: boarded ? now : null,
-      reservation_status: newStatus,
-      boarded_count: boardedCount,
-      total_count: totalCount,
+  async toggleBoarding(
+    passengerId: string,
+    boarded: boolean,
+    userId: string,
+    agencyId: string,
+  ): Promise<BoardingToggleResult> {
+    const operation = boarded ? 'board' : 'unboard';
+
+    // Backend authorization context: authenticated actor + operator agency from
+    // middleware. RPC re-validates membership, trip state, and passenger state.
+    const { data, error } = await supabaseAdmin.rpc('boarding_toggle', {
+      p_passenger_id: passengerId,
+      p_boarded: boarded,
+      p_actor_user_id: userId,
+      p_operator_agency_id: agencyId,
+    });
+
+    if (error) {
+      const mapped = mapBoardingToggleError(error.message || '');
+      const outcome =
+        mapped.statusCode === 404
+          ? 'not_found'
+          : mapped.statusCode === 403
+            ? 'denied'
+            : 'error';
+
+      await recordBoardingAttempt({
+        actor_user_id: userId,
+        operator_agency_id: agencyId,
+        reservation_passenger_id: passengerId,
+        operation,
+        outcome,
+        failure_code: mapped.code,
+      });
+
+      throw mapped;
+    }
+
+    const result: BoardingToggleResult = {
+      passenger_id: data.passenger_id,
+      boarded: Boolean(data.boarded),
+      boarded_at: data.boarded_at ?? null,
+      changed: Boolean(data.changed),
+      reservation_status: data.reservation_status,
+      boarded_count: Number(data.boarded_count ?? 0),
+      total_count: Number(data.total_count ?? 0),
     };
+
+    await recordBoardingAttempt({
+      actor_user_id: userId,
+      operator_agency_id: agencyId,
+      reservation_passenger_id: passengerId,
+      operation,
+      outcome: result.changed ? 'success' : 'no_change',
+    });
+
+    return result;
   }
 
   // ─── Cancel individual passenger ─────────────────────────────────────────

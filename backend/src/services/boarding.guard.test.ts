@@ -1,3 +1,7 @@
+/**
+ * AUD-020 P0 — Boarding guard regression / characterization baseline.
+ * Freeze authorization rules before remediating boarding concurrency/lookup.
+ */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mock database BEFORE any imports ────────────────────────────────
