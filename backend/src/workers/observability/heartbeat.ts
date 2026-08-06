@@ -27,7 +27,7 @@ export interface CreateHeartbeatOptions {
   extraFields?: () => Record<string, unknown>;
 }
 
-function metricsPayload(snap: WorkerMetricsSnapshot) {
+function metricsPayload(snap: WorkerMetricsSnapshot): WorkerMetricsSnapshot {
   return {
     events_processed_total: snap.events_processed_total,
     events_failed_total: snap.events_failed_total,
@@ -37,6 +37,8 @@ function metricsPayload(snap: WorkerMetricsSnapshot) {
     last_processing_duration_ms: snap.last_processing_duration_ms,
     last_success_at: snap.last_success_at,
     last_error_at: snap.last_error_at,
+    processing_duration_samples: snap.processing_duration_samples,
+    processing_duration_sum_ms: snap.processing_duration_sum_ms,
   };
 }
 

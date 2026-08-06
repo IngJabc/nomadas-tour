@@ -29,6 +29,27 @@ function reportWorkerFailure(
   });
 }
 
+/**
+ * Claim RPC filter (`p_event_type`):
+ * - `undefined` → worker default (`reservation.created`)
+ * - `null` → all event types (SQL: `p_event_type IS NULL`)
+ * - `string` → that type only
+ */
+function resolveClaimEventTypeFilter(
+  eventType: string | null | undefined,
+): string | null {
+  if (eventType === undefined) return 'reservation.created';
+  return eventType;
+}
+
+/** Logger field: omit when filter is "all types" (`null`). */
+function claimFilterLabelForLog(
+  eventType: string | null | undefined,
+): string | undefined {
+  const filter = resolveClaimEventTypeFilter(eventType);
+  return filter === null ? undefined : filter;
+}
+
 function resolveLogger(deps: RelayDeps): WorkerLogger | null {
   if (deps.logger) return deps.logger;
   if (!deps.log) return null;
@@ -239,19 +260,14 @@ export async function runOutboxRelayOnce(
     }
   }
 
-  const claimed = await deps.claimEvents(
-    deps.batchSize,
-    deps.eventType === undefined ? 'reservation.created' : deps.eventType,
-  );
+  const claimFilter = resolveClaimEventTypeFilter(deps.eventType);
+  const claimed = await deps.claimEvents(deps.batchSize, claimFilter);
 
   if (claimed.length > 0) {
     logger?.info('outbox_claimed', {
       status: 'claimed',
       claimed: claimed.length,
-      event_type:
-        deps.eventType === undefined
-          ? 'reservation.created'
-          : deps.eventType,
+      event_type: claimFilterLabelForLog(deps.eventType),
     });
   }
 
