@@ -22,6 +22,8 @@ import {
   createWorkerLogger,
   createWorkerMetrics,
   getWorkerVersion,
+  startWorkerHealthServer,
+  type WorkerHealthServer,
 } from './observability/index.js';
 
 const config = getWorkerRuntimeConfig();
@@ -50,6 +52,7 @@ const recoveryScheduler = createRecoveryScheduler({
 
 const controller = new AbortController();
 let shuttingDown = false;
+let healthServer: WorkerHealthServer | null = null;
 
 async function shutdown(signal: string, exitCode = 0) {
   if (shuttingDown) return;
@@ -59,7 +62,22 @@ async function shutdown(signal: string, exitCode = 0) {
     signal,
     metrics: metrics.snapshot(),
   });
+
   controller.abort();
+
+  if (healthServer) {
+    try {
+      await healthServer.close();
+      logger.info('worker_health_server_stopped', { status: 'stopped' });
+    } catch (err) {
+      logger.error('worker_health_server_stop_error', {
+        status: 'error',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+    healthServer = null;
+  }
+
   await flushSentry(2000);
   // Allow the loop to unwind; force exit if it hangs.
   setTimeout(() => process.exit(exitCode), 5_000).unref?.();
@@ -112,65 +130,85 @@ process.on('unhandledRejection', (reason) => {
   void flushSentry(2000).finally(() => process.exit(1));
 });
 
-logger.info('worker_started', {
-  status: 'started',
-  worker_version: workerVersion,
-  process_id: process.pid,
-  email_via_outbox: config.emailViaOutbox,
-  poll_ms: config.pollMs,
-  batch_size: config.batchSize,
-  settle_ms: config.settleMs,
-  max_attempts: config.maxAttempts,
-  heartbeat_ms: config.heartbeatMs,
-  stale_processing_ms: config.staleProcessingMs,
-  recovery_interval_ms: config.recoveryIntervalMs,
-});
+async function main() {
+  healthServer = await startWorkerHealthServer({
+    port: config.healthPort,
+    workerName,
+    workerVersion,
+    startedAt,
+    pid: process.pid,
+  });
 
-// Immediate heartbeat so ops can see liveness without waiting for interval.
-heartbeat.maybeEmit(true);
+  logger.info('worker_health_server_started', {
+    status: 'started',
+    port: healthServer.port,
+  });
 
-runOutboxRelayLoop(
-  {
-    claimEvents: claimOutboxEvents,
-    markCompleted: markOutboxCompleted,
-    markFailed: markOutboxFailed,
-    markRequeue: markOutboxRequeue,
-    recoverStuck: async () => {
-      if (!recoveryScheduler.shouldRun()) {
-        return 0;
-      }
-      recoveryScheduler.markRan();
-      const rows = await recoverStuckOutboxEvents(
-        config.staleProcessingMs,
-        config.staleRecoveryLimit,
-      );
-      return rows.length;
-    },
-    getHandler: (type, version) => resolveHandler(handlers, type, version),
-    maxAttempts: config.maxAttempts,
-    retryBaseMs: config.retryBaseMs,
-    batchSize: config.batchSize,
-    pollMs: config.pollMs,
-    eventType: 'reservation.created',
-    logger,
-    metrics,
-  },
-  {
-    signal: controller.signal,
-    onLoopTick: () => {
-      heartbeat.maybeEmit(false);
-    },
-  },
-)
-  .then(async () => {
+  logger.info('worker_started', {
+    status: 'started',
+    worker_version: workerVersion,
+    process_id: process.pid,
+    email_via_outbox: config.emailViaOutbox,
+    poll_ms: config.pollMs,
+    batch_size: config.batchSize,
+    settle_ms: config.settleMs,
+    max_attempts: config.maxAttempts,
+    heartbeat_ms: config.heartbeatMs,
+    stale_processing_ms: config.staleProcessingMs,
+    recovery_interval_ms: config.recoveryIntervalMs,
+    health_port: healthServer.port,
+  });
+
+  // Immediate heartbeat so ops can see liveness without waiting for interval.
+  heartbeat.maybeEmit(true);
+
+  try {
+    await runOutboxRelayLoop(
+      {
+        claimEvents: claimOutboxEvents,
+        markCompleted: markOutboxCompleted,
+        markFailed: markOutboxFailed,
+        markRequeue: markOutboxRequeue,
+        recoverStuck: async () => {
+          if (!recoveryScheduler.shouldRun()) {
+            return 0;
+          }
+          recoveryScheduler.markRan();
+          const rows = await recoverStuckOutboxEvents(
+            config.staleProcessingMs,
+            config.staleRecoveryLimit,
+          );
+          return rows.length;
+        },
+        getHandler: (type, version) => resolveHandler(handlers, type, version),
+        maxAttempts: config.maxAttempts,
+        retryBaseMs: config.retryBaseMs,
+        batchSize: config.batchSize,
+        pollMs: config.pollMs,
+        eventType: 'reservation.created',
+        logger,
+        metrics,
+      },
+      {
+        signal: controller.signal,
+        onLoopTick: () => {
+          heartbeat.maybeEmit(false);
+        },
+      },
+    );
+
     logger.info('worker_stopped', {
       status: 'stopped',
       metrics: metrics.snapshot(),
     });
+    if (healthServer) {
+      await healthServer.close();
+      logger.info('worker_health_server_stopped', { status: 'stopped' });
+      healthServer = null;
+    }
     await flushSentry(2000);
     process.exit(0);
-  })
-  .catch(async (err) => {
+  } catch (err) {
     metrics.markError();
     logger.error('worker_fatal', {
       status: 'fatal',
@@ -186,6 +224,30 @@ runOutboxRelayLoop(
       fingerprint: fingerprintWorkerFailure(workerName, 'lifecycle'),
       level: 'fatal',
     });
+    if (healthServer) {
+      try {
+        await healthServer.close();
+        logger.info('worker_health_server_stopped', { status: 'stopped' });
+      } catch {
+        // ignore close errors on fatal path
+      }
+      healthServer = null;
+    }
     await flushSentry(2000);
     process.exit(1);
+  }
+}
+
+void main().catch(async (err) => {
+  logger.error('worker_fatal', {
+    status: 'fatal',
+    error: err instanceof Error ? err.message : String(err),
   });
+  captureException(err, {
+    tags: { service: 'worker', worker_name: workerName, status: 'fatal' },
+    fingerprint: fingerprintWorkerFailure(workerName, 'lifecycle'),
+    level: 'fatal',
+  });
+  await flushSentry(2000);
+  process.exit(1);
+});

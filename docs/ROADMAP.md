@@ -69,6 +69,7 @@ FASE 3 — Workers
   WKR-006.2.1 Sentry foundation design (docs) ✅
   WKR-006.2 Sentry wiring (API + worker) ✅
   WKR-006.3 Retention + DLQ runbook ✅
+  WKR-006.4 Worker health endpoint (/healthz) ✅
   WKR-007  Trip / notification event workers → siguiente
   WKR-008  Reminder workers
   WKR-009  Retention worker / automation bridge
@@ -127,7 +128,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 3 — Sistema de Workers
 
-**Prioridad:** En curso (infra workers cerrada hasta 006.3; siguientes consumers WKR-007+).
+**Prioridad:** En curso (infra workers cerrada hasta 006.4 healthz; siguientes consumers WKR-007+).
 
 **Objetivo:** Procesamiento asíncrono y tareas programadas desacopladas del ciclo HTTP, mediante **Transactional Outbox + Workers** ([WKR-002](WKR-002-events-workers-architecture-adr.md)).
 
@@ -145,6 +146,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 | [WKR-006.2.1](WKR-006.2-sentry-foundation-design.md) | Sentry foundation design (docs only) | ✅ |
 | [WKR-006.2](WKR-006.2-sentry-foundation-implementation.md) | Sentry wiring (API + worker; sin frontend) | ✅ |
 | [WKR-006.3](WKR-006.3-outbox-retention-dlq-runbook.md) | Retention + DLQ runbook (docs) | ✅ |
+| [WKR-006.4](WKR-006.4-worker-health-endpoint.md) | Worker `/healthz` (Render Free Web Service) | ✅ |
 | **WKR-007** | **Trip / notification event workers** | **Siguiente** |
 | WKR-008 | Reminder workers | Pendiente |
 | WKR-009 | Retention worker / automation bridge → Fase 4 | Pendiente |
@@ -168,13 +170,15 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** — sin SDK.
 
-#### WKR-006.2 ✅ / WKR-006.3 ✅
+#### WKR-006.2 ✅ / WKR-006.3 ✅ / WKR-006.4 ✅
 
 1. **006.2** — Wiring Sentry API + worker (opcional vía `SENTRY_ENABLED`) ✅
    Doc: [`WKR-006.2-sentry-foundation-implementation.md`](WKR-006.2-sentry-foundation-implementation.md)
 2. **006.3** — Retención + DLQ lógica (`failed`) + runbook ops ✅
    Doc: [`WKR-006.3-outbox-retention-dlq-runbook.md`](WKR-006.3-outbox-retention-dlq-runbook.md)
    Purga automática de `completed` → **WKR-009** (no en este ticket).
+3. **006.4** — Health HTTP `GET /healthz` (`WORKER_HEALTH_PORT`) para Web Service free ✅
+   Doc: [`WKR-006.4-worker-health-endpoint.md`](WKR-006.4-worker-health-endpoint.md)
 
 **Separación conceptual (no mezclar en el mismo ticket):**
 
