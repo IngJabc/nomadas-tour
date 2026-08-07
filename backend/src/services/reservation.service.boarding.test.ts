@@ -74,6 +74,7 @@ vi.mock('../config/env.js', () => ({
     SENTRY_DSN: '',
     SENTRY_ENVIRONMENT: '',
     SENTRY_RELEASE: '',
+    WORKER_HEALTH_PORT: 3002,
   },
 }));
 

@@ -94,14 +94,15 @@ idempotencia. Diseño: serie `docs/WKR-00x-*.md`.
 API / Worker
   → Structured Logs (JSON stdout)
   → Metrics (in-memory) + Heartbeat
-  → Sentry (opcional — SENTRY_ENABLED; errores inesperados)
+  → Sentry (opcional — SENTRY_ENABLED)
+  → Worker GET /healthz (WORKER_HEALTH_PORT — WKR-006.4)
 ```
 
-Runtime (WKR-006.1 + WKR-006.2): correlación en logs; recovery stuck;
-wrapper `backend/src/observability/sentry.ts` (sin Performance/Replay/frontend).
-Retención / DLQ lógica (`status = failed`): runbook
-[`WKR-006.3-outbox-retention-dlq-runbook.md`](WKR-006.3-outbox-retention-dlq-runbook.md)
-(purga automática de `completed` → WKR-009). No mezclar con SEC-009.
+Runtime (WKR-006.1–006.4): correlación en logs; recovery stuck; Sentry
+opcional; health HTTP mínimo para hosting tipo Render Free Web Service
+([`WKR-006.4-worker-health-endpoint.md`](WKR-006.4-worker-health-endpoint.md)).
+Retención / DLQ lógica: [`WKR-006.3-outbox-retention-dlq-runbook.md`](WKR-006.3-outbox-retention-dlq-runbook.md).
+No mezclar con SEC-009.
 
 ### Branding por agencia
 

@@ -12,6 +12,7 @@ export interface WorkerRuntimeConfig {
   staleProcessingMs: number;
   staleRecoveryLimit: number;
   recoveryIntervalMs: number;
+  healthPort: number;
 }
 
 export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
@@ -26,5 +27,6 @@ export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
     staleProcessingMs: env.OUTBOX_STALE_PROCESSING_MS,
     staleRecoveryLimit: env.OUTBOX_STALE_RECOVERY_LIMIT,
     recoveryIntervalMs: env.OUTBOX_RECOVERY_INTERVAL_MS,
+    healthPort: env.WORKER_HEALTH_PORT,
   };
 }

@@ -36,8 +36,15 @@ const envSchema = z.object({
     .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
     .default(false),
   SENTRY_DSN: z.string().default(""),
-  SENTRY_ENVIRONMENT: z.string().default(""),
+  SENTRY_ENVIRONMENT: z
+  .string()
+  .default("production"),
   SENTRY_RELEASE: z.string().default(""),
+  /**
+   * WKR-006.4 — HTTP health port for worker process (Render Free Web Service).
+   * On Render, set this to the platform PORT value.
+   */
+  WORKER_HEALTH_PORT: z.coerce.number().default(3002),
 });
 
 function loadEnv() {

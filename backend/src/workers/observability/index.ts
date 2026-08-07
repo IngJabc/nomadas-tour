@@ -26,5 +26,11 @@ export {
   type RecoveryScheduler,
 } from './recovery-scheduler.js';
 export { getWorkerVersion } from './version.js';
+export {
+  startWorkerHealthServer,
+  type StartWorkerHealthServerOptions,
+  type WorkerHealthPayload,
+  type WorkerHealthServer,
+} from './health-server.js';
 
 export const DEFAULT_WORKER_NAME = 'nomadas-outbox-relay';
