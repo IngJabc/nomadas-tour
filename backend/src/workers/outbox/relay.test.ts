@@ -145,6 +145,19 @@ describe('WKR-006.1 — Relay observability', () => {
     expect(metrics.snapshot().events_processed_total).toBe(2);
 
     await processClaimedEvent(
+      row(),
+      makeDeps({
+        metrics,
+        getHandler: () => async () => ({
+          kind: 'completed',
+          reason: 'skipped_restricted',
+        }),
+      }),
+    );
+    expect(metrics.snapshot().events_skipped_total).toBe(2);
+    expect(metrics.snapshot().events_processed_total).toBe(3);
+
+    await processClaimedEvent(
       row({ attempts: 1 }),
       makeDeps({
         metrics,

@@ -5,6 +5,7 @@ import {
 import type { OutboxEventRow } from '../../events/types.js';
 import { NotFoundError } from '../../errors/index.js';
 import type { TicketData } from '../../types/reservation.js';
+import type { EmailSendResult } from '../../services/email.service.js';
 import type { HandlerOutcome } from '../outbox/types.js';
 
 export interface ReservationEmailFlags {
@@ -19,7 +20,7 @@ export interface ReservationCreatedHandlerDeps {
   sendReservationConfirmationEmail: (
     to: string,
     ticket: TicketData,
-  ) => Promise<void>;
+  ) => Promise<EmailSendResult>;
   markTicketEmailSent: (reservationId: string) => Promise<boolean>;
   settleMs: number;
   settleRetryMs: number;
@@ -92,10 +93,21 @@ export function createReservationCreatedHandler(
 
     try {
       const ticket = await deps.getTicketData(reservation_id);
-      await deps.sendReservationConfirmationEmail(
+      const result = await deps.sendReservationConfirmationEmail(
         flags.contact_email!.trim(),
         ticket,
       );
+
+      if (result.status === 'skipped') {
+        return {
+          kind: 'completed',
+          reason:
+            result.reason === 'disabled'
+              ? 'skipped_disabled'
+              : 'skipped_restricted',
+        };
+      }
+
       await deps.markTicketEmailSent(reservation_id);
       return { kind: 'completed', reason: 'sent' };
     } catch (err) {

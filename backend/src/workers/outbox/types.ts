@@ -3,7 +3,15 @@ import type { WorkerLogger } from '../observability/logger.js';
 import type { WorkerMetrics } from '../observability/metrics.js';
 
 export type HandlerOutcome =
-  | { kind: 'completed'; reason: 'sent' | 'already_sent' | 'skipped_no_email' }
+  | {
+      kind: 'completed';
+      reason:
+        | 'sent'
+        | 'already_sent'
+        | 'skipped_no_email'
+        | 'skipped_restricted'
+        | 'skipped_disabled';
+    }
   | { kind: 'requeue'; reason: string; delayMs: number }
   | { kind: 'failed'; reason: string; permanent: boolean };
 

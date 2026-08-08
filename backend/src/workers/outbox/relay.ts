@@ -63,7 +63,12 @@ function resolveLogger(deps: RelayDeps): WorkerLogger | null {
 }
 
 function isSkipReason(reason: string): boolean {
-  return reason === 'already_sent' || reason === 'skipped_no_email';
+  return (
+    reason === 'already_sent' ||
+    reason === 'skipped_no_email' ||
+    reason === 'skipped_restricted' ||
+    reason === 'skipped_disabled'
+  );
 }
 
 export async function processClaimedEvent(
