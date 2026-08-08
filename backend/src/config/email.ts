@@ -6,4 +6,6 @@ export const resend = new Resend(env.RESEND_API_KEY);
 export const EMAIL_CONFIG = {
   from: env.EMAIL_FROM,
   frontendUrl: env.FRONTEND_URL,
+  deliveryMode: env.EMAIL_DELIVERY_MODE,
+  allowedRecipients: env.EMAIL_ALLOWED_RECIPIENTS,
 } as const;

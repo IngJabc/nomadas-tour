@@ -11,9 +11,18 @@ interface AgenciesStepProps {
   agencies: { id: string; name: string; status?: string }[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
+  /** When true, root and pills are centered horizontally */
+  centered?: boolean;
+  className?: string;
 }
 
-export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepProps) {
+export function AgenciesStep({
+  agencies,
+  selectedIds,
+  onChange,
+  centered = false,
+  className,
+}: AgenciesStepProps) {
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(
@@ -39,7 +48,12 @@ export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepPr
 
   if (agencies.length === 0) {
     return (
-      <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
+      <p
+        className={cn(
+          'font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]',
+          centered && 'text-center',
+        )}
+      >
         No hay agencias disponibles. Crea una agencia primero.
       </p>
     );
@@ -47,15 +61,26 @@ export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepPr
 
   if (activeAgencies.length === 0) {
     return (
-      <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
+      <p
+        className={cn(
+          'font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]',
+          centered && 'text-center',
+        )}
+      >
         No hay agencias activas disponibles para asignar este viaje.
       </p>
     );
   }
 
   return (
-    <div className="space-y-4 max-w-lg">
-      <div className="relative">
+    <div
+      className={cn(
+        'space-y-4 w-full max-w-lg',
+        centered && 'mx-auto',
+        className,
+      )}
+    >
+      <div className="relative w-full">
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-brand-muted)] pointer-events-none" />
         <input
           type="text"
@@ -76,7 +101,12 @@ export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepPr
       </div>
 
       {selectedIds.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+        <div
+          className={cn(
+            'flex flex-wrap gap-1.5',
+            centered && 'justify-center',
+          )}
+        >
           {selectedIds.map((id) => {
             const agency = agencies.find((a) => a.id === id);
             return (
@@ -98,9 +128,9 @@ export function AgenciesStep({ agencies, selectedIds, onChange }: AgenciesStepPr
         </div>
       )}
 
-      <div className="border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden max-h-[200px] overflow-y-auto">
+      <div className="border border-[rgba(0,0,0,0.06)] rounded-xl overflow-hidden max-h-[220px] sm:max-h-[260px] overflow-y-auto w-full text-left">
         {activeAgencies.length === 0 ? (
-          <p className="px-4 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
+          <p className="px-4 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)] text-center">
             No se encontraron agencias
           </p>
         ) : (

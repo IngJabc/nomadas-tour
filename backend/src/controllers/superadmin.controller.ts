@@ -31,6 +31,10 @@ const createTripSchema = z.object({
   postpone: z.boolean().optional(),
 });
 
+const addTripAgenciesSchema = z.object({
+  agency_ids: z.array(z.string().uuid()).min(1),
+});
+
 export class SuperadminController {
   // Agencies
   async listAgencies(req: Request, res: Response, next: NextFunction) {
@@ -181,6 +185,23 @@ export class SuperadminController {
         req.ctx!.userId
       );
       res.status(201).json(trip);
+    } catch (error) {
+      next(
+        error instanceof z.ZodError
+          ? new ValidationError("Invalid input", (error as any).issues)
+          : error
+      );
+    }
+  }
+
+  async addTripAgencies(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = addTripAgenciesSchema.parse(req.body);
+      const result = await superadminService.addAgenciesToTrip(
+        req.params.id as string,
+        data.agency_ids
+      );
+      res.json(result);
     } catch (error) {
       next(
         error instanceof z.ZodError

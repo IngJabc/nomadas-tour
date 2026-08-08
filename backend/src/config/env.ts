@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  normalizeEmailDeliveryMode,
+  parseAllowedRecipients,
+} from "../services/email-delivery-policy.js";
 
 const envSchema = z.object({
   SUPABASE_URL: z.string().url(),
@@ -10,6 +14,22 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().min(1),
   EMAIL_FROM: z.string().min(1),
   FRONTEND_URL: z.string().url(),
+  /**
+   * OPS-EMAIL-001 — Temporary Resend delivery gate.
+   * normal | restricted | disabled (default normal).
+   */
+  EMAIL_DELIVERY_MODE: z
+    .string()
+    .optional()
+    .transform((v) => normalizeEmailDeliveryMode(v)),
+  /**
+   * CSV allowlist used only when EMAIL_DELIVERY_MODE=restricted.
+   * Empty list = fail-safe (skip all sends).
+   */
+  EMAIL_ALLOWED_RECIPIENTS: z
+    .string()
+    .optional()
+    .transform((v) => parseAllowedRecipients(v ?? "")),
   LOCK_TTL_SECONDS: z.coerce.number().default(300),
   /** When true, ticket email is sent by outbox worker; HTTP path skips fire-and-forget. */
   EMAIL_VIA_OUTBOX: z

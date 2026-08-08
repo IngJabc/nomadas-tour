@@ -252,6 +252,14 @@ export const adminApi = {
     trip: Record<string, unknown>;
     action: 'POSTPONED' | 'UPDATED';
   }>(`/admin/trips/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  addTripAgencies: (tripId: string, agency_ids: string[]) =>
+    request<{
+      added_agency_ids: string[];
+      trip_agencies: { agency_id: string; agency_name: string }[];
+    }>(`/admin/trips/${tripId}/agencies`, {
+      method: 'POST',
+      body: JSON.stringify({ agency_ids }),
+    }),
   archiveTrip: (id: string) =>
     request<{ id: string; status: 'archived' }>(`/admin/trips/${id}/archive`, {
       method: 'PATCH',

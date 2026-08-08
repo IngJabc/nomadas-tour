@@ -841,6 +841,168 @@ export class SuperadminService {
     };
   }
 
+  /**
+   * Add-only: insert agencies into trip_agencies.
+   * Allowed even when the trip has active reservations.
+   * Does NOT update trips, seats, reservations, or reservation_passengers.
+   */
+  async addAgenciesToTrip(tripId: string, agencyIds: string[]) {
+    const uniqueIds = [...new Set(agencyIds)];
+    if (uniqueIds.length === 0) {
+      throw new ValidationError("At least one agency is required");
+    }
+
+    let ctx;
+    try {
+      ctx = await getTripOperationalContext(tripId);
+    } catch (err) {
+      if (err instanceof Error && err.message === "Trip not found") {
+        throw new NotFoundError("Trip not found");
+      }
+      throw err;
+    }
+
+    // Status / departure / boarded — does NOT block on active reservations
+    validateTripEditable(ctx);
+
+    const { data: agencies, error: agenciesError } = await supabaseAdmin
+      .from("agencies")
+      .select("id, name, status, email")
+      .in("id", uniqueIds);
+
+    if (agenciesError) throw new ValidationError(agenciesError.message);
+    if (!agencies || agencies.length !== uniqueIds.length) {
+      throw new NotFoundError("Agency not found");
+    }
+
+    for (const agency of agencies) {
+      if (agency.status !== "active") {
+        throw new ValidationError(
+          agency.status === "pending"
+            ? "No se puede asignar una agencia pendiente. La agencia debe estar activa."
+            : "No se puede asignar una agencia inactiva. La agencia debe estar activa."
+        );
+      }
+    }
+
+    const alreadyAssigned = uniqueIds.filter((id) =>
+      ctx.currentAgencyIds.includes(id)
+    );
+    if (alreadyAssigned.length > 0) {
+      throw new ConflictError(
+        "Una o más agencias ya están asignadas a este viaje"
+      );
+    }
+
+    const taRows = uniqueIds.map((agencyId) => ({
+      trip_id: tripId,
+      agency_id: agencyId,
+    }));
+
+    const { error: taError } = await supabaseAdmin
+      .from("trip_agencies")
+      .insert(taRows);
+
+    if (taError) {
+      const code = (taError as { code?: string }).code;
+      const msg = taError.message || "";
+      if (
+        code === "23505" ||
+        /duplicate|unique/i.test(msg)
+      ) {
+        throw new ConflictError(
+          "Una o más agencias ya están asignadas a este viaje"
+        );
+      }
+      throw new ValidationError(taError.message);
+    }
+
+    const { data: route } = await supabaseAdmin
+      .from("routes")
+      .select("origin, destination")
+      .eq("id", ctx.trip.route_id)
+      .single();
+
+    if (route) {
+      const agenciesWithEmail = await getAgenciesWithEmail(uniqueIds);
+      const departureFormatted = formatDateForEmail(ctx.trip.departure_time);
+      for (const agency of agenciesWithEmail) {
+        const emailAllowed = await notificationDeliveryPolicy.shouldDeliver(
+          agency.id,
+          "trip_created",
+          "email"
+        );
+        if (!emailAllowed) continue;
+
+        emailService
+          .sendNewTripAssignedEmail(
+            agency.email,
+            agency.name,
+            route.origin,
+            route.destination,
+            departureFormatted,
+            ctx.trip.vehicle_type,
+            ctx.trip.capacity,
+            tripId,
+            agency.id
+          )
+          .catch((err) => {
+            console.error(
+              JSON.stringify({
+                event: "TRIP_ASSIGNED_EMAIL_FAILED",
+                tripId,
+                agencyId: agency.id,
+                error: err.message,
+              })
+            );
+          });
+      }
+
+      notificationService
+        .createForAgenciesAndAdmin({
+          type: "trip_created",
+          title: "Viaje asignado",
+          body: `Viaje asignado: ${route.origin} → ${route.destination} el ${departureFormatted}`,
+          entityType: "trip",
+          entityId: tripId,
+          agencyIds: uniqueIds,
+          actor: "superadmin",
+          action_url: `/agency/trips/${tripId}/passengers`,
+        })
+        .catch((err) => {
+          console.error(
+            JSON.stringify({
+              event: "NOTIFICATION_FAILED",
+              type: "trip_created",
+              tripId,
+              error: err.message,
+            })
+          );
+        });
+    }
+
+    const allAgencyIds = [...ctx.currentAgencyIds, ...uniqueIds];
+    const { data: agencyNames } = await supabaseAdmin
+      .from("agencies")
+      .select("id, name")
+      .in("id", allAgencyIds.length ? allAgencyIds : ["none"]);
+
+    const nameMap = new Map(
+      (agencyNames || []).map((a: { id: string; name: string }) => [
+        a.id,
+        a.name,
+      ])
+    );
+
+    return {
+      added_agency_ids: uniqueIds,
+      trip_agencies: allAgencyIds.map((agencyId) => ({
+        agency_id: agencyId,
+        agency_name: nameMap.get(agencyId) || "",
+      })),
+    };
+  }
+
   async updateTrip(
     id: string,
     routeId: string,

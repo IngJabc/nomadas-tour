@@ -528,6 +528,7 @@ function NewReservationContent() {
   ]);
 
   const handleReset = useCallback(() => {
+    router.replace('/agency/reservations/new');
     setBookerName("");
     setBookerDocument("");
     setPassengers([]);
@@ -545,7 +546,6 @@ function NewReservationContent() {
     wizard.resetWizard();
     tripCancelledHandledRef.current = false;
     tripCompletedHandledRef.current = false;
-    router.replace('/agency/reservations/new');
   }, [submit, locking, wizard, router, stopCountdown]);
 
   const handleBookerNameChange = useCallback((v: string) => setBookerName(v), []);

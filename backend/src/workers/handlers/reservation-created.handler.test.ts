@@ -58,7 +58,9 @@ function makeDeps(
       trip: null,
       passengers: [],
     })),
-    sendReservationConfirmationEmail: vi.fn(async () => undefined),
+    sendReservationConfirmationEmail: vi.fn(async () => ({
+      status: 'sent' as const,
+    })),
     markTicketEmailSent: vi.fn(async () => true),
     settleMs: 5000,
     settleRetryMs: 1000,
@@ -152,5 +154,42 @@ describe('WKR-005 — ReservationCreatedHandler', () => {
       permanent: false,
       reason: 'Failed to send reservation confirmation email',
     });
+    expect(deps.markTicketEmailSent).not.toHaveBeenCalled();
+  });
+
+  it('OPS-EMAIL-001: skipped restricted does not mark ticket email sent', async () => {
+    const deps = makeDeps({
+      sendReservationConfirmationEmail: vi.fn(async () => ({
+        status: 'skipped' as const,
+        reason: 'restricted' as const,
+      })),
+    });
+    const handler = createReservationCreatedHandler(deps);
+
+    const outcome = await handler(row());
+
+    expect(outcome).toEqual({
+      kind: 'completed',
+      reason: 'skipped_restricted',
+    });
+    expect(deps.markTicketEmailSent).not.toHaveBeenCalled();
+  });
+
+  it('OPS-EMAIL-001: skipped disabled does not mark ticket email sent', async () => {
+    const deps = makeDeps({
+      sendReservationConfirmationEmail: vi.fn(async () => ({
+        status: 'skipped' as const,
+        reason: 'disabled' as const,
+      })),
+    });
+    const handler = createReservationCreatedHandler(deps);
+
+    const outcome = await handler(row());
+
+    expect(outcome).toEqual({
+      kind: 'completed',
+      reason: 'skipped_disabled',
+    });
+    expect(deps.markTicketEmailSent).not.toHaveBeenCalled();
   });
 });
