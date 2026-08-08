@@ -42,6 +42,9 @@ export interface Trip {
   status: string;
   postponed_from: string | null;
   created_by: string;
+  /** WKR-007 Fase 0 */
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface TripSummary {
