@@ -35,6 +35,8 @@ export interface OutboxEventRow {
   error_message: string | null;
   created_at: string;
   updated_at: string;
+  /** WKR-007 Fase 0. NULL until producers set a key (trigger 049 stays NULL until WKR-007.2). */
+  dedup_key?: string | null;
 }
 
 export function envelopeFromOutboxRow<TData>(

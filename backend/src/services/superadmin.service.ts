@@ -20,6 +20,10 @@ import {
   validateNoActiveReservations,
 } from "./trip-edit-context.js";
 import { assertNoDuplicateTrip } from "./trip-duplicate.guard.js";
+import {
+  formatDateForEmail,
+  getAgenciesWithEmail,
+} from "../utils/email-fanout.js";
 
 export enum TripUpdateAction {
   POSTPONED = "POSTPONED",
@@ -367,34 +371,6 @@ export class SuperadminService {
     },
   };
 
-  private async getAgenciesWithEmail(
-    agencyIds: string[]
-  ): Promise<{ id: string; name: string; email: string }[]> {
-    if (agencyIds.length === 0) return [];
-
-    const { data: agencies } = await supabaseAdmin
-      .from("agencies")
-      .select("id, name, email, status")
-      .in("id", agencyIds);
-
-    return (agencies || []).filter(
-      (a: any) => a.status === "active" && a.email
-    );
-  }
-
-  private formatDateForEmail(isoDate: string): string {
-    const d = new Date(isoDate);
-    return d.toLocaleDateString("es-VE", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      timeZone: "America/Caracas",
-    });
-  }
-
   // ---- Trips (atomic: trip + seats + allocations) ----
   async createTrip(
     routeId: string,
@@ -472,8 +448,8 @@ export class SuperadminService {
     }
 
     // Send "new trip assigned" emails to active agencies
-    const agenciesWithEmail = await this.getAgenciesWithEmail(agencyIds);
-    const departureFormatted = this.formatDateForEmail(trip.departure_time);
+    const agenciesWithEmail = await getAgenciesWithEmail(agencyIds);
+    const departureFormatted = formatDateForEmail(trip.departure_time);
     for (const agency of agenciesWithEmail) {
       const emailAllowed = await notificationDeliveryPolicy.shouldDeliver(
         agency.id,
@@ -1059,9 +1035,9 @@ export class SuperadminService {
         const allAgencyIds = [
           ...new Set([...ctx.currentAgencyIds, ...agencyIds]),
         ];
-        const agenciesWithEmail = await this.getAgenciesWithEmail(allAgencyIds);
-        const oldFormatted = this.formatDateForEmail(ctx.trip.departure_time);
-        const newFormatted = this.formatDateForEmail(toUTC(departureTime));
+        const agenciesWithEmail = await getAgenciesWithEmail(allAgencyIds);
+        const oldFormatted = formatDateForEmail(ctx.trip.departure_time);
+        const newFormatted = formatDateForEmail(toUTC(departureTime));
 
         for (const agency of agenciesWithEmail) {
           const emailAllowed = await notificationDeliveryPolicy.shouldDeliver(
@@ -1098,7 +1074,7 @@ export class SuperadminService {
         const notifAgencyIds = [
           ...new Set([...ctx.currentAgencyIds, ...agencyIds]),
         ];
-        const newDepartureFormatted = this.formatDateForEmail(
+        const newDepartureFormatted = formatDateForEmail(
           toUTC(departureTime)
         );
         notificationService
@@ -1285,7 +1261,7 @@ export class SuperadminService {
         .eq("trip_id", id);
 
       const agencyIds = (tripAgencies || []).map((ta: any) => ta.agency_id);
-      const agenciesWithEmail = await this.getAgenciesWithEmail(agencyIds);
+      const agenciesWithEmail = await getAgenciesWithEmail(agencyIds);
 
       const { data: route } = await supabaseAdmin
         .from("routes")
@@ -1294,7 +1270,7 @@ export class SuperadminService {
         .single();
 
       if (route) {
-        const departureFormatted = this.formatDateForEmail(trip.departure_time);
+        const departureFormatted = formatDateForEmail(trip.departure_time);
         for (const agency of agenciesWithEmail) {
           const emailAllowed = await notificationDeliveryPolicy.shouldDeliver(
             agency.id,
@@ -1354,7 +1330,7 @@ export class SuperadminService {
             status === "cancelled" ? "Viaje cancelado" : "Viaje completado",
           body:
             status === "cancelled"
-              ? `El viaje ${routeLabel} del ${this.formatDateForEmail(trip.departure_time)} fue cancelado`
+              ? `El viaje ${routeLabel} del ${formatDateForEmail(trip.departure_time)} fue cancelado`
               : `El viaje ${routeLabel} fue completado`,
           entityType: "trip",
           entityId: id,
