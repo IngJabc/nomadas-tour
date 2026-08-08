@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { Plus, Calendar, Search, X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Plus, Calendar, Search, X, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, Building2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -14,7 +14,9 @@ import { AdminTripCardSkeleton } from '@/components/admin/skeleton/AdminTripCard
 import { Button } from '@/components/ui/Button';
 import { TripCard } from '@/components/admin/trips/TripCard';
 import { TripBuilderModal } from '@/components/admin/trip-builder/TripBuilderModal';
+import { AgenciesStep } from '@/components/admin/trip-builder/AgenciesStep';
 import { ContextualModal } from '@/components/ui/ContextualModal';
+import { Modal } from '@/components/ui/Modal';
 import { DateTimePicker } from '@/components/ui/DateTimePicker';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { subscribeToTripSeats, subscribeToReservationPassengers } from '@/lib/realtime/subscriptions';
@@ -26,7 +28,7 @@ import {
 } from '@/lib/timezone';
 import type { Route } from '@/types';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
-interface AgencyOption { id: string; name: string; }
+interface AgencyOption { id: string; name: string; status?: string; }
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos' },
@@ -90,6 +92,10 @@ export default function AdminTripsPage() {
     anchorRect: DOMRect;
   } | null>(null);
   const [postponeDate, setPostponeDate] = useState('');
+
+  // Add agency modal (independent of trip edit)
+  const [addAgencyTripId, setAddAgencyTripId] = useState<string | null>(null);
+  const [selectedAddAgencyIds, setSelectedAddAgencyIds] = useState<string[]>([]);
 
   useEffect(() => {
     Promise.all([
@@ -222,11 +228,52 @@ export default function AdminTripsPage() {
       return;
     }
 
+    if (action === 'add_agency') {
+      setSelectedAddAgencyIds([]);
+      setAddAgencyTripId(tripId);
+      return;
+    }
+
     if (action === 'complete' || action === 'cancel' || action === 'archive' || action === 'postpone') {
       setPostponeDate('');
       setActiveModal({ tripId, action, anchorRect });
     }
   }, [router]);
+
+  const addAgencyTrip = useMemo(
+    () => (addAgencyTripId ? trips.find((t: any) => t.id === addAgencyTripId) : null),
+    [addAgencyTripId, trips],
+  );
+
+  const availableAgenciesForAdd = useMemo(() => {
+    if (!addAgencyTrip) return [];
+    const assignedIds = new Set(
+      (addAgencyTrip.agencies || []).map((a: { id: string }) => a.id),
+    );
+    return agencies.filter(
+      (a) => a.status === 'active' && !assignedIds.has(a.id),
+    );
+  }, [addAgencyTrip, agencies]);
+
+  const handleAddAgencyConfirm = async () => {
+    if (!addAgencyTripId || selectedAddAgencyIds.length === 0) return;
+    setActionLoading(addAgencyTripId);
+    try {
+      await adminApi.addTripAgencies(addAgencyTripId, selectedAddAgencyIds);
+      toast.success(
+        selectedAddAgencyIds.length === 1
+          ? 'Agencia agregada al viaje'
+          : 'Agencias agregadas al viaje',
+      );
+      setAddAgencyTripId(null);
+      setSelectedAddAgencyIds([]);
+      await doFetch(page, statusFilter, routeFilter, agencyFilter, searchFilter, dateFilter);
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, 'No se pudo agregar la agencia'));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const handleModalConfirm = async () => {
     if (!activeModal) return;
@@ -562,6 +609,77 @@ export default function AdminTripsPage() {
         onClose={handleBuilderClose}
         onSuccess={handleBuilderSuccess}
       />
+
+      <Modal
+        open={!!addAgencyTripId}
+        onClose={() => {
+          if (actionLoading === addAgencyTripId) return;
+          setAddAgencyTripId(null);
+          setSelectedAddAgencyIds([]);
+        }}
+        titleId="add-agency-title"
+        size="sm"
+        className="max-w-[min(100%,420px)] sm:max-w-md"
+      >
+        <div className="flex flex-col items-center px-4 py-6 sm:px-6 sm:py-8 w-full">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-4 bg-[rgba(0,212,255,0.12)]">
+            <Building2 className="w-6 h-6 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
+          </div>
+          <h2
+            id="add-agency-title"
+            className="font-[family-name:var(--font-heading)] text-[20px] font-bold text-[var(--color-brand-navy)] text-center mb-2"
+          >
+            Agregar agencia
+          </h2>
+          <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)] text-center mb-6 max-w-[320px] leading-relaxed">
+            {addAgencyTrip
+              ? `Selecciona agencias activas para el viaje a ${addAgencyTrip.route?.destination}. Podrán vender los asientos disponibles restantes.`
+              : 'Selecciona agencias activas para asignar a este viaje.'}
+          </p>
+
+          <div className="w-full flex flex-col items-center">
+            {availableAgenciesForAdd.length === 0 ? (
+              <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)] text-center py-4 max-w-[320px]">
+                No hay agencias activas disponibles para asignar. Todas las agencias activas ya están en este viaje, o no existen agencias activas.
+              </p>
+            ) : (
+              <AgenciesStep
+                agencies={availableAgenciesForAdd}
+                selectedIds={selectedAddAgencyIds}
+                onChange={setSelectedAddAgencyIds}
+                centered
+                className="max-w-full"
+              />
+            )}
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row gap-3 mt-8 w-full max-w-sm mx-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setAddAgencyTripId(null);
+                setSelectedAddAgencyIds([]);
+              }}
+              disabled={actionLoading === addAgencyTripId}
+              className="flex-1 px-4 py-2.5 text-sm font-semibold text-[var(--color-brand-navy)] bg-[#f1f5f9] rounded-[10px] hover:bg-[#e2e8f0] transition-colors disabled:opacity-40 disabled:cursor-not-allowed font-[family-name:var(--font-body)]"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={handleAddAgencyConfirm}
+              disabled={
+                actionLoading === addAgencyTripId ||
+                selectedAddAgencyIds.length === 0 ||
+                availableAgenciesForAdd.length === 0
+              }
+              className="flex-1 px-4 py-2.5 text-sm font-semibold text-white rounded-[10px] bg-[var(--color-brand-cyan)] hover:bg-[var(--color-brand-blue)] transition-[background] duration-200 disabled:opacity-40 disabled:cursor-not-allowed font-[family-name:var(--font-body)]"
+            >
+              {actionLoading === addAgencyTripId ? 'Cargando...' : 'Agregar'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Contextual Modal for trip actions */}
       <ContextualModal

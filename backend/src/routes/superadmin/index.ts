@@ -55,6 +55,9 @@ router.get("/trips/:id", (req, res, next) =>
 router.post("/trips", (req, res, next) =>
   superadminController.createTrip(req, res, next)
 );
+router.post("/trips/:id/agencies", (req, res, next) =>
+  superadminController.addTripAgencies(req, res, next)
+);
 router.patch("/trips/:id", (req, res, next) =>
   superadminController.updateTrip(req, res, next)
 );
