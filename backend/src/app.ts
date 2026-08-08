@@ -10,6 +10,11 @@ import agencyRoutes from './routes/agency/index.js';
 
 const app = express();
 
+// Render terminates TLS at a load balancer and forwards X-Forwarded-For.
+// Trust exactly 1 hop so req.ip / express-rate-limit see the client IP
+// without allowing spoofing via trust proxy = true.
+app.set('trust proxy', 1);
+
 // Security
 app.use(helmet());
 app.use(cors({
