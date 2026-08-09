@@ -67,7 +67,10 @@ function isSkipReason(reason: string): boolean {
     reason === 'already_sent' ||
     reason === 'skipped_no_email' ||
     reason === 'skipped_restricted' ||
-    reason === 'skipped_disabled'
+    reason === 'skipped_disabled' ||
+    reason === 'skipped_no_agencies' ||
+    reason === 'skipped_effect_disabled' ||
+    reason === 'already_delivered'
   );
 }
 

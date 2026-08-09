@@ -126,15 +126,18 @@ describe('WKR-007 Fase 0 — utils extraction (no behavior change)', () => {
     expect(service).not.toMatch(/private formatDateForEmail/);
   });
 
-  it('does not introduce TRIP_EFFECTS_VIA_OUTBOX or Phase 1+ wiring', () => {
+  it('keeps trip effects disabled while enabling the Phase 1 dispatcher', () => {
     const env = read('backend/src/config/env.ts');
     const runner = read('backend/src/workers/runner.ts');
     const handlers = read('backend/src/workers/handlers/index.ts');
 
     expect(env).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
     expect(env).toContain('EMAIL_VIA_OUTBOX');
-    expect(runner).toContain("eventType: 'reservation.created'");
-    expect(handlers).not.toContain('composeHandlers');
+    expect(runner).toContain('eventType: null');
+    expect(runner).not.toContain("eventType: 'reservation.created'");
+    expect(handlers).toContain('composeHandlers');
+    expect(handlers).toContain('reservationEmailHandler');
+    expect(handlers).toContain('reservationNotificationPlaceholder');
     expect(handlers).not.toContain('notification-fanout');
   });
 });

@@ -69,6 +69,19 @@ describe('WKR-005 — Outbox relay', () => {
     expect(deps.markCompleted).toHaveBeenCalled();
   });
 
+  it('passes null through to claim all event types', async () => {
+    const claimEvents = vi.fn(async () => []);
+    const deps = makeDeps({ claimEvents });
+
+    await runOutboxRelayOnce({
+      ...deps,
+      batchSize: 10,
+      eventType: null,
+    });
+
+    expect(claimEvents).toHaveBeenCalledWith(10, null);
+  });
+
   it('requeues on retryable failure and updates available_at', async () => {
     const deps = makeDeps({
       getHandler: () => async () => ({
@@ -214,6 +227,25 @@ describe('WKR-006.1 — Relay observability', () => {
     const joined = lines.join('\n');
     expect(joined).not.toMatch(/@/);
     expect(joined).not.toContain('payload');
+  });
+
+  it.each([
+    'skipped_no_agencies',
+    'skipped_effect_disabled',
+    'already_delivered',
+  ] as const)('counts %s as a skipped completion', async (reason) => {
+    const metrics = createWorkerMetrics();
+
+    await processClaimedEvent(
+      row(),
+      makeDeps({
+        metrics,
+        getHandler: () => async () => ({ kind: 'completed', reason }),
+      }),
+    );
+
+    expect(metrics.snapshot().events_processed_total).toBe(1);
+    expect(metrics.snapshot().events_skipped_total).toBe(1);
   });
 
   it('calls recoverStuck before claim and logs outbox_recovery_completed', async () => {
