@@ -185,7 +185,7 @@ async function main() {
         retryBaseMs: config.retryBaseMs,
         batchSize: config.batchSize,
         pollMs: config.pollMs,
-        eventType: 'reservation.created',
+        eventType: null,
         logger,
         metrics,
       },

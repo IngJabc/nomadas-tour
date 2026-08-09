@@ -2,16 +2,19 @@ import type { OutboxEventRow } from '../../events/types.js';
 import type { WorkerLogger } from '../observability/logger.js';
 import type { WorkerMetrics } from '../observability/metrics.js';
 
+export type CompletedHandlerReason =
+  | 'sent'
+  | 'already_sent'
+  | 'skipped_no_email'
+  | 'skipped_restricted'
+  | 'skipped_disabled'
+  | 'skipped_no_agencies'
+  | 'skipped_effect_disabled'
+  | 'delivered'
+  | 'already_delivered';
+
 export type HandlerOutcome =
-  | {
-      kind: 'completed';
-      reason:
-        | 'sent'
-        | 'already_sent'
-        | 'skipped_no_email'
-        | 'skipped_restricted'
-        | 'skipped_disabled';
-    }
+  | { kind: 'completed'; reason: CompletedHandlerReason }
   | { kind: 'requeue'; reason: string; delayMs: number }
   | { kind: 'failed'; reason: string; permanent: boolean };
 

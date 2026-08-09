@@ -7,6 +7,7 @@ import { emailService } from '../../services/email.service.js';
 import { reservationService } from '../../services/reservation.service.js';
 import { getWorkerRuntimeConfig } from '../config.js';
 import type { OutboxHandler } from '../outbox/types.js';
+import { composeHandlers } from './compose.js';
 import { createReservationCreatedHandler } from './reservation-created.handler.js';
 
 export async function loadReservationEmailFlags(reservationId: string) {
@@ -47,17 +48,30 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
   const cfg = getWorkerRuntimeConfig();
   const map = new Map<string, OutboxHandler>();
 
+  const reservationEmailHandler = createReservationCreatedHandler({
+    loadFlags: loadReservationEmailFlags,
+    getTicketData: (id) => reservationService.getTicketData(id),
+    sendReservationConfirmationEmail: (to, ticket) =>
+      emailService.sendReservationConfirmationEmail(to, ticket),
+    markTicketEmailSent,
+    settleMs: cfg.settleMs,
+    settleRetryMs: Math.min(cfg.retryBaseMs, cfg.settleMs),
+  });
+
+  // Phase 1 composition boundary. NotificationFanout is implemented in a
+  // later phase; this placeholder keeps the registry shape ready without
+  // introducing a second effect or changing reservation.created behavior.
+  const reservationNotificationPlaceholder: OutboxHandler = async () => ({
+    kind: 'completed',
+    reason: 'skipped_effect_disabled',
+  });
+
   map.set(
     `${RESERVATION_CREATED_V1_TYPE}:${RESERVATION_CREATED_V1_VERSION}`,
-    createReservationCreatedHandler({
-      loadFlags: loadReservationEmailFlags,
-      getTicketData: (id) => reservationService.getTicketData(id),
-      sendReservationConfirmationEmail: (to, ticket) =>
-        emailService.sendReservationConfirmationEmail(to, ticket),
-      markTicketEmailSent,
-      settleMs: cfg.settleMs,
-      settleRetryMs: Math.min(cfg.retryBaseMs, cfg.settleMs),
-    }),
+    composeHandlers(
+      reservationEmailHandler,
+      reservationNotificationPlaceholder,
+    ),
   );
 
   return map;
