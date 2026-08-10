@@ -55,9 +55,40 @@ function buildTableChain(table: string) {
 
 const mockFrom = vi.fn((table: string) => buildTableChain(table));
 
+vi.mock('../config/env.js', () => ({
+  env: {
+    SUPABASE_URL: 'http://localhost:54321',
+    SUPABASE_SERVICE_ROLE_KEY: 'test-service-role',
+    JWT_SECRET: 'test-jwt-secret',
+    PORT: 3001,
+    NODE_ENV: 'test',
+    CORS_ORIGIN: 'http://localhost:3000',
+    RESEND_API_KEY: 'test-resend',
+    EMAIL_FROM: 'test@example.com',
+    FRONTEND_URL: 'http://localhost:3000',
+    LOCK_TTL_SECONDS: 300,
+    EMAIL_VIA_OUTBOX: false,
+    TRIP_EFFECTS_VIA_OUTBOX: false,
+    OUTBOX_POLL_MS: 2000,
+    OUTBOX_BATCH_SIZE: 10,
+    OUTBOX_MAX_ATTEMPTS: 10,
+    OUTBOX_SETTLE_MS: 5000,
+    OUTBOX_RETRY_BASE_MS: 2000,
+    OUTBOX_HEARTBEAT_MS: 30_000,
+    OUTBOX_STALE_PROCESSING_MS: 300_000,
+    OUTBOX_STALE_RECOVERY_LIMIT: 50,
+    OUTBOX_RECOVERY_INTERVAL_MS: 60_000,
+    SENTRY_ENABLED: false,
+    SENTRY_DSN: '',
+    SENTRY_ENVIRONMENT: '',
+    SENTRY_RELEASE: '',
+    WORKER_HEALTH_PORT: 3002,
+  },
+}));
+
 vi.mock('../config/database.js', () => ({
   get supabaseAdmin() {
-    return { from: mockFrom };
+    return { from: mockFrom, rpc: vi.fn() };
   },
 }));
 

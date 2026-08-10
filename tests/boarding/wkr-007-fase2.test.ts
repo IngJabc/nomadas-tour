@@ -232,11 +232,16 @@ describe('WKR-007 Fase 2 — verification harness', () => {
   });
 });
 
-describe('WKR-007 Fase 2 — phase boundary (services not rewritten yet)', () => {
-  it('keeps superadmin.service.ts on the legacy PostgREST path', () => {
+describe('WKR-007 Fase 2 — phase boundary (C2 wired; C3–C5 not yet)', () => {
+  it('wires superadmin trip lifecycle RPCs behind TRIP_EFFECTS_VIA_OUTBOX while keeping legacy', () => {
     const svc = read('backend/src/services/superadmin.service.ts');
+    expect(svc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(svc).toContain('.rpc("create_trip"');
+    expect(svc).toContain('"update_trip"');
+    expect(svc).toContain('.rpc("set_trip_status"');
+    expect(svc).toContain('.rpc("archive_trip"');
     expect(svc).toContain('supabaseAdmin.from("trips")');
-    expect(svc).not.toContain('.rpc(');
+    expect(svc).not.toContain('complete_trip');
   });
 
   it('keeps trip.service.ts on the bulk completeExpiredTrips path', () => {
@@ -245,7 +250,7 @@ describe('WKR-007 Fase 2 — phase boundary (services not rewritten yet)', () =>
     expect(tripSvc).not.toContain('complete_trip');
   });
 
-  it('declares TRIP_EFFECTS_VIA_OUTBOX disabled without service wiring or trip handlers', () => {
+  it('keeps TRIP_EFFECTS_VIA_OUTBOX default false; trip.service and handlers unwired', () => {
     const env = read('backend/src/config/env.ts');
     const superadminSvc = read('backend/src/services/superadmin.service.ts');
     const tripSvc = read('backend/src/services/trip.service.ts');
@@ -254,7 +259,7 @@ describe('WKR-007 Fase 2 — phase boundary (services not rewritten yet)', () =>
     expect(
       env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
     ).toContain('.default(false)');
-    expect(superadminSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(superadminSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
     expect(tripSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
 
     const handlers = read('backend/src/workers/handlers/index.ts');

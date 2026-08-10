@@ -138,7 +138,9 @@ describe('WKR-007 Fase 0 — utils extraction (no behavior change)', () => {
       env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
     ).toContain('.default(false)');
     expect(env).toContain('EMAIL_VIA_OUTBOX');
-    expect(superadminSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    // C2: superadmin adopts trip RPCs behind the flag; trip.service remains C3
+    expect(superadminSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(superadminSvc).toContain('.rpc("create_trip"');
     expect(tripSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
     expect(runner).toContain('eventType: null');
     expect(runner).not.toContain("eventType: 'reservation.created'");
