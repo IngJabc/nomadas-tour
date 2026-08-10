@@ -127,13 +127,22 @@ describe('WKR-007.2 — verification harness and phase boundaries', () => {
     expect(harness).toContain('reservation.created envelope remains unchanged');
   });
 
-  it('keeps the multi-event runner and later-phase flag boundaries intact', () => {
+  it('keeps the multi-event runner with the C1 flag disabled and unwired', () => {
     const runner = read('backend/src/workers/runner.ts');
     const env = read('backend/src/config/env.ts');
+    const superadminSvc = read('backend/src/services/superadmin.service.ts');
+    const tripSvc = read('backend/src/services/trip.service.ts');
+    const handlers = read('backend/src/workers/handlers/index.ts');
 
     expect(runner).toContain('eventType: null');
     expect(runner).not.toContain("eventType: 'reservation.created'");
-    expect(env).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(env).toContain('TRIP_EFFECTS_VIA_OUTBOX: z');
+    expect(
+      env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
+    ).toContain('.default(false)');
+    expect(superadminSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(tripSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(handlers).not.toMatch(/trip\.(created|postponed|cancelled|completed|auto_completed|updated|archived)/);
   });
 });
 

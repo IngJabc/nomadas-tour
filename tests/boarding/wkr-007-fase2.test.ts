@@ -245,9 +245,17 @@ describe('WKR-007 Fase 2 — phase boundary (services not rewritten yet)', () =>
     expect(tripSvc).not.toContain('complete_trip');
   });
 
-  it('does not yet activate TRIP_EFFECTS_VIA_OUTBOX or trip handlers', () => {
+  it('declares TRIP_EFFECTS_VIA_OUTBOX disabled without service wiring or trip handlers', () => {
     const env = read('backend/src/config/env.ts');
-    expect(env).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    const superadminSvc = read('backend/src/services/superadmin.service.ts');
+    const tripSvc = read('backend/src/services/trip.service.ts');
+
+    expect(env).toContain('TRIP_EFFECTS_VIA_OUTBOX: z');
+    expect(
+      env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
+    ).toContain('.default(false)');
+    expect(superadminSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(tripSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
 
     const handlers = read('backend/src/workers/handlers/index.ts');
     expect(handlers).not.toMatch(/trip\.(created|postponed|cancelled|completed|auto_completed|updated|archived)/);

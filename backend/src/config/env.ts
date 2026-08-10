@@ -35,6 +35,10 @@ const envSchema = z.object({
   EMAIL_VIA_OUTBOX: z
     .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
     .default(false),
+  /** When true, trip lifecycle effects will use outbox wiring; false keeps legacy behavior. */
+  TRIP_EFFECTS_VIA_OUTBOX: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
   OUTBOX_POLL_MS: z.coerce.number().default(2000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(10),
