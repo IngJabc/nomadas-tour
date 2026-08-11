@@ -32,6 +32,7 @@ import { reservationService } from '../../services/reservation.service.js';
 import { getWorkerRuntimeConfig } from '../config.js';
 import type { OutboxHandler } from '../outbox/types.js';
 import { composeHandlers } from './compose.js';
+import { createEmailFanoutHandler } from './email-fanout.handler.js';
 import { createNotificationFanoutHandler } from './notification-fanout.handler.js';
 import { createReservationCreatedHandler } from './reservation-created.handler.js';
 
@@ -96,18 +97,30 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
     ),
   );
 
+  // WKR-007 C5 — EmailFanout composed with C4 NotificationFanout for trip emails.
   map.set(
     `${TRIP_CREATED_V1_TYPE}:${TRIP_CREATED_V1_VERSION}`,
-    createNotificationFanoutHandler('trip.created'),
+    composeHandlers(
+      createNotificationFanoutHandler('trip.created'),
+      createEmailFanoutHandler('trip.created'),
+    ),
   );
   map.set(
     `${TRIP_POSTPONED_V1_TYPE}:${TRIP_POSTPONED_V1_VERSION}`,
-    createNotificationFanoutHandler('trip.postponed'),
+    composeHandlers(
+      createNotificationFanoutHandler('trip.postponed'),
+      createEmailFanoutHandler('trip.postponed'),
+    ),
   );
   map.set(
     `${TRIP_CANCELLED_V1_TYPE}:${TRIP_CANCELLED_V1_VERSION}`,
-    createNotificationFanoutHandler('trip.cancelled'),
+    composeHandlers(
+      createNotificationFanoutHandler('trip.cancelled'),
+      createEmailFanoutHandler('trip.cancelled'),
+    ),
   );
+
+  // C4-only (no email fanout in C5).
   map.set(
     `${TRIP_COMPLETED_V1_TYPE}:${TRIP_COMPLETED_V1_VERSION}`,
     createNotificationFanoutHandler('trip.completed'),

@@ -425,7 +425,7 @@ describe('WKR-007 C4 — NotificationFanout', () => {
 });
 
 describe('WKR-007 C4 — registry wiring', () => {
-  it('registers notification fanout for reservation.created and trip.* without email fanout', () => {
+  it('registers notification fanout for reservation.created and trip.* (C5 email composed alongside)', () => {
     const handlers = buildDefaultHandlers();
 
     const expectedKeys = [
@@ -445,7 +445,7 @@ describe('WKR-007 C4 — registry wiring', () => {
       );
     }
 
-    // C5 not wired: no trip.updated consumer, no email-fanout module
+    // No trip.updated consumer (out of C4/C5 notification+email scope)
     expect(handlers.has('trip.updated:1')).toBe(false);
 
     const indexSource = readFileSync(
@@ -453,7 +453,7 @@ describe('WKR-007 C4 — registry wiring', () => {
       'utf8',
     );
     expect(indexSource).toContain('notification-fanout.handler');
-    expect(indexSource).not.toContain('email-fanout');
+    expect(indexSource).toContain('email-fanout.handler');
     expect(indexSource).not.toContain('reservationNotificationPlaceholder');
   });
 
