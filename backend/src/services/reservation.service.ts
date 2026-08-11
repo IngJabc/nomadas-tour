@@ -186,27 +186,30 @@ export class ReservationService {
     const routeNotif = (tripForNotif as any)?.routes;
     const routeLabel = routeNotif ? `${routeNotif.origin} → ${routeNotif.destination}` : 'viaje';
 
-    // Notification: reservation created → superadmin only (agency is the actor)
-    notificationService.createForAgency({
-      type: 'reservation_created',
-      title: 'Nueva reserva',
-      body: `${bookerName} realizó una reserva de ${passengers.length} pasajeros para ${routeLabel}`,
-      entityType: 'reservation',
-      entityId: reservationId,
-      agencyId,
-      actor: 'agency',
-      action_url: `/admin/bookings/${reservationId}`,
-      metadata: {
-        reservation_id: reservationId,
-        trip_id: tripId,
-        booker_name: bookerName,
-        passenger_count: passengers.length,
-        origin: routeNotif?.origin ?? null,
-        destination: routeNotif?.destination ?? null,
-      },
-    }).catch((err) => {
-      console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'reservation_created', reservationId, error: err.message }));
-    });
+    // Notification: reservation created → superadmin only (agency is the actor).
+    // When TRIP_EFFECTS_VIA_OUTBOX=true, NotificationFanout is the sole emitter (WKR-007 C4 F1).
+    if (!env.TRIP_EFFECTS_VIA_OUTBOX) {
+      notificationService.createForAgency({
+        type: 'reservation_created',
+        title: 'Nueva reserva',
+        body: `${bookerName} realizó una reserva de ${passengers.length} pasajeros para ${routeLabel}`,
+        entityType: 'reservation',
+        entityId: reservationId,
+        agencyId,
+        actor: 'agency',
+        action_url: `/admin/bookings/${reservationId}`,
+        metadata: {
+          reservation_id: reservationId,
+          trip_id: tripId,
+          booker_name: bookerName,
+          passenger_count: passengers.length,
+          origin: routeNotif?.origin ?? null,
+          destination: routeNotif?.destination ?? null,
+        },
+      }).catch((err) => {
+        console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'reservation_created', reservationId, error: err.message }));
+      });
+    }
 
     // Update reservation with contact_email and send_ticket_email flags
     if (contactEmail || sendTicketEmail) {

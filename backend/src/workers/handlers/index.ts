@@ -3,11 +3,36 @@ import {
   RESERVATION_CREATED_V1_TYPE,
   RESERVATION_CREATED_V1_VERSION,
 } from '../../events/reservation-created.v1.js';
+import {
+  TRIP_ARCHIVED_V1_TYPE,
+  TRIP_ARCHIVED_V1_VERSION,
+} from '../../events/trip-archived.v1.js';
+import {
+  TRIP_AUTO_COMPLETED_V1_TYPE,
+  TRIP_AUTO_COMPLETED_V1_VERSION,
+} from '../../events/trip-auto-completed.v1.js';
+import {
+  TRIP_CANCELLED_V1_TYPE,
+  TRIP_CANCELLED_V1_VERSION,
+} from '../../events/trip-cancelled.v1.js';
+import {
+  TRIP_COMPLETED_V1_TYPE,
+  TRIP_COMPLETED_V1_VERSION,
+} from '../../events/trip-completed.v1.js';
+import {
+  TRIP_CREATED_V1_TYPE,
+  TRIP_CREATED_V1_VERSION,
+} from '../../events/trip-created.v1.js';
+import {
+  TRIP_POSTPONED_V1_TYPE,
+  TRIP_POSTPONED_V1_VERSION,
+} from '../../events/trip-postponed.v1.js';
 import { emailService } from '../../services/email.service.js';
 import { reservationService } from '../../services/reservation.service.js';
 import { getWorkerRuntimeConfig } from '../config.js';
 import type { OutboxHandler } from '../outbox/types.js';
 import { composeHandlers } from './compose.js';
+import { createNotificationFanoutHandler } from './notification-fanout.handler.js';
 import { createReservationCreatedHandler } from './reservation-created.handler.js';
 
 export async function loadReservationEmailFlags(reservationId: string) {
@@ -58,20 +83,42 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
     settleRetryMs: Math.min(cfg.retryBaseMs, cfg.settleMs),
   });
 
-  // Phase 1 composition boundary. NotificationFanout is implemented in a
-  // later phase; this placeholder keeps the registry shape ready without
-  // introducing a second effect or changing reservation.created behavior.
-  const reservationNotificationPlaceholder: OutboxHandler = async () => ({
-    kind: 'completed',
-    reason: 'skipped_effect_disabled',
-  });
+  // WKR-007 C4 — NotificationFanout (gated by TRIP_EFFECTS_VIA_OUTBOX).
+  const reservationNotificationFanout = createNotificationFanoutHandler(
+    'reservation.created',
+  );
 
   map.set(
     `${RESERVATION_CREATED_V1_TYPE}:${RESERVATION_CREATED_V1_VERSION}`,
     composeHandlers(
       reservationEmailHandler,
-      reservationNotificationPlaceholder,
+      reservationNotificationFanout,
     ),
+  );
+
+  map.set(
+    `${TRIP_CREATED_V1_TYPE}:${TRIP_CREATED_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.created'),
+  );
+  map.set(
+    `${TRIP_POSTPONED_V1_TYPE}:${TRIP_POSTPONED_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.postponed'),
+  );
+  map.set(
+    `${TRIP_CANCELLED_V1_TYPE}:${TRIP_CANCELLED_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.cancelled'),
+  );
+  map.set(
+    `${TRIP_COMPLETED_V1_TYPE}:${TRIP_COMPLETED_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.completed'),
+  );
+  map.set(
+    `${TRIP_AUTO_COMPLETED_V1_TYPE}:${TRIP_AUTO_COMPLETED_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.auto_completed'),
+  );
+  map.set(
+    `${TRIP_ARCHIVED_V1_TYPE}:${TRIP_ARCHIVED_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.archived'),
   );
 
   return map;

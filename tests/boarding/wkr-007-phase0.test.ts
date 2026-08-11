@@ -138,7 +138,7 @@ describe('WKR-007 Fase 0 — utils extraction (no behavior change)', () => {
       env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
     ).toContain('.default(false)');
     expect(env).toContain('EMAIL_VIA_OUTBOX');
-    // C2+C3: superadmin + completeExpiredTrips wired; handlers remain C4/C5
+    // C2–C4 wired; EmailFanout (C5) still pending; flag default false
     expect(superadminSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
     expect(superadminSvc).toContain('.rpc("create_trip"');
     expect(tripSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
@@ -147,9 +147,12 @@ describe('WKR-007 Fase 0 — utils extraction (no behavior change)', () => {
     expect(runner).not.toContain("eventType: 'reservation.created'");
     expect(handlers).toContain('composeHandlers');
     expect(handlers).toContain('reservationEmailHandler');
-    expect(handlers).toContain('reservationNotificationPlaceholder');
-    expect(handlers).not.toContain('notification-fanout');
-    expect(handlers).not.toMatch(/trip\.(created|postponed|cancelled|completed|auto_completed|updated|archived)/);
+    expect(handlers).toContain('notification-fanout.handler');
+    expect(handlers).toContain('createNotificationFanoutHandler');
+    expect(handlers).not.toContain('reservationNotificationPlaceholder');
+    expect(handlers).not.toContain('email-fanout');
+    expect(handlers).toContain('TRIP_CREATED_V1_TYPE');
+    expect(handlers).not.toContain('TRIP_UPDATED_V1_TYPE');
   });
 });
 

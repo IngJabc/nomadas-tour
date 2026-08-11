@@ -140,13 +140,16 @@ describe('WKR-007.2 — verification harness and phase boundaries', () => {
     expect(
       env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
     ).toContain('.default(false)');
-    // C2+C3: superadmin + trip.service wired; handlers still unwired (C4/C5)
+    // C2–C4 wired; EmailFanout (C5) still pending
     expect(superadminSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
     expect(superadminSvc).toContain('.rpc("create_trip"');
     expect(tripSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
     expect(tripSvc).toContain('complete_trip');
-    expect(handlers).not.toMatch(/trip\.(created|postponed|cancelled|completed|auto_completed|updated|archived)/);
-    expect(handlers).not.toContain('notification-fanout');
+    expect(handlers).toContain('notification-fanout.handler');
+    expect(handlers).toContain('createNotificationFanoutHandler');
+    expect(handlers).toContain('TRIP_CREATED_V1_TYPE');
+    expect(handlers).not.toContain('email-fanout');
+    expect(handlers).not.toContain('reservationNotificationPlaceholder');
   });
 });
 
