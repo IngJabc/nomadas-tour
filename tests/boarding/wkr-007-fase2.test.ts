@@ -232,24 +232,63 @@ describe('WKR-007 Fase 2 — verification harness', () => {
   });
 });
 
-describe('WKR-007 Fase 2 — phase boundary (services not rewritten yet)', () => {
-  it('keeps superadmin.service.ts on the legacy PostgREST path', () => {
+describe('WKR-007 Fase 2 — phase boundary (C2–C5 wired; C6–C8 not yet)', () => {
+  it('wires superadmin trip lifecycle RPCs behind TRIP_EFFECTS_VIA_OUTBOX while keeping legacy', () => {
     const svc = read('backend/src/services/superadmin.service.ts');
+    expect(svc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(svc).toContain('.rpc("create_trip"');
+    expect(svc).toContain('"update_trip"');
+    expect(svc).toContain('.rpc("set_trip_status"');
+    expect(svc).toContain('.rpc("archive_trip"');
     expect(svc).toContain('supabaseAdmin.from("trips")');
-    expect(svc).not.toContain('.rpc(');
+    expect(svc).not.toContain('complete_trip');
   });
 
-  it('keeps trip.service.ts on the bulk completeExpiredTrips path', () => {
+  it('wires trip.service completeExpiredTrips via complete_trip behind the flag while keeping legacy', () => {
     const tripSvc = read('backend/src/services/trip.service.ts');
+    expect(tripSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(tripSvc).toContain('.rpc(\'complete_trip\'');
+    expect(tripSvc).toContain("p_source: 'auto'");
     expect(tripSvc).toMatch(/\.update\(\{\s*status:\s*["']completed["']\s*\}\)/);
-    expect(tripSvc).not.toContain('complete_trip');
   });
 
-  it('does not yet activate TRIP_EFFECTS_VIA_OUTBOX or trip handlers', () => {
+  it('wires NotificationFanout + EmailFanout for C5 trip emails; flag default false; C6–C8 absent', () => {
     const env = read('backend/src/config/env.ts');
-    expect(env).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
-
     const handlers = read('backend/src/workers/handlers/index.ts');
-    expect(handlers).not.toMatch(/trip\.(created|postponed|cancelled|completed|auto_completed|updated|archived)/);
+    const notif = read(
+      'backend/src/workers/handlers/notification-fanout.handler.ts',
+    );
+    const email = read('backend/src/workers/handlers/email-fanout.handler.ts');
+
+    expect(env).toContain('TRIP_EFFECTS_VIA_OUTBOX: z');
+    expect(
+      env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
+    ).toContain('.default(false)');
+
+    expect(handlers).toContain('notification-fanout.handler');
+    expect(handlers).toContain('createNotificationFanoutHandler');
+    expect(handlers).toContain('email-fanout.handler');
+    expect(handlers).toContain('createEmailFanoutHandler');
+    expect(handlers).toContain('TRIP_CREATED_V1_TYPE');
+    expect(handlers).toContain('TRIP_POSTPONED_V1_TYPE');
+    expect(handlers).toContain('TRIP_CANCELLED_V1_TYPE');
+    expect(handlers).toContain('TRIP_COMPLETED_V1_TYPE');
+    expect(handlers).toContain('TRIP_AUTO_COMPLETED_V1_TYPE');
+    expect(handlers).toContain('TRIP_ARCHIVED_V1_TYPE');
+    expect(handlers).toContain('composeHandlers');
+    expect(handlers).toContain('reservationEmailHandler');
+    expect(handlers).not.toContain('reservationNotificationPlaceholder');
+    expect(handlers).not.toContain('TRIP_UPDATED_V1_TYPE');
+
+    expect(notif).toContain('skipped_effect_disabled');
+    expect(notif).toContain('source_event_id');
+    expect(notif).toContain('already_delivered');
+
+    expect(email).toContain('email_delivery_log');
+    expect(email).toContain('skipped_effect_disabled');
+    expect(email).toContain('sendNewTripAssignedEmail');
+    expect(email).toContain('sendTripPostponedEmail');
+    expect(email).toContain('sendTripCancelledEmail');
+    expect(email).toContain('skipped_restricted');
   });
 });

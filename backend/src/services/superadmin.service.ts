@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "../config/database.js";
+import { env } from "../config/env.js";
 import { generateUniqueSubdomain } from "../utils/subdomain.js";
 import {
   ConflictError,
@@ -19,7 +20,10 @@ import {
   validateAgencyRemoval,
   validateNoActiveReservations,
 } from "./trip-edit-context.js";
-import { assertNoDuplicateTrip } from "./trip-duplicate.guard.js";
+import {
+  assertNoDuplicateTrip,
+  DUPLICATE_TRIP_MESSAGE,
+} from "./trip-duplicate.guard.js";
 import {
   formatDateForEmail,
   getAgenciesWithEmail,
@@ -42,6 +46,39 @@ function assertDepartureTimeInFuture(departureTime: string): void {
   const departure = new Date(toUTC(departureTime));
   if (departure.getTime() <= Date.now()) {
     throw new ValidationError(DEPARTURE_MUST_BE_FUTURE_MESSAGE);
+  }
+}
+
+/** Map 057 trip RPC ERR_* codes to existing service error types. */
+function mapTripRpcError(error: { message?: string }): never {
+  const raw = error?.message ?? "Unknown trip RPC error";
+  const codeMatch = raw.match(/ERR_[A-Z0-9_]+/);
+  const code = codeMatch?.[0];
+  const detail = raw.includes(": ")
+    ? raw.slice(raw.indexOf(": ") + 2)
+    : raw;
+
+  switch (code) {
+    case "ERR_TRIP_DUPLICATE":
+      throw new ConflictError(DUPLICATE_TRIP_MESSAGE);
+    case "ERR_TRIP_NOT_FOUND":
+    case "ERR_ROUTE_NOT_FOUND":
+      throw new NotFoundError(detail);
+    case "ERR_TRIP_NOT_DEPARTED":
+    case "ERR_TRIP_DEPARTED":
+      throw new ForbiddenError(detail);
+    case "ERR_TRIP_NOT_ACTIVE":
+    case "ERR_NO_AGENCIES":
+    case "ERR_INVALID_VEHICLE_TYPE":
+    case "ERR_SEATS_IN_USE":
+    case "ERR_TRIP_ARCHIVED":
+    case "ERR_ALREADY_ARCHIVED":
+    case "ERR_TRIP_STATUS_INVALID":
+    case "ERR_TRIP_ACTIVE":
+    case "ERR_INVALID_STATUS":
+      throw new ValidationError(detail);
+    default:
+      throw new ValidationError(raw);
   }
 }
 
@@ -402,6 +439,19 @@ export class SuperadminService {
     assertDepartureTimeInFuture(departureTime);
 
     await assertNoDuplicateTrip(routeId, departureTime);
+
+    if (env.TRIP_EFFECTS_VIA_OUTBOX) {
+      const { data: trip, error } = await supabaseAdmin.rpc("create_trip", {
+        p_route_id: routeId,
+        p_departure_time: toUTC(departureTime),
+        p_vehicle_type: vehicleType,
+        p_agency_ids: agencyIds,
+        p_created_by: createdBy,
+      });
+      if (error) throw mapTripRpcError(error);
+      if (!trip) throw new ValidationError("create_trip returned no data");
+      return trip;
+    }
 
     const { data: trip, error: tripError } = await supabaseAdmin
       .from("trips")
@@ -1050,6 +1100,37 @@ export class SuperadminService {
       await assertNoDuplicateTrip(routeId, departureTime, id);
     }
 
+    if (env.TRIP_EFFECTS_VIA_OUTBOX) {
+      const { data: rpcResult, error } = await supabaseAdmin.rpc(
+        "update_trip",
+        {
+          p_trip_id: id,
+          p_route_id: routeId,
+          p_departure_time: normalizedDeparture,
+          p_vehicle_type: vehicleType,
+          p_agency_ids: agencyIds,
+          p_postpone: postpone,
+        }
+      );
+      if (error) throw mapTripRpcError(error);
+
+      const { data: trip } = await supabaseAdmin
+        .from("trips")
+        .select("*, routes(origin, destination), trip_agencies(*)")
+        .eq("id", id)
+        .single();
+
+      if (!trip) throw new NotFoundError("Trip not found");
+
+      return {
+        trip,
+        action:
+          rpcResult?.action === "postponed"
+            ? TripUpdateAction.POSTPONED
+            : TripUpdateAction.UPDATED,
+      };
+    }
+
     // ── Phase 2: Apply changes (sequential for consistency) ─────────
 
     // 2a. Update trip fields
@@ -1313,6 +1394,17 @@ export class SuperadminService {
       );
     }
 
+    if (env.TRIP_EFFECTS_VIA_OUTBOX) {
+      const { data, error } = await supabaseAdmin.rpc("archive_trip", {
+        p_trip_id: id,
+      });
+      if (error) throw mapTripRpcError(error);
+      return {
+        id: (data?.trip_id as string) ?? id,
+        status: "archived",
+      };
+    }
+
     const { data: tripAgencies } = await supabaseAdmin
       .from("trip_agencies")
       .select("agency_id")
@@ -1397,6 +1489,18 @@ export class SuperadminService {
           "Cannot cancel a trip after its departure time"
         );
       }
+    }
+
+    if (env.TRIP_EFFECTS_VIA_OUTBOX) {
+      const { data, error } = await supabaseAdmin.rpc("set_trip_status", {
+        p_trip_id: id,
+        p_status: status,
+      });
+      if (error) throw mapTripRpcError(error);
+      return {
+        id: (data?.trip_id as string) ?? id,
+        status: (data?.status as "completed" | "cancelled") ?? status,
+      };
     }
 
     const { error: updateError } = await supabaseAdmin

@@ -61,6 +61,7 @@ vi.mock('../config/env.js', () => ({
     FRONTEND_URL: 'http://localhost:3000',
     LOCK_TTL_SECONDS: 300,
     EMAIL_VIA_OUTBOX: false,
+    TRIP_EFFECTS_VIA_OUTBOX: false,
     OUTBOX_POLL_MS: 2000,
     OUTBOX_BATCH_SIZE: 10,
     OUTBOX_MAX_ATTEMPTS: 10,

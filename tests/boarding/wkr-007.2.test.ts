@@ -127,13 +127,31 @@ describe('WKR-007.2 — verification harness and phase boundaries', () => {
     expect(harness).toContain('reservation.created envelope remains unchanged');
   });
 
-  it('keeps the multi-event runner and later-phase flag boundaries intact', () => {
+  it('keeps the multi-event runner with the C1 flag disabled and unwired', () => {
     const runner = read('backend/src/workers/runner.ts');
     const env = read('backend/src/config/env.ts');
+    const superadminSvc = read('backend/src/services/superadmin.service.ts');
+    const tripSvc = read('backend/src/services/trip.service.ts');
+    const handlers = read('backend/src/workers/handlers/index.ts');
 
     expect(runner).toContain('eventType: null');
     expect(runner).not.toContain("eventType: 'reservation.created'");
-    expect(env).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(env).toContain('TRIP_EFFECTS_VIA_OUTBOX: z');
+    expect(
+      env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
+    ).toContain('.default(false)');
+    // C2–C5 wired; C6–C8 pending
+    expect(superadminSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(superadminSvc).toContain('.rpc("create_trip"');
+    expect(tripSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(tripSvc).toContain('complete_trip');
+    expect(handlers).toContain('notification-fanout.handler');
+    expect(handlers).toContain('createNotificationFanoutHandler');
+    expect(handlers).toContain('email-fanout.handler');
+    expect(handlers).toContain('createEmailFanoutHandler');
+    expect(handlers).toContain('TRIP_CREATED_V1_TYPE');
+    expect(handlers).not.toContain('reservationNotificationPlaceholder');
+    expect(handlers).not.toContain('TRIP_UPDATED_V1_TYPE');
   });
 });
 

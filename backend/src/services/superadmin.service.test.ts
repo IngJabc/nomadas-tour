@@ -7,6 +7,45 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // from(table).insert(rows)                  (write)
 // from(table).delete().eq().in()            (write)
 
+const mockEnv = vi.hoisted(() => ({
+  TRIP_EFFECTS_VIA_OUTBOX: false,
+}));
+
+const mockRpc = vi.hoisted(() => vi.fn());
+
+vi.mock('../config/env.js', () => ({
+  env: {
+    SUPABASE_URL: 'http://localhost:54321',
+    SUPABASE_SERVICE_ROLE_KEY: 'test-service-role',
+    JWT_SECRET: 'test-jwt-secret',
+    PORT: 3001,
+    NODE_ENV: 'test',
+    CORS_ORIGIN: 'http://localhost:3000',
+    RESEND_API_KEY: 'test-resend',
+    EMAIL_FROM: 'test@example.com',
+    FRONTEND_URL: 'http://localhost:3000',
+    LOCK_TTL_SECONDS: 300,
+    EMAIL_VIA_OUTBOX: false,
+    get TRIP_EFFECTS_VIA_OUTBOX() {
+      return mockEnv.TRIP_EFFECTS_VIA_OUTBOX;
+    },
+    OUTBOX_POLL_MS: 2000,
+    OUTBOX_BATCH_SIZE: 10,
+    OUTBOX_MAX_ATTEMPTS: 10,
+    OUTBOX_SETTLE_MS: 5000,
+    OUTBOX_RETRY_BASE_MS: 2000,
+    OUTBOX_HEARTBEAT_MS: 30_000,
+    OUTBOX_STALE_PROCESSING_MS: 300_000,
+    OUTBOX_STALE_RECOVERY_LIMIT: 50,
+    OUTBOX_RECOVERY_INTERVAL_MS: 60_000,
+    SENTRY_ENABLED: false,
+    SENTRY_DSN: '',
+    SENTRY_ENVIRONMENT: '',
+    SENTRY_RELEASE: '',
+    WORKER_HEALTH_PORT: 3002,
+  },
+}));
+
 function createChainable(defaultResult: any = [], defaultError: any = null) {
   const chain: any = {};
 
@@ -65,7 +104,7 @@ const mockFrom = vi.fn((table: string) => buildTableChain(table));
 
 vi.mock('../config/database.js', () => ({
   get supabaseAdmin() {
-    return { from: mockFrom };
+    return { from: mockFrom, rpc: mockRpc };
   },
 }));
 
@@ -73,6 +112,7 @@ vi.mock('./email.service.js', () => ({
   emailService: {
     sendTripPostponedEmail: vi.fn(),
     sendNewTripAssignedEmail: vi.fn(),
+    sendTripCancelledEmail: vi.fn(),
   },
 }));
 
@@ -102,6 +142,12 @@ import { superadminService, TripUpdateAction } from './superadmin.service.js';
 import { DUPLICATE_TRIP_MESSAGE } from './trip-duplicate.guard.js';
 import { emailService } from './email.service.js';
 import { notificationService } from './notification.service.js';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../errors/index.js';
 
 // ── Constants ───────────────────────────────────────────────────────
 
@@ -263,6 +309,11 @@ function setupCreateTripHappyPath() {
 const DEPARTURE_FUTURE_MESSAGE = 'posterior a la fecha y hora actual';
 
 // ── Tests ───────────────────────────────────────────────────────────
+
+beforeEach(() => {
+  mockEnv.TRIP_EFFECTS_VIA_OUTBOX = false;
+  mockRpc.mockReset();
+});
 
 describe('createTrip departure validation', () => {
   beforeEach(() => {
@@ -834,5 +885,279 @@ describe('superadminService.archiveTrip', () => {
     await expect(superadminService.archiveTrip('trip-1')).rejects.toThrow(
       'El viaje ya está archivado',
     );
+  });
+});
+
+// ── WKR-007 C2 — TRIP_EFFECTS_VIA_OUTBOX RPC path ───────────────────
+
+describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
+  beforeEach(() => {
+    resetTableChains();
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = true;
+    vi.mocked(emailService.sendNewTripAssignedEmail).mockClear();
+    vi.mocked(emailService.sendTripPostponedEmail).mockClear();
+    vi.mocked(emailService.sendTripCancelledEmail).mockClear();
+    vi.mocked(notificationService.createForAgenciesAndAdmin).mockClear();
+  });
+
+  it('createTrip calls create_trip RPC without legacy inserts or side effects', async () => {
+    setupCreateTripHappyPath();
+    mockRpc.mockResolvedValue({
+      data: {
+        id: 'trip-rpc',
+        route_id: 'route-1',
+        departure_time: FUTURE_DATE,
+        capacity: 31,
+        vehicle_type: 'bus',
+      },
+      error: null,
+    });
+
+    const result = await superadminService.createTrip(
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1', 'agency-2'],
+      'user-1',
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith('create_trip', {
+      p_route_id: 'route-1',
+      p_departure_time: expect.any(String),
+      p_vehicle_type: 'bus',
+      p_agency_ids: ['agency-1', 'agency-2'],
+      p_created_by: 'user-1',
+    });
+    expect(tableChains['trips'].insert).not.toHaveBeenCalled();
+    expect(tableChains['seats'].insert).not.toHaveBeenCalled();
+    expect(tableChains['trip_agencies'].insert).not.toHaveBeenCalled();
+    expect(emailService.sendNewTripAssignedEmail).not.toHaveBeenCalled();
+    expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
+    expect(result.id).toBe('trip-rpc');
+  });
+
+  it('updateTrip postpone calls update_trip with p_postpone=true and returns POSTPONED', async () => {
+    const newDeparture = new Date(Date.now() + 2 * 86_400_000).toISOString();
+    setupHappyPath();
+    mockRpc.mockResolvedValue({
+      data: {
+        trip_id: 'trip-1',
+        action: 'postponed',
+        event_type: 'trip.postponed',
+        changed_fields: [],
+      },
+      error: null,
+    });
+
+    const result = await superadminService.updateTrip(
+      'trip-1',
+      'route-1',
+      newDeparture,
+      'bus',
+      ['agency-1', 'agency-2'],
+      true,
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith('update_trip', {
+      p_trip_id: 'trip-1',
+      p_route_id: 'route-1',
+      p_departure_time: expect.any(String),
+      p_vehicle_type: 'bus',
+      p_agency_ids: ['agency-1', 'agency-2'],
+      p_postpone: true,
+    });
+    expect(result.action).toBe(TripUpdateAction.POSTPONED);
+    expect(result.trip.id).toBe('trip-1');
+    expect(emailService.sendTripPostponedEmail).not.toHaveBeenCalled();
+    expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
+  });
+
+  it('updateTrip edit calls update_trip with p_postpone=false and returns UPDATED', async () => {
+    setupHappyPath();
+    mockRpc.mockResolvedValue({
+      data: {
+        trip_id: 'trip-1',
+        action: 'updated',
+        event_type: 'trip.updated',
+        changed_fields: ['route_id'],
+      },
+      error: null,
+    });
+
+    const result = await superadminService.updateTrip(
+      'trip-1',
+      'route-2',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1', 'agency-2'],
+      false,
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith('update_trip', {
+      p_trip_id: 'trip-1',
+      p_route_id: 'route-2',
+      p_departure_time: expect.any(String),
+      p_vehicle_type: 'bus',
+      p_agency_ids: ['agency-1', 'agency-2'],
+      p_postpone: false,
+    });
+    expect(result.action).toBe(TripUpdateAction.UPDATED);
+    expect(emailService.sendTripPostponedEmail).not.toHaveBeenCalled();
+    expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
+  });
+
+  it('updateTripStatus cancel calls set_trip_status without legacy notification', async () => {
+    tableChains['trips'] = createChainable({
+      id: 'trip-1',
+      status: 'active',
+      departure_time: FUTURE_DATE,
+      route_id: 'route-1',
+    });
+    mockRpc.mockResolvedValue({
+      data: { trip_id: 'trip-1', status: 'cancelled' },
+      error: null,
+    });
+
+    const result = await superadminService.updateTripStatus(
+      'trip-1',
+      'cancelled',
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith('set_trip_status', {
+      p_trip_id: 'trip-1',
+      p_status: 'cancelled',
+    });
+    expect(result).toEqual({ id: 'trip-1', status: 'cancelled' });
+    expect(emailService.sendTripCancelledEmail).not.toHaveBeenCalled();
+    expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
+  });
+
+  it('updateTripStatus completed calls set_trip_status for manual completion', async () => {
+    tableChains['trips'] = createChainable({
+      id: 'trip-1',
+      status: 'active',
+      departure_time: PAST_DATE,
+      route_id: 'route-1',
+    });
+    mockRpc.mockResolvedValue({
+      data: { trip_id: 'trip-1', status: 'completed' },
+      error: null,
+    });
+
+    const result = await superadminService.updateTripStatus(
+      'trip-1',
+      'completed',
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith('set_trip_status', {
+      p_trip_id: 'trip-1',
+      p_status: 'completed',
+    });
+    expect(result).toEqual({ id: 'trip-1', status: 'completed' });
+    expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
+  });
+
+  it('archiveTrip calls archive_trip without legacy notification', async () => {
+    tableChains['trips'] = createChainable({
+      id: 'trip-1',
+      status: 'cancelled',
+      route_id: 'route-1',
+    });
+    mockRpc.mockResolvedValue({
+      data: { trip_id: 'trip-1', status: 'archived' },
+      error: null,
+    });
+
+    const result = await superadminService.archiveTrip('trip-1');
+
+    expect(mockRpc).toHaveBeenCalledWith('archive_trip', {
+      p_trip_id: 'trip-1',
+    });
+    expect(result).toEqual({ id: 'trip-1', status: 'archived' });
+    expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
+  });
+
+  it('maps ERR_TRIP_DUPLICATE to ConflictError', async () => {
+    setupCreateTripHappyPath();
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: {
+        message:
+          'ERR_TRIP_DUPLICATE: Ya existe un viaje programado para esta ruta en la fecha y hora seleccionadas.',
+      },
+    });
+
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+      ),
+    ).rejects.toThrow(DUPLICATE_TRIP_MESSAGE);
+  });
+
+  it('maps ERR_TRIP_NOT_FOUND to NotFoundError', async () => {
+    tableChains['trips'] = createChainable({
+      id: 'trip-1',
+      status: 'cancelled',
+      route_id: 'route-1',
+    });
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'ERR_TRIP_NOT_FOUND: Trip not found' },
+    });
+
+    await expect(superadminService.archiveTrip('trip-1')).rejects.toBeInstanceOf(
+      NotFoundError,
+    );
+  });
+
+  it('maps ERR_TRIP_DEPARTED to ForbiddenError', async () => {
+    tableChains['trips'] = createChainable({
+      id: 'trip-1',
+      status: 'active',
+      departure_time: FUTURE_DATE,
+      route_id: 'route-1',
+    });
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: {
+        message: 'ERR_TRIP_DEPARTED: Cannot cancel a trip after its departure time',
+      },
+    });
+
+    await expect(
+      superadminService.updateTripStatus('trip-1', 'cancelled'),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('maps unrecognized RPC errors to ValidationError', async () => {
+    setupCreateTripHappyPath();
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'something unexpected failed' },
+    });
+
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+      ),
+    ).rejects.toBeInstanceOf(ValidationError);
   });
 });
