@@ -37,6 +37,24 @@ describe('WKR-006.4 — Worker health server', () => {
     });
   });
 
+  it('HEAD /healthz returns 200 with no body', async () => {
+    const startedAt = new Date('2026-08-07T12:00:00.000Z');
+    server = await startWorkerHealthServer({
+      port: 0,
+      workerVersion: '1.0.0',
+      startedAt,
+      pid: 4242,
+      now: () => new Date('2026-08-07T12:02:00.000Z'),
+      host: '127.0.0.1',
+    });
+
+    const res = await fetch(`http://127.0.0.1:${server.port}/healthz`, {
+      method: 'HEAD',
+    });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('');
+  });
+
   it('closes cleanly after shutdown', async () => {
     server = await startWorkerHealthServer({
       port: 0,
