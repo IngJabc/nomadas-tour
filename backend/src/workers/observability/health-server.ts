@@ -41,7 +41,7 @@ export function startWorkerHealthServer(
   const host = options.host ?? '0.0.0.0';
 
   const server = http.createServer((req, res) => {
-    if (req.method === 'GET' && (req.url === '/healthz' || req.url === '/healthz/')) {
+    if ((req.method === 'GET' || req.method === 'HEAD') && (req.url === '/healthz' || req.url === '/healthz/')) {
       const uptime_seconds = Math.max(
         0,
         Math.floor((nowFn().getTime() - options.startedAt.getTime()) / 1000),
