@@ -1,8 +1,43 @@
 import { supabaseAdmin } from '../config/database.js';
+import { env } from '../config/env.js';
 import { notificationService } from './notification.service.js';
 
 export async function completeExpiredTrips(): Promise<void> {
   const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+  if (env.TRIP_EFFECTS_VIA_OUTBOX) {
+    const { data, error } = await supabaseAdmin
+      .from('trips')
+      .select('id')
+      .eq('status', 'active')
+      .lt('departure_time', cutoff);
+
+    if (error) {
+      console.error('[TripCleanup] Error:', error.message);
+      return;
+    }
+
+    const trips = data || [];
+    if (trips.length === 0) return;
+
+    let completed = 0;
+    for (const trip of trips) {
+      const { error: rpcError } = await supabaseAdmin.rpc('complete_trip', {
+        p_trip_id: trip.id,
+        p_source: 'auto',
+      });
+      if (rpcError) {
+        console.error('[TripCleanup] Error:', rpcError.message);
+        continue;
+      }
+      completed += 1;
+    }
+
+    if (completed > 0) {
+      console.log(`[TripCleanup] Completed ${completed} expired trip(s)`);
+    }
+    return;
+  }
 
   const { data, error } = await supabaseAdmin
     .from('trips')

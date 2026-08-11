@@ -232,7 +232,7 @@ describe('WKR-007 Fase 2 — verification harness', () => {
   });
 });
 
-describe('WKR-007 Fase 2 — phase boundary (C2 wired; C3–C5 not yet)', () => {
+describe('WKR-007 Fase 2 — phase boundary (C2+C3 wired; C4/C5 not yet)', () => {
   it('wires superadmin trip lifecycle RPCs behind TRIP_EFFECTS_VIA_OUTBOX while keeping legacy', () => {
     const svc = read('backend/src/services/superadmin.service.ts');
     expect(svc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
@@ -244,13 +244,15 @@ describe('WKR-007 Fase 2 — phase boundary (C2 wired; C3–C5 not yet)', () => 
     expect(svc).not.toContain('complete_trip');
   });
 
-  it('keeps trip.service.ts on the bulk completeExpiredTrips path', () => {
+  it('wires trip.service completeExpiredTrips via complete_trip behind the flag while keeping legacy', () => {
     const tripSvc = read('backend/src/services/trip.service.ts');
+    expect(tripSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(tripSvc).toContain('.rpc(\'complete_trip\'');
+    expect(tripSvc).toContain("p_source: 'auto'");
     expect(tripSvc).toMatch(/\.update\(\{\s*status:\s*["']completed["']\s*\}\)/);
-    expect(tripSvc).not.toContain('complete_trip');
   });
 
-  it('keeps TRIP_EFFECTS_VIA_OUTBOX default false; trip.service and handlers unwired', () => {
+  it('keeps TRIP_EFFECTS_VIA_OUTBOX default false; handlers unwired (C4/C5 pending)', () => {
     const env = read('backend/src/config/env.ts');
     const superadminSvc = read('backend/src/services/superadmin.service.ts');
     const tripSvc = read('backend/src/services/trip.service.ts');
@@ -260,9 +262,11 @@ describe('WKR-007 Fase 2 — phase boundary (C2 wired; C3–C5 not yet)', () => 
       env.split('TRIP_EFFECTS_VIA_OUTBOX: z')[1]?.split('OUTBOX_POLL_MS')[0],
     ).toContain('.default(false)');
     expect(superadminSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
-    expect(tripSvc).not.toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(tripSvc).toContain('TRIP_EFFECTS_VIA_OUTBOX');
+    expect(tripSvc).toContain('complete_trip');
 
     const handlers = read('backend/src/workers/handlers/index.ts');
     expect(handlers).not.toMatch(/trip\.(created|postponed|cancelled|completed|auto_completed|updated|archived)/);
+    expect(handlers).not.toContain('notification-fanout');
   });
 });
