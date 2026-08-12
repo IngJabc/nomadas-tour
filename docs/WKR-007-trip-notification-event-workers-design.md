@@ -485,3 +485,7 @@ Se verificó la coherencia de las decisiones aprobadas entre las secciones 4, 6,
 - Tests: `superadmin.service.test.ts`, `trip.service.test.ts`, handlers, events, compose
 
 **NO modificar:** migraciones 001–051; `reservation-created.v1.ts` y su handler (solo registro por composite); `app.ts`/`app.test.ts` (`trust proxy`); claim/stuck/retry RPCs; observability core; `EMAIL_VIA_OUTBOX`; frontend; ADR-001; `docs/incidents/*`.
+
+## Apéndice B — Registro de implementación (WKR-007 ejecutado)
+
+La implementación del wiring a producción (C1–C7, cutover realizado) se registra en [WKR-007-wiring-implementation-plan.md](WKR-007-wiring-implementation-plan.md), que convierte los hallazgos de la auditoría de cierre (NO-GO — Wiring Incomplete) en trabajo auditable por ticket. El cierre documental completo (TASKS, ROADMAP, TASKS-HISTORY) se ejecutó en el PR de cierre de WKR-007.

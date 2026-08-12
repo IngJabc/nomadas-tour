@@ -9,13 +9,15 @@
 
 ## Sprint actual — siguiente
 
-**Fase 3 — WKR-007 — Trip / notification event workers**
+**Fase 3 — WKR-008 — Reminder workers**
 
-Infra workers (outbox → email → observability → Sentry → retention runbook → healthz).
+Reminders proactivos T-24h / T-2h. Referencia de arranque: [`docs/WKR-008-reminder-workers-audit.md`](docs/WKR-008-reminder-workers-audit.md).
 
-- [ ] Definir / emitir eventos de dominio siguientes (sin romper `reservation.created.v1`)
-- [ ] Handlers de notificación desacoplados del request HTTP
-- [ ] Reutilizar outbox + observabilidad + política DLQ de WKR-006.3
+- [ ] Mecanismo de scheduler durable + single-writer (decisión A)
+- [ ] Contrato `trip.reminder_due` v1: `window` (T-24h/T-2h), payload, dedup_key (hallazgo C)
+- [ ] SchedulerWorker productor + ReminderWorker consumidor (`email_delivery_log` como ledger)
+- [ ] Destinatarios: booker (email); agencias email y/o in-app (decisión G)
+- [ ] Feature flag + soak (patrón `EMAIL_VIA_OUTBOX`)
 
 Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/WKR-006.4-worker-health-endpoint.md)
 
@@ -34,6 +36,7 @@ Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/W
 - [x] WKR-006.2 — Sentry wiring (API + worker, opcional)
 - [x] WKR-006.3 — Outbox Retention & DLQ Operational Runbook (docs)
 - [x] WKR-006.4 — Worker health endpoint (`GET /healthz`, `WORKER_HEALTH_PORT`)
+- [x] WKR-007 — Trip / notification event workers (eventos trip.*, RPCs 057, handlers fanout, wiring a producción + cutover realizado; cierre en [`docs/WKR-007-wiring-implementation-plan.md`](docs/WKR-007-wiring-implementation-plan.md))
 
 ---
 
@@ -49,10 +52,8 @@ Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/W
 
 | Orden | Ticket / Fase | Tema | Estado |
 |-------|---------------|------|--------|
-| 1 | **WKR-007** | Trip / notification event workers | **Siguiente** |
-| 2 | WKR-008 | Reminder workers | Pendiente |
-| 3 | WKR-009 | Retention worker (purga completed) / automation bridge | Pendiente |
-| 4 | Fase 4 | Automatizaciones de producto | Pendiente |
+| 1 | WKR-009 | Retention worker (purga completed) / automation bridge | Pendiente |
+| 2 | Fase 4 | Automatizaciones de producto | Pendiente |
 | — | **SEC-009** | Continuous security validation (≠ Sentry) | Futura |
 
 Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
