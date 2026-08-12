@@ -9,9 +9,11 @@
 
 ## Sprint actual — siguiente
 
-**Fase 3 — WKR-009 — Retention worker / automation bridge**
+**Fase 4 — Automatizaciones de producto** (**Pendiente**)
 
-Siguiente consumer tras el cierre de WKR-008. Referencia de fase: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Siguiente fase tras el cierre de WKR-009 (Outbox Retention Worker). Referencia: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+**Fuera del sprint inmediato (follow-ups técnicos, no WKR-009):** migración de timers `LockCleanup` / `completeExpiredTrips`; purga de `boarding_attempts`; automation bridge histórico ≠ Fase 4 producto.
 
 Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/WKR-006.4-worker-health-endpoint.md)
 
@@ -32,6 +34,7 @@ Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/W
 - [x] WKR-006.4 — Worker health endpoint (`GET /healthz`, `WORKER_HEALTH_PORT`)
 - [x] WKR-007 — Trip / notification event workers (eventos trip.*, RPCs 057, handlers fanout, wiring a producción + cutover realizado; cierre en [`docs/WKR-007-wiring-implementation-plan.md`](docs/WKR-007-wiring-implementation-plan.md))
 - [x] WKR-008 — Reminder workers (**Completado** — T-48h/T-24h, migración 059, harness SQL A–K, cutover `TRIP_REMINDER_VIA_OUTBOX=true` en Render; cierre: [`docs/WKR-008-reminder-workers-audit.md`](docs/WKR-008-reminder-workers-audit.md) — PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED)
+- [x] WKR-009 — Outbox Retention Worker (**Completado** — purga `completed` ≥30d, migración 060, scheduler + flag `OUTBOX_RETENTION_VIA_WORKER=true` en Render; harness A–J; EXPLAIN sin índice; cierre: [`docs/WKR-009-outbox-retention-workers-audit.md`](docs/WKR-009-outbox-retention-workers-audit.md) — PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED)
 
 ---
 
@@ -43,12 +46,13 @@ Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/W
 
 ---
 
-## Después (Fase 3 restante → producto)
+## Después (producto / follow-ups)
 
 | Orden | Ticket / Fase | Tema | Estado |
 |-------|---------------|------|--------|
-| 1 | WKR-009 | Retention worker (purga completed) / automation bridge | Pendiente |
-| 2 | Fase 4 | Automatizaciones de producto | Pendiente |
+| 1 | Fase 4 | Automatizaciones de producto | Pendiente |
+| — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` (≠ WKR-009) | Futura |
+| — | Follow-up | Retention `boarding_attempts` (≠ WKR-009) | Futura |
 | — | **SEC-009** | Continuous security validation (≠ Sentry) | Futura |
 
 Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -67,7 +71,7 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Bloqueadores
 
-_Ninguno al cierre de WKR-006.4. En Render Free: Web Service + `WORKER_HEALTH_PORT` = `PORT`._
+_Ninguno al cierre de WKR-009. En Render Free: Web Service + `WORKER_HEALTH_PORT` = `PORT`._
 
 ---
 

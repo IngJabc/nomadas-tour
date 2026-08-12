@@ -459,3 +459,26 @@ Cierre de reminders proactivos sobre Transactional Outbox + worker Node existent
 - **Remediación de cierre:** F-01 `t22` falso positivo; F-02 pre-filtro `NOT EXISTS` inline; F-03 TOCTOU `FOR UPDATE` + revalidación; F-04 harness comportamental — todos CLOSED; sin blockers técnicos
 - **Documentación de cierre:** [`docs/WKR-008-reminder-workers-audit.md`](WKR-008-reminder-workers-audit.md); TASKS/ROADMAP actualizados (WKR-008 ✅, WKR-009 siguiente)
 - **Validación:** WKR-008 unit **20/20** ✓, boarding WKR-008 **14/14** ✓, WKR-007 fase2 **21/21** ✓, backend **352/352** ✓, `tsc --noEmit` ✓, backend build ✓, root build ✓
+
+---
+
+## Sprint 16 — WKR-009 Outbox Retention Worker (2026-08-12)
+
+Cierre de purga automática de `outbox_events` `completed` ≥30d sobre el worker Node existente (sin pg_cron ni segundo proceso; sin automation bridge / Fase 4 / timers).
+
+[x] **WKR-009 — Outbox Retention Worker** (completado; PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED)
+- **Objetivo:** purgar automáticamente filas `outbox_events` con `status = 'completed'` y `COALESCE(processed_at, updated_at) < now() - 30 days`
+- **Scope IN:** RPC DEFINER + scheduler en worker existente + flag + batch + SKIP LOCKED + tests + harness + rollout
+- **Scope OUT:** automation bridge / Fase 4; `LockCleanup` / `completeExpiredTrips`; `boarding_attempts`; pg_cron; segundo worker; DLQ nueva; auto-purga `failed`/`pending`/`processing`; eventos/emails/templates nuevos; índice obligatorio
+- **Migración** `060_purge_completed_outbox_events.sql` — RPC `purge_completed_outbox_events(p_batch, p_older_than_days)`; aplicada en producción
+- **RPC:** SECURITY DEFINER, `search_path=public`, EXECUTE solo `service_role`; clamp batch ≤1000 y days ≥30; predicado completed-only; CTE `picked` + `DELETE … USING` + `FOR UPDATE SKIP LOCKED`; JSON `{deleted, batch, older_than_days, cutoff}`
+- **Remediación:** cuerpo inicial `RETURN (WITH…DELETE…)` → `0A000`; corregido a `SELECT … INTO v_result` + `RETURN v_result` (repo sincronizado con prod)
+- **Scheduler** `retention-scheduler.ts` + wire en `runner.ts` (paralelo a reminder; `Promise.all` en shutdown)
+- **Flag** `OUTBOX_RETENTION_VIA_WORKER` (default `false` en código): soak `false` → cutover `true` en Render
+- **Config:** poll 24h (`86400000`), batch 1000, days 30
+- **Harness SQL** `supabase/tests/wkr_009_verification.sql` (A–J) ejecutado en producción: `Success. No rows returned` (BEGIN/ROLLBACK)
+- **EXPLAIN** producción: Seq Scan; ~30 filas; 0 elegibles; ~0.99 ms → **sin índice** (D6)
+- **Smoke / dry-run:** `eligible_completed = 0`; smoke RPC `deleted: 0`
+- **Cutover Render:** tick `status: ok`, `deleted: 0`, `batch: 1000`, `duration_ms: 894`; sin errores de retention/relay/fatal
+- **Documentación de cierre:** [`docs/WKR-009-outbox-retention-workers-design.md`](WKR-009-outbox-retention-workers-design.md), [`docs/WKR-009-outbox-retention-workers-audit.md`](WKR-009-outbox-retention-workers-audit.md); TASKS/ROADMAP actualizados (WKR-009 ✅, Fase 4 siguiente)
+- **Validación:** backend **361/361** ✓, boarding WKR-009/008/007-fase2 **47/47** ✓, `tsc --noEmit` ✓, backend build ✓

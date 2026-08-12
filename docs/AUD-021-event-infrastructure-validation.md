@@ -249,7 +249,7 @@ La doble ejecución durante la transición (path legacy fire-and-forget en `rese
 ### Validación de WKR-006.3
 
 - **Failed events** — inspección con `status = 'failed'` y `error_message`; retry manual vía actualización de `status → pending` con `available_at = now()`.
-- **Retención** — `completed` 30-90 días; pendiente de worker de purga (**H8**).
+- **Retención** — `completed` 30 días; purga automática entregada por **WKR-009** ✅ (histórico H8: “pendiente de worker” — resuelto; ver nota H8).
 - **Inspección** — consultas documentadas sobre `status`, `attempts`, `available_at`, `created_at`.
 
 ### Confirmación
@@ -284,7 +284,7 @@ Los eventos **no entregan permisos**. Son hechos observables; la autorización s
 | H5 | BAJO | `STALE_PROCESSING_MS` (5 min) puede recuperar handlers realmente lentos | `backend/src/config/env.ts` | WKR futuro de resiliencia |
 | H6 | BAJO | Riesgo residual de doble envío durante transición legacy/worker (mitigado por `ticket_email_sent_at`) | `reservation.service.ts` + `markTicketEmailSent` | Migrar a `EMAIL_VIA_OUTBOX=true` |
 | H7 | BAJO | Métricas in-memory (se pierden al reiniciar; sin endpoint Prometheus) | `metrics.ts` | Prometheus / métricas persistentes |
-| H8 | OBSERVACIÓN | Retención y purga de `outbox_events` delegadas | WKR-006.3 | WKR-009 — Retention Worker |
+| H8 | OBSERVACIÓN | Retención y purga de `outbox_events` delegadas | WKR-006.3 | **WKR-009 ✅ cerrado** (purga `completed` ≥30d) |
 | H9 | OBSERVACIÓN | Eventos futuros como `boarding.*` deberán incluir `operator_agency_id` (ADR-001) | diseño WKR-003.2 | Al implementar boarding events |
 | H10 | OBSERVACIÓN | Timers del API (`LockCleanup`, `TripCleanup`) aún viven en `index.ts`; deben migrar a scheduler durable | `backend/src/index.ts` | Scheduler extraction |
 | H11 | OBSERVACIÓN | Cambios locales pendientes de commit relacionados con Sentry (no es riesgo arquitectónico) | working tree | Commit previo a WKR-007 |
@@ -353,7 +353,9 @@ Los eventos **no entregan permisos**. Son hechos observables; la autorización s
 
 **Severidad:** OBSERVACIÓN
 
-**Aclaración:** DLQ lógica vigente con `status = failed`; la purga de `completed` (30-90 días) queda en WKR-009.
+**Aclaración (histórica AUD-021):** DLQ lógica vigente con `status = failed`; la purga de `completed` quedó diferida a WKR-009.
+
+**Actualización de cierre 2026-08-12:** WKR-009 implementó y cerró la purga automática de **solo** `completed` ≥30d (`COALESCE(processed_at, updated_at)`), sin auto-purga de `failed`. Ver [`WKR-009-outbox-retention-workers-audit.md`](WKR-009-outbox-retention-workers-audit.md).
 
 ## H9 — Eventos futuros con contexto adicional
 
@@ -384,7 +386,7 @@ Documentados para backlog, no implementados en AUD-021:
 - **WKR-007.2 — Outbox idempotency hardening** — constraint único + `ON CONFLICT DO NOTHING`.
 - **Notification Worker** — consumidores adicionales sobre eventos publicados.
 - **Reminder Worker** — recordatorios programados sobre viajes.
-- **Retention Worker (WKR-009)** — purga de `completed`/`failed` según política.
+- **Retention Worker (WKR-009)** — ✅ cerrado: purga de `completed` según política 30d (no auto-purga de `failed`).
 - **Scheduler extraction** — mover `LockCleanup`/`TripCleanup` a scheduler durable.
 - **Métricas persistentes** — Prometheus u otro destino.
 - **Tracing distribuido** — correlación end-to-end más allá de `event_id`.

@@ -395,8 +395,8 @@ SQLSTATE 42P10 — there is no unique or exclusion constraint matching the ON CO
 
 - `trip.reminder_due` → **WKR-008** (scheduler proactivo).
 - Boarding events (`passenger.boarded`/`unboarded`) → ticket propio (requiere ADR-001, `boarding_logs` trigger, `operator_agency_id`).
-- Purga/retention de `outbox_events` → **WKR-009**.
-- Migración de timers (`LockCleanup`, `completeExpiredTrips`) a scheduler durable → **WKR-009** (el *evento* `auto_completed` sí es de WKR-007; el *timer* no).
+- Purga/retention de `outbox_events` → **WKR-009** ✅ (cerrado; solo `completed` ≥30d — ver [`WKR-009-outbox-retention-workers-audit.md`](WKR-009-outbox-retention-workers-audit.md)).
+- Migración de timers (`LockCleanup`, `completeExpiredTrips`) a scheduler durable → **follow-up / ticket separado** (históricamente se asoció a WKR-009; el scope-lock de WKR-009 **excluyó** timers).
 - `agency.created`, `user.invited`, `user.activated` → Fase 4.
 - `reservation.status_changed` (edición admin) → Audit Trail (Fase 5).
 - `reservation.cancelled` / `passenger.cancelled` → ticket posterior (ver Sección 15).
@@ -413,7 +413,7 @@ SQLSTATE 42P10 — there is no unique or exclusion constraint matching the ON CO
 
 **Lo que WKR-007 prepara:**
 - **WKR-008:** handlers/eventos de trip listos; `trip.reminder_due` se publicará cuando exista scheduler; `email_delivery_log` reutilizable para reminders.
-- **WKR-009 / Fase 4:** NotificationFanout + EmailFanout consolidados; automatizaciones consumen los mismos eventos sin cambiar contrato (cambios aditivos, WKR-003.2 §9).
+- **Fase 4:** NotificationFanout + EmailFanout consolidados; automatizaciones de producto consumen los mismos eventos sin cambiar contrato (cambios aditivos, WKR-003.2 §9). *(Referencias históricas “WKR-009 / Fase 4” mezclaban retention con producto; WKR-009 = solo retention, cerrado.)*
 - **WKR-007.2:** columna `dedup_key` e índice ya presentes; solo resta el retrofit del trigger 049.
 
 ---
