@@ -11,6 +11,10 @@ export interface WorkerRuntimeConfig {
   tripReminderViaOutbox: boolean;
   reminderSchedulePollMs: number;
   reminderScheduleBatch: number;
+  outboxRetentionViaWorker: boolean;
+  outboxRetentionPollMs: number;
+  outboxRetentionBatch: number;
+  outboxRetentionDays: number;
   heartbeatMs: number;
   staleProcessingMs: number;
   staleRecoveryLimit: number;
@@ -29,6 +33,10 @@ export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
     tripReminderViaOutbox: env.TRIP_REMINDER_VIA_OUTBOX,
     reminderSchedulePollMs: env.REMINDER_SCHEDULE_POLL_MS,
     reminderScheduleBatch: env.REMINDER_SCHEDULE_BATCH,
+    outboxRetentionViaWorker: env.OUTBOX_RETENTION_VIA_WORKER,
+    outboxRetentionPollMs: env.OUTBOX_RETENTION_POLL_MS,
+    outboxRetentionBatch: env.OUTBOX_RETENTION_BATCH,
+    outboxRetentionDays: env.OUTBOX_RETENTION_DAYS,
     heartbeatMs: env.OUTBOX_HEARTBEAT_MS,
     staleProcessingMs: env.OUTBOX_STALE_PROCESSING_MS,
     staleRecoveryLimit: env.OUTBOX_STALE_RECOVERY_LIMIT,
