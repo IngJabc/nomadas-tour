@@ -94,3 +94,18 @@ export {
   isTripUpdatedPayloadV1,
   parseTripUpdatedEventV1,
 } from './trip-updated.v1.js';
+
+export type {
+  TripReminderDueDataV1,
+  TripReminderDueEventV1,
+  TripReminderWindow,
+} from './trip-reminder-due.v1.js';
+export {
+  TRIP_REMINDER_DUE_V1_AGGREGATE,
+  TRIP_REMINDER_DUE_V1_TYPE,
+  TRIP_REMINDER_DUE_V1_VERSION,
+  assertNoPiiInTripReminderDuePayload,
+  isTripReminderDuePayloadV1,
+  isTripReminderWindow,
+  parseTripReminderDueEventV1,
+} from './trip-reminder-due.v1.js';

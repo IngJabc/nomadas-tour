@@ -56,6 +56,10 @@ describe('createDefaultPreferences', () => {
       in_app_enabled: true,
       email_enabled: true,
     });
+    expect(prefs.trip_reminders).toEqual({
+      in_app_enabled: true,
+      email_enabled: true,
+    });
   });
 });
 
@@ -116,7 +120,7 @@ describe('notificationPreferenceService.getForAgencies', () => {
 });
 
 describe('notificationPreferenceService.seedDefaults', () => {
-  it('upserts four default categories', async () => {
+  it('upserts all default categories including trip_reminders', async () => {
     const chain = createChainable();
     chain.upsert = vi.fn(() => Promise.resolve({ error: null }));
     tableChains['agency_notification_preferences'] = chain;
@@ -131,9 +135,17 @@ describe('notificationPreferenceService.seedDefaults', () => {
           in_app_enabled: true,
           email_enabled: true,
         }),
+        expect.objectContaining({
+          agency_id: 'agency-new',
+          category: 'trip_reminders',
+          in_app_enabled: true,
+          email_enabled: true,
+        }),
       ]),
       { onConflict: 'agency_id,category', ignoreDuplicates: true },
     );
+    const rows = (chain.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(rows).toHaveLength(5);
   });
 });
 
@@ -169,7 +181,7 @@ describe('public preference mappers', () => {
     const prefs = createDefaultPreferences();
     const categories = toPublicCategories(prefs);
 
-    expect(categories).toHaveLength(4);
+    expect(categories).toHaveLength(5);
     expect(categories[0]).toEqual(
       expect.objectContaining({
         key: 'trip_assignments',
@@ -179,6 +191,13 @@ describe('public preference mappers', () => {
     );
     expect(categories.find((c) => c.key === 'trip_cancellations')?.locked).toBe(
       true,
+    );
+    expect(categories.find((c) => c.key === 'trip_reminders')).toEqual(
+      expect.objectContaining({
+        key: 'trip_reminders',
+        locked: false,
+        label: 'Recordatorios de viaje',
+      }),
     );
   });
 });
