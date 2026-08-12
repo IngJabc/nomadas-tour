@@ -28,7 +28,7 @@ const migration059 = read(
 const harness = read('supabase/tests/wkr_008_verification.sql');
 
 describe('WKR-008 — migration isolation', () => {
-  it('keeps 059 contiguous after 056→057→058; tip is 060 after WKR-009', () => {
+  it('keeps 059 contiguous after 056→057→058; 060 follows (tip may advance)', () => {
     const migrations = listMigrations();
     const i056 = migrations.indexOf('056_outbox_trigger_retrofit_dedup_key.sql');
     const i057 = migrations.indexOf('057_trip_events_rpc.sql');
@@ -42,7 +42,7 @@ describe('WKR-008 — migration isolation', () => {
     expect(i058).toBe(i057 + 1);
     expect(i059).toBe(i058 + 1);
     expect(i060).toBe(i059 + 1);
-    expect(i060).toBe(migrations.length - 1);
+    expect(i060).toBeGreaterThanOrEqual(0);
   });
 
   it('has no tracked modifications in migrations 001–058', () => {

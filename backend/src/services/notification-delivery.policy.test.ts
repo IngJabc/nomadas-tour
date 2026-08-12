@@ -10,6 +10,7 @@ function createDefaultPreferences() {
     trip_status_updates: { in_app_enabled: true, email_enabled: true },
     trip_cancellations: { in_app_enabled: true, email_enabled: true },
     trip_reminders: { in_app_enabled: true, email_enabled: true },
+    ops_digest: { in_app_enabled: true, email_enabled: true },
   };
 }
 
@@ -43,6 +44,13 @@ describe('isDeliveryEnabled', () => {
     prefs.trip_reminders.email_enabled = false;
     expect(isDeliveryEnabled(prefs as any, 'trip_reminder', 'email')).toBe(false);
     expect(isDeliveryEnabled(prefs as any, 'trip_reminder', 'in_app')).toBe(true);
+  });
+
+  it('blocks ops_digest email when ops_digest category disabled', () => {
+    const prefs = createDefaultPreferences();
+    prefs.ops_digest.email_enabled = false;
+    expect(isDeliveryEnabled(prefs as any, 'ops_digest', 'email')).toBe(false);
+    expect(isDeliveryEnabled(prefs as any, 'ops_digest', 'in_app')).toBe(true);
   });
 
   it('blocks in-app delivery when category disabled', () => {

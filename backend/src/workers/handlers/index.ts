@@ -31,12 +31,17 @@ import {
   TRIP_REMINDER_DUE_V1_TYPE,
   TRIP_REMINDER_DUE_V1_VERSION,
 } from '../../events/trip-reminder-due.v1.js';
+import {
+  AGENCY_DIGEST_DUE_V1_TYPE,
+  AGENCY_DIGEST_DUE_V1_VERSION,
+} from '../../events/agency-digest-due.v1.js';
 import { env } from '../../config/env.js';
 import { emailService } from '../../services/email.service.js';
 import { reservationService } from '../../services/reservation.service.js';
 import { getWorkerRuntimeConfig } from '../config.js';
 import type { OutboxHandler } from '../outbox/types.js';
 import { composeHandlers } from './compose.js';
+import { createAgencyDigestFanoutHandler } from './agency-digest-fanout.handler.js';
 import { createEmailFanoutHandler } from './email-fanout.handler.js';
 import {
   createDefaultNotificationFanoutDeps,
@@ -157,6 +162,12 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
       createReminderFanoutHandler(),
       reminderNotificationFanout,
     ),
+  );
+
+  // F4-001 — Agency daily digest email (no in-app fanout in v1).
+  map.set(
+    `${AGENCY_DIGEST_DUE_V1_TYPE}:${AGENCY_DIGEST_DUE_V1_VERSION}`,
+    createAgencyDigestFanoutHandler(),
   );
 
   return map;

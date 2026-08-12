@@ -24,6 +24,10 @@ import {
   startRetentionScheduler,
 } from './retention-scheduler.js';
 import {
+  createDefaultDigestSchedulerDeps,
+  startDigestScheduler,
+} from './digest-scheduler.js';
+import {
   DEFAULT_WORKER_NAME,
   createHeartbeatController,
   createRecoveryScheduler,
@@ -164,6 +168,9 @@ async function main() {
     outbox_retention_poll_ms: config.outboxRetentionPollMs,
     outbox_retention_batch: config.outboxRetentionBatch,
     outbox_retention_days: config.outboxRetentionDays,
+    agency_digest_via_worker: config.agencyDigestViaWorker,
+    agency_digest_poll_ms: config.agencyDigestPollMs,
+    agency_digest_batch: config.agencyDigestBatch,
     poll_ms: config.pollMs,
     batch_size: config.batchSize,
     settle_ms: config.settleMs,
@@ -187,6 +194,12 @@ async function main() {
   const retentionScheduler = startRetentionScheduler(
     controller.signal,
     createDefaultRetentionSchedulerDeps(logger),
+  );
+
+  // F4-001 — agency digest scheduler runs in parallel; errors never kill the relay.
+  const digestScheduler = startDigestScheduler(
+    controller.signal,
+    createDefaultDigestSchedulerDeps(logger),
   );
 
   try {
@@ -224,7 +237,11 @@ async function main() {
       },
     );
 
-    await Promise.all([reminderScheduler.done, retentionScheduler.done]);
+    await Promise.all([
+      reminderScheduler.done,
+      retentionScheduler.done,
+      digestScheduler.done,
+    ]);
 
     logger.info('worker_stopped', {
       status: 'stopped',

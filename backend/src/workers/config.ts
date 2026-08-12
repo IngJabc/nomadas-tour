@@ -15,6 +15,9 @@ export interface WorkerRuntimeConfig {
   outboxRetentionPollMs: number;
   outboxRetentionBatch: number;
   outboxRetentionDays: number;
+  agencyDigestViaWorker: boolean;
+  agencyDigestPollMs: number;
+  agencyDigestBatch: number;
   heartbeatMs: number;
   staleProcessingMs: number;
   staleRecoveryLimit: number;
@@ -37,6 +40,9 @@ export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
     outboxRetentionPollMs: env.OUTBOX_RETENTION_POLL_MS,
     outboxRetentionBatch: env.OUTBOX_RETENTION_BATCH,
     outboxRetentionDays: env.OUTBOX_RETENTION_DAYS,
+    agencyDigestViaWorker: env.AGENCY_DIGEST_VIA_WORKER,
+    agencyDigestPollMs: env.AGENCY_DIGEST_POLL_MS,
+    agencyDigestBatch: env.AGENCY_DIGEST_BATCH,
     heartbeatMs: env.OUTBOX_HEARTBEAT_MS,
     staleProcessingMs: env.OUTBOX_STALE_PROCESSING_MS,
     staleRecoveryLimit: env.OUTBOX_STALE_RECOVERY_LIMIT,
