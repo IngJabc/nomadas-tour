@@ -34,7 +34,7 @@ interface NotificationContextValue {
   refresh: () => Promise<void>;
 }
 
-const CRITICAL_TYPES = new Set(['trip_cancelled', 'trip_deleted', 'trip_archived', 'reservation_cancelled', 'passenger_cancelled']);
+const CRITICAL_TYPES = new Set(['trip_cancelled', 'trip_archived', 'reservation_cancelled', 'passenger_cancelled']);
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 

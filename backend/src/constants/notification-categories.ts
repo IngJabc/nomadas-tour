@@ -17,7 +17,6 @@ export const NOTIFICATION_TYPE_TO_CATEGORY = {
   trip_completed: 'trip_status_updates',
   trip_auto_completed: 'trip_status_updates',
   trip_cancelled: 'trip_cancellations',
-  trip_deleted: 'trip_cancellations',
   trip_archived: 'trip_cancellations',
   reservation_created: null,
   reservation_cancelled: null,

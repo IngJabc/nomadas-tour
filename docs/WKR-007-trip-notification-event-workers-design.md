@@ -66,7 +66,7 @@ Las 6 decisiones de la sección 20 están **cerradas y aprobadas** (ver Sección
 - `tenant_id` de `outbox_events` es un solo UUID → un evento `trip.*` (multi-agencia) debe usar `tenant_id = NULL` y llevar `agency_ids` en el payload.
 - Sin handler → evento `failed` en el relay (política DLQ actual). Pasar a `eventType: null` exige que **todo tipo publicado tenga handler registrado**.
 - `EMAIL_VIA_OUTBOX` default `false` (`env.ts:15-17`).
-- `trip_deleted` existe en el tipo DB (029/033) y en `notification.service.ts`, pero **nunca se emite** (no hay endpoint de borrado; la baja es `archived`).
+- `trip_deleted` existió en el tipo DB (029/033) y en `notification.service.ts`, pero **nunca se emite** (no hay endpoint de borrado; la baja es `archived`). **EJECUTADO:** eliminado del código y del CHECK (migración 058).
 
 ---
 
@@ -79,7 +79,7 @@ Las 6 decisiones de la sección 20 están **cerradas y aprobadas** (ver Sección
 5. **Dispatcher limitado**: runner hardcodeado a `reservation.created` (H1 AUD-021).
 6. **Sin idempotencia de publicación** (H3): no hay constraint único ni `dedup_key`; con múltiples productores crece el riesgo de duplicados.
 7. **`trips.created_at` inexistente** rompe el activity feed del admin y dificulta ordenar por creación.
-8. **Gap de catálogo**: `trip.archived`/`trip.deleted` no resueltos como contratos; `trip_deleted` es código muerto.
+8. **Gap de catálogo (resuelto)**: `trip.archived` contratado como `trip.archived.v1` (057); `trip.deleted` **no existe** como evento (la baja es `archived`); tipo muerto `trip_deleted` eliminado (058).
 
 ---
 
@@ -162,7 +162,7 @@ Patrón común (copiar de `reservation-created.v1.ts`): constantes `*_V1_TYPE/_V
 - Payload: `{ trip_id, route_id, departure_time, status: 'archived', agency_ids }`
 
 ### trip.deleted — **NO existe como evento (eliminado del dominio)**
-- No hay operación de borrado en el dominio (la baja es `archived`). Aprobado eliminar el tipo muerto `trip_deleted` de `notification.service.ts`, de `notification-categories.ts` y del CHECK de la migración (nueva migración).
+- No hay operación de borrado en el dominio (la baja es `archived`). Aprobado eliminar el tipo muerto `trip_deleted` de `notification.service.ts`, de `notification-categories.ts` y del CHECK de la migración (nueva migración). **EJECUTADO (058).**
 
 ### reservation.cancelled.v1 / passenger.cancelled.v1 — **FUERA DE SCOPE**
 - Decisión aprobada: **NO incluir** en WKR-007; quedan para ticket posterior. `reservation.service.ts:396,771` conservan su comportamiento actual durante WKR-007.
@@ -325,7 +325,7 @@ SQLSTATE 42P10 — there is no unique or exclusion constraint matching the ON CO
 **Fase 2 — Eventos RPC:** migración con `create_trip`/`postpone_trip`/`set_trip_status`/`complete_trip`/`archive_trip`/`update_trip` + reescritura del service para llamarlos. Los efectos legacy (emails/notificaciones en request) **siguen activos** (`TRIP_EFFECTS_VIA_OUTBOX=false`), handlers de trip registrados pero `skipped_effect_disabled`. Los eventos se producen y quedan `completed` (skip) → auditable sin duplicar efectos.
 
 **Fase 3 — Fanouts:** NotificationFanoutWorker + EmailFanout + `source_event_id`/ledger. En staging: verificar conteos de notificaciones y emails por evento. **Flip `TRIP_EFFECTS_VIA_OUTBOX=true`** → legacy deshabilitado, worker activo. Soak > 48h.
-**Fase 4 — Cleanup:** eliminar loops legacy y llamadas `notificationService.*` del request; eliminar tipo muerto `trip_deleted` (código + migración CHECK); actualizar docs (WKR-003.2, AUD-021).
+**Fase 4 — Cleanup:** eliminar loops legacy y llamadas `notificationService.*` del request; eliminar tipo muerto `trip_deleted` (código + migración CHECK) ✅ **hecho (058)**; actualizar docs (WKR-003.2, AUD-021).
 
 **Regresión `reservation.created`:** no tocar trigger 049, `reservation-created.v1.ts`, ni su handler; solo registrar el NotificationFanout como sub-handler del composite. `EMAIL_VIA_OUTBOX` intacto.
 
@@ -383,7 +383,7 @@ SQLSTATE 42P10 — there is no unique or exclusion constraint matching the ON CO
 4. NotificationFanoutWorker (consume `reservation.created` + trips) con `source_event_id`.
 5. EmailFanout (trip.created/postponed/cancelled) con `email_delivery_log`.
 6. Flag `TRIP_EFFECTS_VIA_OUTBOX` + eliminación de loops/notificaciones en request.
-7. Limpieza de `trip_deleted` (código muerto).
+7. Limpieza de `trip_deleted` (código muerto). ✅ **Hecho (058).**
 
 **Excluidos (decisiones aprobadas):**
 - `reservation.cancelled.v1` y `passenger.cancelled.v1` → **ticket posterior** (no en WKR-007).
@@ -427,7 +427,7 @@ SQLSTATE 42P10 — there is no unique or exclusion constraint matching the ON CO
 5. NotificationFanoutWorker + `source_event_id` + tests.
 6. EmailFanout + `email_delivery_log` + tests.
 7. Flag `TRIP_EFFECTS_VIA_OUTBOX` (default false) → soak → flip true → verificación E2E.
-8. Cleanup legacy (loops, notificaciones en request, `trip_deleted`) + docs (WKR-003.2, AUD-021, ROADMAP/TASKS).
+8. Cleanup legacy (loops, notificaciones en request, `trip_deleted` ✅ hecho) + docs (WKR-003.2, AUD-021, ROADMAP/TASKS).
 
 ---
 
@@ -456,7 +456,7 @@ Se verificó la coherencia de las decisiones aprobadas entre las secciones 4, 6,
 | 2 | **Migraciones 052+ dentro de WKR-007** | ✅ Aprobadas (dedup_key, source_event_id, email_delivery_log, trips.created_at, RPCs, cleanup CHECK) |
 | 3 | **Scope opcional** (`reservation.cancelled`/`passenger.cancelled`) | ✅ **Diferir** a ticket posterior |
 | 4 | **`trip.updated`** | ✅ **Emitir sin consumidor** (vía RPC, con `changed_fields`) |
-| 5 | **`trip_deleted`** | ✅ **Eliminar completamente** (código + CHECK de DB) |
+| 5 | **`trip_deleted`** | ✅ **EJECUTADO** — eliminado del código + CHECK de DB (058) |
 | 6 | **Idempotencia del trigger 049** | ✅ **Después, WKR-007.2** (columna/índice preparados en WKR-007) |
 
 **Ambigüedades residuales para la implementación (sin impacto arquitectónico):**
@@ -470,7 +470,7 @@ Se verificó la coherencia de las decisiones aprobadas entre las secciones 4, 6,
 
 - `backend/src/services/superadmin.service.ts` (createTrip/updateTrip/updateTripStatus/archiveTrip → RPC calls; remover loops tras flag)
 - `backend/src/services/trip.service.ts` (completeExpiredTrips → RPC loop)
-- `backend/src/services/notification.service.ts` (remover tipo `trip_deleted`)
+- `backend/src/services/notification.service.ts` (remover tipo `trip_deleted`) ✅ **hecho**
 - `backend/src/services/notification-delivery.policy.ts` (reutilizar)
 - `backend/src/events/*` (nuevos: `trip-created.v1.ts`, `trip-postponed.v1.ts`, `trip-cancelled.v1.ts`, `trip-completed.v1.ts`, `trip-auto-completed.v1.ts`, `trip-updated.v1.ts`, `trip-archived.v1.ts` + exports)
 - `backend/src/workers/runner.ts` (eventType null)
