@@ -60,6 +60,10 @@ describe('createDefaultPreferences', () => {
       in_app_enabled: true,
       email_enabled: true,
     });
+    expect(prefs.ops_digest).toEqual({
+      in_app_enabled: true,
+      email_enabled: true,
+    });
   });
 });
 
@@ -120,7 +124,7 @@ describe('notificationPreferenceService.getForAgencies', () => {
 });
 
 describe('notificationPreferenceService.seedDefaults', () => {
-  it('upserts all default categories including trip_reminders', async () => {
+  it('upserts all default categories including trip_reminders and ops_digest', async () => {
     const chain = createChainable();
     chain.upsert = vi.fn(() => Promise.resolve({ error: null }));
     tableChains['agency_notification_preferences'] = chain;
@@ -141,11 +145,17 @@ describe('notificationPreferenceService.seedDefaults', () => {
           in_app_enabled: true,
           email_enabled: true,
         }),
+        expect.objectContaining({
+          agency_id: 'agency-new',
+          category: 'ops_digest',
+          in_app_enabled: true,
+          email_enabled: true,
+        }),
       ]),
       { onConflict: 'agency_id,category', ignoreDuplicates: true },
     );
     const rows = (chain.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(6);
   });
 });
 
@@ -181,7 +191,7 @@ describe('public preference mappers', () => {
     const prefs = createDefaultPreferences();
     const categories = toPublicCategories(prefs);
 
-    expect(categories).toHaveLength(5);
+    expect(categories).toHaveLength(6);
     expect(categories[0]).toEqual(
       expect.objectContaining({
         key: 'trip_assignments',
@@ -197,6 +207,13 @@ describe('public preference mappers', () => {
         key: 'trip_reminders',
         locked: false,
         label: 'Recordatorios de viaje',
+      }),
+    );
+    expect(categories.find((c) => c.key === 'ops_digest')).toEqual(
+      expect.objectContaining({
+        key: 'ops_digest',
+        locked: false,
+        label: 'Resumen operativo diario',
       }),
     );
   });

@@ -67,6 +67,18 @@ const envSchema = z.object({
    * Zod does not enforce the floor; the RPC is the security authority.
    */
   OUTBOX_RETENTION_DAYS: z.coerce.number().default(30),
+  /**
+   * F4-001 — When true, digest scheduler emits agency.digest.due and
+   * handler delivers the daily agency email.
+   * Default false until soak/audit.
+   */
+  AGENCY_DIGEST_VIA_WORKER: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
+  /** F4-001 — digest scheduler poll interval (default 1h). */
+  AGENCY_DIGEST_POLL_MS: z.coerce.number().default(3_600_000),
+  /** F4-001 — max agencies scanned per schedule_agency_digests call. */
+  AGENCY_DIGEST_BATCH: z.coerce.number().default(50),
   OUTBOX_POLL_MS: z.coerce.number().default(2000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(10),

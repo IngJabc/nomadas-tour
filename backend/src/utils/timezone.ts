@@ -61,3 +61,49 @@ export function toUTC(naiveDatetime: string): string {
 
   return correctUTC.toISOString();
 }
+
+/**
+ * Calendar date YYYY-MM-DD in BUSINESS_TIMEZONE for an instant.
+ */
+export function toBusinessDateString(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: BUSINESS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
+/**
+ * Local hour (0–23) in BUSINESS_TIMEZONE for an instant.
+ */
+export function getBusinessHour(date: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: BUSINESS_TIMEZONE,
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(date);
+  const hourRaw = parts.find((p) => p.type === 'hour')?.value ?? '0';
+  const hour = parseInt(hourRaw, 10);
+  // Some engines report midnight as 24.
+  return hour === 24 ? 0 : hour;
+}
+
+/**
+ * UTC bounds [start, end) for a BUSINESS_TIMEZONE calendar day (YYYY-MM-DD).
+ */
+export function businessDayBoundsUtc(digestDate: string): {
+  startIso: string;
+  endIsoExclusive: string;
+} {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(digestDate)) {
+    throw new Error(`Invalid digestDate: ${digestDate}`);
+  }
+  const [y, m, d] = digestDate.split('-').map((n) => parseInt(n, 10));
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  const nextDate = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`;
+  return {
+    startIso: toUTC(`${digestDate}T00:00:00`),
+    endIsoExclusive: toUTC(`${nextDate}T00:00:00`),
+  };
+}

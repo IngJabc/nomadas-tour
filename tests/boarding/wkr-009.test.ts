@@ -28,7 +28,7 @@ const migration060 = read(
 const harness = read('supabase/tests/wkr_009_verification.sql');
 
 describe('WKR-009 — migration isolation', () => {
-  it('keeps 060 as tip after contiguous 058→059→060', () => {
+  it('keeps 060 contiguous after 059; tip may advance with later tickets', () => {
     const migrations = listMigrations();
     const i058 = migrations.indexOf(
       '058_remove_trip_deleted_notification_type.sql',
@@ -38,7 +38,8 @@ describe('WKR-009 — migration isolation', () => {
 
     expect(i059).toBe(i058 + 1);
     expect(i060).toBe(i059 + 1);
-    expect(i060).toBe(migrations.length - 1);
+    expect(i060).toBeGreaterThanOrEqual(0);
+    expect(migrations[migrations.length - 1]).toMatch(/^\d{3}_/);
   });
 
   it('has no tracked modifications in migrations 001–059', () => {
@@ -143,9 +144,8 @@ describe('WKR-009 — worker wiring', () => {
     expect(runner).toContain('startRetentionScheduler');
     expect(runner).toContain('createDefaultRetentionSchedulerDeps');
     expect(runner).toContain('startReminderScheduler');
-    expect(runner).toContain(
-      'Promise.all([reminderScheduler.done, retentionScheduler.done])',
-    );
+    expect(runner).toContain('reminderScheduler.done');
+    expect(runner).toContain('retentionScheduler.done');
     expect(runner).toContain('outbox_retention_via_worker');
     expect(runner).not.toContain('pg_cron');
   });
