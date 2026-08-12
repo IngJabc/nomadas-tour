@@ -9,15 +9,9 @@
 
 ## Sprint actual — siguiente
 
-**Fase 3 — WKR-008 — Reminder workers**
+**Fase 3 — WKR-009 — Retention worker / automation bridge**
 
-Reminders proactivos T-24h / T-2h. Referencia de arranque: [`docs/WKR-008-reminder-workers-audit.md`](docs/WKR-008-reminder-workers-audit.md).
-
-- [ ] Mecanismo de scheduler durable + single-writer (decisión A)
-- [ ] Contrato `trip.reminder_due` v1: `window` (T-24h/T-2h), payload, dedup_key (hallazgo C)
-- [ ] SchedulerWorker productor + ReminderWorker consumidor (`email_delivery_log` como ledger)
-- [ ] Destinatarios: booker (email); agencias email y/o in-app (decisión G)
-- [ ] Feature flag + soak (patrón `EMAIL_VIA_OUTBOX`)
+Siguiente consumer tras el cierre de WKR-008. Referencia de fase: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/WKR-006.4-worker-health-endpoint.md)
 
@@ -37,6 +31,7 @@ Worker health (Render Free): [`docs/WKR-006.4-worker-health-endpoint.md`](docs/W
 - [x] WKR-006.3 — Outbox Retention & DLQ Operational Runbook (docs)
 - [x] WKR-006.4 — Worker health endpoint (`GET /healthz`, `WORKER_HEALTH_PORT`)
 - [x] WKR-007 — Trip / notification event workers (eventos trip.*, RPCs 057, handlers fanout, wiring a producción + cutover realizado; cierre en [`docs/WKR-007-wiring-implementation-plan.md`](docs/WKR-007-wiring-implementation-plan.md))
+- [x] WKR-008 — Reminder workers (**Completado** — T-48h/T-24h, migración 059, harness SQL A–K, cutover `TRIP_REMINDER_VIA_OUTBOX=true` en Render; cierre: [`docs/WKR-008-reminder-workers-audit.md`](docs/WKR-008-reminder-workers-audit.md) — PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED)
 
 ---
 

@@ -9,6 +9,7 @@ function createDefaultPreferences() {
     trip_schedule_changes: { in_app_enabled: true, email_enabled: true },
     trip_status_updates: { in_app_enabled: true, email_enabled: true },
     trip_cancellations: { in_app_enabled: true, email_enabled: true },
+    trip_reminders: { in_app_enabled: true, email_enabled: true },
   };
 }
 
@@ -34,6 +35,14 @@ describe('isDeliveryEnabled', () => {
     const prefs = createDefaultPreferences();
     expect(isDeliveryEnabled(prefs as any, 'trip_created', 'in_app')).toBe(true);
     expect(isDeliveryEnabled(prefs as any, 'trip_created', 'email')).toBe(true);
+    expect(isDeliveryEnabled(prefs as any, 'trip_reminder', 'email')).toBe(true);
+  });
+
+  it('blocks trip_reminder email when trip_reminders category disabled', () => {
+    const prefs = createDefaultPreferences();
+    prefs.trip_reminders.email_enabled = false;
+    expect(isDeliveryEnabled(prefs as any, 'trip_reminder', 'email')).toBe(false);
+    expect(isDeliveryEnabled(prefs as any, 'trip_reminder', 'in_app')).toBe(true);
   });
 
   it('blocks in-app delivery when category disabled', () => {

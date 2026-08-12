@@ -6,6 +6,7 @@ import { ResetPasswordEmail } from '../templates/reset-password-email.js';
 import { NewTripAssignedEmail } from '../templates/new-trip-assigned-email.js';
 import { TripPostponedEmail } from '../templates/trip-postponed-email.js';
 import { TripCancelledEmail } from '../templates/trip-cancelled-email.js';
+import { TripReminderEmail } from '../templates/trip-reminder-email.js';
 import { ReservationConfirmedEmail } from '../templates/reservation-confirmed-email.js';
 import { generateTicketPNG } from '../utils/ticket-png.js';
 import type { TicketData } from '../types/reservation.js';
@@ -205,6 +206,39 @@ export class EmailService {
           TripCancelledEmail({ agencyName, origin, destination, departureTime }),
         );
         return { subject: 'Viaje cancelado — Nómadas Tour', html };
+      },
+    );
+  }
+
+  async sendTripReminderEmail(
+    to: string,
+    recipientName: string,
+    origin: string,
+    destination: string,
+    departureTime: string,
+    window: 't48' | 't24',
+    _tripId: string,
+  ): Promise<EmailSendResult> {
+    const subject =
+      window === 't48'
+        ? `Recordatorio: tu viaje sale en dos días — ${origin} → ${destination}`
+        : `Recordatorio: tu viaje sale mañana — ${origin} → ${destination}`;
+
+    return this.deliver(
+      to,
+      'trip_reminder',
+      'Failed to send trip reminder email',
+      async () => {
+        const html = await render(
+          TripReminderEmail({
+            recipientName,
+            origin,
+            destination,
+            departureTime,
+            window,
+          }),
+        );
+        return { subject, html };
       },
     );
   }

@@ -16,6 +16,10 @@ import {
 import { runOutboxRelayLoop } from './outbox/relay.js';
 import { buildDefaultHandlers, resolveHandler } from './handlers/index.js';
 import {
+  createDefaultReminderSchedulerDeps,
+  startReminderScheduler,
+} from './reminder-scheduler.js';
+import {
   DEFAULT_WORKER_NAME,
   createHeartbeatController,
   createRecoveryScheduler,
@@ -149,6 +153,9 @@ async function main() {
     worker_version: workerVersion,
     process_id: process.pid,
     email_via_outbox: config.emailViaOutbox,
+    trip_reminder_via_outbox: config.tripReminderViaOutbox,
+    reminder_schedule_poll_ms: config.reminderSchedulePollMs,
+    reminder_schedule_batch: config.reminderScheduleBatch,
     poll_ms: config.pollMs,
     batch_size: config.batchSize,
     settle_ms: config.settleMs,
@@ -161,6 +168,12 @@ async function main() {
 
   // Immediate heartbeat so ops can see liveness without waiting for interval.
   heartbeat.maybeEmit(true);
+
+  // WKR-008 — reminder scheduler runs in parallel; errors never kill the relay.
+  const reminderScheduler = startReminderScheduler(
+    controller.signal,
+    createDefaultReminderSchedulerDeps(logger),
+  );
 
   try {
     await runOutboxRelayLoop(
@@ -196,6 +209,8 @@ async function main() {
         },
       },
     );
+
+    await reminderScheduler.done;
 
     logger.info('worker_stopped', {
       status: 'stopped',

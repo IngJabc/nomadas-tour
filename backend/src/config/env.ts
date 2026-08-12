@@ -39,6 +39,18 @@ const envSchema = z.object({
   TRIP_EFFECTS_VIA_OUTBOX: z
     .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
     .default(false),
+  /**
+   * WKR-008 — When true, reminder scheduler emits trip.reminder_due and
+   * handlers deliver booker/agency emails + in-app notifications.
+   * Default false until soak/audit.
+   */
+  TRIP_REMINDER_VIA_OUTBOX: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
+  /** WKR-008 — reminder scheduler poll interval (default 1h). */
+  REMINDER_SCHEDULE_POLL_MS: z.coerce.number().default(3_600_000),
+  /** WKR-008 — max trips scanned per schedule_trip_reminders call. */
+  REMINDER_SCHEDULE_BATCH: z.coerce.number().default(50),
   OUTBOX_POLL_MS: z.coerce.number().default(2000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(10),

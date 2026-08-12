@@ -57,18 +57,21 @@ describe('WKR-007 Fase 2 — migration isolation', () => {
     expect(migrations).toContain(
       '058_remove_trip_deleted_notification_type.sql',
     );
+    expect(migrations).toContain('059_schedule_trip_reminders.sql');
 
     const i056 = migrations.indexOf('056_outbox_trigger_retrofit_dedup_key.sql');
     const i057 = migrations.indexOf('057_trip_events_rpc.sql');
     const i058 = migrations.indexOf(
       '058_remove_trip_deleted_notification_type.sql',
     );
+    const i059 = migrations.indexOf('059_schedule_trip_reminders.sql');
 
     // Fase 2 RPC migration must stay contiguous after 056; later cleanup
-    // migrations (058+) may extend the tip without rewriting history.
+    // / feature migrations (058+) may extend the tip without rewriting history.
     expect(i057).toBe(i056 + 1);
     expect(i058).toBe(i057 + 1);
-    expect(i058).toBe(migrations.length - 1);
+    expect(i059).toBe(i058 + 1);
+    expect(i059).toBe(migrations.length - 1);
   });
 
   it('has no tracked modifications in migrations 001–056', () => {

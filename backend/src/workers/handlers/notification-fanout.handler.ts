@@ -28,6 +28,10 @@ import {
   parseTripPostponedEventV1,
   type TripPostponedEventV1,
 } from '../../events/trip-postponed.v1.js';
+import {
+  parseTripReminderDueEventV1,
+  type TripReminderDueEventV1,
+} from '../../events/trip-reminder-due.v1.js';
 import type { OutboxEventRow } from '../../events/types.js';
 import { formatDateForEmail } from '../../utils/email-fanout.js';
 import {
@@ -49,7 +53,9 @@ export type NotificationFanoutEvent =
   | 'trip.cancelled'
   | 'trip.completed'
   | 'trip.auto_completed'
-  | 'trip.archived';
+  | 'trip.archived'
+  /** WKR-008 — in-app reminder; gated via TRIP_REMINDER_VIA_OUTBOX deps. */
+  | 'trip_reminder';
 
 export interface NotificationFanoutInsertRow extends AgencyNotificationRow {
   type: NotificationType;
@@ -493,6 +499,47 @@ async function buildRowsForEvent(
               origin: route?.origin ?? null,
               destination: route?.destination ?? null,
               departure_time: parsed.data.departure_time,
+            },
+          }),
+        };
+      }
+      case 'trip_reminder': {
+        const parsed: TripReminderDueEventV1 =
+          parseTripReminderDueEventV1(row);
+        if (parsed.data.agency_ids.length === 0) {
+          return {
+            ok: false,
+            outcome: { kind: 'completed', reason: 'skipped_no_agencies' },
+          };
+        }
+        const route = await deps.loadRoute(parsed.data.route_id);
+        const origin = route?.origin ?? '?';
+        const destination = route?.destination ?? '?';
+        const departureFormatted = deps.formatDeparture(
+          parsed.data.departure_time,
+        );
+        const headline =
+          parsed.data.window === 't48'
+            ? 'Tu viaje sale en dos días'
+            : 'Tu viaje sale mañana';
+        return {
+          ok: true,
+          rows: buildAgencyAndOptionalAdminRows({
+            type: 'trip_reminder',
+            title: 'Recordatorio de viaje',
+            body: `${headline}: ${origin} → ${destination} el ${departureFormatted}`,
+            entityType: 'trip',
+            entityId: parsed.data.trip_id,
+            agencyIds: parsed.data.agency_ids,
+            actor: 'superadmin',
+            sourceEventId: row.id,
+            actionUrl: `/agency/trips/${parsed.data.trip_id}/passengers`,
+            metadata: {
+              trip_id: parsed.data.trip_id,
+              origin,
+              destination,
+              departure_time: parsed.data.departure_time,
+              window: parsed.data.window,
             },
           }),
         };

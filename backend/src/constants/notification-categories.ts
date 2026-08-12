@@ -3,6 +3,7 @@ export const NOTIFICATION_CATEGORIES = [
   'trip_schedule_changes',
   'trip_status_updates',
   'trip_cancellations',
+  'trip_reminders',
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -18,6 +19,7 @@ export const NOTIFICATION_TYPE_TO_CATEGORY = {
   trip_auto_completed: 'trip_status_updates',
   trip_cancelled: 'trip_cancellations',
   trip_archived: 'trip_cancellations',
+  trip_reminder: 'trip_reminders',
   reservation_created: null,
   reservation_cancelled: null,
   passenger_cancelled: null,
@@ -62,5 +64,11 @@ export const CATEGORY_METADATA: {
     label: 'Cancelaciones y eliminaciones',
     description: 'Cuando un viaje es cancelado o eliminado del sistema.',
     locked: true,
+  },
+  {
+    key: 'trip_reminders',
+    label: 'Recordatorios de viaje',
+    description: 'Avisos automáticos T-48h y T-24h antes de la salida.',
+    locked: false,
   },
 ];

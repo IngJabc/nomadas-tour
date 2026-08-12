@@ -28,6 +28,18 @@ async function parseTripEffectsViaOutbox(value?: string) {
   return env.TRIP_EFFECTS_VIA_OUTBOX;
 }
 
+async function parseTripReminderViaOutbox(value?: string) {
+  process.env = { ...originalEnv, ...requiredEnv };
+  if (value === undefined) {
+    delete process.env.TRIP_REMINDER_VIA_OUTBOX;
+  } else {
+    process.env.TRIP_REMINDER_VIA_OUTBOX = value;
+  }
+
+  const { env } = await import("./env.js");
+  return env.TRIP_REMINDER_VIA_OUTBOX;
+}
+
 describe("C1 — TRIP_EFFECTS_VIA_OUTBOX environment flag", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -44,5 +56,36 @@ describe("C1 — TRIP_EFFECTS_VIA_OUTBOX environment flag", () => {
     ['"1"', "1", true],
   ])("parses %s as %s", async (_label, value, expected) => {
     await expect(parseTripEffectsViaOutbox(value)).resolves.toBe(expected);
+  });
+});
+
+describe("WKR-008 — TRIP_REMINDER_VIA_OUTBOX environment flag", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it.each([
+    ["an absent value", undefined, false],
+    ['"false"', "false", false],
+    ['"true"', "true", true],
+    ['"1"', "1", true],
+  ])("parses %s as %s", async (_label, value, expected) => {
+    await expect(parseTripReminderViaOutbox(value)).resolves.toBe(expected);
+  });
+
+  it("defaults REMINDER_SCHEDULE_POLL_MS to 1h and BATCH to 50", async () => {
+    process.env = { ...originalEnv, ...requiredEnv };
+    delete process.env.REMINDER_SCHEDULE_POLL_MS;
+    delete process.env.REMINDER_SCHEDULE_BATCH;
+    delete process.env.TRIP_REMINDER_VIA_OUTBOX;
+    vi.resetModules();
+    const { env } = await import("./env.js");
+    expect(env.REMINDER_SCHEDULE_POLL_MS).toBe(3_600_000);
+    expect(env.REMINDER_SCHEDULE_BATCH).toBe(50);
+    expect(env.TRIP_REMINDER_VIA_OUTBOX).toBe(false);
   });
 });

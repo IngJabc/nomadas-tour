@@ -27,13 +27,22 @@ import {
   TRIP_POSTPONED_V1_TYPE,
   TRIP_POSTPONED_V1_VERSION,
 } from '../../events/trip-postponed.v1.js';
+import {
+  TRIP_REMINDER_DUE_V1_TYPE,
+  TRIP_REMINDER_DUE_V1_VERSION,
+} from '../../events/trip-reminder-due.v1.js';
+import { env } from '../../config/env.js';
 import { emailService } from '../../services/email.service.js';
 import { reservationService } from '../../services/reservation.service.js';
 import { getWorkerRuntimeConfig } from '../config.js';
 import type { OutboxHandler } from '../outbox/types.js';
 import { composeHandlers } from './compose.js';
 import { createEmailFanoutHandler } from './email-fanout.handler.js';
-import { createNotificationFanoutHandler } from './notification-fanout.handler.js';
+import {
+  createDefaultNotificationFanoutDeps,
+  createNotificationFanoutHandler,
+} from './notification-fanout.handler.js';
+import { createReminderFanoutHandler } from './reminder-fanout.handler.js';
 import { createReservationCreatedHandler } from './reservation-created.handler.js';
 
 export async function loadReservationEmailFlags(reservationId: string) {
@@ -132,6 +141,22 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
   map.set(
     `${TRIP_ARCHIVED_V1_TYPE}:${TRIP_ARCHIVED_V1_VERSION}`,
     createNotificationFanoutHandler('trip.archived'),
+  );
+
+  // WKR-008 — Reminder fanout (email + in-app), gated by TRIP_REMINDER_VIA_OUTBOX.
+  const reminderNotificationFanout = createNotificationFanoutHandler(
+    'trip_reminder',
+    {
+      ...createDefaultNotificationFanoutDeps(),
+      isEffectsEnabled: () => env.TRIP_REMINDER_VIA_OUTBOX,
+    },
+  );
+  map.set(
+    `${TRIP_REMINDER_DUE_V1_TYPE}:${TRIP_REMINDER_DUE_V1_VERSION}`,
+    composeHandlers(
+      createReminderFanoutHandler(),
+      reminderNotificationFanout,
+    ),
   );
 
   return map;

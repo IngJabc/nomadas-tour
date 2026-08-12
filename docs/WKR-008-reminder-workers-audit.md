@@ -1,74 +1,148 @@
 # AUD — WKR-008 Reminder Workers
 
-**Tipo:** Auditoría técnica (read-only)
-**Fecha:** 2026-08-09
-**Estado:** Pendiente (sin código)
-**Rama:** `main` (limpia)
-**Referencia:** [ROADMAP.md](ROADMAP.md), [WKR-001](WKR-001-event-inventory-audit.md), [WKR-002](WKR-002-events-workers-architecture-adr.md), [WKR-003.2](WKR-003.2-domain-event-boundaries.md), [WKR-005.1](WKR-005.1-email-worker-readiness-audit.md), [WKR-007 design](WKR-007-trip-notification-event-workers-design.md)
+**Tipo:** Auditoría técnica + implementación + cierre
+**Fecha auditoría (arranque):** 2026-08-09
+**Fecha implementación:** 2026-08-11
+**Fecha cierre:** 2026-08-12
+**Estado:** **PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED**
+**Rama:** `feat/wkr-008-reminder-workers`
+**Referencia:** [ROADMAP.md](ROADMAP.md), [WKR-001](WKR-001-event-inventory-audit.md), [WKR-002](WKR-002-events-workers-architecture-adr.md), [WKR-003.2](WKR-003.2-domain-event-boundaries.md), [WKR-007 design](WKR-007-trip-notification-event-workers-design.md)
 
 ---
 
-## 1. Estado del contrato (docs)
+## 1. Decisiones implementadas
 
-- **Definición (ROADMAP.md:193):** WKR-008 = *Reminder workers*, ventanas **T-24h / T-2h**. Reminder = notificación **proactiva** de viaje próximo: "Tu viaje sale mañana a las 09:00" / "en 2 horas" (ROADMAP.md:37-38). Se diferencia de los flujos reactivos (confirmación, cancelación).
-- **Evento clave:** `trip.reminder_due` (WKR-003.2:211-216) — un viaje **activo** entró en la ventana T-24h/T-2h. **No significa** que el reminder fue enviado; el envío es del consumer. **Productor:** `SchedulerWorker` (nuevo). **Consumidores futuros:** `ReminderWorker` (email a booker/agencia).
-- **Re-agendar:** `trip.postponed` / `trip.cancelled` tienen como consumidor futuro a ReminderWorker (re-agendar / descartar reminders) (WKR-003.2:190-200).
-- **Inventario (WKR-001:185,272):** `TripReminderWorker`, cron cada hora, "no existe; caso piloto de recordatorios".
-- **ADR (WKR-002:227-230):** Reminder Worker consume *scheduler + trip.updated/postponed/cancelled*; ejecuta generación de `trip.reminder_due` a bookers/agencias en T-24h/T-2h.
-- **Reutilización (WKR-007 design:232,415):** `email_delivery_log` es **reutilizable por WKR-008**; "handlers/eventos de trip listos; `trip.reminder_due` se publicará cuando exista scheduler".
-- **Decisiones pendientes (WKR-003.2:450,453):** Scheduler = *cron durable en worker dedicado, liderazgo single-writer*; `trip.reminder_due` = frecuencia de evaluación (cada hora) y ventanas exactas **sin cerrar**.
+| Decisión | Elección |
+|---|---|
+| Ventanas | **Solo T-48h y T-24h**. **No T-2h.** |
+| Scheduler | Loop Node dentro del worker existente (`reminder-scheduler.ts` + `runner.ts`). **Sin pg_cron**, sin segundo proceso. |
+| Productor | RPC `schedule_trip_reminders(p_batch)` (migración 059) → `emit_trip_event('trip.reminder_due', …)`. |
+| Evento | `trip.reminder_due.v1` con `window: 't48' \| 't24'`. |
+| Idempotencia | `dedup_key = trip.reminder_due:{trip_id}:{window}:{departure_time_utc}` en `outbox_events` (`ON CONFLICT DO NOTHING`). |
+| Catch-up | Si el worker vuelve en la ventana T-24h, emite **solo t24** (nunca T-48h retrospectivo). |
+| Postergación | Nueva `departure_time` → nuevas keys. Restaurar el horario exacto reutiliza la key histórica (no reenvía). |
+| Fanout | `reminder-fanout.handler` (booker + agency email vía `email_delivery_log`) + `NotificationFanout('trip_reminder')` in-app. |
+| Flag | `TRIP_REMINDER_VIA_OUTBOX` — default `false` en código (rollback); **activo `true` en Render** tras validación operativa (ver §10; evidencia de entorno, no verificable desde el repo). |
+| Preferencias | Categoría `trip_reminders` + backfill en 059; defaults en `NOTIFICATION_CATEGORIES` / `seedDefaults`. |
+| Poll | `REMINDER_SCHEDULE_POLL_MS=3600000` (1h); `REMINDER_SCHEDULE_BATCH=50`. |
 
-## 2. Estado de la implementación (código)
+---
 
-**No existe absolutamente nada de reminders/scheduler.** Verificado con grep exhaustivo (backend + app + supabase, excluyendo docs):
+## 2. Contrato `trip.reminder_due.v1`
 
-| Componente | ¿Existe? | Notas |
-|---|---|---|
-| Evento `trip.reminder_due` | ❌ No | `backend/src/events/` solo tiene family trip.* creados en WKR-007.3 |
-| Scheduler durable | ❌ No | Timers viven en `backend/src/index.ts:37-81` (setInterval LockCleanup 60s + completeExpiredTrips 1h) |
-| Handler/worker de reminder | ❌ No | `handlers/index.ts` solo registra `reservation.created` + placeholder de notificación |
-| Migración de reminders | ❌ No | Última migración: `057_trip_events_rpc.sql` |
-| Env vars reminder | ❌ No | `config/env.ts` no las define |
-| Template email reminder | ❌ No | `templates/`: solo invitation, registration, reset, new-trip, postponed, cancelled, confirmed, ticket |
-| Tipo notificación reminder | ❌ No | `notifications.type` CHECK (029) y `NOTIFICATION_CATEGORIES` no lo incluyen |
-| Tabla scheduler | ❌ No | `email_delivery_log` (055) sí existe, lista para reutilizar |
+Archivo: `backend/src/events/trip-reminder-due.v1.ts`
 
-## 3. Hallazgos clave
+```ts
+{
+  trip_id, route_id, departure_time, window: 't48' | 't24', agency_ids
+}
+```
 
-> **Nota de actualización (2026-08-11):** los hallazgos **B**, **D** y **E** quedaron **resueltos** por el cierre de WKR-007 (adopción de RPCs en `superadmin.service.ts`/`trip.service.ts`, handlers `NotificationFanout`/`EmailFanout`, flag `TRIP_EFFECTS_VIA_OUTBOX` con cutover realizado, `trip.auto_completed` emitido vía `complete_trip`). Los hallazgos **A**, **C**, **F** y **G** permanecen vigentes.
+Reglas (igual que resto trip.*): `tenant_id` NULL, `payload.trip_id === aggregate_id`, sin PII.
 
-**A. Dependencia de scheduler durable inexistente.** No hay ningún mecanismo de cron durable. Los schedulers actuales (locks, auto-completado) siguen en la API (`index.ts:37-81`), un anti-patrón documentado (WKR-001 §5.2, AUD-021 H10). WKR-008 requiere el `SchedulerWorker` nuevo como productor de `trip.reminder_due`. El contrato "cron durable + single-writer" (WKR-003.2:450) está sin implementar y sin decisión de mecanismo (Postgres-as-queue vs cron).
+---
 
-**B. `trip.auto_completed` no se emite hoy.** `completeExpiredTrips` (`trip.service.ts:4-57`) hace UPDATE directo + notificación síncrona; no usa el RPC `complete_trip`. Si WKR-008 quiere descartar reminders de viajes no-activos, hoy el "hecho" de auto-completado no pasa por el outbox.
+## 3. Ventanas T-48 / T-24
 
-**C. Gap de contrato en el payload de `trip.reminder_due`.** El evento no define payload shape, y específicamente **no define `window` (T-24h vs T-2h)**. Dado que el type es el mismo para ambas ventanas, sin un campo `window` la idempotencia (dedup_key / `email_delivery_log`) no puede distinguir "enviado a las 24h" de "enviado a las 2h". Es un requisito derivar `dedup_key = trip.reminder_due:{trip}:{window}` (mismo patrón que `trip.postponed`, migración 057:348-350).
+Para un viaje `active` con `now < departure_time` y `now >= departure_time - 48h`:
 
-**D. El worker fallaría hoy ante trip.* events.** `runner.ts:188` usa `eventType: null` (claim todos los tipos), pero el registry solo tiene `reservation.created`. Si un trip.* se publicara hoy → relay lo marca `failed: "No handler"` (relay.ts:100-121). No es un problema activo (el service layer aún no llama a los RPC de trip), pero es la frontera que WKR-007 debe cerrar antes de que WKR-008 pueda encadenarse.
+- **t48:** `departure - 48h <= now < departure - 24h`
+- **t24:** `departure - 24h <= now < departure`
 
-**E. WKR-007 no está completo (contradice WKR-007 design:415).** TASKS.md:52 marca WKR-007 como "**Siguiente**" (no cerrado). En código: migraciones Fase 0 (052-056), contratos trip.* v1 y RPCs 057 **sí**; pero **no** hay adopción en `superadmin.service` (sigue con updates directos, sin `.rpc('create_trip'|...)`), **no** hay handlers de trip (NotificationFanout/EmailFanout), **no** existe flag `TRIP_EFFECTS_VIA_OUTBOX`. El doc WKR-007:415 describe el estado *objetivo*, no el actual.
+Implementación SQL (equivalente): si `departure <= now + 24h` → `t24`, si no → `t48`.
 
-**F. Booker/pasajero sin email propio.** Los payloads trip.* son sin-PII por diseño. El ReminderWorker deberá resolver bookers en runtime (join `reservations.trip_id → contact_email`). Consistente con el patrón del worker actual (load-time lookup en `handlers/index.ts:13-30`).
+---
 
-**G. Canal:** el reminder a pasajero es **email** (el pasajero no autentica; WKR-003.2:216). Para agencias queda la opción email + in-app (requeriría nuevo `notifications.type` y categoría en `notification-categories.ts`). Decisión de producto abierta.
+## 4. Idempotencia y postergación
 
-## 4. Verificación de regresión
+1. Viaje original → un evento t48 + un evento t24 (cuando cada ventana aplique).
+2. Re-poll → `dedup_key` evita duplicados.
+3. Admin pospone `departure_time` → nuevas keys → nuevas ventanas.
+4. Restaura el horario exacto original → key histórica bloquea reemisión.
+5. Nunca se borran / revierten reminders históricos.
 
-- **Backend:** 36 files, **280/280 tests** ✅ (17.64s)
-- **WKR-007 suites:** phase0 (17) + fase2 (21) + 007.2 (9) = **47/47** ✅
-- **Typecheck:** `tsc --noEmit` exit 0 ✅
-- **git:** limpio, sin cambios ✅
+---
 
-## 5. Decisiones que WKR-008 debe tomar (bloqueantes)
+## 5. Fanout
 
-1. **Mecanismo de scheduler durable** (cron worker Node vs pg_cron vs polling) + single-writer.
-2. **Ventanas exactas:** qué cuenta como "T-24h" y "T-2h" respecto de `departure_time`, frecuencia de evaluación (cada hora) y cómo evitar doble emisión.
-3. **Payload/`window`:** definir `trip.reminder_due` payload con `window` y derivar dedup_key → idempotencia vía `email_delivery_log` (reutilizable, ya lista).
-4. **Destinatarios:** booker (email) siempre; ¿agencias por email y/o in-app? (afecta `notifications.type` + categorías).
+| Canal | Mecanismo |
+|---|---|
+| Booker email | Reservas `confirmed`/`partial` con `contact_email`; ledger `trip_reminder_t48` / `trip_reminder_t24`, `recipient_id = reservation.id` |
+| Agency email | `getAgenciesWithEmail` + `shouldDeliver(agency, trip_reminder, email)`; mismo ledger, `recipient_id = agency.id` |
+| In-app | `createNotificationFanoutHandler('trip_reminder')` con `source_event_id`; gated por `TRIP_REMINDER_VIA_OUTBOX` |
 
-## 6. Orden recomendado
+No hay camino síncrono legacy de reminders → no hay doble emisión in-app al activar el flag.
 
-1. Cerrar WKR-007 (adopción RPC en service + handlers de trip + flag) — de él cuelga WKR-008.
-2. Decidir scheduler durable (A) → SchedulerWorker productor.
-3. Definir contrato `trip.reminder_due` v1 (window, payload, dedup) + tests de contrato.
-4. ReminderWorker consumidor: resolver bookers, `email_delivery_log` como ledger, template email (2 variantes T-24h/T-2h), re-agendar en `trip.postponed` y descartar en `trip.cancelled`.
-5. Feature flag (patrón `EMAIL_VIA_OUTBOX`) + soak.
+Textos:
+
+- T-48h: "Tu viaje sale en dos días"
+- T-24h: "Tu viaje sale mañana"
+- Siempre muestran la fecha/hora real del evento (`departure_time`).
+
+---
+
+## 6. Observabilidad
+
+Reutiliza logs JSON del worker, métricas, heartbeat, Sentry, DLQ/retry/recovery. El scheduler loguea `reminder_scheduler_started|tick|error|stopped` con `scanned` / `emitted` / `duration_ms`. Errores del scheduler **no** tumban el relay.
+
+---
+
+## 7. Archivos clave
+
+- `supabase/migrations/059_schedule_trip_reminders.sql`
+- `backend/src/events/trip-reminder-due.v1.ts`
+- `backend/src/workers/reminder-scheduler.ts`
+- `backend/src/workers/handlers/reminder-fanout.handler.ts`
+- `backend/src/templates/trip-reminder-email.tsx`
+- `backend/src/config/env.ts` (`TRIP_REMINDER_VIA_OUTBOX`, poll/batch)
+- `supabase/tests/wkr_008_verification.sql`
+
+---
+
+## 8. Hallazgos del audit de cierre — remediación (histórica)
+
+Trazabilidad de findings del audit de cierre (estado final: **cerrados**; sin blockers técnicos).
+
+| ID | Hallazgo | Severidad | Resolución / estado final |
+|---|---|---|---|
+| **F-01** | Literal `t22` en RPC 059 | P0 (reportado) | **Falso positivo / CLOSED.** Inspección directa de `059_schedule_trip_reminders.sql` y `pg_get_functiondef` (harness K): solo existen `'t48'` y `'t24'`. No había `t22` / `T22` / `trip_reminder_t22`. Sin cambio cosmético. |
+| **F-02** | Pre-filtro muerto (`v_window` NULL en `NOT EXISTS`) | P2 (reportado) | **CLOSED.** Discrepancia con el código real: no existía ese `NOT EXISTS` con `v_window`. Remediación: pre-filtro `NOT EXISTS` con ventana **inline** vía `CASE` sobre `t.departure_time`. `emit_trip_event` sigue siendo la garantía final (`ON CONFLICT DO NOTHING`). |
+| **F-03** | TOCTOU select→emit | P2 | **CLOSED.** `FOR UPDATE OF t SKIP LOCKED` + revalidación de `status` / `departure_time` bajo el lock antes de emitir. |
+| **F-04** | Ausencia / ejecución del harness SQL comportamental | P2 → cerrado en cierre | **CLOSED.** Harness `supabase/tests/wkr_008_verification.sql` (casos A–K) creado, corregido (quoting + discovery por firma `pronargs`/`int4`) y **ejecutado exitosamente en staging** (`success. no rows returned`). |
+
+Observations residuales (no blockers): únicamente P3 de documentación/trazabilidad — resueltas con este cierre documental.
+
+---
+
+## 9. Harness SQL
+
+`supabase/tests/wkr_008_verification.sql` — BEGIN/ROLLBACK, casos A–J (+ K superficie):
+
+- A t48 (~36h), B t24 (~12h), C fuera de ventana, D ya salido
+- E catch-up solo t24, F dedup re-poll, G postponement, H restore
+- I estados no elegibles, J `p_batch`, K solo t48/t24 + FOR UPDATE + NOT EXISTS
+
+**Ejecución staging:** migración **059 aplicada**; harness A–K ejecutado completamente con resultado `success. no rows returned`.
+
+---
+
+## 10. Cierre definitivo (2026-08-12)
+
+**Veredicto:** **PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED**
+
+| Evidencia | Resultado |
+|---|---|
+| Migración 059 en staging | Aplicada |
+| Harness SQL A–K | Ejecutado exitosamente (`success. no rows returned`) |
+| WKR-008 unit tests | 20/20 PASS |
+| WKR-008 boarding | 14/14 PASS |
+| WKR-007 fase2 | 21/21 PASS |
+| Backend tests | 352/352 PASS |
+| Backend `tsc --noEmit` | PASS |
+| Backend build | PASS |
+| Root build | PASS |
+| `TRIP_REMINDER_VIA_OUTBOX=true` en Render | Activo — **evidencia operativa** proporcionada/verificada durante el cierre; **no es una propiedad verificable desde el repositorio** (el default en código permanece `false` como postura de rollback) |
+| Flujo real de reminders en producción | Probado y funcionó correctamente (evidencia operativa de cierre) |
+| Blockers técnicos | **Ninguno** |
+
+No quedan hallazgos P0/P2 abiertos. Observations: P3 de documentación/trazabilidad (este documento + TASKS/ROADMAP/HISTORY).

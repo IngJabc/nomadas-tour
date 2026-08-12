@@ -71,8 +71,8 @@ FASE 3 — Workers
   WKR-006.3 Retention + DLQ runbook ✅
   WKR-006.4 Worker health endpoint (/healthz) ✅
   WKR-007  Trip / notification event workers ✅
-  WKR-008  Reminder workers → siguiente
-  WKR-009  Retention worker / automation bridge
+  WKR-008  Reminder workers ✅
+  WKR-009  Retention worker / automation bridge → siguiente
 
 FASE Seguridad continua
   SEC-001 … SEC-008                        ✅ (hardening cerrado)
@@ -128,7 +128,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 3 — Sistema de Workers
 
-**Prioridad:** En curso (WKR-007 cerrado; siguiente consumer WKR-008).
+**Prioridad:** En curso (WKR-008 cerrado; siguiente consumer WKR-009).
 
 **Objetivo:** Procesamiento asíncrono y tareas programadas desacopladas del ciclo HTTP, mediante **Transactional Outbox + Workers** ([WKR-002](WKR-002-events-workers-architecture-adr.md)).
 
@@ -148,8 +148,8 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 | [WKR-006.3](WKR-006.3-outbox-retention-dlq-runbook.md) | Retention + DLQ runbook (docs) | ✅ |
 | [WKR-006.4](WKR-006.4-worker-health-endpoint.md) | Worker `/healthz` (Render Free Web Service) | ✅ |
 | [WKR-007](WKR-007-trip-notification-event-workers-design.md) | Trip / notification event workers (wiring + cutover) | ✅ |
-| **WKR-008** | Reminder workers | **Siguiente** |
-| WKR-009 | Retention worker / automation bridge → Fase 4 | Pendiente |
+| [WKR-008](WKR-008-reminder-workers-audit.md) | Reminder workers (T-48h/T-24h + cutover) | ✅ |
+| WKR-009 | Retention worker / automation bridge → Fase 4 | **Siguiente** |
 
 #### Capacidades ya en el sistema (WKR-004/005)
 
@@ -159,6 +159,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 - Feature flag `EMAIL_VIA_OUTBOX`
 - Logs JSON estructurados + métricas + heartbeat + stuck recovery (WKR-006.1)
 - Eventos de dominio trip.* (7 contratos v1), RPCs transaccionales 057, handlers NotificationFanout/EmailFanout y flag `TRIP_EFFECTS_VIA_OUTBOX` con cutover realizado (WKR-007)
+- Reminder workers T-48h/T-24h: RPC `schedule_trip_reminders` (059), evento `trip.reminder_due.v1`, fanout email/in-app y flag `TRIP_REMINDER_VIA_OUTBOX` con cutover realizado (WKR-008)
 
 #### WKR-006 / 006.1 — Worker Observability ✅
 
@@ -194,9 +195,13 @@ Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** —
 - Diseño: [`WKR-007-trip-notification-event-workers-design.md`](WKR-007-trip-notification-event-workers-design.md)
 - Registro de implementación (C1–C8): [`WKR-007-wiring-implementation-plan.md`](WKR-007-wiring-implementation-plan.md)
 
-#### WKR-008 → WKR-009 (posteriores)
+#### WKR-008 ✅ — Reminder workers
 
-- **WKR-008 — Reminder workers:** ventanas T-24h / T-2h. Referencia de arranque: [`WKR-008-reminder-workers-audit.md`](WKR-008-reminder-workers-audit.md).
+- **Estado:** Completado. Ventanas **T-48h / T-24h** (sin T-2h). Scheduler en el worker Node + RPC `schedule_trip_reminders` (migración 059) + evento `trip.reminder_due.v1` + fanout email/in-app. Flag `TRIP_REMINDER_VIA_OUTBOX` con cutover realizado (`true` en Render; default `false` en código como postura de rollback). Harness SQL A–K ejecutado en staging; validación operativa en producción. Veredicto de cierre: **PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED**.
+- Auditoría / cierre: [`WKR-008-reminder-workers-audit.md`](WKR-008-reminder-workers-audit.md)
+
+#### WKR-009 (siguiente)
+
 - **WKR-009 — Retention worker / automation bridge:** purga `completed` (política 006.3) + puente a Fase 4.
 
 **Valor de la fase:** reduce acoplamiento HTTP↔efectos secundarios, mejora confiabilidad de emails y prepara automatizaciones de producto.
@@ -240,7 +245,7 @@ El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implemen
 
 **Ejemplos:**
 
-- Recordatorios automáticos (T-24h, T-2h)
+- Recordatorios automáticos (T-48h, T-24h)
 - Digest diario para agencias y superadmin
 - Alertas de ocupación (viaje casi lleno / subocupado)
 - Viajes próximos sin acción

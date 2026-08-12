@@ -438,3 +438,24 @@ Cierre de la fase WKR de infra de workers (WKR-001…006.4 quedaron marcados com
 - **Cleanup legacy**: tipo de notificación `trip_deleted` removido (emisor muerto tras el archivo de trips) — migración `058_remove_trip_deleted_notification_type.sql` + `notification.service.ts`/`notification-categories.ts`/frontend `notification-config.ts`/`NotificationProvider.tsx`
 - **Documentación de cierre**: registro de implementación C1–C8 en `docs/WKR-007-wiring-implementation-plan.md` (EJECUTADO); audit de arranque de WKR-008 conservado en `docs/WKR-008-reminder-workers-audit.md` (KEEP AS HISTORICAL RECORD); Apéndice B de referencia en el design doc; TASKS/ROADMAP actualizados (WKR-007 ✅, WKR-008 siguiente)
 - **Validación:** `tsc --noEmit` ✓ exit 0, suite backend **326/326** ✓, suites WKR-007 ✓
+
+---
+
+## Sprint 15 — WKR-008 Trip Reminder Workers (2026-08-12)
+
+Cierre de reminders proactivos sobre Transactional Outbox + worker Node existente (sin pg_cron ni segundo proceso).
+
+[x] **WKR-008 — Trip Reminder Workers** (completado; PASS WITH OBSERVATIONS / READY FOR CLOSURE / CLOSED)
+- **Objetivo:** emitir y entregar recordatorios automáticos T-48h / T-24h (sin T-2h) para viajes `active` próximos a salir
+- **Scheduler durable** en el worker Node (`reminder-scheduler.ts` + `runner.ts`) → RPC `schedule_trip_reminders(p_batch)`
+- **Evento** `trip.reminder_due.v1` (`window: 't48' | 't24'`, payload sin PII, `tenant_id` NULL)
+- **Idempotencia** vía `dedup_key = trip.reminder_due:{trip_id}:{window}:{departure_time_utc}` (`emit_trip_event` / `ON CONFLICT DO NOTHING`)
+- **Catch-up:** si el worker vuelve en T-24h, emite solo `t24` (nunca T-48h retrospectivo)
+- **Postponement / restore:** nuevo `departure_time` → nuevas keys; restaurar el horario exacto reutiliza la key histórica (no reenvía)
+- **Fanout:** booker + agency email (`email_delivery_log`, tipos `trip_reminder_t48` / `trip_reminder_t24`) + in-app `trip_reminder` (`source_event_id`)
+- **Migración** `059_schedule_trip_reminders.sql` (tipo/categoría de notificación + RPC); aplicada en staging
+- **Harness SQL** `supabase/tests/wkr_008_verification.sql` (casos A–K) ejecutado en staging: `success. no rows returned`
+- **Flag** `TRIP_REMINDER_VIA_OUTBOX` (default `false` en código): cutover realizado — `true` en Render; flujo real de reminders validado en producción (evidencia operativa de cierre; no verificable desde el repo)
+- **Remediación de cierre:** F-01 `t22` falso positivo; F-02 pre-filtro `NOT EXISTS` inline; F-03 TOCTOU `FOR UPDATE` + revalidación; F-04 harness comportamental — todos CLOSED; sin blockers técnicos
+- **Documentación de cierre:** [`docs/WKR-008-reminder-workers-audit.md`](WKR-008-reminder-workers-audit.md); TASKS/ROADMAP actualizados (WKR-008 ✅, WKR-009 siguiente)
+- **Validación:** WKR-008 unit **20/20** ✓, boarding WKR-008 **14/14** ✓, WKR-007 fase2 **21/21** ✓, backend **352/352** ✓, `tsc --noEmit` ✓, backend build ✓, root build ✓
