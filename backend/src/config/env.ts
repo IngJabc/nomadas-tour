@@ -51,6 +51,22 @@ const envSchema = z.object({
   REMINDER_SCHEDULE_POLL_MS: z.coerce.number().default(3_600_000),
   /** WKR-008 — max trips scanned per schedule_trip_reminders call. */
   REMINDER_SCHEDULE_BATCH: z.coerce.number().default(50),
+  /**
+   * WKR-009 — When true, retention scheduler purges old completed outbox rows.
+   * Default false until soak/audit.
+   */
+  OUTBOX_RETENTION_VIA_WORKER: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
+  /** WKR-009 — retention scheduler poll interval (default 24h). */
+  OUTBOX_RETENTION_POLL_MS: z.coerce.number().default(86_400_000),
+  /** WKR-009 — max rows deleted per purge_completed_outbox_events call. */
+  OUTBOX_RETENTION_BATCH: z.coerce.number().default(1000),
+  /**
+   * WKR-009 — retention age in days (RPC clamps to >= 30).
+   * Zod does not enforce the floor; the RPC is the security authority.
+   */
+  OUTBOX_RETENTION_DAYS: z.coerce.number().default(30),
   OUTBOX_POLL_MS: z.coerce.number().default(2000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(10),

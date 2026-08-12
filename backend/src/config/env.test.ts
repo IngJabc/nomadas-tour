@@ -89,3 +89,48 @@ describe("WKR-008 — TRIP_REMINDER_VIA_OUTBOX environment flag", () => {
     expect(env.TRIP_REMINDER_VIA_OUTBOX).toBe(false);
   });
 });
+
+async function parseOutboxRetentionViaWorker(value?: string) {
+  process.env = { ...originalEnv, ...requiredEnv };
+  if (value === undefined) {
+    delete process.env.OUTBOX_RETENTION_VIA_WORKER;
+  } else {
+    process.env.OUTBOX_RETENTION_VIA_WORKER = value;
+  }
+
+  const { env } = await import("./env.js");
+  return env.OUTBOX_RETENTION_VIA_WORKER;
+}
+
+describe("WKR-009 — OUTBOX_RETENTION_* environment", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it.each([
+    ["an absent value", undefined, false],
+    ['"false"', "false", false],
+    ['"true"', "true", true],
+    ['"1"', "1", true],
+  ])("parses OUTBOX_RETENTION_VIA_WORKER %s as %s", async (_label, value, expected) => {
+    await expect(parseOutboxRetentionViaWorker(value)).resolves.toBe(expected);
+  });
+
+  it("defaults poll 24h, batch 1000, days 30, flag false", async () => {
+    process.env = { ...originalEnv, ...requiredEnv };
+    delete process.env.OUTBOX_RETENTION_VIA_WORKER;
+    delete process.env.OUTBOX_RETENTION_POLL_MS;
+    delete process.env.OUTBOX_RETENTION_BATCH;
+    delete process.env.OUTBOX_RETENTION_DAYS;
+    vi.resetModules();
+    const { env } = await import("./env.js");
+    expect(env.OUTBOX_RETENTION_VIA_WORKER).toBe(false);
+    expect(env.OUTBOX_RETENTION_POLL_MS).toBe(86_400_000);
+    expect(env.OUTBOX_RETENTION_BATCH).toBe(1000);
+    expect(env.OUTBOX_RETENTION_DAYS).toBe(30);
+  });
+});

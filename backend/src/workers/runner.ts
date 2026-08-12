@@ -20,6 +20,10 @@ import {
   startReminderScheduler,
 } from './reminder-scheduler.js';
 import {
+  createDefaultRetentionSchedulerDeps,
+  startRetentionScheduler,
+} from './retention-scheduler.js';
+import {
   DEFAULT_WORKER_NAME,
   createHeartbeatController,
   createRecoveryScheduler,
@@ -156,6 +160,10 @@ async function main() {
     trip_reminder_via_outbox: config.tripReminderViaOutbox,
     reminder_schedule_poll_ms: config.reminderSchedulePollMs,
     reminder_schedule_batch: config.reminderScheduleBatch,
+    outbox_retention_via_worker: config.outboxRetentionViaWorker,
+    outbox_retention_poll_ms: config.outboxRetentionPollMs,
+    outbox_retention_batch: config.outboxRetentionBatch,
+    outbox_retention_days: config.outboxRetentionDays,
     poll_ms: config.pollMs,
     batch_size: config.batchSize,
     settle_ms: config.settleMs,
@@ -173,6 +181,12 @@ async function main() {
   const reminderScheduler = startReminderScheduler(
     controller.signal,
     createDefaultReminderSchedulerDeps(logger),
+  );
+
+  // WKR-009 — retention scheduler runs in parallel; errors never kill the relay.
+  const retentionScheduler = startRetentionScheduler(
+    controller.signal,
+    createDefaultRetentionSchedulerDeps(logger),
   );
 
   try {
@@ -210,7 +224,7 @@ async function main() {
       },
     );
 
-    await reminderScheduler.done;
+    await Promise.all([reminderScheduler.done, retentionScheduler.done]);
 
     logger.info('worker_stopped', {
       status: 'stopped',
