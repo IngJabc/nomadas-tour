@@ -155,7 +155,7 @@ No existe emisión explícita de eventos de dominio (sin `publish`, sin outbox, 
 
 | Artefacto | Origen | Consumidores | Persistencia | Naturaleza |
 |---|---|---|---|---|
-| Tipos de notificación (10: `trip_created`, `trip_cancelled`, `trip_completed`, `trip_auto_completed`, `trip_postponed`, `trip_deleted`, `trip_archived`, `reservation_created`, `reservation_cancelled`, `passenger_cancelled`) | `notification.service.ts:4-14` | Frontend (campana, RLS), superadmin/agency | Tabla `notifications` | Materialización síncrona dentro del request (fire-and-forget) |
+| Tipos de notificación (9: `trip_created`, `trip_cancelled`, `trip_completed`, `trip_auto_completed`, `trip_postponed`, `trip_archived`, `reservation_created`, `reservation_cancelled`, `passenger_cancelled`) | `notification.service.ts:4-14` | Frontend (campana, RLS), superadmin/agency | Tabla `notifications` | Materialización síncrona dentro del request (fire-and-forget). El tipo muerto `trip_deleted` fue eliminado (migración 058) |
 | `boarding_logs` | Único escritor: RPC `boarding_toggle` (046) | Dashboards (`reservation.service.ts:907`, `superadmin.service.ts:1513`), realtime (048), scanner | Tabla `boarding_logs` | Auditoría de estado, escrita en transacción SQL |
 | `boarding_attempts` | `boarding-attempts.service.ts` (TS, telemetría) | Solo auditoría/forense (sin lectores de negocio) | Tabla `boarding_attempts` | Auditoría de seguridad, best-effort |
 | Cambios realtime de tablas (10 tablas publicadas) | Supabase Realtime (publicación `supabase_realtime`) | Frontend (`lib/realtime/subscriptions.ts`) | Emisión efímera (sin persistencia de eventos) | Cambios de fila, no eventos de dominio |

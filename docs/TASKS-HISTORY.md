@@ -420,3 +420,21 @@ Validación: tsc --noEmit ✓, next build ✓
   - Estados: scanner, loading, error, success, resultado
 [x] `components/layout/AgencySidebar.tsx` — agregado enlace "Abordaje" con icono ScanLine
 [x] Validación: `tsc --noEmit` ✓ (0 errores), `next build` ✓ (23 rutas compiladas)
+
+---
+
+## Sprint 14 — WKR-007 Trip / Notification Event Workers (2026-08-11)
+
+Cierre de la fase WKR de infra de workers (WKR-001…006.4 quedaron marcados completados en TASKS.md; este sprint ejecutó el wiring a producción y el cierre documental).
+
+[x] **WKR-007 — Trip / notification event workers** (wiring a producción + cutover realizado)
+- **Eventos de dominio trip.\* v1** (7 contratos: created, updated, postponed, cancelled, completed, auto_completed, archived) en `backend/src/events/`, auditados (WKR-007.3)
+- **RPCs transaccionales** (migración `057_trip_events_rpc.sql`): `create_trip`, `update_trip`, `set_trip_status`, `complete_trip`, `archive_trip` — emisión atómica de eventos + scope guard
+- **Adopción en service layer** detrás del flag `TRIP_EFFECTS_VIA_OUTBOX`:
+  - `superadmin.service.ts` (C2): createTrip/updateTrip/updateTripStatus/archiveTrip → RPCs; mapeo de errores centralizado `mapTripRpcError`
+  - `trip.service.ts` (C3): `completeExpiredTrips` → `complete_trip(source='auto')`, emite `trip.auto_completed`
+- **Handlers de fanout** (C4/C5): `notification-fanout.handler.ts` (notificaciones con `source_event_id`, idempotente) y `email-fanout.handler.ts` (`email_delivery_log` pending→sent, PK idempotente), registrados en `handlers/index.ts`
+- **Flag** `TRIP_EFFECTS_VIA_OUTBOX` (env, default `false`): cutover realizado (`true` en entorno tras soak en staging); default `false` en código como postura de rollback
+- **Cleanup legacy**: tipo de notificación `trip_deleted` removido (emisor muerto tras el archivo de trips) — migración `058_remove_trip_deleted_notification_type.sql` + `notification.service.ts`/`notification-categories.ts`/frontend `notification-config.ts`/`NotificationProvider.tsx`
+- **Documentación de cierre**: registro de implementación C1–C8 en `docs/WKR-007-wiring-implementation-plan.md` (EJECUTADO); audit de arranque de WKR-008 conservado en `docs/WKR-008-reminder-workers-audit.md` (KEEP AS HISTORICAL RECORD); Apéndice B de referencia en el design doc; TASKS/ROADMAP actualizados (WKR-007 ✅, WKR-008 siguiente)
+- **Validación:** `tsc --noEmit` ✓ exit 0, suite backend **326/326** ✓, suites WKR-007 ✓
