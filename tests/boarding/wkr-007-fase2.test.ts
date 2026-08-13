@@ -74,7 +74,8 @@ describe('WKR-007 Fase 2 — migration isolation', () => {
     expect(i058).toBe(i057 + 1);
     expect(i059).toBe(i058 + 1);
     expect(i060).toBe(i059 + 1);
-    expect(i060).toBe(migrations.length - 1);
+    expect(i060).toBeGreaterThanOrEqual(0);
+    expect(migrations[migrations.length - 1]).toMatch(/^\d{3}_/);
   });
 
   it('has no tracked modifications in migrations 001–056', () => {

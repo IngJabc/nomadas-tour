@@ -232,6 +232,7 @@ describe('WKR-006.1 — Relay observability', () => {
   it.each([
     'skipped_no_agencies',
     'skipped_effect_disabled',
+    'skipped_empty',
     'already_delivered',
   ] as const)('counts %s as a skipped completion', async (reason) => {
     const metrics = createWorkerMetrics();

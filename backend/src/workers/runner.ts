@@ -28,6 +28,10 @@ import {
   startDigestScheduler,
 } from './digest-scheduler.js';
 import {
+  createDefaultSuperadminDigestSchedulerDeps,
+  startSuperadminDigestScheduler,
+} from './superadmin-digest-scheduler.js';
+import {
   DEFAULT_WORKER_NAME,
   createHeartbeatController,
   createRecoveryScheduler,
@@ -171,6 +175,9 @@ async function main() {
     agency_digest_via_worker: config.agencyDigestViaWorker,
     agency_digest_poll_ms: config.agencyDigestPollMs,
     agency_digest_batch: config.agencyDigestBatch,
+    superadmin_digest_via_worker: config.superadminDigestViaWorker,
+    superadmin_digest_poll_ms: config.superadminDigestPollMs,
+    superadmin_digest_batch: config.superadminDigestBatch,
     poll_ms: config.pollMs,
     batch_size: config.batchSize,
     settle_ms: config.settleMs,
@@ -200,6 +207,12 @@ async function main() {
   const digestScheduler = startDigestScheduler(
     controller.signal,
     createDefaultDigestSchedulerDeps(logger),
+  );
+
+  // F4-002 — superadmin digest scheduler runs in parallel; errors never kill the relay.
+  const superadminDigestScheduler = startSuperadminDigestScheduler(
+    controller.signal,
+    createDefaultSuperadminDigestSchedulerDeps(logger),
   );
 
   try {
@@ -241,6 +254,7 @@ async function main() {
       reminderScheduler.done,
       retentionScheduler.done,
       digestScheduler.done,
+      superadminDigestScheduler.done,
     ]);
 
     logger.info('worker_stopped', {

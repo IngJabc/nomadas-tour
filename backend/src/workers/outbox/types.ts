@@ -10,6 +10,7 @@ export type CompletedHandlerReason =
   | 'skipped_disabled'
   | 'skipped_no_agencies'
   | 'skipped_effect_disabled'
+  | 'skipped_empty'
   | 'delivered'
   | 'already_delivered';
 

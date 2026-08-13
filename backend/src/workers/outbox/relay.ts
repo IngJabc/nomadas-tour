@@ -70,6 +70,7 @@ function isSkipReason(reason: string): boolean {
     reason === 'skipped_disabled' ||
     reason === 'skipped_no_agencies' ||
     reason === 'skipped_effect_disabled' ||
+    reason === 'skipped_empty' ||
     reason === 'already_delivered'
   );
 }

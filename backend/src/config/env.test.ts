@@ -177,3 +177,46 @@ describe("F4-001 — AGENCY_DIGEST_* environment", () => {
     expect(env.AGENCY_DIGEST_BATCH).toBe(50);
   });
 });
+
+async function parseSuperadminDigestViaWorker(value?: string) {
+  process.env = { ...originalEnv, ...requiredEnv };
+  if (value === undefined) {
+    delete process.env.SUPERADMIN_DIGEST_VIA_WORKER;
+  } else {
+    process.env.SUPERADMIN_DIGEST_VIA_WORKER = value;
+  }
+
+  const { env } = await import("./env.js");
+  return env.SUPERADMIN_DIGEST_VIA_WORKER;
+}
+
+describe("F4-002 — SUPERADMIN_DIGEST_* environment", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it.each([
+    ["an absent value", undefined, false],
+    ['"false"', "false", false],
+    ['"true"', "true", true],
+    ['"1"', "1", true],
+  ])("parses SUPERADMIN_DIGEST_VIA_WORKER %s as %s", async (_label, value, expected) => {
+    await expect(parseSuperadminDigestViaWorker(value)).resolves.toBe(expected);
+  });
+
+  it("defaults poll 1h, batch 50, flag false", async () => {
+    process.env = { ...originalEnv, ...requiredEnv };
+    delete process.env.SUPERADMIN_DIGEST_VIA_WORKER;
+    delete process.env.SUPERADMIN_DIGEST_POLL_MS;
+    delete process.env.SUPERADMIN_DIGEST_BATCH;
+    vi.resetModules();
+    const { env } = await import("./env.js");
+    expect(env.SUPERADMIN_DIGEST_VIA_WORKER).toBe(false);
+    expect(env.SUPERADMIN_DIGEST_POLL_MS).toBe(3_600_000);
+    expect(env.SUPERADMIN_DIGEST_BATCH).toBe(50);
+  });
+});

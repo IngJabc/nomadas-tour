@@ -122,6 +122,7 @@ const COMPLETED_REASON_PRIORITY: Record<CompletedHandlerReason, number> = {
   skipped_disabled: 1,
   skipped_no_agencies: 1,
   skipped_effect_disabled: 1,
+  skipped_empty: 1,
 };
 
 function preferCompleted(
