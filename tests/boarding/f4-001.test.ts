@@ -28,7 +28,7 @@ const migration061 = read(
 const harness = read('supabase/tests/f4_001_verification.sql');
 
 describe('F4-001 — migration isolation', () => {
-  it('keeps 061 as tip after contiguous 059→060→061', () => {
+  it('keeps 061 contiguous after 060; tip may advance with later tickets', () => {
     const migrations = listMigrations();
     const i059 = migrations.indexOf('059_schedule_trip_reminders.sql');
     const i060 = migrations.indexOf('060_purge_completed_outbox_events.sql');
@@ -36,7 +36,8 @@ describe('F4-001 — migration isolation', () => {
 
     expect(i060).toBe(i059 + 1);
     expect(i061).toBe(i060 + 1);
-    expect(i061).toBe(migrations.length - 1);
+    expect(i061).toBeGreaterThanOrEqual(0);
+    expect(migrations[migrations.length - 1]).toMatch(/^\d{3}_/);
   });
 
   it('has no tracked modifications in migrations 001–060', () => {

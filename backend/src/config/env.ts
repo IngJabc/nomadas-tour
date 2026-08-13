@@ -79,6 +79,18 @@ const envSchema = z.object({
   AGENCY_DIGEST_POLL_MS: z.coerce.number().default(3_600_000),
   /** F4-001 — max agencies scanned per schedule_agency_digests call. */
   AGENCY_DIGEST_BATCH: z.coerce.number().default(50),
+  /**
+   * F4-002 — When true, superadmin digest scheduler emits
+   * superadmin.digest.due and handler delivers the daily email.
+   * Default false until soak/audit.
+   */
+  SUPERADMIN_DIGEST_VIA_WORKER: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
+  /** F4-002 — superadmin digest scheduler poll interval (default 1h). */
+  SUPERADMIN_DIGEST_POLL_MS: z.coerce.number().default(3_600_000),
+  /** F4-002 — max superadmin recipients processed per handler invocation. */
+  SUPERADMIN_DIGEST_BATCH: z.coerce.number().default(50),
   OUTBOX_POLL_MS: z.coerce.number().default(2000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(10),

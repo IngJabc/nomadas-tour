@@ -18,6 +18,9 @@ export interface WorkerRuntimeConfig {
   agencyDigestViaWorker: boolean;
   agencyDigestPollMs: number;
   agencyDigestBatch: number;
+  superadminDigestViaWorker: boolean;
+  superadminDigestPollMs: number;
+  superadminDigestBatch: number;
   heartbeatMs: number;
   staleProcessingMs: number;
   staleRecoveryLimit: number;
@@ -43,6 +46,9 @@ export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
     agencyDigestViaWorker: env.AGENCY_DIGEST_VIA_WORKER,
     agencyDigestPollMs: env.AGENCY_DIGEST_POLL_MS,
     agencyDigestBatch: env.AGENCY_DIGEST_BATCH,
+    superadminDigestViaWorker: env.SUPERADMIN_DIGEST_VIA_WORKER,
+    superadminDigestPollMs: env.SUPERADMIN_DIGEST_POLL_MS,
+    superadminDigestBatch: env.SUPERADMIN_DIGEST_BATCH,
     heartbeatMs: env.OUTBOX_HEARTBEAT_MS,
     staleProcessingMs: env.OUTBOX_STALE_PROCESSING_MS,
     staleRecoveryLimit: env.OUTBOX_STALE_RECOVERY_LIMIT,

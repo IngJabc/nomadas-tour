@@ -8,10 +8,12 @@ import { TripPostponedEmail } from '../templates/trip-postponed-email.js';
 import { TripCancelledEmail } from '../templates/trip-cancelled-email.js';
 import { TripReminderEmail } from '../templates/trip-reminder-email.js';
 import { AgencyDigestEmail } from '../templates/agency-digest-email.js';
+import { SuperadminDigestEmail } from '../templates/superadmin-digest-email.js';
 import { ReservationConfirmedEmail } from '../templates/reservation-confirmed-email.js';
 import { generateTicketPNG } from '../utils/ticket-png.js';
 import type { TicketData } from '../types/reservation.js';
 import type { AgencyDigestAggregates } from './agency-digest.service.js';
+import type { SuperadminDigestAggregates } from './superadmin-digest.service.js';
 import { evaluateDelivery } from './email-delivery-policy.js';
 
 /** OPS-EMAIL-001 — result of a delivery attempt (send or policy skip). */
@@ -274,6 +276,49 @@ export class EmailService {
         );
         return {
           subject: `Resumen operativo — ${aggregates.digest_date} — Nómadas Tour`,
+          html,
+        };
+      },
+    );
+  }
+
+  async sendSuperadminDigestEmail(
+    to: string,
+    aggregates: SuperadminDigestAggregates,
+  ): Promise<EmailSendResult> {
+    return this.deliver(
+      to,
+      'superadmin_digest',
+      'Failed to send superadmin digest email',
+      async () => {
+        const html = await render(
+          SuperadminDigestEmail({
+            digestDate: aggregates.digest_date,
+            totalAgencies: aggregates.total_agencies,
+            activeAgencies: aggregates.active_agencies,
+            activeTrips: aggregates.active_trips,
+            todayReservations: aggregates.today_reservations,
+            pendingBoarding: aggregates.pending_boarding_passengers,
+            upcomingTrips: aggregates.upcoming_trips.map((t) => ({
+              route_label: t.route_label,
+              departure_formatted: t.departure_formatted,
+              reservation_count: t.reservation_count,
+              available_seats: t.available_seats,
+              capacity: t.capacity,
+              occupancy_pct: t.occupancy_pct,
+            })),
+            occupancyByTrip: aggregates.occupancy_by_trip.map((row) => ({
+              label: row.label,
+              departure: row.departure,
+              total: row.total,
+              reserved: row.reserved,
+              occupancy_pct: row.occupancy_pct,
+            })),
+            dashboardUrl: aggregates.dashboard_url,
+          }),
+        );
+        return {
+          subject: `Resumen operativo plataforma — ${aggregates.digest_date} — Nómadas Tour`,
           html,
         };
       },

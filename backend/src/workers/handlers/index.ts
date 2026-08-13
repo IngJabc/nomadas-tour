@@ -35,6 +35,10 @@ import {
   AGENCY_DIGEST_DUE_V1_TYPE,
   AGENCY_DIGEST_DUE_V1_VERSION,
 } from '../../events/agency-digest-due.v1.js';
+import {
+  SUPERADMIN_DIGEST_DUE_V1_TYPE,
+  SUPERADMIN_DIGEST_DUE_V1_VERSION,
+} from '../../events/superadmin-digest-due.v1.js';
 import { env } from '../../config/env.js';
 import { emailService } from '../../services/email.service.js';
 import { reservationService } from '../../services/reservation.service.js';
@@ -42,6 +46,7 @@ import { getWorkerRuntimeConfig } from '../config.js';
 import type { OutboxHandler } from '../outbox/types.js';
 import { composeHandlers } from './compose.js';
 import { createAgencyDigestFanoutHandler } from './agency-digest-fanout.handler.js';
+import { createSuperadminDigestFanoutHandler } from './superadmin-digest-fanout.handler.js';
 import { createEmailFanoutHandler } from './email-fanout.handler.js';
 import {
   createDefaultNotificationFanoutDeps,
@@ -168,6 +173,12 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
   map.set(
     `${AGENCY_DIGEST_DUE_V1_TYPE}:${AGENCY_DIGEST_DUE_V1_VERSION}`,
     createAgencyDigestFanoutHandler(),
+  );
+
+  // F4-002 — Superadmin daily digest email (no in-app fanout in v1).
+  map.set(
+    `${SUPERADMIN_DIGEST_DUE_V1_TYPE}:${SUPERADMIN_DIGEST_DUE_V1_VERSION}`,
+    createSuperadminDigestFanoutHandler(),
   );
 
   return map;
