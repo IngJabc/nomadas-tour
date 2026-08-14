@@ -37,7 +37,7 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
     expect(screen.getByText('Casi lleno')).toBeTruthy();
     expect(screen.getByText('Mérida')).toBeTruthy();
     expect(screen.queryByText('Caracas → Mérida')).toBeNull();
-    expect(screen.queryByText('Sale pronto')).toBeNull();
+    expect(screen.queryByText('Sale mañana')).toBeNull();
     expect(screen.getByText('93%')).toBeTruthy();
     expect(
       screen.getByRole('link', { name: /Ver viaje/i }).getAttribute('href'),
@@ -69,7 +69,7 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
     expect(screen.queryByText(/Caracas/)).toBeNull();
   });
 
-  it('shows Sale pronto badge and Clock for urgency alerts', () => {
+  it('shows Sale mañana badge and Clock for urgency alerts', () => {
     render(
       <OccupancyAlertsWidget
         alerts={[
@@ -90,7 +90,7 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
     );
 
     expect(screen.getByText('Casi lleno')).toBeTruthy();
-    expect(screen.getByText('Sale pronto')).toBeTruthy();
+    expect(screen.getByText('Sale mañana')).toBeTruthy();
     expect(screen.getByText('Barquisimeto')).toBeTruthy();
     expect(
       screen.getByRole('link', { name: /Ver viaje/i }).getAttribute('href'),

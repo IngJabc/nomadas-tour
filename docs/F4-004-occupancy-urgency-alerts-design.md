@@ -2,8 +2,8 @@
 
 **Tipo:** Diseño / scope-lock (contrato de implementación)
 **Fecha:** 2026-08-14
-**Estado:** **IMPLEMENTACIÓN EN CURSO** — scope-lock cerrado (P1–P9). Migración 064 creada; no aplicada / no soak aún.
-**Rama:** `feat/f4-004-occupancy-urgency-alerts` (sugerida)
+**Estado:** **CLOSED** / operativo en Render — scope-lock cerrado (P1–P9). Migración 064 aplicada; harness `f4_004_verification.sql` PASS; soak `false` → cutover `true`; evidencia real: tick `urgency_matches=1 / urgency_emitted=1 / already_escalated=0`, outbox `trip.occupancy_urgency.due` attempts=1 completed/delivered, 0 retries / 0 failures, UI verificado.
+**Rama:** `feat/f4-004-occupancy-urgency-alerts`
 **Referencias:** [ROADMAP.md](ROADMAP.md) Fase 4, [TASKS.md](../TASKS.md), [F4-003 design](F4-003-occupancy-alerts-design.md) (CLOSED, operativo en producción), `supabase/migrations/063_evaluate_occupancy_alerts.sql`, `supabase/migrations/057_trip_events_rpc.sql` (`emit_trip_event`), `supabase/migrations/049_outbox_events.sql`, `backend/src/workers/occupancy-alert-scheduler.ts`, `backend/src/workers/runner.ts`, `backend/src/workers/handlers/index.ts`, `backend/src/workers/handlers/notification-fanout.handler.ts`, `backend/src/services/occupancy-alert.service.ts`, `backend/src/services/notification-delivery.policy.ts`, `backend/src/constants/notification-categories.ts`, `backend/src/services/notification.service.ts`, `backend/src/events/trip-occupancy-alert-due.v1.ts`, `backend/src/config/env.ts`, `backend/src/utils/timezone.ts` (`BUSINESS_TIMEZONE = 'America/Caracas'`), `components/dashboard/OccupancyAlertsWidget.tsx`, `components/notifications/notification-config.ts`, `components/notifications/NotificationItem.tsx`, `app/agency/page.tsx`, `supabase/tests/f4_003_verification.sql`, `tests/boarding/f4-003.test.ts`
 
 ---
@@ -86,7 +86,7 @@ trip_occupancy_alert_state tiene fila (near_full_alerted / underbooked_alerted)
   ↓
 departure_time - now() <= T-24h
   ↓
-F4-004 → "Sale pronto / Requiere atención"  (una sola vez por ciclo)
+F4-004 → "Sale mañana / Requiere atención"  (una sola vez por ciclo)
 ```
 
 Reglas de acoplamiento:
@@ -149,7 +149,7 @@ Un viaje es elegible para escalación de urgencia en un tick si cumple **todas**
 | Diferencia vs digest | El digest (F4-001/F4-002) es 07:00 diario y resume; T-24h es un aviso puntual de urgencia, no un resumen | T-48h se solaparía conceptualmente con el alcance del digest diario |
 | Justificación fuerte para ambas ventanas en v1 | **No existe** → no se permite | — |
 
-**Constante (versionada en código, NO env var):** ventana = `24h`. En SQL: `INTERVAL '24 hours'`. En frontend (widget): `24 * 60 * 60 * 1000` ms. En código TS (handler/constantes): `OCCUPANCY_URGENCY_WINDOW_MS = 86_400_000`. Valor de la constante en el payload: `urgency_window: 't24'`.
+**Constante (versionada en código, NO env var):** ventana = `24h`. En SQL: `INTERVAL '24 hours'`. En código TS (servicio/constantes): `OCCUPANCY_URGENCY_WINDOW_MS = 86_400_000`. El widget no mantiene la constante: la urgencia llega del backend como `urgency: boolean` (derivada por el servicio `listAgencyOccupancyAlerts` desde `departure_time`). Valor de la constante en el payload: `urgency_window: 't24'`.
 
 **Condición exacta (FIJADA):** en el RPC, un viaje alertado (condiciones §7) emite escalación cuando `(v_locked.departure_time - v_now) <= INTERVAL '24 hours'`. `departure_time > v_now` ya está garantizado por el filtro del loop. En el widget, `urgency = (departure_time - now) <= 24h`.
 
@@ -313,13 +313,13 @@ Ninguna lógica nueva de tenancy; se hereda el contrato de F4-003 (§14 F4-003).
 ┌───────────────────────────────────────────────────────────┐
 │ Alertas de ocupación                                      │
 │                                                           │
-│ [Casi lleno]  ·  [Sale pronto]   🔴 (acento danger)       │
+│ [Casi lleno]  ·  [Sale mañana]   🔴 (acento danger)       │
 │ Barquisimeto → Caracas                                    │
 │ Sale hoy · 18:00                                          │
 │ 94% · 29/31 reservados                                    │
 │ [Ver viaje]                                               │
 │                                                           │
-│ [Pocas reservas] · [Sale pronto]  🔴 (acento danger)       │
+│ [Pocas reservas] · [Sale mañana]  🔴 (acento danger)       │
 │ Valencia → Caracas                                        │
 │ Sale en 6h                                                │
 │ 12% · 4/31 reservados                                     │
@@ -333,10 +333,10 @@ Ninguna lógica nueva de tenancy; se hereda el contrato de F4-003 (§14 F4-003).
 └───────────────────────────────────────────────────────────┘
 ```
 
-- **Badge de urgencia:** pill `Sale pronto` con icono `Clock` (Lucide, stroke 1.75), fondo `#fef2f2`, texto `#ef4444` (danger — reglas de badges AGENTS.md). No se usa cyan para bordes/fondos decorativos (regla 17).
+- **Badge de urgencia:** pill `Sale mañana` con icono `Clock` (Lucide, stroke 1.75), fondo `#fef2f2`, texto `#ef4444` (danger — reglas de badges AGENTS.md). No se usa cyan para bordes/fondos decorativos (regla 17).
 - **Icono:** el badge de urgencia lleva `Clock`; la alerta normal conserva `AlertTriangle` existente. La urgencia **no** cambia el icono de la fila completa.
-- **Copy (P9):** badge `Sale pronto`. Los badges base de F4-003 se mantienen (`Casi lleno` / `Pocas reservas`).
-- **Acento de tarjeta:** para la fila urgente, borde izquierdo o fondo sutil danger (`#fef2f2`) como indicador adicional no-color-dependiente (siempre acompañado del texto "Sale pronto" — accesible sin depender solo de color).
+- **Copy (P9):** badge `Sale mañana`. Los badges base de F4-003 se mantienen (`Casi lleno` / `Pocas reservas`).
+- **Acento de tarjeta:** para la fila urgente, borde izquierdo o fondo sutil danger (`#fef2f2`) como indicador adicional no-color-dependiente (siempre acompañado del texto "Sale mañana" — accesible sin depender solo de color).
 - **Empty state:** sin cambios (mantiene CTA "Ver viajes").
 - **Responsive / accesibilidad:** se reutiliza el layout existente (card → flex row/col); la urgencia se comunica con texto + icono + color (no solo color).
 - **CTA:** sin cambios — "Ver viaje" con deep-link por rol (`/agency/trips/{id}/passengers`).
@@ -344,7 +344,7 @@ Ninguna lógica nueva de tenancy; se hereda el contrato de F4-003 (§14 F4-003).
 ### Campana in-app (NotificationItem)
 
 - La escalación es una fila `type='occupancy_alert'` con `metadata.urgency === true`.
-- **Distinción visual (FIJADA):** `NotificationItem` renderiza un chip pequeño `Sale pronto` cuando `notification.metadata?.urgency === true`. Opcional (polish, no bloqueante): añadir la clave `occupancy_alert` a `NOTIFICATION_ICONS` para que la campana deje de usar el fallback `trip_created` (observación NON-BLOCKING de F4-003; se aprovecha para mejorar la legibilidad de la escalación). No es obligatorio para el contrato.
+- **Distinción visual (FIJADA):** `NotificationItem` renderiza un chip pequeño `Sale mañana` cuando `notification.metadata?.urgency === true`. Opcional (polish, no bloqueante): añadir la clave `occupancy_alert` a `NOTIFICATION_ICONS` para que la campana deje de usar el fallback `trip_created` (observación NON-BLOCKING de F4-003; se aprovecha para mejorar la legibilidad de la escalación). No es obligatorio para el contrato.
 
 ---
 
@@ -362,7 +362,7 @@ Ninguna lógica nueva de tenancy; se hereda el contrato de F4-003 (§14 F4-003).
 2. **Postura de rollback:** ante un problema de la escalación, se apaga `OCCUPANCY_URGENCY_VIA_WORKER` sin afectar las alertas base.
 3. **Doble puerta:** el RPC recibe `p_urgency_enabled = env.OCCUPANCY_URGENCY_VIA_WORKER` (no emite con flag off) y el handler tiene `isEffectsEnabled = env.OCCUPANCY_URGENCY_VIA_WORKER` (no entrega con flag off). Durante soak no se generan eventos de urgencia ni filas de notificación.
 
-**No** se crean env vars para thresholds ni ventana: T-24h es constante versionada (código/SQL/frontend, §9), como los umbrales de F4-003.
+**No** se crean env vars para thresholds ni ventana: T-24h es constante versionada (SQL/backend, §9), como los umbrales de F4-003.
 
 **Implementación documentada (NO realizada aquí):** definir en `backend/src/config/env.ts` (`OCCUPANCY_URGENCY_VIA_WORKER`, preprocess booleano, default `false`), documentar en `backend/.env-example`, extender `getWorkerRuntimeConfig` y el log `worker_started`. **Definir default en código o `.env-example` NO configura Render**: `OCCUPANCY_URGENCY_VIA_WORKER` debe **agregarse manualmente en Render (servicio worker)** (ver §23 rollout).
 
@@ -406,8 +406,8 @@ Reglas:
 - Scheduler F4-003: pasar `p_urgency_enabled = env.OCCUPANCY_URGENCY_VIA_WORKER`; extender `OccupancyAlertEvaluateResult`/`parseEvaluateResult` y logs con `urgency_matches` / `urgency_emitted` / `already_escalated`.
 - `config/env.ts` + `.env-example` + `workers/config.ts` + `worker_started`: `OCCUPANCY_URGENCY_VIA_WORKER`.
 - Servicio `listAgencyOccupancyAlerts`: añadir `urgency: boolean` (derivación T-24h) y ordenación urgente-primero.
-- Widget `OccupancyAlertsWidget.tsx`: pill `Sale pronto` (icono `Clock`, danger), ordenación, jerarquía visual; sin cap.
-- `NotificationItem.tsx`: chip `Sale pronto` cuando `metadata.urgency === true`. (Polish opcional: clave `occupancy_alert` en `NOTIFICATION_ICONS`.)
+- Widget `OccupancyAlertsWidget.tsx`: pill `Sale mañana` (icono `Clock`, danger), ordenación, jerarquía visual; sin cap.
+- `NotificationItem.tsx`: chip `Sale mañana` cuando `metadata.urgency === true`. (Polish opcional: clave `occupancy_alert` en `NOTIFICATION_ICONS`.)
 - Harness SQL `supabase/tests/f4_004_verification.sql` + test boarding `tests/boarding/f4-004.test.ts` + **actualizar la aserción "tip" en `tests/boarding/f4-003.test.ts`** (063 → 064).
 - Tests unitarios (evento, scheduler/parse, handler, servicio/widget) + regresión F4-001/002/003, WKR-007/008/009.
 - Soak `false` → `true` + evidencia en producción; observabilidad; cierre documental.
@@ -451,7 +451,7 @@ Es estrictamente **una capa de escalación de urgencia sobre F4-003**.
 | Evento | `trip.occupancy_urgency.due.v1`, `tenant_id=NULL`, payload mínimo sin PII + `urgency_window:'t24'` |
 | Handler | NotificationFanout con gate `OCCUPANCY_URGENCY_VIA_WORKER`; `type='occupancy_alert'`; metadata `urgency:true`; `action_url` por rol |
 | Preferencias | Categoría `occupancy_alerts` reutilizada (solo agencia); superadmin incondicional |
-| UI | Widget existente; urgencia = estado visual adicional (pill `Sale pronto`, danger, `Clock`); urgentes primero; sin cap; CTA sin cambios |
+| UI | Widget existente; urgencia = estado visual adicional (pill `Sale mañana`, danger, `Clock`); urgentes primero; sin cap; CTA sin cambios |
 | Env var | `OCCUPANCY_URGENCY_VIA_WORKER` default `false` (única nueva) |
 | Persistencia | Sin tabla nueva (urgencia derivable de estado + departure + dedup outbox) |
 
@@ -468,8 +468,8 @@ Es estrictamente **una capa de escalación de urgencia sobre F4-003**.
 | **P5 — Destinatarios** | Agencias asociadas activas (`trip_agencies`) respetando `in_app_enabled`; superadmin global sin opt-out; sin `superadmin_notification_preferences`. |
 | **P6 — Canal** | In-app only v1. Sin Resend/EmailFanout/`email_delivery_log`. |
 | **P7 — Categoría** | Reutilizar `occupancy_alerts`. Frontend distingue normal/urgente por `metadata.urgency` (campana) y derivación temporal (widget), sin categoría nueva. |
-| **P8 — UI** | Extender el widget existente: badge `Sale pronto` (danger + `Clock`), urgentes primero (departure ASC), sin cap, empty state y CTA sin cambios; sin pantallas nuevas. |
-| **P9 — Copy** | Badge: **"Sale pronto"**. Normal (base F4-003 intacta): "Viaje casi lleno" / "Viaje con pocas reservas". Urgente título: **"Viaje casi lleno — sale pronto"** / **"Viaje con pocas reservas — sale pronto"**. Body: **`{destination} sale pronto · {pct}% ({reserved}/{total})`**. Sin términos técnicos (no "underbooked"/"urgency"/"occupancy state"). |
+| **P8 — UI** | Extender el widget existente: badge `Sale mañana` (danger + `Clock`), urgentes primero (departure ASC), sin cap, empty state y CTA sin cambios; sin pantallas nuevas. |
+| **P9 — Copy** | Badge: **"Sale mañana"**. Normal (base F4-003 intacta): "Viaje casi lleno" / "Viaje con pocas reservas". Urgente título: **"Viaje casi lleno — sale mañana"** / **"Viaje con pocas reservas — sale mañana"**. Body: **`{destination} sale mañana · {pct}% ({reserved}/{total})`**. Sin términos técnicos (no "underbooked"/"urgency"/"occupancy state"). |
 
 **No quedan decisiones de producto abiertas antes de implementación.**
 
@@ -504,7 +504,7 @@ Es estrictamente **una capa de escalación de urgencia sobre F4-003**.
 - `in_app_enabled=true` → entrega; `false` → fila de agencia filtrada; superadmin sin gate.
 
 **UI:**
-- Badge `Sale pronto` presente solo con `urgency === true`; ordenación urgentes-primero + departure ASC; copy P9; CTA por rol intactos; empty state intacto.
+- Badge `Sale mañana` presente solo con `urgency === true`; ordenación urgentes-primero + departure ASC; copy P9; CTA por rol intactos; empty state intacto.
 
 **Contrato SQL (harness `f4_004_verification.sql`, BEGIN/ROLLBACK):**
 - A) RPC extendido existe, `SECURITY DEFINER`, `search_path=public`, firma 4-arg con default; B) grants `service_role` only; C) `p_urgency_enabled=FALSE` no emite urgencia (F4-003 intacto); D) `p_urgency_enabled=TRUE` + alertado + ventana → 1 evento `trip.occupancy_urgency.due` con payload sin PII y `urgency_window='t24'`; E) segundo tick → sin duplicado (`already_escalated`); F) secuenciación (entrada este tick → sin urgencia); G) postponement (departure nueva en ventana → nueva emisión); H) fuera de ventana → sin urgencia; I) sin fila de estado → sin urgencia; J) limpieza heredada de F4-003 (sin lógica nueva de cleanup).
@@ -521,7 +521,7 @@ Es estrictamente **una capa de escalación de urgencia sobre F4-003**.
 - [ ] Evento `trip.occupancy_urgency.due.v1` + parser + `dedup_key` con `departure_time`.
 - [ ] Handler NotificationFanout con gate `OCCUPANCY_URGENCY_VIA_WORKER`; `type='occupancy_alert'`; metadata `urgency:true`; `action_url` por rol.
 - [ ] Scheduler: `p_urgency_enabled` desde env; contadores/logs extendidos.
-- [ ] `listAgencyOccupancyAlerts` con `urgency` y orden urgente-primero; widget con pill `Sale pronto`; chip en `NotificationItem`.
+- [ ] `listAgencyOccupancyAlerts` con `urgency` y orden urgente-primero; widget con pill `Sale mañana`; chip en `NotificationItem`.
 - [ ] Sin email v1, sin tabla nueva, sin scheduler nuevo, sin categoría nueva.
 - [ ] Harness SQL + boarding/unit + regresión verdes.
 - [ ] `tsc --noEmit` + backend build + frontend build verdes.

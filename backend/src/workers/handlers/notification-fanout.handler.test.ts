@@ -703,7 +703,7 @@ describe('F4-004 — occupancy urgency NotificationFanout', () => {
     expect(deps.insertNotificationRows).not.toHaveBeenCalled();
   });
 
-  it('fans out urgency with Sale pronto copy, metadata, and role action_urls', async () => {
+  it('fans out urgency with Sale mañana copy, metadata, and role action_urls', async () => {
     const deps = makeDeps({
       loadTripAgencyIds: vi.fn(async () => [AGENCY_A]),
       loadLiveOccupancy: vi.fn(async () => ({
@@ -731,8 +731,8 @@ describe('F4-004 — occupancy urgency NotificationFanout', () => {
       type: 'occupancy_alert',
       agency_id: AGENCY_A,
       recipient_role: 'agency',
-      title: 'Viaje casi lleno — sale pronto',
-      body: 'Mérida sale pronto · 94% (29/31)',
+      title: 'Viaje casi lleno — sale mañana',
+      body: 'Mérida sale mañana · 94% (29/31)',
       action_url: `/agency/trips/${TRIP_ID}/passengers`,
       metadata: {
         alert_type: 'near_full',
@@ -746,7 +746,7 @@ describe('F4-004 — occupancy urgency NotificationFanout', () => {
       recipient_role: 'superadmin',
       agency_id: null,
       action_url: `/admin/trips/${TRIP_ID}`,
-      title: 'Viaje casi lleno — sale pronto',
+      title: 'Viaje casi lleno — sale mañana',
     });
   });
 
@@ -773,8 +773,8 @@ describe('F4-004 — occupancy urgency NotificationFanout', () => {
     const rows = vi.mocked(deps.insertNotificationRows).mock.calls[0][0];
     expect(rows[0]).toMatchObject({
       recipient_role: 'superadmin',
-      title: 'Viaje con pocas reservas — sale pronto',
-      body: expect.stringMatching(/^Mérida sale pronto · /),
+      title: 'Viaje con pocas reservas — sale mañana',
+      body: expect.stringMatching(/^Mérida sale mañana · /),
     });
   });
 

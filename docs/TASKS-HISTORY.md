@@ -530,3 +530,23 @@ Alertas in-app `near_full` / `underbooked` sobre viajes `active` futuros (agenci
 - **UI:** widget «Alertas de ocupación» en `/agency`; deep-link agencia → passengers; superadmin → `/admin/trips/{id}`
 - **Resultado final:** **CLOSED**
 - **Siguiente producto (Fase 4 resto, aún no descompuesto):** viajes sin acción / métricas nocturnas
+
+---
+
+## Sprint 20 — F4-004 Occupancy Urgency Alerts (in-app) (2026-08-14)
+
+Escalación in-app de urgencia temporal (T-24h) sobre el estado persistido de F4-003, sin segundo detector, sin tabla nueva, sin email v1.
+
+[x] **F4-004 — Occupancy Urgency Alerts** (**CLOSED** / operativo en Render)
+- **Design / scope-lock** (P1–P9) — [`docs/F4-004-occupancy-urgency-alerts-design.md`](F4-004-occupancy-urgency-alerts-design.md)
+- **Implementation:** migración `064` (extiende `evaluate_occupancy_alerts` con `p_urgency_enabled BOOLEAN DEFAULT FALSE`; emisión `trip.occupancy_urgency.due` dentro del mismo tick y transacción), evento `trip.occupancy_urgency.due.v1` (dedup `trip.occupancy_urgency:{id}:{type}:t24:{departure}`, payload sin PII, `tenant_id NULL`), NotificationFanout (agencia + superadmin, copy de urgencia), widget `/agency` (urgencias primero + departure ASC, badge «Sale mañana»), chip campana, tests y harness
+- **Copy re-fijada (P9):** badge/pill/chip «Sale mañana»; títulos «Viaje casi lleno — sale mañana» / «Viaje con pocas reservas — sale mañana»; body `{destination} sale mañana · {pct}% ({reserved}/{total})`
+- **Migración** `064_occupancy_urgency_alerts.sql` — aplicada en producción (tip; sin modificaciones a 001–063)
+- **Harness SQL** `supabase/tests/f4_004_verification.sql` (BEGIN/ROLLBACK) — PASS (posture, grants, flag off/on, T-24, fuera de ventana, same-tick, no-state, dedup, postponement, cleanup, PII)
+- **Soak** `OCCUPANCY_URGENCY_VIA_WORKER=false` → **cutover** `true` en Render (worker)
+- **Primer ciclo real:** scanned=5, evaluated=5, emitted=0, skipped=5, cleaned_up=0, urgency_matches=1, urgency_emitted=1, already_escalated=0
+- **Outbox / delivery:** 1× `trip.occupancy_urgency.due` completed/delivered; attempts=1; 0 retries; 0 failures
+- **UI:** widget «Alertas de ocupación» con badge de urgencia «Sale mañana» en `/agency`; chip en campana; deep-link agencia → passengers; superadmin → `/admin/trips/{id}`
+- **Regresión:** F4-001/002/003 (harness pasa con la firma extendida), WKR-007/008/009
+- **Resultado final:** **CLOSED**
+- **Siguiente producto (Fase 4 resto, aún no descompuesto):** métricas nocturnas (futuro / Fase 6 / reporting)

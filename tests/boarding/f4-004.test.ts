@@ -155,24 +155,24 @@ describe('F4-004 — worker wiring', () => {
     );
     expect(event).toContain("'trip.occupancy_urgency.due'");
     expect(fanout).toContain("case 'trip.occupancy_urgency'");
-    expect(fanout).toContain('Viaje casi lleno — sale pronto');
-    expect(fanout).toContain('Viaje con pocas reservas — sale pronto');
+    expect(fanout).toContain('Viaje casi lleno — sale mañana');
+    expect(fanout).toContain('Viaje con pocas reservas — sale mañana');
     expect(fanout).toContain('urgency: true');
     expect(fanout).toContain("type: 'occupancy_alert'");
   });
 });
 
 describe('F4-004 — UI surface', () => {
-  it('extends OccupancyAlertsWidget with Sale pronto / Clock urgency', () => {
+  it('extends OccupancyAlertsWidget with Sale mañana / Clock urgency', () => {
     const widget = read('components/dashboard/OccupancyAlertsWidget.tsx');
     const item = read('components/notifications/NotificationItem.tsx');
     const icons = read('components/notifications/notification-config.ts');
     const service = read('backend/src/services/occupancy-alert.service.ts');
 
-    expect(widget).toContain('Sale pronto');
+    expect(widget).toContain('Sale mañana');
     expect(widget).toContain('Clock');
     expect(widget).toContain('urgency');
-    expect(item).toContain('Sale pronto');
+    expect(item).toContain('Sale mañana');
     expect(item).toContain('metadata?.urgency');
     expect(icons).toContain('occupancy_alert');
     expect(service).toContain('urgency:');
