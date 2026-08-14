@@ -1,9 +1,9 @@
 # F4-003 — Occupancy Alerts (in-app)
 
-**Tipo:** Diseño / scope-lock (sin implementación en este documento)
-**Fecha:** 2026-08-13
-**Estado:** Diseño — **scope-lock cerrado** (P1–P5 fijadas en §23; decisión de UI del dashboard de agencia en §15/§20).
-**Rama:** por definir (`feat/f4-003-occupancy-alerts`)
+**Tipo:** Diseño / scope-lock (contrato de implementación)
+**Fecha:** 2026-08-13 · **Cierre:** 2026-08-14
+**Estado:** **CLOSED** — Operativo / Completado (migración 063 aplicada; harness PASS; cutover `OCCUPANCY_ALERT_VIA_WORKER=true`; evidencia de producción).
+**Rama:** `feat/f4-003-occupancy-alerts` (historial en TASKS-HISTORY Sprint 19)
 **Referencias:** [ROADMAP.md](ROADMAP.md) Fase 4, [TASKS.md](../TASKS.md), [F4-001 design](F4-001-agency-daily-digest-design.md), [F4-002 design](F4-002-superadmin-daily-digest-design.md), [WKR-007 design](WKR-007-trip-notification-event-workers-design.md), [WKR-008 audit](WKR-008-reminder-workers-audit.md), [WKR-009 design](WKR-009-outbox-retention-workers-design.md), `superadmin.service.ts#getDashboard`, `reservation.service.ts#getAgencyDashboard`, `notification-fanout.handler.ts`, `notification-delivery.policy.ts`, `notification-categories.ts`, `reminder-scheduler.ts`, `trip-reminder-due.v1.ts`, `backend/src/utils/timezone.ts`
 
 ---

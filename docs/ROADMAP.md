@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-13
+**Última actualización:** 2026-08-14
 
 ---
 
@@ -30,8 +30,8 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Transactional Outbox + EmailWorker (`reservation.created.v1`) | Operativo (WKR-004/005) |
 | Reminders T-48h / T-24h | Operativo (WKR-008) |
 | Digest diario agencias | Operativo (F4-001) |
-| Digest diario superadmin | Implementado — soak/cutover (F4-002) |
-| Alertas de ocupación (in-app) | Implementado — soak/cutover (F4-003) |
+| Digest diario superadmin | Operativo (F4-002) |
+| Alertas de ocupación (in-app) | Operativo / Completado (F4-003) |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -84,8 +84,9 @@ FASE Seguridad continua
 
 FASE 4 — Automatizaciones (producto)
   F4-001  Agency Daily Digest            ✅
-  F4-002  Superadmin Daily Digest        → soak/cutover
-  F4-003  Occupancy Alerts               → en curso (soak/cutover)
+  F4-002  Superadmin Daily Digest        ✅
+  F4-003  Occupancy Alerts               ✅
+  (siguiente: viajes sin acción / métricas nocturnas — aún no descompuesto)
 FASE 5 — Audit Trail
 FASE 6 — Reportes
 FASE 7 — UX
@@ -259,11 +260,11 @@ El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implemen
 
 | Ticket | Tema | Estado |
 |--------|------|--------|
-| F4-001 | Digest diario agencias (email) | Operativo |
-| F4-002 | Digest diario superadmin (email) | Implementado — migración/soak/cutover |
-| F4-003 | Alertas de ocupación (in-app) | Implementado — migración/soak/cutover |
+| F4-001 | Digest diario agencias (email) | Operativo / Completado |
+| F4-002 | Digest diario superadmin (email) | Operativo / Completado |
+| F4-003 | Alertas de ocupación (in-app) | Operativo / Completado |
 
-**También en la fase (aún no descompuesto en sprint):** viajes próximos sin acción; métricas nocturnas. Recordatorios T-48h/T-24h ya viven en WKR-008.
+**También en la fase (aún no descompuesto en sprint — próximo producto):** viajes próximos sin acción; métricas nocturnas. Recordatorios T-48h/T-24h ya viven en WKR-008.
 
 **Valor:** El producto pasa de reactivo a **proactivo** — avisa antes de que algo falle en operación.
 
