@@ -7,16 +7,26 @@
 
 ---
 
-## Sprint actual — siguiente producto (Fase 4)
+## Sprint actual — F4-004 Occupancy Urgency Alerts (in-app)
 
-**F4-003 CLOSED.** Sin ticket de producto descompuesto a continuación.
+**Fase 4 — Automatizaciones de producto.** Tarea activa: **F4-004**.
 
-Próximo trabajo de producto según roadmap (aún no descompuesto en sprint):
+Diseño: [`docs/F4-004-occupancy-urgency-alerts-design.md`](docs/F4-004-occupancy-urgency-alerts-design.md)
 
-- Viajes próximos sin acción
-- Métricas nocturnas
+- [x] Design scope-lock (P1–P9)
+- [x] Implementación (migración 064, evento, fanout, widget, tests, harness)
+- [ ] Aplicar migración `064_occupancy_urgency_alerts.sql`
+- [ ] Harness `supabase/tests/f4_004_verification.sql` (BEGIN/ROLLBACK)
+- [ ] Soak en Render (worker): `OCCUPANCY_URGENCY_VIA_WORKER=false`
+- [ ] Habilitación controlada: `OCCUPANCY_URGENCY_VIA_WORKER=true`
 
-Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md) Fase 4.
+**No es cierre.** F4-003 permanece CLOSED/operativo.
+
+**Render (worker)** — agregar si aún no está:
+
+| Variable | Soak | Encender |
+|---|---|---|
+| `OCCUPANCY_URGENCY_VIA_WORKER` | `false` | `true` |
 
 ---
 
@@ -62,7 +72,9 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md) Fase 4.
 
 | Orden | Ticket / Fase | Tema | Estado |
 |-------|---------------|------|--------|
-| — | Fase 4 resto | Viajes sin acción; métricas nocturnas | Futura (próximo producto) |
+| — | **F4-004** | Occupancy Urgency Alerts | En implementación |
+| — | Futuro / Fase 6 | Métricas históricas y reporting | Futura |
+| — | Infraestructura / Operaciones | Backup & Disaster Recovery — estrategia de backups automáticos, retención, almacenamiento externo, restauración verificada, RPO/RTO y alertas operativas | Futura capacidad de infraestructura |
 | — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` | Futura |
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |

@@ -103,6 +103,14 @@ const envSchema = z.object({
   OCCUPANCY_ALERT_POLL_MS: z.coerce.number().default(3_600_000),
   /** F4-003 — max trips evaluated per evaluate_occupancy_alerts call. */
   OCCUPANCY_ALERT_BATCH: z.coerce.number().default(50),
+  /**
+   * F4-004 — When true, evaluate_occupancy_alerts emits T-24h urgency
+   * and NotificationFanout delivers urgency in-app rows.
+   * Independent of OCCUPANCY_ALERT_VIA_WORKER. Default false until soak.
+   */
+  OCCUPANCY_URGENCY_VIA_WORKER: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
   OUTBOX_POLL_MS: z.coerce.number().default(2000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(10),

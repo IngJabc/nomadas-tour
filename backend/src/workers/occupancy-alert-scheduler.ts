@@ -17,15 +17,20 @@ export interface OccupancyAlertEvaluateResult {
   batch: number;
   has_more: boolean;
   next_cursor: OccupancyAlertCursor | null;
+  urgency_matches: number;
+  urgency_emitted: number;
+  already_escalated: number;
 }
 
 export interface OccupancyAlertSchedulerDeps {
   isEnabled: () => boolean;
+  isUrgencyEnabled: () => boolean;
   pollMs: number;
   batch: number;
   evaluate: (
     batch: number,
     cursor: OccupancyAlertCursor | null,
+    urgencyEnabled: boolean,
   ) => Promise<OccupancyAlertEvaluateResult>;
   logger: WorkerLogger;
   now?: () => number;
@@ -45,6 +50,9 @@ const EMPTY_RESULT: OccupancyAlertEvaluateResult = {
   batch: 0,
   has_more: false,
   next_cursor: null,
+  urgency_matches: 0,
+  urgency_emitted: 0,
+  already_escalated: 0,
 };
 
 const MAX_PAGES_PER_CYCLE = 200;
@@ -75,17 +83,22 @@ export function parseEvaluateResult(data: unknown): OccupancyAlertEvaluateResult
     batch: asNumber(row.batch),
     has_more: row.has_more === true,
     next_cursor: parseCursor(row.next_cursor),
+    urgency_matches: asNumber(row.urgency_matches),
+    urgency_emitted: asNumber(row.urgency_emitted),
+    already_escalated: asNumber(row.already_escalated),
   };
 }
 
 export async function callEvaluateOccupancyAlerts(
   batch: number,
   cursor: OccupancyAlertCursor | null,
+  urgencyEnabled: boolean,
 ): Promise<OccupancyAlertEvaluateResult> {
   const { data, error } = await supabaseAdmin.rpc('evaluate_occupancy_alerts', {
     p_batch: batch,
     p_after_departure: cursor?.departure_time ?? null,
     p_after_id: cursor?.id ?? null,
+    p_urgency_enabled: urgencyEnabled,
   });
   if (error) {
     throw new Error(`evaluate_occupancy_alerts: ${error.message}`);
@@ -96,6 +109,7 @@ export async function callEvaluateOccupancyAlerts(
 export async function runOccupancyAlertCycle(
   batch: number,
   evaluate: OccupancyAlertSchedulerDeps['evaluate'],
+  urgencyEnabled: boolean,
   signal?: AbortSignal,
 ): Promise<OccupancyAlertEvaluateResult> {
   let cursor: OccupancyAlertCursor | null = null;
@@ -104,13 +118,16 @@ export async function runOccupancyAlertCycle(
   for (let page = 0; page < MAX_PAGES_PER_CYCLE; page += 1) {
     if (signal?.aborted) break;
 
-    const result = await evaluate(batch, cursor);
+    const result = await evaluate(batch, cursor, urgencyEnabled);
     totals.scanned += result.scanned;
     totals.evaluated += result.evaluated;
     totals.emitted += result.emitted;
     totals.skipped += result.skipped;
     totals.skipped_invalid_occupancy += result.skipped_invalid_occupancy;
     totals.cleaned_up += result.cleaned_up;
+    totals.urgency_matches += result.urgency_matches;
+    totals.urgency_emitted += result.urgency_emitted;
+    totals.already_escalated += result.already_escalated;
     totals.batch = result.batch || batch;
     totals.has_more = result.has_more;
     totals.next_cursor = result.next_cursor;
@@ -135,6 +152,7 @@ export function createDefaultOccupancyAlertSchedulerDeps(
 ): OccupancyAlertSchedulerDeps {
   return {
     isEnabled: () => env.OCCUPANCY_ALERT_VIA_WORKER,
+    isUrgencyEnabled: () => env.OCCUPANCY_URGENCY_VIA_WORKER,
     pollMs: env.OCCUPANCY_ALERT_POLL_MS,
     batch: env.OCCUPANCY_ALERT_BATCH,
     evaluate: callEvaluateOccupancyAlerts,
@@ -143,7 +161,7 @@ export function createDefaultOccupancyAlertSchedulerDeps(
 }
 
 /**
- * F4-003 — occupancy alert poll loop inside the existing Node worker.
+ * F4-003/F4-004 — occupancy alert (+ optional urgency) poll loop.
  * No daily hour gate. Errors are logged and do not throw out of the loop.
  */
 export function startOccupancyAlertScheduler(
@@ -158,6 +176,7 @@ export function startOccupancyAlertScheduler(
       poll_ms: deps.pollMs,
       batch: deps.batch,
       occupancy_alert_via_worker: deps.isEnabled(),
+      occupancy_urgency_via_worker: deps.isUrgencyEnabled(),
     });
 
     while (!signal.aborted) {
@@ -169,9 +188,11 @@ export function startOccupancyAlertScheduler(
             duration_ms: nowFn() - tickStarted,
           });
         } else {
+          const urgencyEnabled = deps.isUrgencyEnabled();
           const result = await runOccupancyAlertCycle(
             deps.batch,
             deps.evaluate,
+            urgencyEnabled,
             signal,
           );
           deps.logger.info('occupancy_alert_scheduler_tick', {
@@ -182,6 +203,9 @@ export function startOccupancyAlertScheduler(
             skipped: result.skipped,
             skipped_invalid_occupancy: result.skipped_invalid_occupancy,
             cleaned_up: result.cleaned_up,
+            urgency_matches: result.urgency_matches,
+            urgency_emitted: result.urgency_emitted,
+            already_escalated: result.already_escalated,
             duration_ms: nowFn() - tickStarted,
           });
         }

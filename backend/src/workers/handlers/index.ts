@@ -43,6 +43,10 @@ import {
   TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
   TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
 } from '../../events/trip-occupancy-alert-due.v1.js';
+import {
+  TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE,
+  TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION,
+} from '../../events/trip-occupancy-urgency-due.v1.js';
 import { env } from '../../config/env.js';
 import { emailService } from '../../services/email.service.js';
 import { reservationService } from '../../services/reservation.service.js';
@@ -191,6 +195,15 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
     createNotificationFanoutHandler('trip.occupancy_alert', {
       ...createDefaultNotificationFanoutDeps(),
       isEffectsEnabled: () => env.OCCUPANCY_ALERT_VIA_WORKER,
+    }),
+  );
+
+  // F4-004 — Occupancy urgency in-app only (no EmailFanout).
+  map.set(
+    `${TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE}:${TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.occupancy_urgency', {
+      ...createDefaultNotificationFanoutDeps(),
+      isEffectsEnabled: () => env.OCCUPANCY_URGENCY_VIA_WORKER,
     }),
   );
 

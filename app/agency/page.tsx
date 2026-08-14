@@ -73,6 +73,7 @@ interface AgencyDashboardData {
     capacity: number;
     reserved: number;
     available: number;
+    urgency?: boolean;
   }[];
 }
 

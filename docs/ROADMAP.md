@@ -86,7 +86,11 @@ FASE 4 — Automatizaciones (producto)
   F4-001  Agency Daily Digest            ✅
   F4-002  Superadmin Daily Digest        ✅
   F4-003  Occupancy Alerts               ✅
-  (siguiente: viajes sin acción / métricas nocturnas — aún no descompuesto)
+  F4-004  Occupancy Urgency Alerts       → siguiente
+  (métricas nocturnas → futuro / Fase 6 / reporting)
+
+FASE Infraestructura / Operaciones
+  Backup & Disaster Recovery             → futura capacidad
 FASE 5 — Audit Trail
 FASE 6 — Reportes
 FASE 7 — UX
@@ -263,10 +267,32 @@ El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implemen
 | F4-001 | Digest diario agencias (email) | Operativo / Completado |
 | F4-002 | Digest diario superadmin (email) | Operativo / Completado |
 | F4-003 | Alertas de ocupación (in-app) | Operativo / Completado |
+| F4-004 | Occupancy Urgency Alerts | Siguiente |
 
-**También en la fase (aún no descompuesto en sprint — próximo producto):** viajes próximos sin acción; métricas nocturnas. Recordatorios T-48h/T-24h ya viven en WKR-008.
+**Próximo ticket de producto:** **F4-004 — Occupancy Urgency Alerts** (antes «viajes sin acción»; aún no descompuesto en sprint). Recordatorios T-48h/T-24h ya viven en WKR-008.
+
+**Retirado de la prioridad de Fase 4:** métricas nocturnas → **futuro / Fase 6 / reporting** (no existe aún un consumidor de negocio definido para materializar snapshots históricos).
 
 **Valor:** El producto pasa de reactivo a **proactivo** — avisa antes de que algo falle en operación.
+
+---
+
+### Fase Infraestructura / Operaciones
+
+**Prioridad:** Futura — capacidad transversal de infraestructura/operación, no un sprint de producto.
+
+**Objetivo:** Proteger los datos del SaaS ante pérdida de base de datos, corrupción, eliminación accidental, incidentes de infraestructura, fallo catastrófico del proveedor y necesidad de restauración operativa.
+
+**Alcance conceptual (sin implementación):**
+
+- **Backup** — backup automático diario; horario objetivo configurable (inicialmente alrededor de 03:00 America/Caracas); almacenamiento independiente del proveedor principal; cifrado; retención configurable.
+- **Recovery** — restauración manual verificable; restore drill periódico; verificación de integridad; procedimiento de recuperación documentado.
+- **Resilience** — RPO; RTO; recuperación ante pérdida/corrupción; protección contra borrado accidental.
+- **Operations** — monitoreo del job; alerta si falla; evidencia de último backup exitoso; trazabilidad del proceso.
+
+**Scope guard:** aún no se incluye implementación, elección definitiva de proveedor, scripts, credenciales, infraestructura concreta, costos definitivos ni frecuencia final de retención. Esas decisiones se tomarán en el design de su futuro ticket.
+
+**No confundir con Workers:** puede aprovechar infraestructura existente cuando llegue el momento, pero no forma parte de WKR-006.x, no es un scheduler de producto, no debe implementarse como una tarea de notificaciones y es una capacidad de infraestructura/operación y disaster recovery.
 
 ---
 

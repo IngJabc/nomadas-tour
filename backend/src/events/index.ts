@@ -125,3 +125,21 @@ export {
   occupancyAlertDedupKey,
   parseTripOccupancyAlertDueEventV1,
 } from './trip-occupancy-alert-due.v1.js';
+
+export type {
+  OccupancyUrgencyWindow,
+  TripOccupancyUrgencyDueDataV1,
+  TripOccupancyUrgencyDueEventV1,
+} from './trip-occupancy-urgency-due.v1.js';
+export {
+  OCCUPANCY_URGENCY_WINDOW,
+  OCCUPANCY_URGENCY_WINDOW_MS,
+  TRIP_OCCUPANCY_URGENCY_DUE_V1_AGGREGATE,
+  TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE,
+  TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION,
+  assertNoPiiInTripOccupancyUrgencyDuePayload,
+  isOccupancyUrgencyWindow,
+  isTripOccupancyUrgencyDuePayloadV1,
+  parseTripOccupancyUrgencyDueEventV1,
+  urgencyDedupKey,
+} from './trip-occupancy-urgency-due.v1.js';

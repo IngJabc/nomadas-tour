@@ -42,6 +42,21 @@ export interface AgencyOccupancyAlertRow {
   capacity: number;
   reserved: number;
   available: number;
+  /** F4-004 — derived at read time: departure within T-24h. */
+  urgency: boolean;
+}
+
+/** T-24h window constant (ms). Matches SQL INTERVAL '24 hours'. */
+export const OCCUPANCY_URGENCY_WINDOW_MS = 86_400_000;
+
+export function isOccupancyUrgency(
+  departureTimeIso: string,
+  nowMs: number = Date.now(),
+): boolean {
+  const departureMs = Date.parse(departureTimeIso);
+  if (!Number.isFinite(departureMs)) return false;
+  const delta = departureMs - nowMs;
+  return delta > 0 && delta <= OCCUPANCY_URGENCY_WINDOW_MS;
 }
 
 /**
@@ -178,6 +193,7 @@ export async function listAgencyOccupancyAlerts(
   }
 
   const rows: AgencyOccupancyAlertRow[] = [];
+  const nowMs = Date.now();
   for (const trip of trips) {
     const alertType = stateByTrip.get(trip.id as string);
     if (!alertType) continue;
@@ -190,18 +206,29 @@ export async function listAgencyOccupancyAlerts(
     );
     if (!occupancy.ok) continue;
 
+    const departure_time = trip.departure_time as string;
     rows.push({
       trip_id: trip.id as string,
       alert_type: alertType,
       origin: routeRow?.origin || '?',
       destination: routeRow?.destination || '?',
-      departure_time: trip.departure_time as string,
+      departure_time,
       occupancy_pct: occupancy.occupancy_pct,
       capacity: occupancy.total,
       reserved: occupancy.reserved,
       available: occupancy.available,
+      urgency: isOccupancyUrgency(departure_time, nowMs),
     });
   }
+
+  // Urgents first, then departure ASC within each group (trips already ASC).
+  rows.sort((a, b) => {
+    if (a.urgency !== b.urgency) return a.urgency ? -1 : 1;
+    return (
+      Date.parse(a.departure_time) - Date.parse(b.departure_time) ||
+      a.trip_id.localeCompare(b.trip_id)
+    );
+  });
 
   return rows;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications, resolveNotificationRoute, timeAgo, type Notification } from './NotificationProvider';
 import { NOTIFICATION_ICONS } from './notification-config';
@@ -16,6 +17,9 @@ export function NotificationItem({ notification, role }: NotificationItemProps) 
   const isUnread = !notification.read_at;
   const cfg = NOTIFICATION_ICONS[notification.type] || NOTIFICATION_ICONS.trip_created;
   const Icon = cfg.icon;
+  const isOccupancyUrgency =
+    notification.type === 'occupancy_alert' &&
+    notification.metadata?.urgency === true;
 
   const handleClick = async () => {
     if (isUnread) {
@@ -44,9 +48,17 @@ export function NotificationItem({ notification, role }: NotificationItemProps) 
         <Icon className={cn('w-4 h-4', cfg.color)} strokeWidth={1.75} />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)] truncate">
-          {notification.title}
-        </p>
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="font-[family-name:var(--font-body)] font-semibold text-[13px] text-[var(--color-brand-navy)] truncate">
+            {notification.title}
+          </p>
+          {isOccupancyUrgency && (
+            <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#fef2f2] text-[#ef4444] font-[family-name:var(--font-body)] font-semibold text-[10px] px-2 py-0.5">
+              <Clock className="w-3 h-3" strokeWidth={1.75} />
+              Sale pronto
+            </span>
+          )}
+        </div>
         <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[var(--color-brand-muted)] line-clamp-2 mt-0.5">
           {notification.body}
         </p>

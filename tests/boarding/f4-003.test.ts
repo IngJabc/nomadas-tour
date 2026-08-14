@@ -28,17 +28,19 @@ const migration063 = read(
 const harness = read('supabase/tests/f4_003_verification.sql');
 
 describe('F4-003 — migration isolation', () => {
-  it('keeps 063 contiguous after 060→061→062; tip is 063', () => {
+  it('keeps 063 contiguous after 060→061→062; tip follows 064 when present', () => {
     const migrations = listMigrations();
     const i060 = migrations.indexOf('060_purge_completed_outbox_events.sql');
     const i061 = migrations.indexOf('061_schedule_agency_digests.sql');
     const i062 = migrations.indexOf('062_schedule_superadmin_digest.sql');
     const i063 = migrations.indexOf('063_evaluate_occupancy_alerts.sql');
+    const i064 = migrations.indexOf('064_occupancy_urgency_alerts.sql');
 
     expect(i061).toBe(i060 + 1);
     expect(i062).toBe(i061 + 1);
     expect(i063).toBe(i062 + 1);
-    expect(i063).toBe(migrations.length - 1);
+    expect(i064).toBe(i063 + 1);
+    expect(i064).toBe(migrations.length - 1);
   });
 
   it('has no tracked modifications in migrations 001–062', () => {

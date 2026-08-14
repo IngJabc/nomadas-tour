@@ -256,10 +256,43 @@ describe("F4-003 — OCCUPANCY_ALERT_* environment", () => {
     delete process.env.OCCUPANCY_ALERT_VIA_WORKER;
     delete process.env.OCCUPANCY_ALERT_POLL_MS;
     delete process.env.OCCUPANCY_ALERT_BATCH;
+    delete process.env.OCCUPANCY_URGENCY_VIA_WORKER;
     vi.resetModules();
     const { env } = await import("./env.js");
     expect(env.OCCUPANCY_ALERT_VIA_WORKER).toBe(false);
     expect(env.OCCUPANCY_ALERT_POLL_MS).toBe(3_600_000);
     expect(env.OCCUPANCY_ALERT_BATCH).toBe(50);
+    expect(env.OCCUPANCY_URGENCY_VIA_WORKER).toBe(false);
+  });
+});
+
+async function parseOccupancyUrgencyViaWorker(value?: string) {
+  process.env = { ...originalEnv, ...requiredEnv };
+  if (value === undefined) {
+    delete process.env.OCCUPANCY_URGENCY_VIA_WORKER;
+  } else {
+    process.env.OCCUPANCY_URGENCY_VIA_WORKER = value;
+  }
+
+  const { env } = await import("./env.js");
+  return env.OCCUPANCY_URGENCY_VIA_WORKER;
+}
+
+describe("F4-004 — OCCUPANCY_URGENCY_VIA_WORKER environment", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it.each([
+    ["an absent value", undefined, false],
+    ['"false"', "false", false],
+    ['"true"', "true", true],
+    ['"1"', "1", true],
+  ])("parses OCCUPANCY_URGENCY_VIA_WORKER %s as %s", async (_label, value, expected) => {
+    await expect(parseOccupancyUrgencyViaWorker(value)).resolves.toBe(expected);
   });
 });
