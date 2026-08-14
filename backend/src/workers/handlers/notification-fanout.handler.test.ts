@@ -590,8 +590,10 @@ describe('F4-003 — occupancy NotificationFanout', () => {
       recipient_role: 'superadmin',
       agency_id: null,
       action_url: `/admin/trips/${TRIP_ID}`,
-      title: 'Viaje subocupado',
+      title: 'Viaje con pocas reservas',
     });
+    expect(rows[0].body).toMatch(/^Mérida el /);
+    expect(rows[0].body).not.toMatch(/Caracas →/);
   });
 
   it('filters disabled agency prefs but keeps superadmin row', async () => {
