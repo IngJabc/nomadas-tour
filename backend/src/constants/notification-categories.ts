@@ -84,7 +84,8 @@ export const CATEGORY_METADATA: {
   {
     key: 'occupancy_alerts',
     label: 'Alertas de ocupación',
-    description: 'Avisos in-app cuando un viaje está casi lleno o subocupado.',
+    description:
+      'Avisos in-app cuando un viaje está casi lleno o con pocas reservas.',
     locked: false,
   },
 ];

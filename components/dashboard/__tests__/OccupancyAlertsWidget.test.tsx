@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { OccupancyAlertsWidget } from '@/components/dashboard/OccupancyAlertsWidget';
 import { OccupancyChart } from '@/components/dashboard/charts/OccupancyChart';
@@ -7,12 +7,11 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
   it('shows empty state with CTA when there are no alerts', () => {
     render(<OccupancyAlertsWidget alerts={[]} />);
 
-    expect(screen.getByText('Alertas de ocupación')).toBeInTheDocument();
-    expect(screen.getByText('No hay alertas de ocupación')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Ver viajes/i })).toHaveAttribute(
-      'href',
-      '/agency/trips',
-    );
+    expect(screen.getByText('Alertas de ocupación')).toBeTruthy();
+    expect(screen.getByText('No hay alertas de ocupación')).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: /Ver viajes/i }).getAttribute('href'),
+    ).toBe('/agency/trips');
   });
 
   it('renders active alert fields and deep-links to passengers', () => {
@@ -34,16 +33,40 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
       />,
     );
 
-    expect(screen.getByText('Casi lleno')).toBeInTheDocument();
-    expect(screen.getByText('Caracas → Mérida')).toBeInTheDocument();
-    expect(screen.getByText('93%')).toBeInTheDocument();
-    expect(screen.getByText('10')).toBeInTheDocument();
-    expect(screen.getByText('9')).toBeInTheDocument();
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Ver viaje/i })).toHaveAttribute(
-      'href',
-      '/agency/trips/trip-1/passengers',
+    expect(screen.getByText('Casi lleno')).toBeTruthy();
+    expect(screen.getByText('Mérida')).toBeTruthy();
+    expect(screen.queryByText('Caracas → Mérida')).toBeNull();
+    expect(screen.getByText('93%')).toBeTruthy();
+    expect(screen.getByText('10')).toBeTruthy();
+    expect(screen.getByText('9')).toBeTruthy();
+    expect(screen.getByText('1')).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: /Ver viaje/i }).getAttribute('href'),
+    ).toBe('/agency/trips/trip-1/passengers');
+  });
+
+  it('labels underbooked alerts as Pocas reservas', () => {
+    render(
+      <OccupancyAlertsWidget
+        alerts={[
+          {
+            trip_id: 'trip-2',
+            alert_type: 'underbooked',
+            origin: 'Caracas',
+            destination: 'Valencia',
+            departure_time: '2026-08-21T12:00:00.000Z',
+            occupancy_pct: 15,
+            capacity: 10,
+            reserved: 2,
+            available: 8,
+          },
+        ]}
+      />,
     );
+
+    expect(screen.getByText('Pocas reservas')).toBeTruthy();
+    expect(screen.getByText('Valencia')).toBeTruthy();
+    expect(screen.queryByText(/Caracas/)).toBeNull();
   });
 
   it('keeps OccupancyChart available for admin composition', () => {
@@ -62,6 +85,6 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
       />,
     );
 
-    expect(screen.getByText('Ocupación de viajes')).toBeInTheDocument();
+    expect(screen.getByText('Ocupación de viajes')).toBeTruthy();
   });
 });

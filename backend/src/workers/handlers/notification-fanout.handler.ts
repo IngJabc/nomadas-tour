@@ -618,7 +618,6 @@ async function buildRowsForEvent(
 
         const agencyIds = await deps.loadTripAgencyIds(parsed.data.trip_id);
         const route = await deps.loadRoute(parsed.data.route_id);
-        const origin = route?.origin ?? '?';
         const destination = route?.destination ?? '?';
         const departureFormatted = deps.formatDeparture(
           parsed.data.departure_time,
@@ -630,12 +629,12 @@ async function buildRowsForEvent(
         const reserved = live?.reserved;
         const total = live?.total;
         const isNearFull = parsed.data.alert_type === 'near_full';
-        const title = isNearFull ? 'Viaje casi lleno' : 'Viaje subocupado';
+        const title = isNearFull ? 'Viaje casi lleno' : 'Viaje con pocas reservas';
         const counts =
           reserved !== undefined && total !== undefined
             ? ` · ${occupancyPct}% (${reserved}/${total})`
             : ` · ${occupancyPct}%`;
-        const body = `${origin} → ${destination} el ${departureFormatted}${counts}`;
+        const body = `${destination} el ${departureFormatted}${counts}`;
         const metadata = {
           alert_type: parsed.data.alert_type,
           occupancy_pct: occupancyPct,
