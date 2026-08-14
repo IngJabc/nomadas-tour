@@ -39,6 +39,10 @@ import {
   SUPERADMIN_DIGEST_DUE_V1_TYPE,
   SUPERADMIN_DIGEST_DUE_V1_VERSION,
 } from '../../events/superadmin-digest-due.v1.js';
+import {
+  TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+  TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+} from '../../events/trip-occupancy-alert-due.v1.js';
 import { env } from '../../config/env.js';
 import { emailService } from '../../services/email.service.js';
 import { reservationService } from '../../services/reservation.service.js';
@@ -179,6 +183,15 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
   map.set(
     `${SUPERADMIN_DIGEST_DUE_V1_TYPE}:${SUPERADMIN_DIGEST_DUE_V1_VERSION}`,
     createSuperadminDigestFanoutHandler(),
+  );
+
+  // F4-003 — Occupancy alerts in-app only (no EmailFanout).
+  map.set(
+    `${TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE}:${TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION}`,
+    createNotificationFanoutHandler('trip.occupancy_alert', {
+      ...createDefaultNotificationFanoutDeps(),
+      isEffectsEnabled: () => env.OCCUPANCY_ALERT_VIA_WORKER,
+    }),
   );
 
   return map;

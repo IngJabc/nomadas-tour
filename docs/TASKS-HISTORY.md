@@ -482,3 +482,18 @@ Cierre de purga automática de `outbox_events` `completed` ≥30d sobre el worke
 - **Cutover Render:** tick `status: ok`, `deleted: 0`, `batch: 1000`, `duration_ms: 894`; sin errores de retention/relay/fatal
 - **Documentación de cierre:** [`docs/WKR-009-outbox-retention-workers-design.md`](WKR-009-outbox-retention-workers-design.md), [`docs/WKR-009-outbox-retention-workers-audit.md`](WKR-009-outbox-retention-workers-audit.md); TASKS/ROADMAP actualizados (WKR-009 ✅, Fase 4 siguiente)
 - **Validación:** backend **361/361** ✓, boarding WKR-009/008/007-fase2 **47/47** ✓, `tsc --noEmit` ✓, backend build ✓
+
+---
+
+## Sprint 17 — F4-001 Agency Daily Digest (2026-08-12)
+
+Primer ticket de **Fase 4**. Digest diario email a agencias activas (sin PII, sin in-app).
+
+[x] **F4-001 — Agency Daily Digest** (implementado y habilitado en Render)
+- **Scheduler** `digest-scheduler.ts` en el worker Node (07:00 America/Caracas) → RPC `schedule_agency_digests` + `emit_agency_event`
+- **Evento** `agency.digest.due.v1` (`aggregate_type=agency`, payload `{ agency_id, digest_date }`)
+- **Handler** email-only + `email_delivery_log` (`email_type=agency_digest`); prefs `ops_digest`
+- **Migración** `061_schedule_agency_digests.sql` — aplicada en producción
+- **Flag** `AGENCY_DIGEST_VIA_WORKER` (default `false` en código): soak → `true` en Render
+- **Diseño:** [`docs/F4-001-agency-daily-digest-design.md`](F4-001-agency-daily-digest-design.md)
+- **Siguiente:** F4-002 Superadmin Daily Digest

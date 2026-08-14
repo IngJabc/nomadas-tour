@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-05
+**Última actualización:** 2026-08-13
 
 ---
 
@@ -28,6 +28,10 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Estados inválidos protegidos | Operativo |
 | Branding configurable por agencia (logo + colores runtime) | Operativo |
 | Transactional Outbox + EmailWorker (`reservation.created.v1`) | Operativo (WKR-004/005) |
+| Reminders T-48h / T-24h | Operativo (WKR-008) |
+| Digest diario agencias | Operativo (F4-001) |
+| Digest diario superadmin | Implementado — soak/cutover (F4-002) |
+| Alertas de ocupación (in-app) | Implementado — soak/cutover (F4-003) |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -78,7 +82,10 @@ FASE Seguridad continua
   SEC-001 … SEC-008                        ✅ (hardening cerrado)
   SEC-009  Continuous security validation  → futura
 
-FASE 4 — Automatizaciones (producto) → siguiente
+FASE 4 — Automatizaciones (producto)
+  F4-001  Agency Daily Digest            ✅
+  F4-002  Superadmin Daily Digest        → soak/cutover
+  F4-003  Occupancy Alerts               → en curso (soak/cutover)
 FASE 5 — Audit Trail
 FASE 6 — Reportes
 FASE 7 — UX
@@ -128,7 +135,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 3 — Sistema de Workers
 
-**Prioridad:** Completada hasta WKR-009 (siguiente producto: Fase 4 — Automatizaciones).
+**Prioridad:** Completada hasta WKR-009. Producto siguiente/en curso: Fase 4 — Automatizaciones.
 
 **Objetivo:** Procesamiento asíncrono y tareas programadas desacopladas del ciclo HTTP, mediante **Transactional Outbox + Workers** ([WKR-002](WKR-002-events-workers-architecture-adr.md)).
 
@@ -244,18 +251,19 @@ El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implemen
 
 ### Fase 4 — Automatizaciones
 
-**Prioridad:** Tras WKR-007/008/009 (construida sobre Workers endurecidos).
+**Prioridad:** En curso (sobre Workers endurecidos). Ejecución: [`TASKS.md`](../TASKS.md).
 
 **Objetivo:** Reglas de negocio y comunicaciones que se ejecutan solas según configuración o umbrales.
 
-**Ejemplos:**
+**Progreso**
 
-- Recordatorios automáticos (T-48h, T-24h)
-- Digest diario para agencias y superadmin
-- Alertas de ocupación (viaje casi lleno / subocupado)
-- Viajes próximos sin acción
-- Limpieza programada
-- Métricas nocturnas (agregados para dashboards)
+| Ticket | Tema | Estado |
+|--------|------|--------|
+| F4-001 | Digest diario agencias (email) | Operativo |
+| F4-002 | Digest diario superadmin (email) | Implementado — migración/soak/cutover |
+| F4-003 | Alertas de ocupación (in-app) | Implementado — migración/soak/cutover |
+
+**También en la fase (aún no descompuesto en sprint):** viajes próximos sin acción; métricas nocturnas. Recordatorios T-48h/T-24h ya viven en WKR-008.
 
 **Valor:** El producto pasa de reactivo a **proactivo** — avisa antes de que algo falle en operación.
 

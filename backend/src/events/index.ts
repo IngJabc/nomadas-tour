@@ -109,3 +109,19 @@ export {
   isTripReminderWindow,
   parseTripReminderDueEventV1,
 } from './trip-reminder-due.v1.js';
+
+export type {
+  OccupancyAlertType,
+  TripOccupancyAlertDueDataV1,
+  TripOccupancyAlertDueEventV1,
+} from './trip-occupancy-alert-due.v1.js';
+export {
+  TRIP_OCCUPANCY_ALERT_DUE_V1_AGGREGATE,
+  TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+  TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+  assertNoPiiInTripOccupancyAlertDuePayload,
+  isOccupancyAlertType,
+  isTripOccupancyAlertDuePayloadV1,
+  occupancyAlertDedupKey,
+  parseTripOccupancyAlertDueEventV1,
+} from './trip-occupancy-alert-due.v1.js';

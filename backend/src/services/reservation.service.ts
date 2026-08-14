@@ -16,6 +16,7 @@ import {
 } from './boarding-attempts.service.js';
 import { notificationService } from './notification.service.js';
 import { emailService } from './email.service.js';
+import { listAgencyOccupancyAlerts } from './occupancy-alert.service.js';
 import type { TicketData, TicketTrip, TicketPassenger } from '../types/reservation.js';
 import type {
   BoardingLookupDTO,
@@ -1054,6 +1055,8 @@ export class ReservationService {
       .eq('id', agencyId)
       .single();
 
+    const occupancyAlerts = await listAgencyOccupancyAlerts(agencyId);
+
     return {
       agency_name: (agencyInfo as any)?.name || 'Agencia',
       total_trips: totalTrips || 0,
@@ -1064,6 +1067,7 @@ export class ReservationService {
       upcoming_trips: upcoming,
       recent_activity: recentActivity,
       occupancy_by_trip: occupancyData,
+      occupancy_alerts: occupancyAlerts,
     };
   }
 

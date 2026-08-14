@@ -143,7 +143,7 @@ describe('F4-001 — worker wiring', () => {
     expect(handlers).toContain('createAgencyDigestFanoutHandler');
     expect(event).toContain("AGENCY_DIGEST_DUE_V1_TYPE = 'agency.digest.due'");
     // Digest is email-only in v1 (no NotificationFanout compose for this event).
-    const digestBlock = handlers.split('F4-001')[1] ?? '';
+    const digestBlock = handlers.split('F4-001')[1]?.split('F4-002')[0] ?? '';
     expect(digestBlock).toContain('createAgencyDigestFanoutHandler()');
     expect(digestBlock).not.toContain('createNotificationFanoutHandler');
   });

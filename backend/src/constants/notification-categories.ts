@@ -5,6 +5,7 @@ export const NOTIFICATION_CATEGORIES = [
   'trip_cancellations',
   'trip_reminders',
   'ops_digest',
+  'occupancy_alerts',
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -22,6 +23,7 @@ export const NOTIFICATION_TYPE_TO_CATEGORY = {
   trip_archived: 'trip_cancellations',
   trip_reminder: 'trip_reminders',
   ops_digest: 'ops_digest',
+  occupancy_alert: 'occupancy_alerts',
   reservation_created: null,
   reservation_cancelled: null,
   passenger_cancelled: null,
@@ -77,6 +79,12 @@ export const CATEGORY_METADATA: {
     key: 'ops_digest',
     label: 'Resumen operativo diario',
     description: 'Email diario con el estado de viajes, reservas y abordaje.',
+    locked: false,
+  },
+  {
+    key: 'occupancy_alerts',
+    label: 'Alertas de ocupación',
+    description: 'Avisos in-app cuando un viaje está casi lleno o subocupado.',
     locked: false,
   },
 ];

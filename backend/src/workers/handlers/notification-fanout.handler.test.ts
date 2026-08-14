@@ -92,6 +92,10 @@ import {
   TRIP_POSTPONED_V1_VERSION,
 } from '../../events/trip-postponed.v1.js';
 import {
+  TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+  TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+} from '../../events/trip-occupancy-alert-due.v1.js';
+import {
   createNotificationFanoutHandler,
   type NotificationFanoutDeps,
   type NotificationFanoutEvent,
@@ -476,5 +480,188 @@ describe('WKR-007 C4 — registry wiring', () => {
       kind: 'completed',
       reason: 'skipped_effect_disabled',
     });
+  });
+});
+
+describe('F4-003 — occupancy NotificationFanout', () => {
+  const occupancyPayload = {
+    trip_id: TRIP_ID,
+    alert_type: 'near_full' as const,
+    occupancy_pct: 93,
+    departure_time: '2026-08-15T12:00:00.000Z',
+    route_id: ROUTE_ID,
+  };
+
+  it('skips when OCCUPANCY_ALERT_VIA_WORKER gate is false', async () => {
+    const deps = makeDeps({ isEffectsEnabled: () => false });
+    const handler = createNotificationFanoutHandler('trip.occupancy_alert', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+          occupancyPayload,
+        ),
+      ),
+    ).resolves.toEqual({
+      kind: 'completed',
+      reason: 'skipped_effect_disabled',
+    });
+    expect(deps.insertNotificationRows).not.toHaveBeenCalled();
+  });
+
+  it('fans out to associated agencies + unconditional superadmin with role-specific action_url', async () => {
+    const deps = makeDeps({
+      loadTripAgencyIds: vi.fn(async () => [AGENCY_A, AGENCY_B]),
+      loadLiveOccupancy: vi.fn(async () => ({
+        reserved: 9,
+        total: 10,
+        available: 1,
+        occupancy_pct: 90,
+      })),
+    });
+    const handler = createNotificationFanoutHandler('trip.occupancy_alert', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+          occupancyPayload,
+        ),
+      ),
+    ).resolves.toEqual({ kind: 'completed', reason: 'delivered' });
+
+    const rows = vi.mocked(deps.insertNotificationRows).mock.calls[0][0];
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.type)).toEqual([
+      'occupancy_alert',
+      'occupancy_alert',
+      'occupancy_alert',
+    ]);
+    expect(rows[0]).toMatchObject({
+      agency_id: AGENCY_A,
+      recipient_role: 'agency',
+      action_url: `/agency/trips/${TRIP_ID}/passengers`,
+      source_event_id: EVENT_ID,
+      metadata: {
+        alert_type: 'near_full',
+        occupancy_pct: 90,
+        trip_id: TRIP_ID,
+      },
+    });
+    expect(rows[1]).toMatchObject({
+      agency_id: AGENCY_B,
+      recipient_role: 'agency',
+      action_url: `/agency/trips/${TRIP_ID}/passengers`,
+    });
+    expect(rows[2]).toMatchObject({
+      agency_id: null,
+      recipient_role: 'superadmin',
+      action_url: `/admin/trips/${TRIP_ID}`,
+    });
+    expect(deps.loadTripAgencyIds).toHaveBeenCalledWith(TRIP_ID);
+  });
+
+  it('still inserts superadmin when no agencies are associated', async () => {
+    const deps = makeDeps({
+      loadTripAgencyIds: vi.fn(async () => []),
+    });
+    const handler = createNotificationFanoutHandler('trip.occupancy_alert', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+          {
+            ...occupancyPayload,
+            alert_type: 'underbooked',
+            occupancy_pct: 15,
+          },
+        ),
+      ),
+    ).resolves.toEqual({ kind: 'completed', reason: 'delivered' });
+
+    const rows = vi.mocked(deps.insertNotificationRows).mock.calls[0][0];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      recipient_role: 'superadmin',
+      agency_id: null,
+      action_url: `/admin/trips/${TRIP_ID}`,
+      title: 'Viaje subocupado',
+    });
+  });
+
+  it('filters disabled agency prefs but keeps superadmin row', async () => {
+    const deps = makeDeps({
+      loadTripAgencyIds: vi.fn(async () => [AGENCY_A, AGENCY_B]),
+      filterAgencyNotificationRows: vi.fn(async (rows) =>
+        rows.filter(
+          (row) =>
+            row.recipient_role !== 'agency' || row.agency_id !== AGENCY_A,
+        ),
+      ),
+    });
+    const handler = createNotificationFanoutHandler('trip.occupancy_alert', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+          occupancyPayload,
+        ),
+      ),
+    ).resolves.toEqual({ kind: 'completed', reason: 'delivered' });
+
+    const rows = vi.mocked(deps.insertNotificationRows).mock.calls[0][0];
+    expect(rows.map((r) => r.agency_id)).toEqual([AGENCY_B, null]);
+  });
+
+  it('is idempotent on partial delivery via source_event_id', async () => {
+    const deps = makeDeps({
+      loadTripAgencyIds: vi.fn(async () => [AGENCY_A]),
+      findExistingBySourceEventId: vi.fn(async () => [
+        { agency_id: AGENCY_A, recipient_role: 'agency' },
+      ]),
+    });
+    const handler = createNotificationFanoutHandler('trip.occupancy_alert', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
+          occupancyPayload,
+        ),
+      ),
+    ).resolves.toEqual({ kind: 'completed', reason: 'delivered' });
+
+    const rows = vi.mocked(deps.insertNotificationRows).mock.calls[0][0];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      recipient_role: 'superadmin',
+      agency_id: null,
+    });
+  });
+
+  it('registers occupancy handler without email path', () => {
+    const handlers = buildDefaultHandlers();
+    expect(
+      handlers.has(
+        `${TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE}:${TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION}`,
+      ),
+    ).toBe(true);
+
+    const indexSource = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'index.ts'),
+      'utf8',
+    );
+    const block = indexSource.split('F4-003')[1] ?? '';
+    expect(block).toContain('trip.occupancy_alert');
+    expect(block).not.toContain('createEmailFanoutHandler');
+    expect(block).not.toContain('email_delivery_log');
   });
 });

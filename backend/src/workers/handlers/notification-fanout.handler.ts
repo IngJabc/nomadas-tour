@@ -32,6 +32,11 @@ import {
   parseTripReminderDueEventV1,
   type TripReminderDueEventV1,
 } from '../../events/trip-reminder-due.v1.js';
+import {
+  parseTripOccupancyAlertDueEventV1,
+  type TripOccupancyAlertDueEventV1,
+} from '../../events/trip-occupancy-alert-due.v1.js';
+import { computeCanonicalOccupancy } from '../../services/occupancy-alert.service.js';
 import type { OutboxEventRow } from '../../events/types.js';
 import { formatDateForEmail } from '../../utils/email-fanout.js';
 import {
@@ -55,7 +60,9 @@ export type NotificationFanoutEvent =
   | 'trip.auto_completed'
   | 'trip.archived'
   /** WKR-008 — in-app reminder; gated via TRIP_REMINDER_VIA_OUTBOX deps. */
-  | 'trip_reminder';
+  | 'trip_reminder'
+  /** F4-003 — in-app occupancy alert; gated via OCCUPANCY_ALERT_VIA_WORKER. */
+  | 'trip.occupancy_alert';
 
 export interface NotificationFanoutInsertRow extends AgencyNotificationRow {
   type: NotificationType;
@@ -100,6 +107,15 @@ export interface NotificationFanoutDeps {
     tripId: string,
   ) => Promise<ReservationNotificationContext | null>;
   formatDeparture: (iso: string) => string;
+  loadTripAgencyIds?: (tripId: string) => Promise<string[]>;
+  loadLiveOccupancy?: (
+    tripId: string,
+  ) => Promise<{
+    reserved: number;
+    total: number;
+    available: number;
+    occupancy_pct: number;
+  } | null>;
 }
 
 function recipientKey(
@@ -242,6 +258,48 @@ export function createDefaultNotificationFanoutDeps(): NotificationFanoutDeps {
       };
     },
     formatDeparture: formatDateForEmail,
+    async loadTripAgencyIds(tripId) {
+      const { data, error } = await supabaseAdmin
+        .from('trip_agencies')
+        .select('agency_id, agencies!inner(status)')
+        .eq('trip_id', tripId)
+        .eq('agencies.status', 'active');
+      if (error) {
+        throw new Error(`loadTripAgencyIds: ${error.message}`);
+      }
+      return (data ?? []).map((row) => row.agency_id as string);
+    },
+    async loadLiveOccupancy(tripId) {
+      const { data: trip, error: tripError } = await supabaseAdmin
+        .from('trips')
+        .select('capacity')
+        .eq('id', tripId)
+        .maybeSingle();
+      if (tripError) {
+        throw new Error(`loadLiveOccupancy: ${tripError.message}`);
+      }
+      if (!trip) return null;
+
+      const { data: seats, error: seatError } = await supabaseAdmin
+        .from('seats')
+        .select('status')
+        .eq('trip_id', tripId);
+      if (seatError) {
+        throw new Error(`loadLiveOccupancy: ${seatError.message}`);
+      }
+
+      const occupancy = computeCanonicalOccupancy(
+        (seats ?? []) as Array<{ status: string }>,
+        Number((trip as { capacity?: number }).capacity) || 0,
+      );
+      if (!occupancy.ok) return null;
+      return {
+        reserved: occupancy.reserved,
+        total: occupancy.total,
+        available: occupancy.available,
+        occupancy_pct: occupancy.occupancy_pct,
+      };
+    },
   };
 }
 
@@ -543,6 +601,76 @@ async function buildRowsForEvent(
             },
           }),
         };
+      }
+      case 'trip.occupancy_alert': {
+        const parsed: TripOccupancyAlertDueEventV1 =
+          parseTripOccupancyAlertDueEventV1(row);
+        if (!deps.loadTripAgencyIds) {
+          return {
+            ok: false,
+            outcome: {
+              kind: 'failed',
+              permanent: true,
+              reason: 'loadTripAgencyIds is required for occupancy alerts',
+            },
+          };
+        }
+
+        const agencyIds = await deps.loadTripAgencyIds(parsed.data.trip_id);
+        const route = await deps.loadRoute(parsed.data.route_id);
+        const origin = route?.origin ?? '?';
+        const destination = route?.destination ?? '?';
+        const departureFormatted = deps.formatDeparture(
+          parsed.data.departure_time,
+        );
+        const live = deps.loadLiveOccupancy
+          ? await deps.loadLiveOccupancy(parsed.data.trip_id)
+          : null;
+        const occupancyPct = live?.occupancy_pct ?? parsed.data.occupancy_pct;
+        const reserved = live?.reserved;
+        const total = live?.total;
+        const isNearFull = parsed.data.alert_type === 'near_full';
+        const title = isNearFull ? 'Viaje casi lleno' : 'Viaje subocupado';
+        const counts =
+          reserved !== undefined && total !== undefined
+            ? ` · ${occupancyPct}% (${reserved}/${total})`
+            : ` · ${occupancyPct}%`;
+        const body = `${origin} → ${destination} el ${departureFormatted}${counts}`;
+        const metadata = {
+          alert_type: parsed.data.alert_type,
+          occupancy_pct: occupancyPct,
+          trip_id: parsed.data.trip_id,
+        };
+
+        const rows: NotificationFanoutInsertRow[] = [];
+        for (const agencyId of agencyIds) {
+          rows.push({
+            type: 'occupancy_alert',
+            title,
+            body,
+            entity_type: 'trip',
+            entity_id: parsed.data.trip_id,
+            agency_id: agencyId,
+            recipient_role: 'agency',
+            action_url: `/agency/trips/${parsed.data.trip_id}/passengers`,
+            metadata,
+            source_event_id: row.id,
+          });
+        }
+        rows.push({
+          type: 'occupancy_alert',
+          title,
+          body,
+          entity_type: 'trip',
+          entity_id: parsed.data.trip_id,
+          agency_id: null,
+          recipient_role: 'superadmin',
+          action_url: `/admin/trips/${parsed.data.trip_id}`,
+          metadata,
+          source_event_id: row.id,
+        });
+
+        return { ok: true, rows };
       }
       default: {
         const _exhaustive: never = event;

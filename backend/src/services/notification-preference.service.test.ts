@@ -64,6 +64,10 @@ describe('createDefaultPreferences', () => {
       in_app_enabled: true,
       email_enabled: true,
     });
+    expect(prefs.occupancy_alerts).toEqual({
+      in_app_enabled: true,
+      email_enabled: true,
+    });
   });
 });
 
@@ -151,11 +155,17 @@ describe('notificationPreferenceService.seedDefaults', () => {
           in_app_enabled: true,
           email_enabled: true,
         }),
+        expect.objectContaining({
+          agency_id: 'agency-new',
+          category: 'occupancy_alerts',
+          in_app_enabled: true,
+          email_enabled: true,
+        }),
       ]),
       { onConflict: 'agency_id,category', ignoreDuplicates: true },
     );
     const rows = (chain.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(7);
   });
 });
 
@@ -191,7 +201,7 @@ describe('public preference mappers', () => {
     const prefs = createDefaultPreferences();
     const categories = toPublicCategories(prefs);
 
-    expect(categories).toHaveLength(6);
+    expect(categories).toHaveLength(7);
     expect(categories[0]).toEqual(
       expect.objectContaining({
         key: 'trip_assignments',
@@ -214,6 +224,13 @@ describe('public preference mappers', () => {
         key: 'ops_digest',
         locked: false,
         label: 'Resumen operativo diario',
+      }),
+    );
+    expect(categories.find((c) => c.key === 'occupancy_alerts')).toEqual(
+      expect.objectContaining({
+        key: 'occupancy_alerts',
+        locked: false,
+        label: 'Alertas de ocupación',
       }),
     );
   });

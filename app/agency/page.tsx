@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/Button";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ActivityWidget } from "@/components/dashboard/ActivityWidget";
 import { Timeline } from "@/components/dashboard/Timeline";
-import { OccupancyChart } from "@/components/dashboard/charts/OccupancyChart";
+import { OccupancyAlertsWidget } from "@/components/dashboard/OccupancyAlertsWidget";
 import { useAuthUser } from '@/hooks/useAuthUser';
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 
@@ -62,6 +62,17 @@ interface AgencyDashboardData {
     total: number;
     reserved: number;
     occupancy_pct: number;
+  }[];
+  occupancy_alerts: {
+    trip_id: string;
+    alert_type: "near_full" | "underbooked";
+    origin: string;
+    destination: string;
+    departure_time: string;
+    occupancy_pct: number;
+    capacity: number;
+    reserved: number;
+    available: number;
   }[];
 }
 
@@ -384,8 +395,8 @@ export default function AgencyDashboardPage() {
           animate="visible"
           transition={{ duration: 0.25, delay: 0.15 }}
         >
-          <OccupancyChart
-            data={data?.occupancy_by_trip ?? []}
+          <OccupancyAlertsWidget
+            alerts={data?.occupancy_alerts ?? []}
             loading={false}
           />
         </motion.div>

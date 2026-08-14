@@ -21,6 +21,9 @@ export interface WorkerRuntimeConfig {
   superadminDigestViaWorker: boolean;
   superadminDigestPollMs: number;
   superadminDigestBatch: number;
+  occupancyAlertViaWorker: boolean;
+  occupancyAlertPollMs: number;
+  occupancyAlertBatch: number;
   heartbeatMs: number;
   staleProcessingMs: number;
   staleRecoveryLimit: number;
@@ -49,6 +52,9 @@ export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
     superadminDigestViaWorker: env.SUPERADMIN_DIGEST_VIA_WORKER,
     superadminDigestPollMs: env.SUPERADMIN_DIGEST_POLL_MS,
     superadminDigestBatch: env.SUPERADMIN_DIGEST_BATCH,
+    occupancyAlertViaWorker: env.OCCUPANCY_ALERT_VIA_WORKER,
+    occupancyAlertPollMs: env.OCCUPANCY_ALERT_POLL_MS,
+    occupancyAlertBatch: env.OCCUPANCY_ALERT_BATCH,
     heartbeatMs: env.OUTBOX_HEARTBEAT_MS,
     staleProcessingMs: env.OUTBOX_STALE_PROCESSING_MS,
     staleRecoveryLimit: env.OUTBOX_STALE_RECOVERY_LIMIT,
