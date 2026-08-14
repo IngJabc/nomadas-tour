@@ -95,7 +95,7 @@ export function OccupancyAlertsWidget({
                               className="inline-flex items-center gap-1"
                             >
                               <Clock className="w-3 h-3" strokeWidth={1.75} />
-                              Sale pronto
+                              Sale mañana
                             </Badge>
                           ) : (
                             <AlertTriangle

@@ -53,7 +53,7 @@ BEGIN
   WHERE n.nspname = 'public'
     AND p.proname = 'evaluate_occupancy_alerts'
     AND pg_get_function_identity_arguments(p.oid)
-      = 'integer, timestamp with time zone, uuid, boolean';
+      = 'p_batch integer, p_after_departure timestamp with time zone, p_after_id uuid, p_urgency_enabled boolean';
 
   IF v_is_definer IS NOT TRUE OR v_nargs IS DISTINCT FROM 4 THEN
     RAISE EXCEPTION 'FAIL: A) 4-arg evaluate_occupancy_alerts DEFINER missing';
@@ -65,7 +65,7 @@ BEGIN
   WHERE n.nspname = 'public'
     AND p.proname = 'evaluate_occupancy_alerts'
     AND pg_get_function_identity_arguments(p.oid)
-      = 'integer, timestamp with time zone, uuid, boolean';
+      = 'p_batch integer, p_after_departure timestamp with time zone, p_after_id uuid, p_urgency_enabled boolean';
 
   IF v_search_path IS NULL OR v_search_path NOT LIKE '%search_path=public%' THEN
     RAISE EXCEPTION 'FAIL: A) search_path is not public: %', v_search_path;
@@ -196,8 +196,10 @@ BEGIN
   -- tick 1 (flag TRUE): enter only — F4-004 urgency must NOT fire this tick.
   -- tick 2 (flag TRUE): still alerted + in T-24h → urgency fires now.
   -- tick 3 (flag TRUE): no second urgency (same cycle).
+  -- departure NOW()+2h keeps the trip in T-24h and avoids colliding with
+  -- v_trip_enter (NOW()+3h) on trips_route_departure_unique (route_id, departure_time).
   INSERT INTO public.trips (id, route_id, departure_time, capacity, vehicle_type, status)
-  VALUES (v_trip_seq, v_route, NOW() + INTERVAL '3 hours', 10, 'kia', 'active')
+  VALUES (v_trip_seq, v_route, NOW() + INTERVAL '2 hours', 10, 'kia', 'active')
   ON CONFLICT (id) DO NOTHING;
   INSERT INTO public.seats (trip_id, seat_code, status)
   SELECT v_trip_seq, 'A' || g, CASE WHEN g <= 2 THEN 'reserved' ELSE 'available' END

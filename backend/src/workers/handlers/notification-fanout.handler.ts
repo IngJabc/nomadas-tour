@@ -702,13 +702,13 @@ async function buildRowsForEvent(
         const total = live?.total;
         const isNearFull = parsed.data.alert_type === 'near_full';
         const title = isNearFull
-          ? 'Viaje casi lleno — sale pronto'
-          : 'Viaje con pocas reservas — sale pronto';
+          ? 'Viaje casi lleno — sale mañana'
+          : 'Viaje con pocas reservas — sale mañana';
         const counts =
           reserved !== undefined && total !== undefined
             ? `${occupancyPct}% (${reserved}/${total})`
             : `${occupancyPct}%`;
-        const body = `${destination} sale pronto · ${counts}`;
+        const body = `${destination} sale mañana · ${counts}`;
         const metadata = {
           alert_type: parsed.data.alert_type,
           occupancy_pct: occupancyPct,

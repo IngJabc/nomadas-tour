@@ -86,7 +86,7 @@ FASE 4 — Automatizaciones (producto)
   F4-001  Agency Daily Digest            ✅
   F4-002  Superadmin Daily Digest        ✅
   F4-003  Occupancy Alerts               ✅
-  F4-004  Occupancy Urgency Alerts       → siguiente
+  F4-004  Occupancy Urgency Alerts       ✅
   (métricas nocturnas → futuro / Fase 6 / reporting)
 
 FASE Infraestructura / Operaciones
@@ -267,9 +267,9 @@ El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implemen
 | F4-001 | Digest diario agencias (email) | Operativo / Completado |
 | F4-002 | Digest diario superadmin (email) | Operativo / Completado |
 | F4-003 | Alertas de ocupación (in-app) | Operativo / Completado |
-| F4-004 | Occupancy Urgency Alerts | Siguiente |
+| F4-004 | Occupancy Urgency Alerts | Operativo / Completado |
 
-**Próximo ticket de producto:** **F4-004 — Occupancy Urgency Alerts** (antes «viajes sin acción»; aún no descompuesto en sprint). Recordatorios T-48h/T-24h ya viven en WKR-008.
+**Fase 4 operativa:** F4-001 a F4-004 CLOSED. **Próximo ticket de producto:** siguiente descompuesto de Fase 4 (métricas nocturnas quedó retirado → futuro / Fase 6 / reporting). Recordatorios T-48h/T-24h ya viven en WKR-008; la escalación T-24h de ocupación vive en F4-004.
 
 **Retirado de la prioridad de Fase 4:** métricas nocturnas → **futuro / Fase 6 / reporting** (no existe aún un consumidor de negocio definido para materializar snapshots históricos).
 

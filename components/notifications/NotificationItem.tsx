@@ -55,7 +55,7 @@ export function NotificationItem({ notification, role }: NotificationItemProps) 
           {isOccupancyUrgency && (
             <span className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#fef2f2] text-[#ef4444] font-[family-name:var(--font-body)] font-semibold text-[10px] px-2 py-0.5">
               <Clock className="w-3 h-3" strokeWidth={1.75} />
-              Sale pronto
+              Sale mañana
             </span>
           )}
         </div>

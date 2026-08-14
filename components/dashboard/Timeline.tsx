@@ -148,7 +148,7 @@ export function Timeline({ items, loading }: TimelineProps) {
                           <div className="mb-1.5">
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#fef2f2] text-[#ef4444] font-[family-name:var(--font-body)] font-semibold text-[10px] leading-tight">
                               <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444]" />
-                              Sale pronto
+                              Sale mañana
                             </span>
                           </div>
                         ) : item.days_until_departure <= 3 ? (
