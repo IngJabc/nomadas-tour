@@ -3,7 +3,9 @@ import {
   classifyOccupancyCounts,
   computeCanonicalOccupancy,
   decideOccupancyTransition,
+  isOccupancyUrgency,
   listAgencyOccupancyAlerts,
+  OCCUPANCY_URGENCY_WINDOW_MS,
   persistedStateFromAlertType,
 } from './occupancy-alert.service.js';
 
@@ -183,5 +185,88 @@ describe('F4-003 — listAgencyOccupancyAlerts tenancy', () => {
     tableChains.trip_agencies = chain([]);
     await expect(listAgencyOccupancyAlerts('agency-empty')).resolves.toEqual([]);
     expect(tableChains.trip_occupancy_alert_state).toBeUndefined();
+  });
+});
+
+describe('F4-004 — urgency derivation and ordering', () => {
+  it('marks departure within 24h as urgent and outside as not', () => {
+    const now = Date.parse('2026-08-14T12:00:00.000Z');
+    expect(
+      isOccupancyUrgency(
+        new Date(now + OCCUPANCY_URGENCY_WINDOW_MS).toISOString(),
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      isOccupancyUrgency(
+        new Date(now + OCCUPANCY_URGENCY_WINDOW_MS + 1).toISOString(),
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      isOccupancyUrgency(new Date(now - 1).toISOString(), now),
+    ).toBe(false);
+  });
+
+  it('sorts urgency alerts before normal and keeps departure ASC within groups', async () => {
+    const urgentTrip = 'trip-urgent';
+    const laterUrgent = 'trip-urgent-later';
+    const normalTrip = 'trip-normal';
+    const now = Date.now();
+    const in6h = new Date(now + 6 * 60 * 60 * 1000).toISOString();
+    const in12h = new Date(now + 12 * 60 * 60 * 1000).toISOString();
+    const in48h = new Date(now + 48 * 60 * 60 * 1000).toISOString();
+
+    tableChains.trip_agencies = chain([
+      { trip_id: urgentTrip },
+      { trip_id: laterUrgent },
+      { trip_id: normalTrip },
+    ]);
+    tableChains.trip_occupancy_alert_state = chain([
+      { trip_id: urgentTrip, alert_type: 'underbooked' },
+      { trip_id: laterUrgent, alert_type: 'near_full' },
+      { trip_id: normalTrip, alert_type: 'near_full' },
+    ]);
+    // Returned ASC by departure from query mock — service re-sorts by urgency.
+    tableChains.trips = chain([
+      {
+        id: urgentTrip,
+        capacity: 10,
+        departure_time: in6h,
+        routes: { origin: 'A', destination: 'Urgente' },
+      },
+      {
+        id: laterUrgent,
+        capacity: 10,
+        departure_time: in12h,
+        routes: { origin: 'A', destination: 'Urgente2' },
+      },
+      {
+        id: normalTrip,
+        capacity: 10,
+        departure_time: in48h,
+        routes: { origin: 'A', destination: 'Normal' },
+      },
+    ]);
+    tableChains.seats = chain([
+      { trip_id: urgentTrip, status: 'reserved' },
+      { trip_id: urgentTrip, status: 'available' },
+      { trip_id: laterUrgent, status: 'reserved' },
+      { trip_id: laterUrgent, status: 'reserved' },
+      { trip_id: laterUrgent, status: 'available' },
+      { trip_id: normalTrip, status: 'reserved' },
+      { trip_id: normalTrip, status: 'reserved' },
+      { trip_id: normalTrip, status: 'available' },
+    ]);
+
+    const rows = await listAgencyOccupancyAlerts('agency-1');
+    expect(rows.map((r) => r.trip_id)).toEqual([
+      urgentTrip,
+      laterUrgent,
+      normalTrip,
+    ]);
+    expect(rows[0].urgency).toBe(true);
+    expect(rows[1].urgency).toBe(true);
+    expect(rows[2].urgency).toBe(false);
   });
 });

@@ -185,6 +185,7 @@ async function main() {
     occupancy_alert_via_worker: config.occupancyAlertViaWorker,
     occupancy_alert_poll_ms: config.occupancyAlertPollMs,
     occupancy_alert_batch: config.occupancyAlertBatch,
+    occupancy_urgency_via_worker: config.occupancyUrgencyViaWorker,
     poll_ms: config.pollMs,
     batch_size: config.batchSize,
     settle_ms: config.settleMs,

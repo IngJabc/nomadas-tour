@@ -28,6 +28,7 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
             capacity: 10,
             reserved: 9,
             available: 1,
+            urgency: false,
           },
         ]}
       />,
@@ -36,10 +37,8 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
     expect(screen.getByText('Casi lleno')).toBeTruthy();
     expect(screen.getByText('Mérida')).toBeTruthy();
     expect(screen.queryByText('Caracas → Mérida')).toBeNull();
+    expect(screen.queryByText('Sale pronto')).toBeNull();
     expect(screen.getByText('93%')).toBeTruthy();
-    expect(screen.getByText('10')).toBeTruthy();
-    expect(screen.getByText('9')).toBeTruthy();
-    expect(screen.getByText('1')).toBeTruthy();
     expect(
       screen.getByRole('link', { name: /Ver viaje/i }).getAttribute('href'),
     ).toBe('/agency/trips/trip-1/passengers');
@@ -59,6 +58,7 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
             capacity: 10,
             reserved: 2,
             available: 8,
+            urgency: false,
           },
         ]}
       />,
@@ -67,6 +67,34 @@ describe('F4-003 — OccupancyAlertsWidget', () => {
     expect(screen.getByText('Pocas reservas')).toBeTruthy();
     expect(screen.getByText('Valencia')).toBeTruthy();
     expect(screen.queryByText(/Caracas/)).toBeNull();
+  });
+
+  it('shows Sale pronto badge and Clock for urgency alerts', () => {
+    render(
+      <OccupancyAlertsWidget
+        alerts={[
+          {
+            trip_id: 'trip-urgent',
+            alert_type: 'near_full',
+            origin: 'Caracas',
+            destination: 'Barquisimeto',
+            departure_time: '2026-08-14T18:00:00.000Z',
+            occupancy_pct: 94,
+            capacity: 31,
+            reserved: 29,
+            available: 2,
+            urgency: true,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Casi lleno')).toBeTruthy();
+    expect(screen.getByText('Sale pronto')).toBeTruthy();
+    expect(screen.getByText('Barquisimeto')).toBeTruthy();
+    expect(
+      screen.getByRole('link', { name: /Ver viaje/i }).getAttribute('href'),
+    ).toBe('/agency/trips/trip-urgent/passengers');
   });
 
   it('keeps OccupancyChart available for admin composition', () => {

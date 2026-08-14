@@ -24,6 +24,7 @@ export interface WorkerRuntimeConfig {
   occupancyAlertViaWorker: boolean;
   occupancyAlertPollMs: number;
   occupancyAlertBatch: number;
+  occupancyUrgencyViaWorker: boolean;
   heartbeatMs: number;
   staleProcessingMs: number;
   staleRecoveryLimit: number;
@@ -55,6 +56,7 @@ export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
     occupancyAlertViaWorker: env.OCCUPANCY_ALERT_VIA_WORKER,
     occupancyAlertPollMs: env.OCCUPANCY_ALERT_POLL_MS,
     occupancyAlertBatch: env.OCCUPANCY_ALERT_BATCH,
+    occupancyUrgencyViaWorker: env.OCCUPANCY_URGENCY_VIA_WORKER,
     heartbeatMs: env.OUTBOX_HEARTBEAT_MS,
     staleProcessingMs: env.OUTBOX_STALE_PROCESSING_MS,
     staleRecoveryLimit: env.OUTBOX_STALE_RECOVERY_LIMIT,

@@ -36,6 +36,10 @@ import {
   parseTripOccupancyAlertDueEventV1,
   type TripOccupancyAlertDueEventV1,
 } from '../../events/trip-occupancy-alert-due.v1.js';
+import {
+  parseTripOccupancyUrgencyDueEventV1,
+  type TripOccupancyUrgencyDueEventV1,
+} from '../../events/trip-occupancy-urgency-due.v1.js';
 import { computeCanonicalOccupancy } from '../../services/occupancy-alert.service.js';
 import type { OutboxEventRow } from '../../events/types.js';
 import { formatDateForEmail } from '../../utils/email-fanout.js';
@@ -62,7 +66,9 @@ export type NotificationFanoutEvent =
   /** WKR-008 — in-app reminder; gated via TRIP_REMINDER_VIA_OUTBOX deps. */
   | 'trip_reminder'
   /** F4-003 — in-app occupancy alert; gated via OCCUPANCY_ALERT_VIA_WORKER. */
-  | 'trip.occupancy_alert';
+  | 'trip.occupancy_alert'
+  /** F4-004 — in-app occupancy urgency; gated via OCCUPANCY_URGENCY_VIA_WORKER. */
+  | 'trip.occupancy_urgency';
 
 export interface NotificationFanoutInsertRow extends AgencyNotificationRow {
   type: NotificationType;
@@ -639,6 +645,76 @@ async function buildRowsForEvent(
           alert_type: parsed.data.alert_type,
           occupancy_pct: occupancyPct,
           trip_id: parsed.data.trip_id,
+        };
+
+        const rows: NotificationFanoutInsertRow[] = [];
+        for (const agencyId of agencyIds) {
+          rows.push({
+            type: 'occupancy_alert',
+            title,
+            body,
+            entity_type: 'trip',
+            entity_id: parsed.data.trip_id,
+            agency_id: agencyId,
+            recipient_role: 'agency',
+            action_url: `/agency/trips/${parsed.data.trip_id}/passengers`,
+            metadata,
+            source_event_id: row.id,
+          });
+        }
+        rows.push({
+          type: 'occupancy_alert',
+          title,
+          body,
+          entity_type: 'trip',
+          entity_id: parsed.data.trip_id,
+          agency_id: null,
+          recipient_role: 'superadmin',
+          action_url: `/admin/trips/${parsed.data.trip_id}`,
+          metadata,
+          source_event_id: row.id,
+        });
+
+        return { ok: true, rows };
+      }
+      case 'trip.occupancy_urgency': {
+        const parsed: TripOccupancyUrgencyDueEventV1 =
+          parseTripOccupancyUrgencyDueEventV1(row);
+        if (!deps.loadTripAgencyIds) {
+          return {
+            ok: false,
+            outcome: {
+              kind: 'failed',
+              permanent: true,
+              reason: 'loadTripAgencyIds is required for occupancy urgency',
+            },
+          };
+        }
+
+        const agencyIds = await deps.loadTripAgencyIds(parsed.data.trip_id);
+        const route = await deps.loadRoute(parsed.data.route_id);
+        const destination = route?.destination ?? '?';
+        const live = deps.loadLiveOccupancy
+          ? await deps.loadLiveOccupancy(parsed.data.trip_id)
+          : null;
+        const occupancyPct = live?.occupancy_pct ?? parsed.data.occupancy_pct;
+        const reserved = live?.reserved;
+        const total = live?.total;
+        const isNearFull = parsed.data.alert_type === 'near_full';
+        const title = isNearFull
+          ? 'Viaje casi lleno — sale pronto'
+          : 'Viaje con pocas reservas — sale pronto';
+        const counts =
+          reserved !== undefined && total !== undefined
+            ? `${occupancyPct}% (${reserved}/${total})`
+            : `${occupancyPct}%`;
+        const body = `${destination} sale pronto · ${counts}`;
+        const metadata = {
+          alert_type: parsed.data.alert_type,
+          occupancy_pct: occupancyPct,
+          trip_id: parsed.data.trip_id,
+          urgency: true,
+          urgency_window: parsed.data.urgency_window,
         };
 
         const rows: NotificationFanoutInsertRow[] = [];

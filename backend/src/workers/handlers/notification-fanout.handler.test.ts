@@ -31,6 +31,8 @@ vi.mock('../../config/env.js', () => ({
     SENTRY_ENVIRONMENT: '',
     SENTRY_RELEASE: '',
     WORKER_HEALTH_PORT: 3002,
+    OCCUPANCY_ALERT_VIA_WORKER: true,
+    OCCUPANCY_URGENCY_VIA_WORKER: true,
   },
 }));
 
@@ -95,6 +97,10 @@ import {
   TRIP_OCCUPANCY_ALERT_DUE_V1_TYPE,
   TRIP_OCCUPANCY_ALERT_DUE_V1_VERSION,
 } from '../../events/trip-occupancy-alert-due.v1.js';
+import {
+  TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE,
+  TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION,
+} from '../../events/trip-occupancy-urgency-due.v1.js';
 import {
   createNotificationFanoutHandler,
   type NotificationFanoutDeps,
@@ -665,5 +671,128 @@ describe('F4-003 — occupancy NotificationFanout', () => {
     expect(block).toContain('trip.occupancy_alert');
     expect(block).not.toContain('createEmailFanoutHandler');
     expect(block).not.toContain('email_delivery_log');
+  });
+});
+
+describe('F4-004 — occupancy urgency NotificationFanout', () => {
+  const urgencyPayload = {
+    trip_id: TRIP_ID,
+    alert_type: 'near_full' as const,
+    occupancy_pct: 94,
+    departure_time: '2026-08-15T12:00:00.000Z',
+    route_id: ROUTE_ID,
+    urgency_window: 't24' as const,
+  };
+
+  it('skips when OCCUPANCY_URGENCY_VIA_WORKER gate is false', async () => {
+    const deps = makeDeps({ isEffectsEnabled: () => false });
+    const handler = createNotificationFanoutHandler('trip.occupancy_urgency', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION,
+          urgencyPayload,
+        ),
+      ),
+    ).resolves.toEqual({
+      kind: 'completed',
+      reason: 'skipped_effect_disabled',
+    });
+    expect(deps.insertNotificationRows).not.toHaveBeenCalled();
+  });
+
+  it('fans out urgency with Sale pronto copy, metadata, and role action_urls', async () => {
+    const deps = makeDeps({
+      loadTripAgencyIds: vi.fn(async () => [AGENCY_A]),
+      loadLiveOccupancy: vi.fn(async () => ({
+        reserved: 29,
+        total: 31,
+        available: 2,
+        occupancy_pct: 94,
+      })),
+    });
+    const handler = createNotificationFanoutHandler('trip.occupancy_urgency', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION,
+          urgencyPayload,
+        ),
+      ),
+    ).resolves.toEqual({ kind: 'completed', reason: 'delivered' });
+
+    const rows = vi.mocked(deps.insertNotificationRows).mock.calls[0][0];
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({
+      type: 'occupancy_alert',
+      agency_id: AGENCY_A,
+      recipient_role: 'agency',
+      title: 'Viaje casi lleno — sale pronto',
+      body: 'Mérida sale pronto · 94% (29/31)',
+      action_url: `/agency/trips/${TRIP_ID}/passengers`,
+      metadata: {
+        alert_type: 'near_full',
+        occupancy_pct: 94,
+        trip_id: TRIP_ID,
+        urgency: true,
+        urgency_window: 't24',
+      },
+    });
+    expect(rows[1]).toMatchObject({
+      recipient_role: 'superadmin',
+      agency_id: null,
+      action_url: `/admin/trips/${TRIP_ID}`,
+      title: 'Viaje casi lleno — sale pronto',
+    });
+  });
+
+  it('uses underbooked urgency title', async () => {
+    const deps = makeDeps({
+      loadTripAgencyIds: vi.fn(async () => []),
+    });
+    const handler = createNotificationFanoutHandler('trip.occupancy_urgency', deps);
+
+    await expect(
+      handler(
+        tripRow(
+          TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE,
+          TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION,
+          {
+            ...urgencyPayload,
+            alert_type: 'underbooked',
+            occupancy_pct: 12,
+          },
+        ),
+      ),
+    ).resolves.toEqual({ kind: 'completed', reason: 'delivered' });
+
+    const rows = vi.mocked(deps.insertNotificationRows).mock.calls[0][0];
+    expect(rows[0]).toMatchObject({
+      recipient_role: 'superadmin',
+      title: 'Viaje con pocas reservas — sale pronto',
+      body: expect.stringMatching(/^Mérida sale pronto · /),
+    });
+  });
+
+  it('registers urgency handler without email path', () => {
+    const handlers = buildDefaultHandlers();
+    expect(
+      handlers.has(
+        `${TRIP_OCCUPANCY_URGENCY_DUE_V1_TYPE}:${TRIP_OCCUPANCY_URGENCY_DUE_V1_VERSION}`,
+      ),
+    ).toBe(true);
+
+    const indexSource = readFileSync(
+      path.join(path.dirname(fileURLToPath(import.meta.url)), 'index.ts'),
+      'utf8',
+    );
+    expect(indexSource).toContain('trip.occupancy_urgency');
+    expect(indexSource).toContain('OCCUPANCY_URGENCY_VIA_WORKER');
+    const f4004 = indexSource.split('F4-004')[1] ?? '';
+    expect(f4004).not.toContain('createEmailFanoutHandler');
   });
 });

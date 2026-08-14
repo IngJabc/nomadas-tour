@@ -5,6 +5,7 @@ vi.mock('../config/env.js', () => ({
     OCCUPANCY_ALERT_VIA_WORKER: false,
     OCCUPANCY_ALERT_POLL_MS: 3_600_000,
     OCCUPANCY_ALERT_BATCH: 50,
+    OCCUPANCY_URGENCY_VIA_WORKER: false,
   },
 }));
 
@@ -48,7 +49,24 @@ function page(
     batch: 50,
     has_more: hasMore,
     next_cursor: cursor,
+    urgency_matches: 0,
+    urgency_emitted: 0,
+    already_escalated: 0,
     ...extras,
+  };
+}
+
+function baseDeps(
+  overrides: Partial<OccupancyAlertSchedulerDeps>,
+): OccupancyAlertSchedulerDeps {
+  return {
+    isEnabled: () => false,
+    isUrgencyEnabled: () => false,
+    pollMs: 10,
+    batch: 50,
+    evaluate: vi.fn(),
+    logger: makeLogger(),
+    ...overrides,
   };
 }
 
@@ -58,15 +76,10 @@ describe('F4-003 — occupancy alert scheduler loop', () => {
     const evaluate = vi.fn();
     const controller = new AbortController();
 
-    const deps: OccupancyAlertSchedulerDeps = {
-      isEnabled: () => false,
-      pollMs: 10,
-      batch: 50,
-      evaluate,
-      logger,
-    };
-
-    const handle = startOccupancyAlertScheduler(controller.signal, deps);
+    const handle = startOccupancyAlertScheduler(
+      controller.signal,
+      baseDeps({ isEnabled: () => false, evaluate, logger }),
+    );
     await new Promise((r) => setTimeout(r, 25));
     controller.abort();
     await handle.done;
@@ -74,7 +87,10 @@ describe('F4-003 — occupancy alert scheduler loop', () => {
     expect(evaluate).not.toHaveBeenCalled();
     expect(logger.info).toHaveBeenCalledWith(
       'occupancy_alert_scheduler_started',
-      expect.objectContaining({ occupancy_alert_via_worker: false }),
+      expect.objectContaining({
+        occupancy_alert_via_worker: false,
+        occupancy_urgency_via_worker: false,
+      }),
     );
     expect(logger.info).toHaveBeenCalledWith(
       'occupancy_alert_scheduler_tick',
@@ -82,26 +98,33 @@ describe('F4-003 — occupancy alert scheduler loop', () => {
     );
   });
 
-  it('evaluates when enabled and logs tick metrics', async () => {
+  it('evaluates when enabled and logs tick metrics including urgency counters', async () => {
     const logger = makeLogger();
     const evaluate = vi.fn(async () =>
-      page(3, false, null, { emitted: 1, skipped: 2 }),
+      page(3, false, null, {
+        emitted: 1,
+        skipped: 2,
+        urgency_matches: 1,
+        urgency_emitted: 1,
+      }),
     );
     const controller = new AbortController();
 
-    const handle = startOccupancyAlertScheduler(controller.signal, {
-      isEnabled: () => true,
-      pollMs: 10,
-      batch: 50,
-      evaluate,
-      logger,
-    });
+    const handle = startOccupancyAlertScheduler(
+      controller.signal,
+      baseDeps({
+        isEnabled: () => true,
+        isUrgencyEnabled: () => true,
+        evaluate,
+        logger,
+      }),
+    );
 
     await new Promise((r) => setTimeout(r, 25));
     controller.abort();
     await handle.done;
 
-    expect(evaluate).toHaveBeenCalledWith(50, null);
+    expect(evaluate).toHaveBeenCalledWith(50, null, true);
     expect(logger.info).toHaveBeenCalledWith(
       'occupancy_alert_scheduler_tick',
       expect.objectContaining({
@@ -109,8 +132,32 @@ describe('F4-003 — occupancy alert scheduler loop', () => {
         scanned: 3,
         emitted: 1,
         skipped: 2,
+        urgency_matches: 1,
+        urgency_emitted: 1,
+        already_escalated: 0,
       }),
     );
+  });
+
+  it('passes urgencyEnabled=false to RPC during urgency soak', async () => {
+    const evaluate = vi.fn(async () => page(1, false, null));
+    const controller = new AbortController();
+
+    const handle = startOccupancyAlertScheduler(
+      controller.signal,
+      baseDeps({
+        isEnabled: () => true,
+        isUrgencyEnabled: () => false,
+        evaluate,
+        logger: makeLogger(),
+      }),
+    );
+
+    await new Promise((r) => setTimeout(r, 25));
+    controller.abort();
+    await handle.done;
+
+    expect(evaluate).toHaveBeenCalledWith(50, null, false);
   });
 
   it('logs errors without rejecting the loop', async () => {
@@ -123,13 +170,10 @@ describe('F4-003 — occupancy alert scheduler loop', () => {
     });
     const controller = new AbortController();
 
-    const handle = startOccupancyAlertScheduler(controller.signal, {
-      isEnabled: () => true,
-      pollMs: 10,
-      batch: 50,
-      evaluate,
-      logger,
-    });
+    const handle = startOccupancyAlertScheduler(
+      controller.signal,
+      baseDeps({ isEnabled: () => true, evaluate, logger }),
+    );
 
     await new Promise((r) => setTimeout(r, 45));
     controller.abort();
@@ -149,7 +193,7 @@ describe('F4-003 — occupancy alert scheduler loop', () => {
 describe('F4-003 — batch fairness / keyset cycle', () => {
   it('processes 50 trips in one invocation', async () => {
     const evaluate = vi.fn(async () => page(50, false, null));
-    const result = await runOccupancyAlertCycle(50, evaluate);
+    const result = await runOccupancyAlertCycle(50, evaluate, false);
     expect(evaluate).toHaveBeenCalledTimes(1);
     expect(result.scanned).toBe(50);
   });
@@ -162,9 +206,10 @@ describe('F4-003 — batch fairness / keyset cycle', () => {
       return page(1, false, { departure_time: '2026-08-20T11:00:00.000Z', id: 't51' });
     });
 
-    const result = await runOccupancyAlertCycle(50, evaluate);
+    const result = await runOccupancyAlertCycle(50, evaluate, true);
     expect(evaluate).toHaveBeenCalledTimes(2);
     expect(result.scanned).toBe(51);
+    expect(evaluate).toHaveBeenNthCalledWith(1, 50, null, true);
   });
 
   it('processes 100 trips in two full pages', async () => {
@@ -174,7 +219,7 @@ describe('F4-003 — batch fairness / keyset cycle', () => {
       }
       return page(50, false, { departure_time: 'b', id: '100' });
     });
-    const result = await runOccupancyAlertCycle(50, evaluate);
+    const result = await runOccupancyAlertCycle(50, evaluate, false);
     expect(evaluate).toHaveBeenCalledTimes(2);
     expect(result.scanned).toBe(100);
   });
@@ -190,7 +235,7 @@ describe('F4-003 — batch fairness / keyset cycle', () => {
       return page(50, pageIndex < 6, { departure_time: `d${pageIndex}`, id: lastId });
     });
 
-    const result = await runOccupancyAlertCycle(50, evaluate);
+    const result = await runOccupancyAlertCycle(50, evaluate, false);
     expect(evaluate).toHaveBeenCalledTimes(6);
     expect(result.scanned).toBe(300);
   });
@@ -200,9 +245,30 @@ describe('F4-003 — batch fairness / keyset cycle', () => {
       expect(cursor).toBeNull();
       return page(10, false, null, { emitted: 0 });
     });
-    await runOccupancyAlertCycle(50, evaluate);
-    await runOccupancyAlertCycle(50, evaluate);
-    expect(evaluate).toHaveBeenNthCalledWith(1, 50, null);
-    expect(evaluate).toHaveBeenNthCalledWith(2, 50, null);
+    await runOccupancyAlertCycle(50, evaluate, false);
+    await runOccupancyAlertCycle(50, evaluate, false);
+    expect(evaluate).toHaveBeenNthCalledWith(1, 50, null, false);
+    expect(evaluate).toHaveBeenNthCalledWith(2, 50, null, false);
+  });
+
+  it('aggregates urgency counters across pages', async () => {
+    const evaluate = vi.fn(async (_batch, cursor) => {
+      if (!cursor) {
+        return page(50, true, { departure_time: 'a', id: '50' }, {
+          urgency_matches: 2,
+          urgency_emitted: 1,
+          already_escalated: 1,
+        });
+      }
+      return page(10, false, null, {
+        urgency_matches: 1,
+        urgency_emitted: 1,
+        already_escalated: 0,
+      });
+    });
+    const result = await runOccupancyAlertCycle(50, evaluate, true);
+    expect(result.urgency_matches).toBe(3);
+    expect(result.urgency_emitted).toBe(2);
+    expect(result.already_escalated).toBe(1);
   });
 });
