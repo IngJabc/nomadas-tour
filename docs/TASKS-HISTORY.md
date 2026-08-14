@@ -497,3 +497,36 @@ Primer ticket de **Fase 4**. Digest diario email a agencias activas (sin PII, si
 - **Flag** `AGENCY_DIGEST_VIA_WORKER` (default `false` en código): soak → `true` en Render
 - **Diseño:** [`docs/F4-001-agency-daily-digest-design.md`](F4-001-agency-daily-digest-design.md)
 - **Siguiente:** F4-002 Superadmin Daily Digest
+
+---
+
+## Sprint 18 — F4-002 Superadmin Daily Digest (2026-08-13)
+
+Digest diario email a superadmins (sin PII, sin in-app de digest).
+
+[x] **F4-002 — Superadmin Daily Digest** (**CLOSED** / operativo en Render)
+- **Migración** `062_schedule_superadmin_digest.sql` — aplicada en producción
+- **Harness SQL** `supabase/tests/f4_002_verification.sql` (BEGIN/ROLLBACK) — PASS
+- **Flag** `SUPERADMIN_DIGEST_VIA_WORKER` (default `false` en código): soak → cutover `true` en Render (worker)
+- **Evidencia operativa:** worker operativo; primer email real recibido ~2026-08-13 07:31 America/Caracas
+- **Diseño:** [`docs/F4-002-superadmin-daily-digest-design.md`](F4-002-superadmin-daily-digest-design.md)
+- **Siguiente:** F4-003 Occupancy Alerts
+
+---
+
+## Sprint 19 — F4-003 Occupancy Alerts (in-app) (2026-08-14)
+
+Alertas in-app `near_full` / `underbooked` sobre viajes `active` futuros (agencia asociada + superadmin), sin email v1.
+
+[x] **F4-003 — Occupancy Alerts** (**CLOSED** / operativo en Render)
+- **Design / scope-lock** (P1–P5) — [`docs/F4-003-occupancy-alerts-design.md`](F4-003-occupancy-alerts-design.md)
+- **Implementation:** estado `trip_occupancy_alert_state` (Estrategia B), RPC `evaluate_occupancy_alerts`, evento `trip.occupancy_alert.due.v1`, scheduler en worker, NotificationFanout, widget agencia, deep-links por rol
+- **Ajustes post-audit (copy):** badge/título «Casi lleno» / «Pocas reservas»; destino sin origen; fila del widget clickeable
+- **Migración** `063_evaluate_occupancy_alerts.sql` — aplicada en producción
+- **Harness SQL** `supabase/tests/f4_003_verification.sql` (BEGIN/ROLLBACK) — PASS (incl. L exact-boundary con conteo real de elegibles)
+- **Soak** `OCCUPANCY_ALERT_VIA_WORKER=false` → **cutover** `true` en Render (worker)
+- **Primer ciclo real:** scanned=5, evaluated=5, emitted=4, skipped=1, skipped_invalid_occupancy=0, cleaned_up=0
+- **Outbox / delivery:** 4 eventos `trip.occupancy_alert.due` completed/delivered; attempts=1; 0 retries; 0 failures
+- **UI:** widget «Alertas de ocupación» en `/agency`; deep-link agencia → passengers; superadmin → `/admin/trips/{id}`
+- **Resultado final:** **CLOSED**
+- **Siguiente producto (Fase 4 resto, aún no descompuesto):** viajes sin acción / métricas nocturnas

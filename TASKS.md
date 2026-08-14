@@ -7,54 +7,48 @@
 
 ---
 
-## Sprint actual — F4-003 Occupancy Alerts (in-app)
+## Sprint actual — siguiente producto (Fase 4)
 
-**Fase 4 — Automatizaciones de producto.** Una tarea activa: **F4-003**.
+**F4-003 CLOSED.** Sin ticket de producto descompuesto a continuación.
 
-Diseño: [`docs/F4-003-occupancy-alerts-design.md`](docs/F4-003-occupancy-alerts-design.md)
+Próximo trabajo de producto según roadmap (aún no descompuesto en sprint):
 
-- [x] Design scope-lock (P1–P5)
-- [x] Implementación (estado, RPC `evaluate_occupancy_alerts`, evento, scheduler, NotificationFanout, widget, tests)
-- [ ] Aplicar migración `063_evaluate_occupancy_alerts.sql`
-- [ ] Harness `supabase/tests/f4_003_verification.sql` (BEGIN/ROLLBACK)
-- [ ] Soak en Render (worker): `OCCUPANCY_ALERT_VIA_WORKER=false`
-- [ ] Habilitación controlada: `OCCUPANCY_ALERT_VIA_WORKER=true`
+- Viajes próximos sin acción
+- Métricas nocturnas
 
-**No es cierre de fase.** Siguiente producto tras cutover: viajes sin acción / métricas nocturnas (o el ticket que se descomponga).
-
-**Render (worker)** — agregar si aún no están:
-
-| Variable | Soak | Encender |
-|---|---|---|
-| `OCCUPANCY_ALERT_VIA_WORKER` | `false` | `true` |
-| `OCCUPANCY_ALERT_POLL_MS` | `3600000` | igual |
-| `OCCUPANCY_ALERT_BATCH` | `50` | igual |
-
-**Fuera de este sprint:** email de occupancy; thresholds configurables; seat quotas; analytics; timers; boarding retention; UI nueva superadmin de alertas.
+Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md) Fase 4.
 
 ---
 
-## Ops pendiente — F4-002 (no CLOSED)
+## Completado recientemente — Fase 4
 
-Implementación lista; falta cutover:
+- [x] **F4-003** — Occupancy Alerts (in-app) — **CLOSED**
+  - Diseño / scope-lock (P1–P5)
+  - Implementación + ajustes post-audit (copy UI/notif: «Casi lleno» / «Pocas reservas»; solo destino; fila clickeable)
+  - Migración `063_evaluate_occupancy_alerts.sql` aplicada
+  - Harness `supabase/tests/f4_003_verification.sql` (BEGIN/ROLLBACK) — PASS
+  - Soak `OCCUPANCY_ALERT_VIA_WORKER=false` → cutover `true` en Render (worker)
+  - Evidencia primer tick real: scanned=5, evaluated=5, emitted=4, skipped=1, skipped_invalid_occupancy=0, cleaned_up=0; 4× `trip.occupancy_alert.due` completed/delivered; 0 retries; 0 failures
+  - Diseño: [`docs/F4-003-occupancy-alerts-design.md`](docs/F4-003-occupancy-alerts-design.md)
 
-- [ ] Aplicar `062_schedule_superadmin_digest.sql`
-- [ ] Harness `supabase/tests/f4_002_verification.sql` (BEGIN/ROLLBACK)
-- [ ] Soak `SUPERADMIN_DIGEST_VIA_WORKER=false` → `true` (07:00 America/Caracas)
-
-Diseño: [`docs/F4-002-superadmin-daily-digest-design.md`](docs/F4-002-superadmin-daily-digest-design.md)
-
-| Variable | Soak | Encender |
-|---|---|---|
-| `SUPERADMIN_DIGEST_VIA_WORKER` | `false` | `true` |
-| `SUPERADMIN_DIGEST_POLL_MS` | `3600000` | igual |
-| `SUPERADMIN_DIGEST_BATCH` | `50` | igual |
-
----
-
-## Completado recientemente — Fase 4 (inicio)
+- [x] **F4-002** — Superadmin Daily Digest (email) — **CLOSED**
+  - Migración `062_schedule_superadmin_digest.sql` aplicada
+  - Harness `supabase/tests/f4_002_verification.sql` (BEGIN/ROLLBACK) — PASS
+  - Cutover `SUPERADMIN_DIGEST_VIA_WORKER=true` en Render (worker)
+  - Primer email real recibido ~2026-08-13 07:31 America/Caracas
+  - Diseño: [`docs/F4-002-superadmin-daily-digest-design.md`](docs/F4-002-superadmin-daily-digest-design.md)
 
 - [x] **F4-001** — Agency Daily Digest (email) — 07:00 Caracas, migración 061, flag `AGENCY_DIGEST_VIA_WORKER` (cutover `true` en Render). Diseño: [`docs/F4-001-agency-daily-digest-design.md`](docs/F4-001-agency-daily-digest-design.md)
+
+**Render (worker) — F4-003 (operativo):**
+
+| Variable | Valor |
+|---|---|
+| `OCCUPANCY_ALERT_VIA_WORKER` | `true` |
+| `OCCUPANCY_ALERT_POLL_MS` | `3600000` |
+| `OCCUPANCY_ALERT_BATCH` | `50` |
+
+**Fuera de F4-003 (follow-ups):** email de occupancy; thresholds configurables; seat quotas; analytics; timers; boarding retention; UI nueva superadmin de alertas.
 
 ---
 
@@ -68,8 +62,7 @@ Diseño: [`docs/F4-002-superadmin-daily-digest-design.md`](docs/F4-002-superadmi
 
 | Orden | Ticket / Fase | Tema | Estado |
 |-------|---------------|------|--------|
-| — | **F4-002** cutover | Migración 062 + soak/habilitación | Ops pendiente |
-| — | Fase 4 resto | Viajes sin acción; métricas nocturnas | Futura |
+| — | Fase 4 resto | Viajes sin acción; métricas nocturnas | Futura (próximo producto) |
 | — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` | Futura |
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
@@ -81,7 +74,7 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Bloqueadores
 
-_Ninguno. F4-003 no se declara CLOSED hasta migración 063 + soak + habilitación. F4-002 tampoco hasta 062 + soak + habilitación._
+_Ninguno. F4-001, F4-002 y F4-003 están CLOSED / operativos. Sin bloqueadores abiertos de Fase 4 sobre digests ni occupancy alerts._
 
 ---
 
