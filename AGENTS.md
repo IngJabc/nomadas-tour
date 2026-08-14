@@ -666,6 +666,16 @@ El resultado final debe sentirse como un SaaS premium moderno, no como un panel 
 16. Usar exclusivamente Lucide para iconografía — no mezclar librerías.
 17. El color cyan (#00D4FF) se reserva para acciones, foco, indicadores, gráficos
     y estados activos — no para bordes decorativos ni fondos de cards.
+18. Si una implementación añade, renombra o cambia el default de una variable
+    de entorno, el cierre de la tarea DEBE avisarlo de forma explícita:
+    qué agregar en Render, en qué servicio (web / worker), valor de soak
+    y valor de encendido. Nunca asumir que el default en código basta
+    para que el operador se entere.
+19. Después de cada cambio de código, y antes de declarar listo o
+    proponer commit, ejecutar el build real. En la raíz: `npm run build`
+    (`next build`). Si el cambio toca `backend/`, ejecutar también
+    `npm run build` en `backend/` (`tsc`). `tsc --noEmit` no sustituye
+    el script de build. Si el build falla, corregirlo antes de seguir.
 
 ---
 
@@ -680,4 +690,4 @@ Antes de comenzar cualquier tarea:
 
 Durante la tarea: 5. Usar solo las variables y valores definidos aquí 6. Si algo no está definido aquí, usar el criterio más cercano que sí esté 7. Si hay ambigüedad real, hacer UNA sola pregunta antes de continuar
 
-Al terminar: 8. Correr el servidor y revisar la consola de errores 9. Si hay errores, corregirlos sin preguntar 10. Verificar contra el checklist de la tarea (ver [`TASKS.md`](TASKS.md); visión de producto en [`docs/ROADMAP.md`](docs/ROADMAP.md)) 11. Solo reportar "listo" cuando el servidor corra sin errores
+Al terminar: 8. Correr el servidor y revisar la consola de errores 9. Si hay errores, corregirlos sin preguntar 10. Verificar contra el checklist de la tarea (ver [`TASKS.md`](TASKS.md); visión de producto en [`docs/ROADMAP.md`](docs/ROADMAP.md)) 11. Ejecutar `npm run build` en la raíz; si hubo cambios en `backend/`, ejecutar también `npm run build` ahí 12. Solo reportar "listo" cuando el servidor y los builds terminen sin errores 13. Si hubo cambios de env vars, incluir un bloque **Render** en el cierre (nombre, servicio, valor soak, cuándo poner `true` / encender). Un default `false` en código no sustituye este aviso.

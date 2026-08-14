@@ -32,6 +32,10 @@ import {
   startSuperadminDigestScheduler,
 } from './superadmin-digest-scheduler.js';
 import {
+  createDefaultOccupancyAlertSchedulerDeps,
+  startOccupancyAlertScheduler,
+} from './occupancy-alert-scheduler.js';
+import {
   DEFAULT_WORKER_NAME,
   createHeartbeatController,
   createRecoveryScheduler,
@@ -178,6 +182,9 @@ async function main() {
     superadmin_digest_via_worker: config.superadminDigestViaWorker,
     superadmin_digest_poll_ms: config.superadminDigestPollMs,
     superadmin_digest_batch: config.superadminDigestBatch,
+    occupancy_alert_via_worker: config.occupancyAlertViaWorker,
+    occupancy_alert_poll_ms: config.occupancyAlertPollMs,
+    occupancy_alert_batch: config.occupancyAlertBatch,
     poll_ms: config.pollMs,
     batch_size: config.batchSize,
     settle_ms: config.settleMs,
@@ -213,6 +220,12 @@ async function main() {
   const superadminDigestScheduler = startSuperadminDigestScheduler(
     controller.signal,
     createDefaultSuperadminDigestSchedulerDeps(logger),
+  );
+
+  // F4-003 — occupancy-alert scheduler runs in parallel; errors never kill the relay.
+  const occupancyAlertScheduler = startOccupancyAlertScheduler(
+    controller.signal,
+    createDefaultOccupancyAlertSchedulerDeps(logger),
   );
 
   try {
@@ -255,6 +268,7 @@ async function main() {
       retentionScheduler.done,
       digestScheduler.done,
       superadminDigestScheduler.done,
+      occupancyAlertScheduler.done,
     ]);
 
     logger.info('worker_stopped', {

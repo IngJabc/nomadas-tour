@@ -28,7 +28,7 @@ const migration062 = read(
 const harness = read('supabase/tests/f4_002_verification.sql');
 
 describe('F4-002 — migration isolation', () => {
-  it('keeps 062 as tip after contiguous 060→061→062', () => {
+  it('keeps 062 contiguous after 060→061; tip may advance with later tickets', () => {
     const migrations = listMigrations();
     const i060 = migrations.indexOf('060_purge_completed_outbox_events.sql');
     const i061 = migrations.indexOf('061_schedule_agency_digests.sql');
@@ -36,7 +36,8 @@ describe('F4-002 — migration isolation', () => {
 
     expect(i061).toBe(i060 + 1);
     expect(i062).toBe(i061 + 1);
-    expect(i062).toBe(migrations.length - 1);
+    expect(i062).toBeGreaterThanOrEqual(0);
+    expect(migrations[migrations.length - 1]).toMatch(/^\d{3}_/);
   });
 
   it('has no tracked modifications in migrations 001–061', () => {
@@ -141,7 +142,7 @@ describe('F4-002 — worker wiring', () => {
     expect(handlers).toContain('createSuperadminDigestFanoutHandler');
     expect(event).toContain("SUPERADMIN_DIGEST_DUE_V1_TYPE = 'superadmin.digest.due'");
     expect(event).toContain("SUPERADMIN_DIGEST_DUE_V1_AGGREGATE = 'platform'");
-    const digestBlock = handlers.split('F4-002')[1] ?? '';
+    const digestBlock = handlers.split('F4-002')[1]?.split('F4-003')[0] ?? '';
     expect(digestBlock).toContain('createSuperadminDigestFanoutHandler()');
     expect(digestBlock).not.toContain('createNotificationFanoutHandler');
   });

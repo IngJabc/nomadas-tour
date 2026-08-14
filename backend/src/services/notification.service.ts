@@ -10,6 +10,7 @@ export type NotificationType =
   | 'trip_archived'
   | 'trip_reminder'
   | 'ops_digest'
+  | 'occupancy_alert'
   | 'reservation_created'
   | 'reservation_cancelled'
   | 'passenger_cancelled';

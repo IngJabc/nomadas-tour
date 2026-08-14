@@ -118,6 +118,7 @@ describe('Agency dashboard identity', () => {
       upcoming_trips: [],
       recent_activity: [],
       occupancy_by_trip: [],
+      occupancy_alerts: [],
     });
 
     render(<AgencyDashboardPage />);
