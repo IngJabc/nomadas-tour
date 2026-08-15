@@ -62,6 +62,9 @@ function createMockReqRes(body: Record<string, unknown> = {}) {
   const req = {
     ctx: { agencyId: 'agency-1', userId: 'user-1', role: 'agency' },
     body,
+    ip: '127.0.0.1',
+    get: (name: string) =>
+      name.toLowerCase() === 'user-agent' ? 'vitest' : undefined,
   } as unknown as Request;
 
   const json = vi.fn();
@@ -105,9 +108,14 @@ describe('NotificationPreferenceController.updatePreferences', () => {
 
     await notificationPreferenceController.updatePreferences(req, res, next);
 
-    expect(mockUpdateForAgency).toHaveBeenCalledWith('agency-1', {
-      trip_assignments: false,
-    });
+    expect(mockUpdateForAgency).toHaveBeenCalledWith(
+      'agency-1',
+      'user-1',
+      {
+        trip_assignments: false,
+      },
+      expect.objectContaining({ source: 'api' }),
+    );
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         preferences: expect.objectContaining({ trip_assignments: false }),
@@ -126,9 +134,14 @@ describe('NotificationPreferenceController.updatePreferences', () => {
 
     await notificationPreferenceController.updatePreferences(req, res, next);
 
-    expect(mockUpdateForAgency).toHaveBeenCalledWith('agency-1', {
-      [key]: false,
-    });
+    expect(mockUpdateForAgency).toHaveBeenCalledWith(
+      'agency-1',
+      'user-1',
+      {
+        [key]: false,
+      },
+      expect.objectContaining({ source: 'api' }),
+    );
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         preferences: expect.objectContaining({ [key]: false }),
@@ -153,11 +166,16 @@ describe('NotificationPreferenceController.updatePreferences', () => {
 
     await notificationPreferenceController.updatePreferences(req, res, next);
 
-    expect(mockUpdateForAgency).toHaveBeenCalledWith('agency-1', {
-      trip_reminders: false,
-      ops_digest: false,
-      occupancy_alerts: false,
-    });
+    expect(mockUpdateForAgency).toHaveBeenCalledWith(
+      'agency-1',
+      'user-1',
+      {
+        trip_reminders: false,
+        ops_digest: false,
+        occupancy_alerts: false,
+      },
+      expect.objectContaining({ source: 'api' }),
+    );
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         preferences: expect.objectContaining({

@@ -6,6 +6,7 @@ import {
   toPublicCategories,
   toPublicPreferences,
 } from '../services/notification-preference.service.js';
+import { auditRequestMetadata } from '../utils/audit-metadata.js';
 
 const updatePreferencesSchema = z
   .object({
@@ -52,7 +53,9 @@ export class NotificationPreferenceController {
 
       const updated = await notificationPreferenceService.updateForAgency(
         agencyId,
+        req.ctx!.userId,
         data,
+        auditRequestMetadata(req),
       );
 
       res.json({

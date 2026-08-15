@@ -163,6 +163,7 @@ export class SuperadminController {
         data.vehicle_type,
         data.agency_ids,
         data.postpone ?? false,
+        req.ctx!.userId,
       );
       res.json(result);
     } catch (error) {
@@ -254,7 +255,8 @@ export class SuperadminController {
         .parse(req.body);
       const result = await superadminService.updateTripStatus(
         req.params.id as string,
-        data.status
+        data.status,
+        req.ctx!.userId,
       );
       res.json(result);
     } catch (error) {

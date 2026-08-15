@@ -24,10 +24,11 @@ function buildTableChain(table: string) {
 }
 
 const mockFrom = vi.fn((table: string) => buildTableChain(table));
+const mockRpc = vi.fn();
 
 vi.mock('../config/database.js', () => ({
   get supabaseAdmin() {
-    return { from: mockFrom };
+    return { from: mockFrom, rpc: mockRpc };
   },
 }));
 
@@ -172,7 +173,7 @@ describe('notificationPreferenceService.seedDefaults', () => {
 describe('notificationPreferenceService.updateForAgency', () => {
   it('rejects disabling locked categories', async () => {
     await expect(
-      notificationPreferenceService.updateForAgency('agency-1', {
+      notificationPreferenceService.updateForAgency('agency-1', 'user-1', {
         trip_cancellations: false,
       }),
     ).rejects.toThrow('trip_cancellations cannot be disabled');
@@ -180,53 +181,40 @@ describe('notificationPreferenceService.updateForAgency', () => {
 
   it('rejects unknown categories', async () => {
     await expect(
-      notificationPreferenceService.updateForAgency('agency-1', {
+      notificationPreferenceService.updateForAgency('agency-1', 'user-1', {
         unknown_category: false,
       } as any),
     ).rejects.toThrow('Unknown notification category');
   });
 
-  it('persists trip_reminders, ops_digest and occupancy_alerts through upsert', async () => {
+  it('persists trip_reminders, ops_digest and occupancy_alerts through RPC', async () => {
+    mockRpc.mockResolvedValue({ data: { changed: true }, error: null });
     const chain = createChainable();
     tableChains['agency_notification_preferences'] = chain;
 
-    await notificationPreferenceService.updateForAgency('agency-1', {
-      trip_reminders: false,
-      ops_digest: false,
-      occupancy_alerts: false,
-    });
+    await notificationPreferenceService.updateForAgency(
+      'agency-1',
+      'user-1',
+      {
+        trip_reminders: false,
+        ops_digest: false,
+        occupancy_alerts: false,
+      },
+      { source: 'api' },
+    );
 
-    const upsert = chain.upsert as ReturnType<typeof vi.fn>;
-    expect(upsert).toHaveBeenCalledTimes(3);
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        agency_id: 'agency-1',
-        category: 'trip_reminders',
-        in_app_enabled: false,
-        email_enabled: false,
-        updated_at: expect.any(String),
-      }),
-      { onConflict: 'agency_id,category' },
-    );
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        agency_id: 'agency-1',
-        category: 'ops_digest',
-        in_app_enabled: false,
-        email_enabled: false,
-        updated_at: expect.any(String),
-      }),
-      { onConflict: 'agency_id,category' },
-    );
-    expect(upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        agency_id: 'agency-1',
-        category: 'occupancy_alerts',
-        in_app_enabled: false,
-        email_enabled: false,
-        updated_at: expect.any(String),
-      }),
-      { onConflict: 'agency_id,category' },
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_agency_notification_preferences',
+      {
+        p_agency_id: 'agency-1',
+        p_actor_user_id: 'user-1',
+        p_patch: {
+          trip_reminders: false,
+          ops_digest: false,
+          occupancy_alerts: false,
+        },
+        p_metadata: { source: 'api' },
+      },
     );
   });
 });

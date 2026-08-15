@@ -35,6 +35,9 @@ function createMockReqRes(body: Record<string, unknown> = {}) {
     ctx: { agencyId: 'agency-1', userId: 'user-1', role: 'agency' },
     headers: { authorization: 'Bearer verified-user-token' },
     body,
+    ip: '127.0.0.1',
+    get: (name: string) =>
+      name.toLowerCase() === 'user-agent' ? 'vitest' : undefined,
   } as unknown as Request;
   const json = vi.fn();
   const res = { json } as unknown as Response;
@@ -76,6 +79,9 @@ function createMultipartReqRes({
       authorization: 'Bearer verified-user-token',
       'content-type': `multipart/form-data; boundary=${boundary}`,
     },
+    ip: '127.0.0.1',
+    get: (name: string) =>
+      name.toLowerCase() === 'user-agent' ? 'vitest' : undefined,
   });
   const json = vi.fn();
   const res = { json } as unknown as Response;
@@ -154,11 +160,12 @@ describe('AgencySettingsController.updateBranding', () => {
 
     expect(mockUpdateBranding).toHaveBeenCalledWith(
       'agency-1',
-      'verified-user-token',
+      'user-1',
       {
         logo_url: null,
         accent_color: '#ABCDEF',
       },
+      expect.objectContaining({ source: 'api' }),
     );
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -188,8 +195,9 @@ describe('AgencySettingsController.uploadLogo', () => {
     });
     expect(mockUpdateBranding).toHaveBeenCalledWith(
       'agency-1',
-      'verified-user-token',
+      'user-1',
       { logo_url: logoUrl },
+      expect.objectContaining({ source: 'api' }),
     );
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({ logo_url: logoUrl }),

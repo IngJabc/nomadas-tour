@@ -506,7 +506,7 @@ describe('updateTrip', () => {
       return updateCalls;
     }
 
-    it('sets postponed_from when postponing to a new departure time', async () => {
+    it('sets postponed_from in the same UPDATE as trip fields (F5-001 single audit)', async () => {
       const updateCalls = captureTripUpdates({
         tripOverrides: { departure_time: OLD_DEPARTURE },
       });
@@ -518,9 +518,22 @@ describe('updateTrip', () => {
         'bus',
         ['agency-1'],
         true,
+        'actor-1',
       );
 
-      expect(updateCalls).toContainEqual({ postponed_from: OLD_DEPARTURE });
+      const primary = updateCalls.find(
+        (c) => c.departure_time !== undefined && c.postponed_from !== undefined,
+      );
+      expect(primary).toEqual(
+        expect.objectContaining({
+          postponed_from: OLD_DEPARTURE,
+          updated_by: 'actor-1',
+          departure_time: expect.any(String),
+        }),
+      );
+      expect(
+        updateCalls.filter((c) => Object.keys(c).length === 1 && 'postponed_from' in c),
+      ).toHaveLength(0);
     });
 
     it('does not set postponed_from when postpone=true but departure time is unchanged', async () => {
@@ -965,6 +978,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
       p_vehicle_type: 'bus',
       p_agency_ids: ['agency-1', 'agency-2'],
       p_postpone: true,
+      p_actor_user_id: null,
     });
     expect(result.action).toBe(TripUpdateAction.POSTPONED);
     expect(result.trip.id).toBe('trip-1');
@@ -1000,6 +1014,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
       p_vehicle_type: 'bus',
       p_agency_ids: ['agency-1', 'agency-2'],
       p_postpone: false,
+      p_actor_user_id: null,
     });
     expect(result.action).toBe(TripUpdateAction.UPDATED);
     expect(emailService.sendTripPostponedEmail).not.toHaveBeenCalled();
@@ -1026,6 +1041,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
     expect(mockRpc).toHaveBeenCalledWith('set_trip_status', {
       p_trip_id: 'trip-1',
       p_status: 'cancelled',
+      p_actor_user_id: null,
     });
     expect(result).toEqual({ id: 'trip-1', status: 'cancelled' });
     expect(emailService.sendTripCancelledEmail).not.toHaveBeenCalled();
@@ -1052,6 +1068,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
     expect(mockRpc).toHaveBeenCalledWith('set_trip_status', {
       p_trip_id: 'trip-1',
       p_status: 'completed',
+      p_actor_user_id: null,
     });
     expect(result).toEqual({ id: 'trip-1', status: 'completed' });
     expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
