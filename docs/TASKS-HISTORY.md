@@ -549,4 +549,20 @@ Escalación in-app de urgencia temporal (T-24h) sobre el estado persistido de F4
 - **UI:** widget «Alertas de ocupación» con badge de urgencia «Sale mañana» en `/agency`; chip en campana; deep-link agencia → passengers; superadmin → `/admin/trips/{id}`
 - **Regresión:** F4-001/002/003 (harness pasa con la firma extendida), WKR-007/008/009
 - **Resultado final:** **CLOSED**
-- **Siguiente producto (Fase 4 resto, aún no descompuesto):** métricas nocturnas (futuro / Fase 6 / reporting)
+- **Siguiente producto:** Fase 5 — Audit Trail (F5-001)
+
+---
+
+## Sprint 21 — F5-001 Audit Trail foundation (2026-08-15)
+
+Fundación append-only multi-tenant de auditoría operativa (sin UI/API de lectura; sin F5-002).
+
+[x] **F5-001 — Audit Trail foundation** (**Implementado** / tip `065`)
+- **Design / scope-lock** — [`docs/F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md)
+- **Implementation:** tabla `public.audit_log` + `audit_append()` SECURITY DEFINER; RLS SELECT (superadmin all / agency por `agency_id`); append-only `ERR_AUDIT_APPEND_ONLY`; triggers `trg_trips_audit` / `trg_reservations_audit` (CONSTRAINT TRIGGER deferred); `trips.updated_by`; RPCs `update_trip` / `set_trip_status` (+ `p_actor_user_id`), `cancel_agency_reservation`, `boarding_toggle` (audit), `update_agency_branding`, `update_agency_notification_preferences`; drop `bl_agency_insert` / `reservations_agency_insert`; backend propaga `req.ctx` + `audit-metadata.ts`
+- **Acciones (9):** `trip.created` / `trip.updated` / `trip.cancelled` / `reservation.created` / `reservation.cancelled` / `boarding.board` / `boarding.unboard` / `agency_settings.updated` / `notification_preferences.updated`
+- **Migración** `065_audit_log.sql` — en tip (sin tocar 001–064); **ops:** aplicar en Supabase + harness
+- **Harness SQL** `supabase/tests/f5_001_verification.sql` (BEGIN/ROLLBACK) — schema/RLS/atomicidad/PII (ajustes PG15: `tgconstraint`, CTE walk)
+- **Tests:** boarding tip `f5-001`; unitarios PII / cancel RPC / metadata; tips F4-003/004 apuntan a 065
+- **Fuera de scope:** read API/UI; invitaciones; correlation ID; retención; analytics; migrar `boarding_logs`; outbox-as-audit
+- **Siguiente:** ops apply/harness → F5-002+ (lectura/UI / invitaciones) o siguiente ticket de Fase 5

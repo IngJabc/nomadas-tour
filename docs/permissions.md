@@ -13,6 +13,7 @@ Acceso total e irrestricto a todas las entidades del sistema:
 - boarding_logs (lectura)
 - users (lectura)
 - invitations (CRUD)
+- audit_log (lectura — F5-001; append-only, sin mutación directa)
 
 ## AGENCY
 
@@ -62,6 +63,18 @@ La propiedad comercial se determina por `reservation.agency_id`.
   que ejecutó el boarding.
 - Una agencia no obtiene por esta excepción acceso general al historial
   administrativo de otra agencia.
+
+### Audit log (F5-001)
+
+- Tabla append-only `audit_log`: INSERT solo vía `audit_append` / service_role;
+  sin UPDATE/DELETE.
+- **Superadmin:** SELECT de todas las filas.
+- **Agency:** SELECT únicamente donde `agency_id` coincide con su tenant
+  (`private.auth_app_agency_id()`). No ve filas con `agency_id IS NULL`.
+- El actor de escritura se toma del contexto autenticado del backend
+  (`req.ctx`), nunca del body del cliente.
+- No existe API/UI de lectura en F5-001; los permisos anteriores aplican a RLS
+  cuando exista un consumidor autorizado.
 
 ## Regla clave
 

@@ -32,6 +32,8 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Digest diario agencias | Operativo (F4-001) |
 | Digest diario superadmin | Operativo (F4-002) |
 | Alertas de ocupación (in-app) | Operativo / Completado (F4-003) |
+| Escalación de urgencia de ocupación (T-24h, in-app) | Operativo / Completado (F4-004) |
+| Audit trail (append-only, writers atómicos) | Implementado (F5-001; apply/harness ops) |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -91,7 +93,11 @@ FASE 4 — Automatizaciones (producto)
 
 FASE Infraestructura / Operaciones
   Backup & Disaster Recovery             → futura capacidad
+
 FASE 5 — Audit Trail
+  F5-001  Audit trail foundation         ✅ Implementado
+  (read API / UI / invitaciones → F5-002+)
+
 FASE 6 — Reportes
 FASE 7 — UX
 FASE 8 — Escalabilidad (amplía observabilidad)
@@ -140,7 +146,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 3 — Sistema de Workers
 
-**Prioridad:** Completada hasta WKR-009. Producto siguiente/en curso: Fase 4 — Automatizaciones.
+**Prioridad:** Completada hasta WKR-009. Producto siguiente/en curso: Fase 5 — Audit Trail (F4 automatizaciones cerrada).
 
 **Objetivo:** Procesamiento asíncrono y tareas programadas desacopladas del ciclo HTTP, mediante **Transactional Outbox + Workers** ([WKR-002](WKR-002-events-workers-architecture-adr.md)).
 
@@ -277,7 +283,7 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 ### Fase 4 — Automatizaciones
 
-**Prioridad:** En curso (sobre Workers endurecidos). Ejecución: [`TASKS.md`](../TASKS.md).
+**Prioridad:** Completada (F4-001 … F4-004). Ejecución histórica: [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
 **Objetivo:** Reglas de negocio y comunicaciones que se ejecutan solas según configuración o umbrales.
 
@@ -290,7 +296,7 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 | F4-003 | Alertas de ocupación (in-app) | Operativo / Completado |
 | F4-004 | Occupancy Urgency Alerts | Operativo / Completado |
 
-**Fase 4 operativa:** F4-001 a F4-004 CLOSED. **Próximo ticket de producto:** siguiente descompuesto de Fase 4 (métricas nocturnas quedó retirado → futuro / Fase 6 / reporting). Recordatorios T-48h/T-24h ya viven en WKR-008; la escalación T-24h de ocupación vive en F4-004.
+**Fase 4 operativa:** F4-001 a F4-004 CLOSED. Recordatorios T-48h/T-24h viven en WKR-008; la escalación T-24h de ocupación vive en F4-004. Producto siguiente: **Fase 5 — Audit Trail**.
 
 **Retirado de la prioridad de Fase 4:** métricas nocturnas → **futuro / Fase 6 / reporting** (no existe aún un consumidor de negocio definido para materializar snapshots históricos).
 
@@ -319,24 +325,32 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 ### Fase 5 — Audit Trail
 
-**Prioridad:** Tras automatizaciones iniciales (o en paralelo selectivo con outbox).
+**Prioridad:** En curso (fundación F5-001 implementada). Ejecución: [`TASKS.md`](../TASKS.md).
 
 **Objetivo:** Registrar acciones administrativas y eventos relevantes para soporte, auditoría y trazabilidad.
 
-**Eventos a registrar (ejemplos):**
+**Progreso**
+
+| Ticket | Tema | Estado |
+|--------|------|--------|
+| [F5-001](F5-001-audit-trail-design.md) | Foundation: `audit_log` append-only + writers atómicos (9 acciones) | Implementado (ops: apply `065` + harness) |
+| F5-002+ | Read API / UI; invitaciones / usuarios; correlación; retención | Futura |
+
+**F5-001 cubre:**
 
 - Crear / editar / cancelar viaje
 - Crear / cancelar reserva
-- Boarding (marcar / desmarcar pasajero)
-- Cambios de usuarios e invitaciones
-- Cambios de configuración de agencia
+- Boarding (board / unboard)
+- Cambios de branding y preferencias de notificación de agencia
 
-**Por evento:**
+**Aún fuera de F5-001:** cambios de usuarios e invitaciones; API/UI de consulta; correlation ID; retención/purge.
 
-- **Actor** (usuario, rol, agencia)
-- **Fecha** (timestamp con timezone)
-- **Antes / después** (diff estructurado cuando aplique)
-- **Metadata** (IP, origen, correlación)
+**Por evento (modelo F5-001):**
+
+- **Actor** (usuario, rol, agencia; `system` solo sin `actor_user_id`)
+- **Fecha** (`occurred_at` timestamptz)
+- **Antes / después** (diff JSONB minimizado / whitelist — sin PII)
+- **Metadata** (`source`, `ip`, `user_agent`, correlación de dominio acotada)
 
 **Valor:** Resuelve disputas operativas, cumplimiento interno y debugging sin depender de logs crudos.
 
@@ -407,6 +421,7 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 | [`architecture.md`](architecture.md) | Arquitectura técnica actual |
 | [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones SEC-001…008 (cerradas); SEC-009 futura |
 | Serie `WKR-00x-*.md` | Workers/outbox (incl. [WKR-006.1](WKR-006.1-worker-observability-implementation.md), [Sentry design](WKR-006.2-sentry-foundation-design.md)) |
+| Serie `F4-00x-*.md` / [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md) | Automatizaciones y audit trail (contratos de implementación) |
 | [`system-spec.md`](system-spec.md) | Especificación funcional base |
 | [`AGENTS.md`](../AGENTS.md) | Reglas de diseño e implementación |
 

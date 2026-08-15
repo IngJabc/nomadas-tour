@@ -239,6 +239,8 @@ No existe dashboard para pasajeros.
 - Boarding cross-agency requiere asignación al viaje.
 - Cada acción de boarding registra `board` o `unboard` con actor y agencia
   operadora.
+- Acciones administrativas/operativas relevantes se registran en
+  `audit_log` (append-only, F5-001); detalle: [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md).
 
 ---
 

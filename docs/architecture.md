@@ -104,6 +104,21 @@ opcional; health HTTP mínimo para hosting tipo Render Free Web Service
 Retención / DLQ lógica: [`WKR-006.3-outbox-retention-dlq-runbook.md`](WKR-006.3-outbox-retention-dlq-runbook.md).
 No mezclar con SEC-009.
 
+### Audit trail
+
+`public.audit_log` es el registro append-only de acciones administrativas y
+operativas (viajes, reservas, boarding, branding, preferencias de notificación).
+Las escrituras ocurren en la misma transacción que la mutación (triggers /
+`audit_append` / RPCs SECURITY DEFINER). RLS: superadmin lee todo; agencia solo
+filas con su `agency_id`. No hay UI ni API de lectura en F5-001.
+
+Diseño: [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md).
+Migración: `065_audit_log.sql`.
+
+`outbox_events` permanece como mecanismo de side-effects asíncronos y **no**
+sustituye al audit trail. `boarding_logs` sigue siendo el detalle canónico del
+estado de boarding; el audit solo resume `board` / `unboard`.
+
 ### Branding por agencia
 
 `agency_settings` almacena logo y colores sin mezclar branding con la identidad
