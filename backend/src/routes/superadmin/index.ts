@@ -4,6 +4,7 @@ import { authorize } from "../../middlewares/authorize.js";
 import { superadminController } from "../../controllers/superadmin.controller.js";
 import { reservationController } from "../../controllers/reservation.controller.js";
 import { notificationController } from "../../controllers/notification.controller.js";
+import { auditController } from "../../controllers/audit.controller.js";
 
 const router = Router();
 
@@ -91,6 +92,11 @@ router.patch("/notifications/:id/read", (req, res, next) =>
 );
 router.patch("/notifications/read-all", (req, res, next) =>
   notificationController.markAllAsRead(req, res, next)
+);
+
+// Audit trail (F5-002 — read-only)
+router.get("/audit", (req, res, next) =>
+  auditController.getAdminAudit(req, res, next)
 );
 
 export default router;

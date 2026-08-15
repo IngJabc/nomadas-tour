@@ -6,6 +6,7 @@ import { reservationController } from '../../controllers/reservation.controller.
 import { notificationController } from '../../controllers/notification.controller.js';
 import { notificationPreferenceController } from '../../controllers/notification-preference.controller.js';
 import { agencySettingsController } from '../../controllers/agency-settings.controller.js';
+import { auditController } from '../../controllers/audit.controller.js';
 
 const router = Router();
 
@@ -57,6 +58,11 @@ router.patch('/settings/branding', (req, res, next) =>
 );
 router.post('/settings/logo', (req, res, next) =>
   agencySettingsController.uploadLogo(req, res, next),
+);
+
+// Audit trail (F5-002 — read-only)
+router.get('/audit', (req, res, next) =>
+  auditController.getAgencyAudit(req, res, next),
 );
 
 export default router;
