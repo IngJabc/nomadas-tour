@@ -13,6 +13,9 @@ const updatePreferencesSchema = z
     trip_schedule_changes: z.boolean().optional(),
     trip_status_updates: z.boolean().optional(),
     trip_cancellations: z.boolean().optional(),
+    trip_reminders: z.boolean().optional(),
+    ops_digest: z.boolean().optional(),
+    occupancy_alerts: z.boolean().optional(),
   })
   .strict();
 

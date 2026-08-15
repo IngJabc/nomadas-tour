@@ -185,6 +185,50 @@ describe('notificationPreferenceService.updateForAgency', () => {
       } as any),
     ).rejects.toThrow('Unknown notification category');
   });
+
+  it('persists trip_reminders, ops_digest and occupancy_alerts through upsert', async () => {
+    const chain = createChainable();
+    tableChains['agency_notification_preferences'] = chain;
+
+    await notificationPreferenceService.updateForAgency('agency-1', {
+      trip_reminders: false,
+      ops_digest: false,
+      occupancy_alerts: false,
+    });
+
+    const upsert = chain.upsert as ReturnType<typeof vi.fn>;
+    expect(upsert).toHaveBeenCalledTimes(3);
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agency_id: 'agency-1',
+        category: 'trip_reminders',
+        in_app_enabled: false,
+        email_enabled: false,
+        updated_at: expect.any(String),
+      }),
+      { onConflict: 'agency_id,category' },
+    );
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agency_id: 'agency-1',
+        category: 'ops_digest',
+        in_app_enabled: false,
+        email_enabled: false,
+        updated_at: expect.any(String),
+      }),
+      { onConflict: 'agency_id,category' },
+    );
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agency_id: 'agency-1',
+        category: 'occupancy_alerts',
+        in_app_enabled: false,
+        email_enabled: false,
+        updated_at: expect.any(String),
+      }),
+      { onConflict: 'agency_id,category' },
+    );
+  });
 });
 
 describe('public preference mappers', () => {

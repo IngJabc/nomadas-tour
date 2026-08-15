@@ -105,6 +105,48 @@ describe('notificationDeliveryPolicy.shouldDeliver', () => {
 
     expect(allowed).toBe(true);
   });
+
+  it('returns false for trip_reminder email when trip_reminders is disabled', async () => {
+    const prefs = createDefaultPreferences();
+    prefs.trip_reminders.email_enabled = false;
+    mockGetForAgency.mockResolvedValue(prefs);
+
+    const allowed = await notificationDeliveryPolicy.shouldDeliver(
+      'agency-1',
+      'trip_reminder',
+      'email',
+    );
+
+    expect(allowed).toBe(false);
+  });
+
+  it('returns false for ops_digest email when ops_digest is disabled', async () => {
+    const prefs = createDefaultPreferences();
+    prefs.ops_digest.email_enabled = false;
+    mockGetForAgency.mockResolvedValue(prefs);
+
+    const allowed = await notificationDeliveryPolicy.shouldDeliver(
+      'agency-1',
+      'ops_digest',
+      'email',
+    );
+
+    expect(allowed).toBe(false);
+  });
+
+  it('returns false for occupancy_alert in_app when occupancy_alerts is disabled', async () => {
+    const prefs = createDefaultPreferences();
+    prefs.occupancy_alerts.in_app_enabled = false;
+    mockGetForAgency.mockResolvedValue(prefs);
+
+    const allowed = await notificationDeliveryPolicy.shouldDeliver(
+      'agency-1',
+      'occupancy_alert',
+      'in_app',
+    );
+
+    expect(allowed).toBe(false);
+  });
 });
 
 describe('notificationDeliveryPolicy.filterAgencyNotificationRows', () => {
