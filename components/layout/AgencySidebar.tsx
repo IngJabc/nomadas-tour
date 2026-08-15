@@ -1,6 +1,6 @@
 'use client';
 
-import { LayoutDashboard, ClipboardList, QrCode, Bus, Bell, Palette, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, QrCode, Bus, Bell, Palette, History, type LucideIcon } from 'lucide-react';
 import { PlatformLogoMark } from '@/components/brand/PlatformLogoMark';
 import { useAgencyBranding } from '@/components/branding/AgencyBrandingProvider';
 import { useAuthUser } from '@/hooks/useAuthUser';
@@ -11,6 +11,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/agency/trips', label: 'Mis viajes', icon: Bus },
   { href: '/agency/reservations', label: 'Reservas', icon: ClipboardList },
   { href: '/agency/scan', label: 'Escáner QR', icon: QrCode },
+  { href: '/agency/audit', label: 'Auditoría', icon: History },
   { href: '/agency/settings/branding', label: 'Branding', icon: Palette },
   { href: '/agency/settings/notifications', label: 'Notificaciones', icon: Bell },
 ];

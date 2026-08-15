@@ -433,6 +433,28 @@ Las fases iniciales del producto (backend, reservas, abordaje, dashboards, legac
 
 ---
 
+## Follow-ups de producto (post F5-003)
+
+Ítems posteriores al Audit Trail UI. **No son sprint activo** y no abren una fase nueva; se ejecutan cuando el backlog operativo los priorice. Ver también [`TASKS.md`](../TASKS.md).
+
+### UX / comunicaciones — Actor en notificaciones de reservas
+
+Los eventos de reserva (creación, cancelación y copies equivalentes) deben identificar a la **agencia** como actor visible, no al individuo reservante. Ejemplo: `"Agencia Central realizó una reserva"` en lugar de `"José Bonilla realizó una reserva"`. Es un cambio de presentación/copy: conservar `booker_name`, `booker_document` y demás datos de dominio.
+
+### UX — Boleto: solo destino
+
+Mostrar únicamente el destino en el boleto. Conservar `origin` en el modelo/backend de rutas para soportar múltiples orígenes en el futuro. Solo cambia la representación del boleto.
+
+### Futura capacidad — Reserva asistida por enlace
+
+Después de seleccionar asientos, permitir opcionalmente que la agencia genere un enlace seguro para que el reservante complete los datos (alternativa al wizard manual, que permanece). El diseño futuro deberá resolver token seguro y no adivinable, expiración, relación con seat locks, estado temporal, invalidación al confirmar/cancelar/expirar, campos permitidos al cliente, impedir cambiar viaje/asientos/precio y posible recuperación de progreso.
+
+### Integridad de reservas — Viajes ya salidos
+
+No permitir nuevas reservas cuando `departure_time <= now()`, independientemente de `status = 'active'`. La regla de negocio es `departure_time > now()`. El enforcement debe vivir en backend/RPC (no confiar solo en frontend), con test de regresión y cobertura de todos los caminos de creación.
+
+---
+
 ## Fuera de alcance (por ahora)
 
 - Pagos y facturación

@@ -13,6 +13,7 @@ export default defineConfig({
       'tests/branding/**/*.test.{ts,tsx}',
       'tests/auth/**/*.test.{ts,tsx}',
       'tests/boarding/**/*.test.{ts,tsx}',
+      'tests/audit/**/*.test.{ts,tsx}',
       'tests/security/**/*.test.ts',
       'tests/security/**/*.test.tsx',
     ],
