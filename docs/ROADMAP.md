@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-14
+**Última actualización:** 2026-08-15
 
 ---
 
@@ -200,7 +200,7 @@ Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** —
 | Capacidad | Rol | Ticket |
 |-----------|-----|--------|
 | **Logs / métricas / health / Sentry** | Observabilidad y operación en producción | **WKR-006.x** |
-| **Strix** / SAST / scanners | Seguridad ofensiva/preventiva, vulnerabilidades, validación continua | **SEC-009** |
+| **SAST / Dependabot / secret scanning / DAST / Strix (candidatos)** | Seguridad ofensiva/preventiva, vulnerabilidades, validación continua | **SEC-009** |
 
 #### WKR-007 ✅ — Trip / notification event workers
 
@@ -233,6 +233,8 @@ El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implemen
 
 #### SEC-009 — Continuous Security Validation
 
+**Estado:** Futura (no es sprint activo; sin herramienta seleccionada).
+
 **Objetivo:** Automatizar parte de las auditorías de seguridad que hoy son manuales o semi-manuales.
 
 **Alcance (futuro, sin elegir herramienta definitiva):**
@@ -244,13 +246,32 @@ El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implemen
 - Validaciones multi-tenant / aislamiento
 - Revisión continua de permisos y RLS
 
-**Herramientas candidatas (evaluación abierta):**
+**Herramientas candidatas (evaluación abierta — ninguna seleccionada todavía):**
 
-- Strix u equivalentes de security testing asistido
-- GitHub security tooling (Dependabot, CodeQL, secret scanning)
-- Scanners SAST del ecosistema JS/TS
+La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del ticket). Hasta entonces ninguna herramienta se considera definitiva ni debe configurarse en el repo.
 
-**No mezclar con WKR-006.x:** SEC-009 no es observabilidad de runtime; Sentry no sustituye SAST ni pentest asistido.
+| Candidato | Rol a evaluar |
+|-----------|----------------|
+| **Strix** | Evaluación de seguridad asistida por IA / testing ofensivo |
+| **GitHub CodeQL** | SAST |
+| **GitHub Dependabot** | Dependency scanning y alertas de dependencias vulnerables |
+| **GitHub secret scanning** | Disponibilidad y condiciones según plan/repositorio |
+| **SAST del ecosistema JavaScript/TypeScript** | Alternativas open source o gratuitas (además o en lugar de CodeQL) |
+| **DAST / API security scanners** | Herramientas gratuitas/open source para probar endpoints y detectar vulnerabilidades desde el exterior |
+
+**Criterios de evaluación (cuando se abra el ticket):**
+
+- Priorizar **costo cero / open source / free tier**: el proyecto **no dispone hoy de presupuesto dedicado** a herramientas de seguridad.
+- Cobertura real frente al stack **Next.js + TypeScript + Node/Supabase**.
+- Facilidad de integración (local y/o CI).
+- Tasa y manejabilidad de falsos positivos.
+- Carga de mantenimiento operativo.
+- Privacidad de datos (qué se envía a terceros).
+- Posibilidad de ejecutarlo localmente o en CI sin dependencias de pago.
+- **No asumir** que una herramienta gratuita hoy seguirá siendo gratuita al momento de ejecutar SEC-009: verificar precios y licencias en esa fecha.
+- **Strix** queda como **candidato**, no como solución automática definitiva.
+
+**No mezclar con WKR-006.x:** SEC-009 no es observabilidad de runtime. **Sentry no sustituye SEC-009** (ni SAST, ni dependency scanning, ni pentest/DAST asistido).
 
 ---
 

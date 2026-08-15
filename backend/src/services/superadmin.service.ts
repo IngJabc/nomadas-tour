@@ -1059,7 +1059,8 @@ export class SuperadminService {
     departureTime: string,
     vehicleType: "bus" | "kia",
     agencyIds: string[],
-    postpone: boolean = false
+    postpone: boolean = false,
+    actorUserId?: string,
   ) {
     if (agencyIds.length === 0) {
       throw new ValidationError("At least one agency is required");
@@ -1110,6 +1111,7 @@ export class SuperadminService {
           p_vehicle_type: vehicleType,
           p_agency_ids: agencyIds,
           p_postpone: postpone,
+          p_actor_user_id: actorUserId ?? null,
         }
       );
       if (error) throw mapTripRpcError(error);
@@ -1133,13 +1135,17 @@ export class SuperadminService {
 
     // ── Phase 2: Apply changes (sequential for consistency) ─────────
 
-    // 2a. Update trip fields
+    // 2a. Update trip fields (+ postponed_from in same UPDATE when real postpone; F5-001)
     const updateFields: Record<string, any> = {
       route_id: routeId,
       departure_time: normalizedDeparture,
       capacity,
       vehicle_type: vehicleType,
+      updated_by: actorUserId ?? null,
     };
+    if (isRealPostpone) {
+      updateFields.postponed_from = ctx.trip.departure_time;
+    }
 
     const { error: tripError } = await supabaseAdmin
       .from("trips")
@@ -1261,13 +1267,8 @@ export class SuperadminService {
         );
     }
 
-    // 2d. Real postpone: save old departure_time, emails, notifications
+    // 2d. Real postpone: emails + notifications (postponed_from set in 2a)
     if (isRealPostpone) {
-      await supabaseAdmin
-        .from("trips")
-        .update({ postponed_from: ctx.trip.departure_time })
-        .eq("id", id);
-
       const { data: route } = await supabaseAdmin
         .from("routes")
         .select("origin, destination")
@@ -1459,7 +1460,11 @@ export class SuperadminService {
     return { id, status: "archived" };
   }
 
-  async updateTripStatus(id: string, status: "completed" | "cancelled") {
+  async updateTripStatus(
+    id: string,
+    status: "completed" | "cancelled",
+    actorUserId?: string,
+  ) {
     const { data: trip, error: fetchError } = await supabaseAdmin
       .from("trips")
       .select("departure_time, status, route_id")
@@ -1495,6 +1500,7 @@ export class SuperadminService {
       const { data, error } = await supabaseAdmin.rpc("set_trip_status", {
         p_trip_id: id,
         p_status: status,
+        p_actor_user_id: actorUserId ?? null,
       });
       if (error) throw mapTripRpcError(error);
       return {
@@ -1505,7 +1511,7 @@ export class SuperadminService {
 
     const { error: updateError } = await supabaseAdmin
       .from("trips")
-      .update({ status })
+      .update({ status, updated_by: actorUserId ?? null })
       .eq("id", id);
 
     if (updateError) throw new ValidationError(updateError.message);

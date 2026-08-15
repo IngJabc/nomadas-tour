@@ -3,19 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockSingle = vi.fn();
 const mockEq = vi.fn();
 const mockSelect = vi.fn();
-const mockUpdate = vi.fn();
 const mockFrom = vi.fn();
 const mockCreateAuthenticatedClient = vi.fn();
+const mockRpc = vi.fn();
 
 const chain = {
   select: mockSelect,
-  update: mockUpdate,
   eq: mockEq,
   single: mockSingle,
 };
 
 mockSelect.mockReturnValue(chain);
-mockUpdate.mockReturnValue(chain);
 mockEq.mockReturnValue(chain);
 mockFrom.mockReturnValue(chain);
 mockCreateAuthenticatedClient.mockReturnValue({ from: mockFrom });
@@ -23,6 +21,9 @@ mockCreateAuthenticatedClient.mockReturnValue({ from: mockFrom });
 vi.mock('../config/database.js', () => ({
   createAuthenticatedClient: (token: string) =>
     mockCreateAuthenticatedClient(token),
+  get supabaseAdmin() {
+    return { rpc: mockRpc };
+  },
 }));
 
 import { agencySettingsService } from './agency-settings.service.js';
@@ -37,7 +38,6 @@ const BRANDING = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockSelect.mockReturnValue(chain);
-  mockUpdate.mockReturnValue(chain);
   mockEq.mockReturnValue(chain);
   mockFrom.mockReturnValue(chain);
   mockCreateAuthenticatedClient.mockReturnValue({ from: mockFrom });
@@ -60,21 +60,27 @@ describe('AgencySettingsService', () => {
     expect(result).toEqual(BRANDING);
   });
 
-  it('updates only the row matching the authenticated agency context', async () => {
+  it('updates branding via update_agency_branding RPC with actor from ctx', async () => {
     const patch = { accent_color: '#ABCDEF' };
-    mockSingle.mockResolvedValue({
-      data: { ...BRANDING, ...patch },
+    mockRpc.mockResolvedValue({
+      data: { ...BRANDING, ...patch, changed: true },
       error: null,
     });
 
     const result = await agencySettingsService.updateBranding(
       'agency-1',
-      'verified-user-token',
+      'user-1',
       patch,
+      { source: 'api' },
     );
 
-    expect(mockUpdate).toHaveBeenCalledWith(patch);
-    expect(mockEq).toHaveBeenCalledWith('agency_id', 'agency-1');
+    expect(mockRpc).toHaveBeenCalledWith('update_agency_branding', {
+      p_agency_id: 'agency-1',
+      p_actor_user_id: 'user-1',
+      p_patch: patch,
+      p_metadata: { source: 'api' },
+    });
+    expect(mockCreateAuthenticatedClient).not.toHaveBeenCalled();
     expect(result.accent_color).toBe('#ABCDEF');
   });
 });

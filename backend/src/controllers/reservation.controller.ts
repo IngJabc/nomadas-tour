@@ -3,6 +3,7 @@ import { reservationService } from '../services/reservation.service.js';
 import { z } from 'zod';
 import { ValidationError } from '../errors/index.js';
 import { supabaseAdmin } from '../config/database.js';
+import { auditRequestMetadata } from '../utils/audit-metadata.js';
 
 const agencyReservationSchema = z.object({
   trip_id: z.string().uuid(),
@@ -139,7 +140,12 @@ export class ReservationController {
         return;
       }
       const id = req.params.id as string;
-      const result = await reservationService.cancelAgencyReservation(id, agencyId);
+      const result = await reservationService.cancelAgencyReservation(
+        id,
+        agencyId,
+        req.ctx!.userId,
+        auditRequestMetadata(req),
+      );
       res.json(result);
     } catch (error) {
       next(error);

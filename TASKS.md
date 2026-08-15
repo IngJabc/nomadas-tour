@@ -73,7 +73,7 @@
 | — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` | Futura |
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
-| — | **SEC-009** | Continuous security validation (≠ Sentry) | Futura |
+| — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas (Strix, CodeQL, Dependabot, secret scanning, SAST/DAST) se decide en el design del ticket. | Futura |
 
 Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

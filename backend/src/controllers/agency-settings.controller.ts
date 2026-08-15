@@ -10,6 +10,7 @@ import {
   logoService,
   MAX_LOGO_BYTES,
 } from '../services/logo.service.js';
+import { auditRequestMetadata } from '../utils/audit-metadata.js';
 
 const hexColorSchema = z
   .string()
@@ -150,8 +151,9 @@ export class AgencySettingsController {
 
       const branding = await agencySettingsService.updateBranding(
         agencyId,
-        getAccessToken(req),
+        req.ctx!.userId,
         patch,
+        auditRequestMetadata(req),
       );
       res.json(branding);
     } catch (error) {
@@ -177,8 +179,9 @@ export class AgencySettingsController {
       });
       const branding = await agencySettingsService.updateBranding(
         agencyId,
-        getAccessToken(req),
+        req.ctx!.userId,
         { logo_url: logoUrl },
+        auditRequestMetadata(req),
       );
 
       res.json(branding);

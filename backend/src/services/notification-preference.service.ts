@@ -116,7 +116,9 @@ export class NotificationPreferenceService {
 
   async updateForAgency(
     agencyId: string,
+    actorUserId: string,
     patch: Partial<Record<NotificationCategory, boolean>>,
+    metadata: Record<string, unknown> = { source: 'api' },
   ): Promise<AgencyNotificationPreferences> {
     for (const [category, enabled] of Object.entries(patch)) {
       if (!this.isValidCategory(category)) {
@@ -127,25 +129,35 @@ export class NotificationPreferenceService {
       }
     }
 
-    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.rpc(
+      'update_agency_notification_preferences',
+      {
+        p_agency_id: agencyId,
+        p_actor_user_id: actorUserId,
+        p_patch: patch,
+        p_metadata: metadata,
+      },
+    );
 
-    for (const [category, enabled] of Object.entries(patch)) {
-      if (!this.isValidCategory(category) || enabled === undefined) continue;
-
-      const { error } = await supabaseAdmin
-        .from('agency_notification_preferences')
-        .upsert(
-          {
-            agency_id: agencyId,
-            category,
-            in_app_enabled: enabled,
-            email_enabled: enabled,
-            updated_at: now,
-          },
-          { onConflict: 'agency_id,category' },
+    if (error) {
+      const raw = error.message ?? '';
+      if (raw.includes('ERR_PREF_LOCKED')) {
+        throw new ValidationError('trip_cancellations cannot be disabled');
+      }
+      if (raw.includes('ERR_PREF_CATEGORY')) {
+        throw new ValidationError(
+          raw.includes(': ') ? raw.slice(raw.indexOf(': ') + 2) : raw,
         );
-
-      if (error) throw new ValidationError(error.message);
+      }
+      if (
+        raw.includes('ERR_ACTOR_NOT_FOUND') ||
+        raw.includes('ERR_ACTOR_AGENCY_MISMATCH')
+      ) {
+        throw new ValidationError(
+          raw.includes(': ') ? raw.slice(raw.indexOf(': ') + 2) : raw,
+        );
+      }
+      throw new ValidationError(raw);
     }
 
     return this.getForAgency(agencyId);

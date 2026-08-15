@@ -1,4 +1,4 @@
-import { createAuthenticatedClient } from '../config/database.js';
+import { createAuthenticatedClient, supabaseAdmin } from '../config/database.js';
 import { NotFoundError, ValidationError } from '../errors/index.js';
 
 const BRANDING_COLUMNS =
@@ -34,25 +34,43 @@ export class AgencySettingsService {
 
   async updateBranding(
     agencyId: string,
-    accessToken: string,
+    actorUserId: string,
     patch: AgencyBrandingPatch,
+    metadata: Record<string, unknown> = { source: 'api' },
   ): Promise<AgencyBrandingSettings> {
-    const client = createAuthenticatedClient(accessToken);
-    const { data, error } = await client
-      .from('agency_settings')
-      .update(patch)
-      .eq('agency_id', agencyId)
-      .select(BRANDING_COLUMNS)
-      .single();
+    const { data, error } = await supabaseAdmin.rpc('update_agency_branding', {
+      p_agency_id: agencyId,
+      p_actor_user_id: actorUserId,
+      p_patch: patch,
+      p_metadata: metadata,
+    });
 
     if (error) {
-      throw new ValidationError(error.message);
+      const raw = error.message ?? '';
+      if (raw.includes('ERR_SETTINGS_NOT_FOUND')) {
+        throw new NotFoundError('Configuración de marca no encontrada');
+      }
+      if (
+        raw.includes('ERR_ACTOR_NOT_FOUND') ||
+        raw.includes('ERR_ACTOR_AGENCY_MISMATCH')
+      ) {
+        throw new ValidationError(
+          raw.includes(': ') ? raw.slice(raw.indexOf(': ') + 2) : raw,
+        );
+      }
+      throw new ValidationError(raw);
     }
+
     if (!data) {
       throw new NotFoundError('Configuración de marca no encontrada');
     }
 
-    return data as AgencyBrandingSettings;
+    return {
+      logo_url: data.logo_url ?? null,
+      primary_color: data.primary_color,
+      secondary_color: data.secondary_color,
+      accent_color: data.accent_color,
+    };
   }
 }
 

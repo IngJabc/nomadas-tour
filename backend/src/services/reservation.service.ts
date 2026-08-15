@@ -346,46 +346,57 @@ export class ReservationService {
     return ticketData;
   }
 
-  async cancelAgencyReservation(id: string, agencyId: string) {
+  async cancelAgencyReservation(
+    id: string,
+    agencyId: string,
+    actorUserId: string,
+    metadata: Record<string, unknown> = { source: 'api' },
+  ) {
+    // Prefetch display fields for notifications (RPC does not return PII).
     const { data: reservation, error: findError } = await supabaseAdmin
       .from('reservations')
-      .select('*, reservation_passengers(seat_id)')
+      .select('id, trip_id, booker_name, status, agency_id')
       .eq('id', id)
       .eq('agency_id', agencyId)
-      .single();
+      .maybeSingle();
 
-    if (findError || !reservation) throw new NotFoundError('Reservation not found');
+    if (findError) throw new ValidationError(findError.message);
+    if (!reservation) throw new NotFoundError('Reservation not found');
 
-    if (reservation.status !== 'confirmed') {
-      throw new ValidationError('Only confirmed reservations can be cancelled');
+    const { data: rpcResult, error: rpcError } = await supabaseAdmin.rpc(
+      'cancel_agency_reservation',
+      {
+        p_reservation_id: id,
+        p_actor_user_id: actorUserId,
+        p_agency_id: agencyId,
+        p_metadata: metadata,
+      },
+    );
+
+    if (rpcError) {
+      const raw = rpcError.message ?? '';
+      if (raw.includes('ERR_RESERVATION_NOT_FOUND')) {
+        throw new NotFoundError('Reservation not found');
+      }
+      if (raw.includes('ERR_RESERVATION_NOT_OWNED')) {
+        throw new NotFoundError('Reservation not found');
+      }
+      if (raw.includes('ERR_ACTOR_NOT_FOUND') || raw.includes('ERR_ACTOR_AGENCY_MISMATCH')) {
+        throw new ValidationError(raw.includes(': ') ? raw.slice(raw.indexOf(': ') + 2) : raw);
+      }
+      if (raw.includes('ERR_RESERVATION_NOT_CONFIRMED')) {
+        throw new ValidationError('Only confirmed reservations can be cancelled');
+      }
+      if (raw.includes('ERR_TRIP_CANCELLED')) {
+        throw new ValidationError('Este viaje fue cancelado. No es posible cancelar reservas.');
+      }
+      if (raw.includes('ERR_TRIP_COMPLETED')) {
+        throw new ValidationError('Este viaje ya fue completado. No es posible cancelar reservas.');
+      }
+      throw new ValidationError(raw);
     }
 
-    const { data: tripStatus } = await supabaseAdmin
-      .from('trips')
-      .select('status')
-      .eq('id', (reservation as any).trip_id)
-      .single();
-    if (tripStatus?.status === 'cancelled') throw new ValidationError('Este viaje fue cancelado. No es posible cancelar reservas.');
-    if (tripStatus?.status === 'completed') throw new ValidationError('Este viaje ya fue completado. No es posible cancelar reservas.');
-
-    const seatIds = ((reservation as any).reservation_passengers || []).map((p: any) => p.seat_id);
-
-    const { error: updateError } = await supabaseAdmin
-      .from('reservations')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
-
-    if (updateError) throw new ValidationError(updateError.message);
-
-    if (seatIds.length > 0) {
-      const { error: unlockError } = await supabaseAdmin
-        .from('seats')
-        .update({ status: 'available', updated_at: new Date().toISOString() })
-        .eq('trip_id', reservation.trip_id)
-        .in('id', seatIds);
-
-      if (unlockError) throw new ValidationError(unlockError.message);
-    }
+    const freedSeats = Number(rpcResult?.freed_seats ?? 0);
 
     // Get trip info for notification
     const { data: tripForCancelNotif } = await supabaseAdmin
@@ -394,7 +405,9 @@ export class ReservationService {
       .eq('id', (reservation as any).trip_id)
       .single();
     const routeCancelNotif = (tripForCancelNotif as any)?.routes;
-    const routeCancelLabel = routeCancelNotif ? `${routeCancelNotif.origin} → ${routeCancelNotif.destination}` : 'viaje';
+    const routeCancelLabel = routeCancelNotif
+      ? `${routeCancelNotif.origin} → ${routeCancelNotif.destination}`
+      : 'viaje';
 
     // Notification: reservation cancelled → superadmin only (agency is the actor)
     notificationService.createForAgency({
@@ -410,7 +423,7 @@ export class ReservationService {
       console.error(JSON.stringify({ event: 'NOTIFICATION_FAILED', type: 'reservation_cancelled', reservationId: id, error: err.message }));
     });
 
-    return { cancelled: true, reservation_id: id, freed_seats: seatIds.length };
+    return { cancelled: true, reservation_id: id, freed_seats: freedSeats };
   }
 
   // ─── Boarding — exact lookup + RPC toggle (AUD-020) ─────────────────────
