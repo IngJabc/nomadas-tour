@@ -7,53 +7,48 @@
 
 ---
 
-## Completado recientemente — Fase 4
+## Completado recientemente — Fase 5
+
+- [x] **F5-001** — Audit Trail (foundation) — **Implementado**
+  - Tabla append-only `public.audit_log` + `audit_append()` + RLS/grants
+  - 9 acciones: trip create/update/cancel, reservation create/cancel, boarding board/unboard, branding, notification prefs
+  - RPCs atómicos (`cancel_agency_reservation`, branding/prefs) + triggers trips/reservations; `trips.updated_by`
+  - Drop policies cliente `bl_agency_insert` / `reservations_agency_insert`
+  - Actor solo desde `req.ctx`; PII minimizado (whitelist)
+  - Migración `065_audit_log.sql` (tip; sin tocar 001–064)
+  - Harness `supabase/tests/f5_001_verification.sql` (BEGIN/ROLLBACK) — listo post-apply
+  - Diseño: [`docs/F5-001-audit-trail-design.md`](docs/F5-001-audit-trail-design.md)
+
+**Ops pendientes (F5-001):** aplicar migración `065` en Supabase (si aún no) → ejecutar harness → confirmar PASS.
+
+**Fuera de F5-001 (follow-ups):** read API / UI; invitaciones/usuarios; correlation ID; retención/purge; analytics/realtime audit.
+
+---
+
+## Completado — Fase 4 (Automatizaciones)
 
 - [x] **F4-004** — Occupancy Urgency Alerts (in-app) — **CLOSED**
-  - Diseño / scope-lock (P1–P9)
-  - Implementación: migración `064` (extiende RPC F4-003 con `p_urgency_enabled`), evento `trip.occupancy_urgency.due.v1`, NotificationFanout, widget agencia (badge «Sale mañana»), chip campana, tests, harness
-  - Migración `064_occupancy_urgency_alerts.sql` aplicada
-  - Harness `supabase/tests/f4_004_verification.sql` (BEGIN/ROLLBACK) — PASS (incl. same-tick, postponement, PII)
-  - Soak `OCCUPANCY_URGENCY_VIA_WORKER=false` → cutover `true` en Render (worker)
-  - Evidencia primer tick real: scanned=5, evaluated=5, emitted=0, skipped=5, cleaned_up=0, urgency_matches=1, urgency_emitted=1, already_escalated=0; 1× `trip.occupancy_urgency.due` completed/delivered; attempts=1; 0 retries; 0 failures
-  - Copy re-fijada (P9): badge/pill/chip «Sale mañana»; títulos «Viaje casi lleno — sale mañana» / «Viaje con pocas reservas — sale mañana»; body `{destination} sale mañana · {pct}% ({reserved}/{total})`
   - Diseño: [`docs/F4-004-occupancy-urgency-alerts-design.md`](docs/F4-004-occupancy-urgency-alerts-design.md)
 
 - [x] **F4-003** — Occupancy Alerts (in-app) — **CLOSED**
-  - Diseño / scope-lock (P1–P5)
-  - Implementación + ajustes post-audit (copy UI/notif: «Casi lleno» / «Pocas reservas»; solo destino; fila clickeable)
-  - Migración `063_evaluate_occupancy_alerts.sql` aplicada
-  - Harness `supabase/tests/f4_003_verification.sql` (BEGIN/ROLLBACK) — PASS
-  - Soak `OCCUPANCY_ALERT_VIA_WORKER=false` → cutover `true` en Render (worker)
-  - Evidencia primer tick real: scanned=5, evaluated=5, emitted=4, skipped=1, skipped_invalid_occupancy=0, cleaned_up=0; 4× `trip.occupancy_alert.due` completed/delivered; 0 retries; 0 failures
   - Diseño: [`docs/F4-003-occupancy-alerts-design.md`](docs/F4-003-occupancy-alerts-design.md)
 
 - [x] **F4-002** — Superadmin Daily Digest (email) — **CLOSED**
-  - Migración `062_schedule_superadmin_digest.sql` aplicada
-  - Harness `supabase/tests/f4_002_verification.sql` (BEGIN/ROLLBACK) — PASS
-  - Cutover `SUPERADMIN_DIGEST_VIA_WORKER=true` en Render (worker)
-  - Primer email real recibido ~2026-08-13 07:31 America/Caracas
   - Diseño: [`docs/F4-002-superadmin-daily-digest-design.md`](docs/F4-002-superadmin-daily-digest-design.md)
 
-- [x] **F4-001** — Agency Daily Digest (email) — 07:00 Caracas, migración 061, flag `AGENCY_DIGEST_VIA_WORKER` (cutover `true` en Render). Diseño: [`docs/F4-001-agency-daily-digest-design.md`](docs/F4-001-agency-daily-digest-design.md)
+- [x] **F4-001** — Agency Daily Digest (email) — **CLOSED**
+  - Diseño: [`docs/F4-001-agency-daily-digest-design.md`](docs/F4-001-agency-daily-digest-design.md)
 
-**Render (worker) — F4-003 (operativo):**
+Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md).
+
+**Render (worker) — F4 occupancy (operativo):**
 
 | Variable | Valor |
 |---|---|
 | `OCCUPANCY_ALERT_VIA_WORKER` | `true` |
 | `OCCUPANCY_ALERT_POLL_MS` | `3600000` |
 | `OCCUPANCY_ALERT_BATCH` | `50` |
-
-**Render (worker) — F4-004 (operativo):**
-
-| Variable | Valor |
-|---|---|
 | `OCCUPANCY_URGENCY_VIA_WORKER` | `true` |
-
-**Fuera de F4-003 (follow-ups):** email de occupancy; thresholds configurables; seat quotas; analytics; timers; boarding retention; UI nueva superadmin de alertas.
-
-**Fuera de F4-004 (follow-ups):** email de la escalación de urgencia; ventanas T-6h/T-2h; consolidar la constante de ventana (SQL + 2 defs TS).
 
 ---
 
@@ -67,13 +62,14 @@
 
 | Orden | Ticket / Fase | Tema | Estado |
 |-------|---------------|------|--------|
-| — | **F4-004** | Occupancy Urgency Alerts | Operativo / **CLOSED** |
+| — | **F5-001** | Audit Trail foundation | Implementado — ops apply/harness |
+| — | **F5-002+** / Fase 5 resto | Read API / UI audit; invitaciones/usuarios | Futura |
 | — | Futuro / Fase 6 | Métricas históricas y reporting | Futura |
-| — | Infraestructura / Operaciones | Backup & Disaster Recovery — estrategia de backups automáticos, retención, almacenamiento externo, restauración verificada, RPO/RTO y alertas operativas | Futura capacidad de infraestructura |
+| — | Infraestructura / Operaciones | Backup & Disaster Recovery | Futura |
 | — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` | Futura |
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
-| — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas (Strix, CodeQL, Dependabot, secret scanning, SAST/DAST) se decide en el design del ticket. | Futura |
+| — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas en el design del ticket. | Futura |
 
 Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -81,7 +77,7 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Bloqueadores
 
-_Ninguno. F4-001, F4-002, F4-003 y F4-004 están CLOSED / operativos. Sin bloqueadores abiertos de Fase 4 sobre digests ni occupancy alerts._
+_Ninguno. F4-001…F4-004 CLOSED. F5-001 implementado en tip; sin bloqueadores de código. Ops: aplicar `065` + harness si aún no están en el entorno objetivo._
 
 ---
 
@@ -94,3 +90,4 @@ _Ninguno. F4-001, F4-002, F4-003 y F4-004 están CLOSED / operativos. Sin bloque
 - **Email occupancy_alerts** — requiere Resend comercial
 - **UI prefs `superadmin_digest`** — v1 es seed + gate de envío
 - **Dashboard superadmin de alertas activas** — v1 usa in-app existente
+- **UI / API de lectura del audit trail** — fuera de F5-001

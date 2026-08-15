@@ -206,7 +206,8 @@ BEGIN
   RAISE NOTICE 'PASS: SCHEMA INSERT revoked for authenticated';
 
   -- trg_reservations_audit: CONSTRAINT TRIGGER deferred
-  SELECT t.tgisconstraint, t.tgdeferrable, t.tginitdeferred, t.tgenabled
+  -- PG15+ (Supabase): use tgconstraint OID (≠0), not legacy tgisconstraint.
+  SELECT t.tgconstraint, t.tgdeferrable, t.tginitdeferred, t.tgenabled
   INTO v_tg
   FROM pg_trigger t
   WHERE t.tgname = 'trg_reservations_audit'
@@ -216,7 +217,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'FAIL: SCHEMA trg_reservations_audit missing';
   END IF;
-  IF v_tg.tgisconstraint IS NOT TRUE THEN
+  IF v_tg.tgconstraint = 0 THEN
     RAISE EXCEPTION 'FAIL: SCHEMA trg_reservations_audit must be CONSTRAINT TRIGGER';
   END IF;
   IF v_tg.tgdeferrable IS NOT TRUE OR v_tg.tginitdeferred IS NOT TRUE THEN
@@ -808,6 +809,7 @@ BEGIN
        OR (al.metadata->>'source' = 'f5-001-harness')
   LOOP
     v_hit := NULL;
+    -- Single walk reference in recursive term (PG forbids referencing the CTE twice).
     WITH RECURSIVE walk(path, val, typ) AS (
       SELECT ARRAY[e.key]::text[], e.value, jsonb_typeof(e.value)
       FROM jsonb_each(
@@ -820,19 +822,17 @@ BEGIN
         )
       ) AS e(key, value)
       UNION ALL
-      SELECT *
-      FROM (
-        SELECT w.path || e.key, e.value, jsonb_typeof(e.value)
-        FROM walk w
-        CROSS JOIN LATERAL jsonb_each(w.val) AS e(key, value)
+      SELECT w.path || x.key, x.val, jsonb_typeof(x.val)
+      FROM walk w
+      CROSS JOIN LATERAL (
+        SELECT e.key::text AS key, e.value AS val
+        FROM jsonb_each(w.val) AS e(key, value)
         WHERE w.typ = 'object'
         UNION ALL
-        SELECT w.path || (ord::text), elem, jsonb_typeof(elem)
-        FROM walk w
-        CROSS JOIN LATERAL jsonb_array_elements(w.val)
-          WITH ORDINALITY AS a(elem, ord)
+        SELECT ord::text AS key, elem AS val
+        FROM jsonb_array_elements(w.val) WITH ORDINALITY AS a(elem, ord)
         WHERE w.typ = 'array'
-      ) AS rec
+      ) AS x
     )
     SELECT lower(w.path[array_length(w.path, 1)])
     INTO v_hit
