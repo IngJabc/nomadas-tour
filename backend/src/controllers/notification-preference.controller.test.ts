@@ -4,52 +4,57 @@ import type { Request, Response, NextFunction } from 'express';
 const mockGetForAgency = vi.fn();
 const mockUpdateForAgency = vi.fn();
 
+const ALL_CATEGORIES = [
+  'trip_assignments',
+  'trip_schedule_changes',
+  'trip_status_updates',
+  'trip_cancellations',
+  'trip_reminders',
+  'ops_digest',
+  'occupancy_alerts',
+] as const;
+
 vi.mock('../services/notification-preference.service.js', () => ({
   notificationPreferenceService: {
     getForAgency: (...args: unknown[]) => mockGetForAgency(...args),
     updateForAgency: (...args: unknown[]) => mockUpdateForAgency(...args),
   },
-  toPublicPreferences: (prefs: any) => ({
-    trip_assignments: prefs.trip_assignments.in_app_enabled,
-    trip_schedule_changes: prefs.trip_schedule_changes.in_app_enabled,
-    trip_status_updates: prefs.trip_status_updates.in_app_enabled,
-    trip_cancellations: prefs.trip_cancellations.in_app_enabled,
-  }),
-  toPublicCategories: (prefs: any) => [
-    {
-      key: 'trip_assignments',
-      label: 'Nuevos viajes asignados',
+  toPublicPreferences: (prefs: any) => {
+    const out: Record<string, boolean> = {};
+    for (const key of ALL_CATEGORIES) {
+      out[key] = prefs[key].in_app_enabled;
+    }
+    return out;
+  },
+  toPublicCategories: (prefs: any) =>
+    ALL_CATEGORIES.map((key) => ({
+      key,
+      label: key,
       description: 'Test',
       locked: false,
       channels: {
-        in_app: prefs.trip_assignments.in_app_enabled,
-        email: prefs.trip_assignments.email_enabled,
+        in_app: prefs[key].in_app_enabled,
+        email: prefs[key].email_enabled,
       },
-    },
-  ],
+    })),
 }));
 
 import { notificationPreferenceController } from '../controllers/notification-preference.controller.js';
 
 function mockPrefs(overrides: Partial<Record<string, boolean>> = {}) {
   const enabled = (key: string) => overrides[key] ?? true;
+  const build = (key: string) => ({
+    in_app_enabled: enabled(key),
+    email_enabled: enabled(key),
+  });
   return {
-    trip_assignments: {
-      in_app_enabled: enabled('trip_assignments'),
-      email_enabled: enabled('trip_assignments'),
-    },
-    trip_schedule_changes: {
-      in_app_enabled: enabled('trip_schedule_changes'),
-      email_enabled: enabled('trip_schedule_changes'),
-    },
-    trip_status_updates: {
-      in_app_enabled: enabled('trip_status_updates'),
-      email_enabled: enabled('trip_status_updates'),
-    },
-    trip_cancellations: {
-      in_app_enabled: enabled('trip_cancellations'),
-      email_enabled: enabled('trip_cancellations'),
-    },
+    trip_assignments: build('trip_assignments'),
+    trip_schedule_changes: build('trip_schedule_changes'),
+    trip_status_updates: build('trip_status_updates'),
+    trip_cancellations: build('trip_cancellations'),
+    trip_reminders: build('trip_reminders'),
+    ops_digest: build('ops_digest'),
+    occupancy_alerts: build('occupancy_alerts'),
   };
 }
 
@@ -106,6 +111,60 @@ describe('NotificationPreferenceController.updatePreferences', () => {
     expect(json).toHaveBeenCalledWith(
       expect.objectContaining({
         preferences: expect.objectContaining({ trip_assignments: false }),
+      }),
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['trip_reminders', 'trip_reminders'],
+    ['ops_digest', 'ops_digest'],
+    ['occupancy_alerts', 'occupancy_alerts'],
+  ])('accepts %s key and forwards the value', async (key) => {
+    mockUpdateForAgency.mockResolvedValue(mockPrefs({ [key]: false }));
+    const { req, res, next, json } = createMockReqRes({ [key]: false });
+
+    await notificationPreferenceController.updatePreferences(req, res, next);
+
+    expect(mockUpdateForAgency).toHaveBeenCalledWith('agency-1', {
+      [key]: false,
+    });
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferences: expect.objectContaining({ [key]: false }),
+      }),
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('accepts all three newer keys in a single patch', async () => {
+    mockUpdateForAgency.mockResolvedValue(
+      mockPrefs({
+        trip_reminders: false,
+        ops_digest: false,
+        occupancy_alerts: false,
+      }),
+    );
+    const { req, res, next, json } = createMockReqRes({
+      trip_reminders: false,
+      ops_digest: false,
+      occupancy_alerts: false,
+    });
+
+    await notificationPreferenceController.updatePreferences(req, res, next);
+
+    expect(mockUpdateForAgency).toHaveBeenCalledWith('agency-1', {
+      trip_reminders: false,
+      ops_digest: false,
+      occupancy_alerts: false,
+    });
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        preferences: expect.objectContaining({
+          trip_reminders: false,
+          ops_digest: false,
+          occupancy_alerts: false,
+        }),
       }),
     );
     expect(next).not.toHaveBeenCalled();
