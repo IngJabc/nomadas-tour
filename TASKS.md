@@ -70,6 +70,26 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
 | — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas en el design del ticket. | Futura |
+| — | **Post-sprint** | Notificaciones de reservas: agencia como actor visible (copy) | Futura |
+| — | **Post-sprint** | Boleto: mostrar solo destino (conservar `origin` en modelo) | Futura |
+| — | **Futura capacidad** | Reserva asistida por enlace (después de seleccionar asientos) | Futura |
+| — | **Post-sprint** | Bloquear nuevas reservas si `departure_time <= now()` | Futura |
+
+### Post F5-003 (no activos — no mezclar con el sprint)
+
+Trabajo posterior documentado. **Ninguno es la tarea activa.** Detalle de producto: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+
+1. **Post-sprint — Notificaciones de reservas (copy)**
+   Hoy el actor visible puede ser el reservante (`"José Bonilla realizó una reserva"`). Debe identificar a la **agencia** (`"Agencia Central realizó una reserva"`). Aplica a creación, cancelación y copies equivalentes. Cambio de presentación únicamente: no eliminar `booker_name` / `booker_document` ni otros datos de dominio; no cambiar backend ahora.
+
+2. **Post-sprint — Boleto: solo destino**
+   El boleto debe mostrar únicamente el destino. **No eliminar `origin`** del backend/modelo de rutas (soporte futuro multi-origen). Solo representación del boleto.
+
+3. **Futura capacidad — Reserva asistida por enlace**
+   Tras seleccionar viaje/asientos, opción: registrar datos ahora **o** enviar enlace seguro al reservante (completa datos; reserva sigue flujo normal). El wizard manual permanece. Diseño futuro debe cubrir: token no adivinable, expiración, seat locks, estado temporal, invalidación, campos permitidos al cliente, impedir cambiar viaje/asientos/precio, posible recuperación de progreso.
+
+4. **Post-sprint — Reservas en viajes ya salidos**
+   Bug/fix de integridad: no permitir crear reserva si `departure_time <= now()`, aunque `trips.status = 'active'`. Regla: `departure_time > now()` obligatorio. Enforcement futuro en backend/RPC (no solo frontend), test de regresión, todos los caminos de creación.
 
 Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

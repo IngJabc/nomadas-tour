@@ -1,4 +1,5 @@
 import type { AgencyReservation, AgencyTripPassengersResponse } from '@/types';
+import type { AuditListResponse, AuditQueryParams } from '@/types/audit';
 import type { AppUser } from '@/lib/auth/types';
 import { ApiError } from '@/lib/errors/api-error';
 import { logoutInactiveAgency } from '@/lib/auth/session-handler';
@@ -271,6 +272,11 @@ export const adminApi = {
   getReservation: (id: string) => request<any>(`/admin/reservations/${id}`),
   updateReservationStatus: (id: string, status: string) =>
     request<any>(`/admin/reservations/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  /** F5-003 — Audit Trail read (admin) */
+  listAudit: (params?: AuditQueryParams) =>
+    request<AuditListResponse>('/admin/audit', {
+      params: params as Record<string, string | undefined>,
+    }),
 };
 
 // Agency
@@ -362,5 +368,11 @@ export const agencyApi = {
     request<NotificationPreferencesResponse>('/agency/notification-preferences', {
       method: 'PATCH',
       body: JSON.stringify(patch),
+    }),
+
+  /** F5-003 — Audit Trail read (agency). Never send agency_id. */
+  listAudit: (params?: Omit<AuditQueryParams, 'agency_id'>) =>
+    request<AuditListResponse>('/agency/audit', {
+      params: params as Record<string, string | undefined>,
     }),
 };
