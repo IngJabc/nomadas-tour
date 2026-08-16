@@ -1,20 +1,27 @@
 'use client';
 
+import { useMemo } from 'react';
 import { LayoutDashboard, ClipboardList, QrCode, Bus, Bell, Palette, History, type LucideIcon } from 'lucide-react';
 import { PlatformLogoMark } from '@/components/brand/PlatformLogoMark';
 import { useAgencyBranding } from '@/components/branding/AgencyBrandingProvider';
 import { useAuthUser } from '@/hooks/useAuthUser';
+import { canAccessAdminAuditUi } from '@/lib/audit-ui-gate';
 import { Sidebar } from './Sidebar';
 
-const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
+const BASE_NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/agency', label: 'Panel', icon: LayoutDashboard },
   { href: '/agency/trips', label: 'Mis viajes', icon: Bus },
   { href: '/agency/reservations', label: 'Reservas', icon: ClipboardList },
   { href: '/agency/scan', label: 'Escáner QR', icon: QrCode },
-  { href: '/agency/audit', label: 'Auditoría', icon: History },
   { href: '/agency/settings/branding', label: 'Branding', icon: Palette },
   { href: '/agency/settings/notifications', label: 'Notificaciones', icon: Bell },
 ];
+
+const AUDIT_NAV_ITEM = {
+  href: '/agency/audit',
+  label: 'Auditoría',
+  icon: History,
+} as const;
 
 interface AgencySidebarProps {
   onLogout: () => void;
@@ -50,9 +57,17 @@ export function AgencySidebar({ onLogout }: AgencySidebarProps) {
       ? user.agency_name.trim()
       : 'Agencia';
 
+  const navItems = useMemo(() => {
+    // TEMPORARY UI GATE — Audit Trail (visibility only; API auth unchanged)
+    if (canAccessAdminAuditUi(user)) {
+      return [...BASE_NAV_ITEMS, AUDIT_NAV_ITEM];
+    }
+    return BASE_NAV_ITEMS;
+  }, [user]);
+
   return (
     <Sidebar
-      navItems={NAV_ITEMS}
+      navItems={navItems}
       logo={
         <AgencySidebarLogo
           logoUrl={branding?.logo_url ?? null}

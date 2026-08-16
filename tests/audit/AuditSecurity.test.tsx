@@ -86,7 +86,27 @@ describe('AuditSecurity', () => {
     expect(params).toHaveProperty('to');
   });
 
-  it('agency page uses agencyApi.listAudit and never sends agency_id', async () => {
+  it('agency audit page is hidden (gate) for unauthorized agency users', () => {
+    render(<AgencyAuditPage />);
+    expect(mockAgencyListAudit).not.toHaveBeenCalled();
+    expect(mockAdminListAudit).not.toHaveBeenCalled();
+    expect(mockListAgencies).not.toHaveBeenCalled();
+    expect(mockListRoutes).not.toHaveBeenCalled();
+  });
+
+  it('allowed user sees the agency feed via agencyApi and never sends agency_id', async () => {
+    mockUseAuthUser.mockReturnValue({
+      user: {
+        id: AUDIT_UI_ALLOWED_SUPERADMIN_ID,
+        email: 'admin@example.com',
+        role: 'superadmin',
+        agency_id: null,
+        agency_name: null,
+      },
+      loading: false,
+      refresh: vi.fn(),
+      signOut: vi.fn(),
+    });
     render(<AgencyAuditPage />);
     await waitFor(() => {
       expect(mockAgencyListAudit).toHaveBeenCalled();
