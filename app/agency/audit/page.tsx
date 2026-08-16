@@ -3,9 +3,17 @@
 import { PageHeader } from '@/components/ui/PageHeader';
 import { AuditFeed } from '@/components/audit/AuditFeed';
 import { useAuthUser } from '@/hooks/useAuthUser';
+import { canAccessAdminAuditUi } from '@/lib/audit-ui-gate';
 
 export default function AgencyAuditPage() {
-  const { user } = useAuthUser();
+  const { user, loading: authLoading } = useAuthUser();
+  const allowed = canAccessAdminAuditUi(user);
+
+  // Match AuthRoleGuard: return null while loading / unauthorized (UX only).
+  if (authLoading || !allowed) {
+    return null;
+  }
+
   const agencyName =
     user?.role === 'agency' && user.agency_name?.trim()
       ? user.agency_name.trim()

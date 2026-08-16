@@ -50,9 +50,14 @@ vi.mock('@/components/brand/PlatformLogoMark', () => ({
   PlatformLogoMark: () => <span data-testid="logo" />,
 }));
 
+vi.mock('@/components/branding/AgencyBrandingProvider', () => ({
+  useAgencyBranding: () => ({ branding: null }),
+}));
+
 import AdminAuditPage from '@/app/admin/audit/page';
 import AgencyAuditPage from '@/app/agency/audit/page';
 import { AdminSidebar } from '@/components/layout/AdminSidebar';
+import { AgencySidebar } from '@/components/layout/AgencySidebar';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -132,8 +137,8 @@ describe('TEMPORARY UI GATE — /admin/audit', () => {
   });
 });
 
-describe('TEMPORARY UI GATE — agency unchanged', () => {
-  it('agency audit page still loads via agencyApi', async () => {
+describe('TEMPORARY UI GATE — AgencySidebar / /agency/audit', () => {
+  it('hides Auditoría from every agency user in the sidebar', () => {
     mockUseAuthUser.mockReturnValue(
       authUser({
         id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -141,10 +146,21 @@ describe('TEMPORARY UI GATE — agency unchanged', () => {
         agency_name: 'Agencia Central',
       }),
     );
-    render(<AgencyAuditPage />);
-    await waitFor(() => {
-      expect(mockAgencyListAudit).toHaveBeenCalled();
-    });
+    render(<AgencySidebar onLogout={vi.fn()} />);
+    expect(screen.queryByText('Auditoría')).toBeNull();
+  });
+
+  it('does not render the agency audit page or call listAudit for agency users', async () => {
+    mockUseAuthUser.mockReturnValue(
+      authUser({
+        id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        role: 'agency',
+        agency_name: 'Agencia Central',
+      }),
+    );
+    const { container } = render(<AgencyAuditPage />);
+    expect(container.firstChild).toBeNull();
+    expect(mockAgencyListAudit).not.toHaveBeenCalled();
     expect(mockAdminListAudit).not.toHaveBeenCalled();
   });
 });
