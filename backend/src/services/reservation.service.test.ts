@@ -119,6 +119,7 @@ vi.mock('./boarding-attempts.service.js', () => ({
 
 import { reservationService } from './reservation.service.js';
 import { notificationService } from './notification.service.js';
+import { ConflictError } from '../errors/index.js';
 
 const TRIP_ID = 'trip-1';
 const AGENCY_ID = 'agency-1';
@@ -238,5 +239,37 @@ describe('WKR-007 C4 F1 — reservation.created notification gate', () => {
       }),
     );
     expect(notificationService.createForAgency).not.toHaveBeenCalled();
+  });
+});
+
+describe('createAgencyReservation — ERR_TRIP_DEPARTED', () => {
+  it('maps ERR_TRIP_DEPARTED to ConflictError', async () => {
+    queueFrom('trips', [readSingle({ id: TRIP_ID, capacity: 31 })]);
+    queueFrom('trip_agencies', [readSingle({ id: 'alloc-1' })]);
+    queueFrom('seats', [readCount(10), readCount(0)]);
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: {
+        message:
+          'ERR_TRIP_DEPARTED: Cannot create a reservation after departure time',
+      },
+    });
+
+    await expect(
+      reservationService.createAgencyReservation(
+        TRIP_ID,
+        'Ana Pérez',
+        'V123',
+        null,
+        [{ seat_id: SEAT_ID, name: 'Ana', document: 'V1', phone: null }],
+        AGENCY_ID,
+        USER_ID,
+      ),
+    ).rejects.toMatchObject({
+      name: 'ConflictError',
+      statusCode: 409,
+      message:
+        'This trip has already departed. Reservations are no longer accepted.',
+    });
   });
 });

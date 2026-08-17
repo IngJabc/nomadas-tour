@@ -156,6 +156,11 @@ export class ReservationService {
     if (rpcError) {
       const msg = rpcError.message || '';
       if (msg.includes('ERR_TRIP_NOT_FOUND')) throw new NotFoundError('Trip not found or not active');
+      if (msg.includes('ERR_TRIP_DEPARTED')) {
+        throw new ConflictError(
+          'This trip has already departed. Reservations are no longer accepted.',
+        );
+      }
       if (msg.includes('ERR_AGENCY_NOT_ASSIGNED')) throw new ForbiddenError('Your agency is not assigned to this trip');
       if (msg.includes('ERR_SEAT_NOT_FOUND')) throw new NotFoundError('One or more seats not found in this trip');
       if (msg.includes('ERR_SEAT_UNAVAILABLE')) throw new ConflictError('One or more seats are no longer available');
