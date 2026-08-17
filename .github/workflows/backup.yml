@@ -1,0 +1,83 @@
+# Daily encrypted backup to Cloudflare R2. Read-only vs production.
+# Schedule: 03:00 UTC = 23:00 America/Caracas of the previous calendar day.
+# GitHub cron is not guaranteed to the minute.
+name: backup
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nomadas-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: database + storage + verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BACKUP_UPLOAD: "1"
+      BACKUP_KEEP_WORK: "1"
+      R2_BUCKET: nomadas-backups
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+      BACKUP_AGE_VERIFY_RECIPIENT: ${{ secrets.BACKUP_AGE_VERIFY_RECIPIENT }}
+      BACKUP_AGE_VERIFY_IDENTITY: ${{ secrets.BACKUP_AGE_VERIFY_IDENTITY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y age jq
+          if ! command -v aws >/dev/null; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install
+          fi
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Prepare workspace
+        run: |
+          set -euo pipefail
+          WORK="$(mktemp -d "${TMPDIR:-/tmp}/nomadas-backup.XXXXXX")"
+          echo "BACKUP_WORK_DIR=$WORK" >> "$GITHUB_ENV"
+          echo "BACKUP_ID=$(date -u +%Y%m%dT%H%M%SZ)-${GITHUB_RUN_ID}" >> "$GITHUB_ENV"
+          echo "BACKUP_REPO_ROOT=${GITHUB_WORKSPACE}" >> "$GITHUB_ENV"
+
+      - name: Database dump (roles + schema + data)
+        run: bash scripts/backup/database.sh
+
+      - name: Storage object backup
+        run: bash scripts/backup/storage.sh
+
+      - name: Verify download/decrypt/decompress
+        run: bash scripts/backup/verify.sh
+
+      - name: Manifest + GFS copies
+        run: bash scripts/backup/finalize.sh
+
+      - name: Retention (GFS apply)
+        run: bash scripts/backup/retention.sh --apply
+
+      - name: Cleanup workspace
+        if: always()
+        run: |
+          if [[ -n "${BACKUP_WORK_DIR:-}" && -d "${BACKUP_WORK_DIR}" ]]; then
+            rm -rf "${BACKUP_WORK_DIR}"
+          fi

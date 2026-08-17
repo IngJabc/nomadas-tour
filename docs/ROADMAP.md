@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-15
+**Última actualización:** 2026-08-17
 
 ---
 
@@ -33,7 +33,11 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Digest diario superadmin | Operativo (F4-002) |
 | Alertas de ocupación (in-app) | Operativo / Completado (F4-003) |
 | Escalación de urgencia de ocupación (T-24h, in-app) | Operativo / Completado (F4-004) |
-| Audit trail (append-only, writers atómicos) | Implementado (F5-001; apply/harness ops) |
+| Audit trail (append-only + lectura API/UI) | Operativo (F5-001…F5-003; gate UI temporal) |
+| Integridad: no reservar tras `departure_time` | Operativo (RPC `066` + UX «Ya salió») |
+| Notificaciones in-app: actor = agencia; ruta = destino | Operativo (copy; dominio intacto) |
+| Boleto: solo destino | Operativo (`origin` conservado en modelo) |
+| Backup & DR (dump lógico diario cifrado en R2) | Operativo / MVP (GitHub Actions; drill trimestral pendiente) |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -92,11 +96,15 @@ FASE 4 — Automatizaciones (producto)
   (métricas nocturnas → futuro / Fase 6 / reporting)
 
 FASE Infraestructura / Operaciones
-  Backup & Disaster Recovery             → futura capacidad
+  Backup & Disaster Recovery MVP         ✅
+  Restore drill trimestral               → futura (manual)
+  Backup local de contingencia           → futura capacidad
 
 FASE 5 — Audit Trail
-  F5-001  Audit trail foundation         ✅ Implementado
-  (read API / UI / invitaciones → F5-002+)
+  F5-001  Audit trail foundation         ✅
+  F5-002  Read API                       ✅
+  F5-003  UI                             ✅
+  F5 resto                               → futura
 
 FASE 6 — Reportes
 FASE 7 — UX
@@ -146,7 +154,7 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 ### Fase 3 — Sistema de Workers
 
-**Prioridad:** Completada hasta WKR-009. Producto siguiente/en curso: Fase 5 — Audit Trail (F4 automatizaciones cerrada).
+**Prioridad:** Completada hasta WKR-009. F4 y F5-001…F5-003 cerradas.
 
 **Objetivo:** Procesamiento asíncrono y tareas programadas desacopladas del ciclo HTTP, mediante **Transactional Outbox + Workers** ([WKR-002](WKR-002-events-workers-architecture-adr.md)).
 
@@ -296,7 +304,7 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 | F4-003 | Alertas de ocupación (in-app) | Operativo / Completado |
 | F4-004 | Occupancy Urgency Alerts | Operativo / Completado |
 
-**Fase 4 operativa:** F4-001 a F4-004 CLOSED. Recordatorios T-48h/T-24h viven en WKR-008; la escalación T-24h de ocupación vive en F4-004. Producto siguiente: **Fase 5 — Audit Trail**.
+**Fase 4 operativa:** F4-001 a F4-004 CLOSED. Recordatorios T-48h/T-24h viven en WKR-008; la escalación T-24h de ocupación vive en F4-004. Audit Trail F5-001…F5-003 cerrado.
 
 **Retirado de la prioridad de Fase 4:** métricas nocturnas → **futuro / Fase 6 / reporting** (no existe aún un consumidor de negocio definido para materializar snapshots históricos).
 
@@ -306,26 +314,23 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 ### Fase Infraestructura / Operaciones
 
-**Prioridad:** Futura — capacidad transversal de infraestructura/operación, no un sprint de producto.
+**Prioridad:** MVP de backup implementado. Restore drill trimestral y backup local de contingencia siguen futuras.
 
 **Objetivo:** Proteger los datos del SaaS ante pérdida de base de datos, corrupción, eliminación accidental, incidentes de infraestructura, fallo catastrófico del proveedor y necesidad de restauración operativa.
 
-**Alcance conceptual (sin implementación):**
+**MVP (en repo):** GitHub Actions diario (03:00 UTC = 23:00 America/Caracas del día anterior) → `roles.sql` + `schema.sql` + `data.sql` + bytes de Storage → `age` → Cloudflare R2 (`nomadas-backups`). RPO 24 h; RTO target 8 h; RTO estimado ~90 min (no es SLA). Auth **no** viene en el dump. Runbook: [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md).
 
-- **Backup** — backup automático diario; horario objetivo configurable (inicialmente alrededor de 03:00 America/Caracas); almacenamiento independiente del proveedor principal; cifrado; retención configurable.
-- **Recovery** — restauración manual verificable; restore drill periódico; verificación de integridad; procedimiento de recuperación documentado.
-- **Resilience** — RPO; RTO; recuperación ante pérdida/corrupción; protección contra borrado accidental.
-- **Operations** — monitoreo del job; alerta si falla; evidencia de último backup exitoso; trazabilidad del proceso.
+**Aún fuera del MVP:** PITR; restore drill automático; creación automática de proyectos Supabase; garantía de pérdida cero; backup local de contingencia.
 
-**Scope guard:** aún no se incluye implementación, elección definitiva de proveedor, scripts, credenciales, infraestructura concreta, costos definitivos ni frecuencia final de retención. Esas decisiones se tomarán en el design de su futuro ticket.
+**Roles de almacenamiento:** R2 = backup automático principal. Backup local = contingencia manual (fuera del scheduler).
 
-**No confundir con Workers:** puede aprovechar infraestructura existente cuando llegue el momento, pero no forma parte de WKR-006.x, no es un scheduler de producto, no debe implementarse como una tarea de notificaciones y es una capacidad de infraestructura/operación y disaster recovery.
+**No confundir con Workers:** no forma parte de WKR-006.x, no es un scheduler de producto y no corre en Render.
 
 ---
 
 ### Fase 5 — Audit Trail
 
-**Prioridad:** En curso (fundación F5-001 implementada). Ejecución: [`TASKS.md`](../TASKS.md).
+**Prioridad:** F5-001…F5-003 cerrados. F5 resto (invitaciones/usuarios, correlation ID, retención/purge, quitar gate UI temporal) es futuro. Ejecución histórica: [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
 **Objetivo:** Registrar acciones administrativas y eventos relevantes para soporte, auditoría y trazabilidad.
 
@@ -333,8 +338,10 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 | Ticket | Tema | Estado |
 |--------|------|--------|
-| [F5-001](F5-001-audit-trail-design.md) | Foundation: `audit_log` append-only + writers atómicos (9 acciones) | Implementado (ops: apply `065` + harness) |
-| F5-002+ | Read API / UI; invitaciones / usuarios; correlación; retención | Futura |
+| [F5-001](F5-001-audit-trail-design.md) | Foundation: `audit_log` append-only + writers atómicos (9 acciones) | ✅ |
+| F5-002 | Read API (`GET /admin/audit`, `GET /agency/audit`) | ✅ |
+| F5-003 | UI `/admin/audit` y `/agency/audit` (gate UI temporal) | ✅ |
+| F5 resto | Invitaciones / usuarios; correlation ID; retención; quitar gate UI | Futura |
 
 **F5-001 cubre:**
 
@@ -343,7 +350,9 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 - Boarding (board / unboard)
 - Cambios de branding y preferencias de notificación de agencia
 
-**Aún fuera de F5-001:** cambios de usuarios e invitaciones; API/UI de consulta; correlation ID; retención/purge.
+**F5-002 / F5-003 cubren:** consulta paginada, filtros, sanitización por rol, pantallas admin/agencia.
+
+**Aún fuera de F5-001…F5-003:** cambios de usuarios e invitaciones; correlation ID; retención/purge; visibilidad del audit para todos los superadmins/agencias (hoy hay gate UI temporal).
 
 **Por evento (modelo F5-001):**
 
@@ -433,25 +442,22 @@ Las fases iniciales del producto (backend, reservas, abordaje, dashboards, legac
 
 ---
 
-## Follow-ups de producto (post F5-003)
+## Follow-ups de producto
 
-Ítems posteriores al Audit Trail UI. **No son sprint activo** y no abren una fase nueva; se ejecutan cuando el backlog operativo los priorice. Ver también [`TASKS.md`](../TASKS.md).
-
-### UX / comunicaciones — Actor en notificaciones de reservas
-
-Los eventos de reserva (creación, cancelación y copies equivalentes) deben identificar a la **agencia** como actor visible, no al individuo reservante. Ejemplo: `"Agencia Central realizó una reserva"` en lugar de `"José Bonilla realizó una reserva"`. Es un cambio de presentación/copy: conservar `booker_name`, `booker_document` y demás datos de dominio.
-
-### UX — Boleto: solo destino
-
-Mostrar únicamente el destino en el boleto. Conservar `origin` en el modelo/backend de rutas para soportar múltiples orígenes en el futuro. Solo cambia la representación del boleto.
+**Cerrados:** actor de notificaciones = agencia; notificaciones in-app y boleto con solo destino (`origin` conservado en modelo); no reservar si `departure_time <= now()`. Detalle: [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
 ### Futura capacidad — Reserva asistida por enlace
 
 Después de seleccionar asientos, permitir opcionalmente que la agencia genere un enlace seguro para que el reservante complete los datos (alternativa al wizard manual, que permanece). El diseño futuro deberá resolver token seguro y no adivinable, expiración, relación con seat locks, estado temporal, invalidación al confirmar/cancelar/expirar, campos permitidos al cliente, impedir cambiar viaje/asientos/precio y posible recuperación de progreso.
 
-### Integridad de reservas — Viajes ya salidos
+### Futura capacidad — Backup local de contingencia
 
-No permitir nuevas reservas cuando `departure_time <= now()`, independientemente de `status = 'active'`. La regla de negocio es `departure_time > now()`. El enforcement debe vivir en backend/RPC (no confiar solo en frontend), con test de regresión y cobertura de todos los caminos de creación.
+Copia local **manual y cifrada** (`age`) del backup como último recurso, independiente de GitHub Actions, Cloudflare R2 y Supabase. Debe compartir el formato del MVP y permanecer **fuera del flujo automático**.
+
+- **R2** = backup automático principal
+- **Backup local** = contingencia manual
+
+No es scheduler, no sustituye R2 y no trata la PC del operador como infraestructura de producción.
 
 ---
 
