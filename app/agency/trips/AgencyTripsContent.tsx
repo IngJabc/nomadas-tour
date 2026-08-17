@@ -95,6 +95,8 @@ export default function AgencyTripsContent() {
     return result;
   }, [trips, statusFilter, searchFilter, dateFilter]);
 
+  const now = new Date();
+
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);
   };
@@ -393,7 +395,7 @@ export default function AgencyTripsContent() {
           >
             {filteredTrips.map((trip) => (
               <motion.div key={trip.id} variants={staggerItem}>
-                <AgencyTripCard trip={trip} />
+                <AgencyTripCard trip={trip} now={now} />
               </motion.div>
             ))}
           </motion.div>

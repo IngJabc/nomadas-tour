@@ -84,13 +84,22 @@ export function useReservationSubmit({
       setResult(res);
       onSuccess(res.reservation.id);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      const lower = msg.toLowerCase();
+      const departed =
+        lower.includes("already departed") ||
+        lower.includes("err_trip_departed") ||
+        lower.includes("ya partió") ||
+        lower.includes("ya partio");
       setSubmitError(
-        err instanceof Error
-          ? err.message.includes("409") || err.message.toLowerCase().includes("conflict") || err.message.toLowerCase().includes("already reserved")
+        departed
+          ? "Este viaje ya partió. Las reservas ya no están disponibles."
+          : err instanceof Error
+          ? msg.includes("409") || lower.includes("conflict") || lower.includes("already reserved")
             ? "Uno o más asientos ya no están disponibles. Regresa y selecciona nuevamente."
-            : err.message.includes("lock") || err.message.toLowerCase().includes("expir")
+            : lower.includes("lock") || lower.includes("expir")
             ? "Tus asientos expiraron. Regresa y selecciona nuevamente."
-            : err.message
+            : msg
           : "Error al crear la reserva"
       );
     } finally {

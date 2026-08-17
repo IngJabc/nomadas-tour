@@ -26,12 +26,14 @@ const migration065 = read('supabase/migrations/065_audit_log.sql');
 const harness = read('supabase/tests/f5_001_verification.sql');
 
 describe('F5-001 — migration isolation', () => {
-  it('keeps 064→065 contiguous; tip is 065', () => {
+  it('keeps 064→065 contiguous; 066 is tip after departed-reservation fix', () => {
     const migrations = listMigrations();
     const i064 = migrations.indexOf('064_occupancy_urgency_alerts.sql');
     const i065 = migrations.indexOf('065_audit_log.sql');
+    const i066 = migrations.indexOf('066_create_agency_reservation_departed.sql');
     expect(i065).toBe(i064 + 1);
-    expect(i065).toBe(migrations.length - 1);
+    expect(i066).toBe(i065 + 1);
+    expect(i066).toBe(migrations.length - 1);
   });
 
   it('has no tracked modifications in migrations 001–064', () => {
@@ -50,7 +52,8 @@ describe('F5-001 — migration isolation', () => {
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean)
-      .filter((line) => !line.includes('065_audit_log.sql'));
+      .filter((line) => !line.includes('065_audit_log.sql'))
+      .filter((line) => !line.includes('066_create_agency_reservation_departed.sql'));
     expect(dirtyHistorical).toEqual([]);
   });
 
