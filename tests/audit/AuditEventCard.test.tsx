@@ -51,4 +51,36 @@ describe('AuditEventCard', () => {
     );
     expect(screen.getByText(/Sistema/)).toBeTruthy();
   });
+
+  it('supports controlled accordion expand', () => {
+    let open = true;
+    const onExpandedChange = (next: boolean) => {
+      open = next;
+    };
+    const { rerender } = render(
+      <AuditEventCard
+        event={base}
+        role="superadmin"
+        expanded={open}
+        onExpandedChange={onExpandedChange}
+      />,
+    );
+    const toggle = screen.getByRole('button', { name: /Ocultar detalle/i });
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(toggle);
+    expect(open).toBe(false);
+    rerender(
+      <AuditEventCard
+        event={base}
+        role="superadmin"
+        expanded={false}
+        onExpandedChange={onExpandedChange}
+      />,
+    );
+    expect(
+      screen.getByRole('button', { name: /Ver detalle/i }).getAttribute(
+        'aria-expanded',
+      ),
+    ).toBe('false');
+  });
 });

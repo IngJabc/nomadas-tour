@@ -78,6 +78,7 @@ export default function AdminAuditPage() {
       </p>
       <AuditFeed
         role="superadmin"
+        singleExpand
         agencies={agencies}
         agencyLabels={agencyLabels}
         routeLabels={routeLabels}
