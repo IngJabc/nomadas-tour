@@ -23,6 +23,8 @@ interface AuditFeedProps {
   agencies?: { id: string; name: string }[];
   agencyLabels?: Record<string, string>;
   routeLabels?: Record<string, string>;
+  /** Admin: only one event card expanded at a time. */
+  singleExpand?: boolean;
 }
 
 function mergeUnique(
@@ -45,6 +47,7 @@ export function AuditFeed({
   agencies = [],
   agencyLabels,
   routeLabels,
+  singleExpand = false,
 }: AuditFeedProps) {
   const [filters, setFilters] = useState<AuditFilterState>(defaultAuditFilters);
   const [items, setItems] = useState<AuditEventDTO[]>([]);
@@ -53,6 +56,7 @@ export function AuditFeed({
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const requestGen = useRef(0);
 
   const doFetch = useCallback(
@@ -79,9 +83,13 @@ export function AuditFeed({
           opts.append ? mergeUnique(prev, data.items) : data.items,
         );
         setNextCursor(data.next_cursor);
+        if (!opts.append && singleExpand) setExpandedId(null);
       } catch {
         if (gen !== requestGen.current) return;
-        if (!opts.append) setItems([]);
+        if (!opts.append) {
+          setItems([]);
+          if (singleExpand) setExpandedId(null);
+        }
         setFetchError(
           'No se pudo cargar la auditoría. Intenta de nuevo.',
         );
@@ -93,7 +101,7 @@ export function AuditFeed({
         }
       }
     },
-    [role],
+    [role, singleExpand],
   );
 
   const reloadFirstPage = useCallback(
@@ -104,11 +112,12 @@ export function AuditFeed({
         setNextCursor(null);
         setLoading(false);
         setFetchError(null);
+        if (singleExpand) setExpandedId(null);
         return;
       }
       void doFetch({ params, append: false, soft });
     },
-    [doFetch, role],
+    [doFetch, role, singleExpand],
   );
 
   useEffect(() => {
@@ -213,6 +222,14 @@ export function AuditFeed({
                   agencyName={agencyName}
                   agencyLabels={agencyLabels}
                   routeLabels={routeLabels}
+                  {...(singleExpand
+                    ? {
+                        expanded: expandedId === event.id,
+                        onExpandedChange: (open: boolean) =>
+                          setExpandedId(open ? event.id : null),
+                        scrollOnExpand: true,
+                      }
+                    : {})}
                 />
               </li>
             ))}

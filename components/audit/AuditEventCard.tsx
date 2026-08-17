@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
@@ -42,6 +42,11 @@ interface AuditEventCardProps {
   agencyName?: string | null;
   agencyLabels?: Record<string, string>;
   routeLabels?: Record<string, string>;
+  /** When set with onExpandedChange, expansion is controlled by the parent (accordion). */
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
+  /** Scroll the card into view when it opens (admin accordion). */
+  scrollOnExpand?: boolean;
 }
 
 export function AuditEventCard({
@@ -50,14 +55,39 @@ export function AuditEventCard({
   agencyName,
   agencyLabels,
   routeLabels,
+  expanded: expandedProp,
+  onExpandedChange,
+  scrollOnExpand = false,
 }: AuditEventCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [uncontrolledExpanded, setUncontrolledExpanded] = useState(false);
+  const isControlled = typeof expandedProp === 'boolean';
+  const expanded = isControlled ? expandedProp : uncontrolledExpanded;
   const reduceMotion = useReducedMotion();
   const detailId = useId();
+  const cardRef = useRef<HTMLDivElement>(null);
   const config = getAuditActionConfig(event.action);
   const Icon = config.icon;
   const tone = TONE_STYLES[config.tone];
   const summary = config.summarize(event);
+
+  const setExpanded = (next: boolean) => {
+    if (isControlled) onExpandedChange?.(next);
+    else setUncontrolledExpanded(next);
+  };
+
+  useEffect(() => {
+    if (!scrollOnExpand || !expanded) return;
+    const node = cardRef.current;
+    if (!node) return;
+    // After layout settles so the open card top is the scroll target.
+    const id = window.requestAnimationFrame(() => {
+      node.scrollIntoView({
+        behavior: reduceMotion ? 'auto' : 'smooth',
+        block: 'start',
+      });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [expanded, scrollOnExpand, reduceMotion]);
 
   const resolvedAgency =
     (event.agency_id && agencyLabels?.[event.agency_id]) ||
@@ -72,9 +102,10 @@ export function AuditEventCard({
 
   return (
     <Card
+      ref={cardRef}
       borderLeft
       borderColor={tone.border}
-      className="!p-4 sm:!p-5"
+      className="!p-4 sm:!p-5 scroll-mt-6"
       data-testid="audit-event-card"
     >
       <div className="flex gap-3">
@@ -118,7 +149,7 @@ export function AuditEventCard({
             className="mt-3 inline-flex items-center gap-1 rounded-lg border-none bg-transparent px-0 py-1 text-[13px] font-semibold text-[var(--color-brand-cyan)] hover:text-[var(--color-brand-blue)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-cyan)]"
             aria-expanded={expanded}
             aria-controls={detailId}
-            onClick={() => setExpanded((v) => !v)}
+            onClick={() => setExpanded(!expanded)}
           >
             {expanded ? 'Ocultar detalle' : 'Ver detalle'}
             <ChevronDown
