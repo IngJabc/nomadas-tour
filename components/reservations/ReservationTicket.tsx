@@ -67,7 +67,7 @@ export const ReservationTicket = forwardRef<HTMLDivElement, ReservationTicketPro
                     Ruta
                   </p>
                   <p className="font-[family-name:var(--font-heading)] font-bold text-[13px] text-[var(--color-brand-navy)] truncate">
-                    {trip.origin} → {trip.destination}
+                    {trip.destination}
                   </p>
                 </div>
               </div>

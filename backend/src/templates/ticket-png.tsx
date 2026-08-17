@@ -260,7 +260,7 @@ export function TicketPNGTemplate({ ticket }: { ticket: TicketData }) {
                     fontFamily: 'Montserrat',
                   }}
                 >
-                  {trip.origin} → {trip.destination}
+                  {trip.destination}
                 </span>
               </div>
             </div>

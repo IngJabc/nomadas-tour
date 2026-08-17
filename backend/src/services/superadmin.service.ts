@@ -28,6 +28,7 @@ import {
   formatDateForEmail,
   getAgenciesWithEmail,
 } from "../utils/email-fanout.js";
+import { notificationDestinationLabel } from "../utils/notification-route-label.js";
 
 export enum TripUpdateAction {
   POSTPONED = "POSTPONED",
@@ -537,7 +538,7 @@ export class SuperadminService {
       .createForAgenciesAndAdmin({
         type: "trip_created",
         title: "Viaje creado",
-        body: `Viaje asignado: ${route.origin} → ${route.destination} el ${departureFormatted}`,
+        body: `Viaje asignado: ${notificationDestinationLabel(route.destination, "?")} el ${departureFormatted}`,
         entityType: "trip",
         entityId: trip.id,
         agencyIds,
@@ -1012,7 +1013,7 @@ export class SuperadminService {
         .createForAgenciesAndAdmin({
           type: "trip_created",
           title: "Viaje asignado",
-          body: `Viaje asignado: ${route.origin} → ${route.destination} el ${departureFormatted}`,
+          body: `Viaje asignado: ${notificationDestinationLabel(route.destination, "?")} el ${departureFormatted}`,
           entityType: "trip",
           entityId: tripId,
           agencyIds: uniqueIds,
@@ -1423,7 +1424,7 @@ export class SuperadminService {
         .eq("id", trip.route_id)
         .single();
       if (route) {
-        routeLabel = `${route.origin} → ${route.destination}`;
+        routeLabel = notificationDestinationLabel(route.destination);
       }
     }
 
@@ -1591,9 +1592,9 @@ export class SuperadminService {
         .eq("id", trip.route_id)
         .single();
 
-      const routeLabel = routeForNotif
-        ? `${routeForNotif.origin} → ${routeForNotif.destination}`
-        : "viaje";
+      const routeLabel = notificationDestinationLabel(
+        routeForNotif?.destination,
+      );
 
       notificationService
         .createForAgenciesAndAdmin({

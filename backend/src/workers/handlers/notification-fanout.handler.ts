@@ -43,6 +43,7 @@ import {
 import { computeCanonicalOccupancy } from '../../services/occupancy-alert.service.js';
 import type { OutboxEventRow } from '../../events/types.js';
 import { formatDateForEmail } from '../../utils/email-fanout.js';
+import { notificationDestinationLabel } from '../../utils/notification-route-label.js';
 import {
   notificationDeliveryPolicy,
   type AgencyNotificationRow,
@@ -346,10 +347,7 @@ async function buildRowsForEvent(
             },
           };
         }
-        const routeLabel =
-          ctx.origin && ctx.destination
-            ? `${ctx.origin} → ${ctx.destination}`
-            : 'viaje';
+        const routeLabel = notificationDestinationLabel(ctx.destination);
         const agencyName = await deps.loadAgencyName(parsed.data.agency_id);
         // Mirrors createForAgency(actor: 'agency') → superadmin only.
         return {
@@ -396,7 +394,7 @@ async function buildRowsForEvent(
           rows: buildAgencyAndOptionalAdminRows({
             type: 'trip_created',
             title: 'Viaje creado',
-            body: `Viaje asignado: ${origin} → ${destination} el ${departureFormatted}`,
+            body: `Viaje asignado: ${notificationDestinationLabel(destination, '?')} el ${departureFormatted}`,
             entityType: 'trip',
             entityId: parsed.data.trip_id,
             agencyIds: parsed.data.agency_ids,
@@ -457,9 +455,7 @@ async function buildRowsForEvent(
           };
         }
         const route = await deps.loadRoute(parsed.data.route_id);
-        const routeLabel = route
-          ? `${route.origin} → ${route.destination}`
-          : 'viaje';
+        const routeLabel = notificationDestinationLabel(route?.destination);
         return {
           ok: true,
           rows: buildAgencyAndOptionalAdminRows({
@@ -490,9 +486,7 @@ async function buildRowsForEvent(
           };
         }
         const route = await deps.loadRoute(parsed.data.route_id);
-        const routeLabel = route
-          ? `${route.origin} → ${route.destination}`
-          : 'viaje';
+        const routeLabel = notificationDestinationLabel(route?.destination);
         return {
           ok: true,
           rows: buildAgencyAndOptionalAdminRows({
@@ -523,9 +517,7 @@ async function buildRowsForEvent(
           };
         }
         const route = await deps.loadRoute(parsed.data.route_id);
-        const routeLabel = route
-          ? `${route.origin} → ${route.destination}`
-          : 'viaje';
+        const routeLabel = notificationDestinationLabel(route?.destination);
         return {
           ok: true,
           rows: buildAgencyAndOptionalAdminRows({
@@ -555,9 +547,7 @@ async function buildRowsForEvent(
           };
         }
         const route = await deps.loadRoute(parsed.data.route_id);
-        const routeLabel = route
-          ? `${route.origin} → ${route.destination}`
-          : 'viaje';
+        const routeLabel = notificationDestinationLabel(route?.destination);
         return {
           ok: true,
           rows: buildAgencyAndOptionalAdminRows({
@@ -602,7 +592,7 @@ async function buildRowsForEvent(
           rows: buildAgencyAndOptionalAdminRows({
             type: 'trip_reminder',
             title: 'Recordatorio de viaje',
-            body: `${headline}: ${origin} → ${destination} el ${departureFormatted}`,
+            body: `${headline}: ${notificationDestinationLabel(destination, '?')} el ${departureFormatted}`,
             entityType: 'trip',
             entityId: parsed.data.trip_id,
             agencyIds: parsed.data.agency_ids,

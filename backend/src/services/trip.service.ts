@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/database.js';
 import { env } from '../config/env.js';
 import { notificationService } from './notification.service.js';
+import { notificationDestinationLabel } from '../utils/notification-route-label.js';
 
 export async function completeExpiredTrips(): Promise<void> {
   const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
@@ -73,7 +74,7 @@ export async function completeExpiredTrips(): Promise<void> {
         .eq('id', trip.route_id)
         .single();
 
-      const routeLabel = route ? `${route.origin} → ${route.destination}` : 'viaje';
+      const routeLabel = notificationDestinationLabel(route?.destination);
 
       // Notification: auto-completed → agencies + superadmin (system is the actor)
       notificationService.createForAgenciesAndAdmin({
