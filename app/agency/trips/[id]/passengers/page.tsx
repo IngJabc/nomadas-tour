@@ -31,6 +31,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import { PassengerCard } from "@/components/agency/PassengerCard";
 import { pageFade } from "@/lib/motion/variants";
+import { isTripOpenForReservation } from "@/lib/reservations/bookableTrips";
 
 function formatDate(iso: string) {
   const d = new Date(iso);
@@ -253,7 +254,7 @@ export default function TripPassengersPage() {
               <Badge variant="completed" size="md">
                 Completado
               </Badge>
-            ) : trip?.status === "active" && (trip?.available_seats ?? 0) > 0 ? (
+            ) : trip && isTripOpenForReservation(trip, new Date()) ? (
               <Link
                 href={`/agency/reservations/new?trip=${tripId}&source=passengers`}
                 className="inline-flex items-center gap-2 px-4 py-2.5 bg-[var(--color-brand-cyan)] text-white font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl no-underline transition-all duration-200 hover:bg-[var(--color-brand-blue)] whitespace-nowrap"

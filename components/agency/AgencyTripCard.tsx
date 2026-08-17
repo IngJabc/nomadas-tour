@@ -12,6 +12,10 @@ import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { formatDateLong, formatTime12h } from "@/lib/timezone";
+import {
+  isDepartureInFuture,
+  isTripOpenForReservation,
+} from "@/lib/reservations/bookableTrips";
 
 interface AgencyTripRoute {
   origin: string;
@@ -33,11 +37,21 @@ export interface AgencyTrip {
 interface AgencyTripCardProps {
   trip: AgencyTrip;
   onSelect?: (tripId: string) => void;
+  now?: Date;
 }
 
-function getStatusBadge(status: string, postponedFrom?: string | null) {
-  if (postponedFrom) return { label: 'Reprogramado', variant: 'warning' as const };
-  switch (status) {
+function getStatusBadge(
+  trip: AgencyTrip,
+  now: Date,
+) {
+  if (
+    trip.status === 'active' &&
+    !isDepartureInFuture(trip.departure_time, now)
+  ) {
+    return { label: 'Ya salió', variant: 'warning' as const };
+  }
+  if (trip.postponed_from) return { label: 'Reprogramado', variant: 'warning' as const };
+  switch (trip.status) {
     case 'cancelled': return { label: 'Cancelado', variant: 'cancelled' as const };
     case 'completed': return { label: 'Completado', variant: 'completed' as const };
     case 'active': return { label: 'Programado', variant: 'active' as const };
@@ -45,10 +59,12 @@ function getStatusBadge(status: string, postponedFrom?: string | null) {
   }
 }
 
-export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
+export function AgencyTripCard({ trip, onSelect, now }: AgencyTripCardProps) {
+  const clock = now ?? new Date();
   const isFull = trip.available_seats === 0;
   const isClosed = trip.status === 'cancelled' || trip.status === 'completed';
-  const statusBadge = getStatusBadge(trip.status, trip.postponed_from);
+  const canCreateReservation = isTripOpenForReservation(trip, clock);
+  const statusBadge = getStatusBadge(trip, clock);
 
   const cardContent = (
     <>
@@ -143,15 +159,15 @@ export function AgencyTripCard({ trip, onSelect }: AgencyTripCardProps) {
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             )}
-            {!isClosed && !isFull && (
+            {!isClosed && canCreateReservation && (
               <>
                 <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
                 <Link
-                  href={isFull ? `/agency/trips/${trip.id}/passengers` : `/agency/reservations/new?trip=${trip.id}&source=trips`}
+                  href={`/agency/reservations/new?trip=${trip.id}&source=trips`}
                   className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  {isFull ? "Ver información" : "Nueva Reserva"}
+                  Nueva Reserva
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
               </>

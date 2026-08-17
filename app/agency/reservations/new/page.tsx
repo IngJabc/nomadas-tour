@@ -38,6 +38,7 @@ import { useReservationSubmit } from "@/hooks/useReservationSubmit";
 import { useCapture } from "@/hooks/useCapture";
 import { useLockCountdown } from "@/hooks/useLockCountdown";
 import { validateForm } from "@/lib/reservations/validateForm";
+import { filterBookableTrips } from "@/lib/reservations/bookableTrips";
 import { BusLayout } from "@/components/bus/BusLayout";
 import { BusLayoutSnapshot } from "@/components/bus/BusLayoutSnapshot";
 import { withReposition } from "@/lib/capture-reposition";
@@ -591,10 +592,10 @@ function NewReservationContent() {
   }, [wizard.step, locking.selectedSeats.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Derived state ────────────────────────────────────────────────
-  const availableTrips = useMemo(
-    () => trips.filter((t) => t.status === "active" && t.available_seats > 0),
-    [trips]
-  );
+  const availableTrips = useMemo(() => {
+    const now = new Date();
+    return filterBookableTrips(trips, now);
+  }, [trips]);
 
   // ═════════════════════════════════════════════════════════════════════
   // RENDER
