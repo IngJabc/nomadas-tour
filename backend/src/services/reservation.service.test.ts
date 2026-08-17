@@ -201,7 +201,7 @@ describe('WKR-007 C4 F1 — reservation.created notification gate', () => {
     expect(notificationService.createForAgency).toHaveBeenCalledWith({
       type: 'reservation_created',
       title: 'Nueva reserva',
-      body: 'Agencia Test realizó una reserva de 2 pasajeros para Caracas → Mérida',
+      body: 'Agencia Test realizó una reserva de 2 pasajeros para Mérida',
       entityType: 'reservation',
       entityId: RES_ID,
       agencyId: AGENCY_ID,

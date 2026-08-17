@@ -162,7 +162,8 @@ describe('reservationService.cancelAgencyReservation (F5-001)', () => {
     };
     expect(notif.type).toBe('reservation_cancelled');
     expect(notif.body).toContain('Agencia Central');
-    expect(notif.body).toContain('A → B');
+    expect(notif.body).toContain('B');
+    expect(notif.body).not.toMatch(/A → B/);
     expect(notif.body).not.toMatch(/La reserva de Ana fue cancelada/);
   });
 

@@ -59,7 +59,7 @@ describe('notificationService.createNotification', () => {
     await notificationService.createNotification({
       type: 'trip_cancelled',
       title: 'Viaje cancelado',
-      body: 'El viaje Caracas → Valencia fue cancelado',
+      body: 'El viaje Valencia fue cancelado',
       entityType: 'trip',
       entityId: 'trip-123',
       agencyId: 'agency-456',
@@ -152,7 +152,7 @@ describe('Targeting: actor = agency', () => {
     await notificationService.createForAgency({
       type: 'reservation_created',
       title: 'Nueva reserva',
-      body: 'Reserva de Juan — Caracas → Valencia',
+      body: 'Reserva de Juan — Valencia',
       entityType: 'reservation',
       entityId: 'res-1',
       agencyId: 'agency-a',

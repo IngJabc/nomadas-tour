@@ -86,7 +86,7 @@ export function ReservationTicketEmail({ ticket }: { ticket: TicketData }) {
                     </div>
                     <div style={infoContentStyle}>
                       <p style={infoLabelStyle}>Ruta</p>
-                      <p style={infoValueBoldStyle}>{trip.origin} → {trip.destination}</p>
+                      <p style={infoValueBoldStyle}>{trip.destination}</p>
                     </div>
                   </div>
 

@@ -8,6 +8,7 @@ import {
   AppError,
 } from '../errors/index.js';
 import { generateQRContent, generateQRDataURL } from '../utils/qr.js';
+import { notificationDestinationLabel } from '../utils/notification-route-label.js';
 import { sortBySeatCode } from '../utils/sort.js';
 import { toUTC } from '../utils/timezone.js';
 import {
@@ -214,7 +215,7 @@ export class ReservationService {
       .eq('id', tripId)
       .single();
     const routeNotif = (tripForNotif as any)?.routes;
-    const routeLabel = routeNotif ? `${routeNotif.origin} → ${routeNotif.destination}` : 'viaje';
+    const routeLabel = notificationDestinationLabel(routeNotif?.destination);
 
     // Notification: reservation created → superadmin only (agency is the actor).
     // When TRIP_EFFECTS_VIA_OUTBOX=true, NotificationFanout is the sole emitter (WKR-007 C4 F1).
@@ -440,9 +441,9 @@ export class ReservationService {
       .eq('id', (reservation as any).trip_id)
       .single();
     const routeCancelNotif = (tripForCancelNotif as any)?.routes;
-    const routeCancelLabel = routeCancelNotif
-      ? `${routeCancelNotif.origin} → ${routeCancelNotif.destination}`
-      : 'viaje';
+    const routeCancelLabel = notificationDestinationLabel(
+      routeCancelNotif?.destination,
+    );
 
     // Notification: reservation cancelled → superadmin only (agency is the actor)
     const agencyName = await this.resolveAgencyName(agencyId);
@@ -817,7 +818,9 @@ export class ReservationService {
         .eq('id', reservation.trip_id)
         .single();
       const routePassNotif = (tripForPassNotif as any)?.routes;
-      const routePassLabel = routePassNotif ? `${routePassNotif.origin} → ${routePassNotif.destination}` : 'viaje';
+      const routePassLabel = notificationDestinationLabel(
+        routePassNotif?.destination,
+      );
       const passengerName = (passenger as any).name || 'pasajero';
 
       // Notification: passenger cancelled → superadmin only (agency is the actor)
