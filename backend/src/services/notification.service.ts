@@ -41,6 +41,7 @@ interface NotificationInsertRow {
   recipient_role: RecipientRole;
   action_url: string | null;
   metadata: Record<string, unknown>;
+  source_event_id?: string | null;
 }
 
 export class NotificationService {
@@ -64,6 +65,8 @@ export class NotificationService {
     const { error } = await supabaseAdmin.from('notifications').insert(filtered);
 
     if (error) {
+      // Unique (source_event_id, agency, role) — concurrent legacy + outbox fanout.
+      if ((error as { code?: string }).code === '23505') return;
       console.error(
         JSON.stringify({
           event: context.event,
@@ -164,8 +167,10 @@ export class NotificationService {
     actor: NotificationActor;
     action_url?: string;
     metadata?: Record<string, unknown>;
+    source_event_id?: string | null;
   }): Promise<void> {
     const rows: NotificationInsertRow[] = [];
+    const sourceEventId = params.source_event_id ?? null;
 
     if (params.actor === 'system') {
       rows.push({
@@ -178,6 +183,7 @@ export class NotificationService {
         recipient_role: 'agency',
         action_url: params.action_url ?? null,
         metadata: params.metadata ?? {},
+        source_event_id: sourceEventId,
       });
     }
 
@@ -192,6 +198,7 @@ export class NotificationService {
         recipient_role: 'superadmin',
         action_url: params.action_url ?? null,
         metadata: params.metadata ?? {},
+        source_event_id: sourceEventId,
       });
     }
 

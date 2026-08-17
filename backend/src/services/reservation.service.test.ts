@@ -33,6 +33,7 @@ function createFilterChain(terminal: () => Promise<{ data: any; error: any; coun
   chain.update = vi.fn(() => chain);
   chain.is = vi.fn(() => chain);
   chain.order = vi.fn(() => chain);
+  chain.limit = vi.fn(() => chain);
   chain.single = vi.fn(() => terminal());
   chain.maybeSingle = vi.fn(() => terminal());
   chain.then = vi.fn((resolve: (value: { data: any; error: any; count?: number }) => void) => {
@@ -127,7 +128,10 @@ const USER_ID = 'user-1';
 const RES_ID = 'res-1';
 const SEAT_ID = 'seat-1';
 
-function setupCreateAgencyReservationHappyPath() {
+function setupCreateAgencyReservationHappyPath(
+  bookerName = 'Ana Pérez',
+  agencyName = 'Agencia Test',
+) {
   queueFrom('trips', [
     readSingle({ id: TRIP_ID, capacity: 31 }),
     readSingle({ routes: { origin: 'Caracas', destination: 'Mérida' } }),
@@ -139,13 +143,15 @@ function setupCreateAgencyReservationHappyPath() {
       id: RES_ID,
       trip_id: TRIP_ID,
       agency_id: AGENCY_ID,
-      booker_name: 'Ana Pérez',
+      booker_name: bookerName,
       reservation_passengers: [
         { id: 'p1', seat_id: SEAT_ID, name: 'Ana', seats: { seat_code: 'A1' } },
         { id: 'p2', seat_id: 'seat-2', name: 'Luis', seats: { seat_code: 'A2' } },
       ],
     }),
   ]);
+  queueFrom('agencies', [readSingle({ name: agencyName })]);
+  queueFrom('outbox_events', [readSingle({ id: 'outbox-evt-1' })]);
 
   mockRpc.mockResolvedValue({
     data: { reservation_id: RES_ID, qr_code: 'ABCDEF12' },
@@ -195,12 +201,13 @@ describe('WKR-007 C4 F1 — reservation.created notification gate', () => {
     expect(notificationService.createForAgency).toHaveBeenCalledWith({
       type: 'reservation_created',
       title: 'Nueva reserva',
-      body: 'Ana Pérez realizó una reserva de 2 pasajeros para Caracas → Mérida',
+      body: 'Agencia Test realizó una reserva de 2 pasajeros para Caracas → Mérida',
       entityType: 'reservation',
       entityId: RES_ID,
       agencyId: AGENCY_ID,
       actor: 'agency',
       action_url: `/admin/bookings/${RES_ID}`,
+      source_event_id: 'outbox-evt-1',
       metadata: {
         reservation_id: RES_ID,
         trip_id: TRIP_ID,
@@ -210,6 +217,32 @@ describe('WKR-007 C4 F1 — reservation.created notification gate', () => {
         destination: 'Mérida',
       },
     });
+  });
+
+  it('uses agency name as actor, not booker_name', async () => {
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = false;
+    setupCreateAgencyReservationHappyPath('Juan Pérez', 'Agencia Central');
+
+    await reservationService.createAgencyReservation(
+      TRIP_ID,
+      'Juan Pérez',
+      'V123',
+      null,
+      [
+        { seat_id: SEAT_ID, name: 'Ana', document: 'V1', phone: null },
+        { seat_id: 'seat-2', name: 'Luis', document: 'V2', phone: null },
+      ],
+      AGENCY_ID,
+      USER_ID,
+    );
+
+    const call = mockCreateForAgency.mock.calls[0]?.[0] as {
+      body: string;
+      metadata: { booker_name: string };
+    };
+    expect(call.body).toContain('Agencia Central');
+    expect(call.body).not.toMatch(/Juan Pérez realizó/);
+    expect(call.metadata.booker_name).toBe('Juan Pérez');
   });
 
   it('flag=true skips legacy createForAgency so NotificationFanout is sole emitter', async () => {

@@ -60,6 +60,30 @@ function mapBoardingToggleError(message: string): AppError {
 }
 
 export class ReservationService {
+  private async resolveAgencyName(agencyId: string): Promise<string> {
+    const { data } = await supabaseAdmin
+      .from('agencies')
+      .select('name')
+      .eq('id', agencyId)
+      .maybeSingle();
+    return (data as { name?: string } | null)?.name || 'agencia';
+  }
+
+  /** Outbox row id for reservation.created (trigger 049) — used for notification idempotency. */
+  private async findReservationCreatedOutboxId(
+    reservationId: string,
+  ): Promise<string | null> {
+    const { data } = await supabaseAdmin
+      .from('outbox_events')
+      .select('id')
+      .eq('event_type', 'reservation.created')
+      .eq('aggregate_id', reservationId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return (data as { id?: string } | null)?.id ?? null;
+  }
+
   async getTripWithSeats(tripId: string) {
     const { data: trip, error: tripError } = await supabaseAdmin
       .from('trips')
@@ -194,16 +218,22 @@ export class ReservationService {
 
     // Notification: reservation created → superadmin only (agency is the actor).
     // When TRIP_EFFECTS_VIA_OUTBOX=true, NotificationFanout is the sole emitter (WKR-007 C4 F1).
+    // When false (local rollback), still attach outbox source_event_id so a remote
+    // worker with the flag on cannot insert a second row for the same event.
     if (!env.TRIP_EFFECTS_VIA_OUTBOX) {
+      const agencyName = await this.resolveAgencyName(agencyId);
+      const sourceEventId =
+        await this.findReservationCreatedOutboxId(reservationId);
       notificationService.createForAgency({
         type: 'reservation_created',
         title: 'Nueva reserva',
-        body: `${bookerName} realizó una reserva de ${passengers.length} pasajeros para ${routeLabel}`,
+        body: `${agencyName} realizó una reserva de ${passengers.length} pasajeros para ${routeLabel}`,
         entityType: 'reservation',
         entityId: reservationId,
         agencyId,
         actor: 'agency',
         action_url: `/admin/bookings/${reservationId}`,
+        source_event_id: sourceEventId,
         metadata: {
           reservation_id: reservationId,
           trip_id: tripId,
@@ -415,10 +445,11 @@ export class ReservationService {
       : 'viaje';
 
     // Notification: reservation cancelled → superadmin only (agency is the actor)
+    const agencyName = await this.resolveAgencyName(agencyId);
     notificationService.createForAgency({
       type: 'reservation_cancelled',
       title: 'Reserva cancelada',
-      body: `La reserva de ${(reservation as any).booker_name || 'cliente'} fue cancelada para ${routeCancelLabel}`,
+      body: `La reserva de ${agencyName} fue cancelada para ${routeCancelLabel}`,
       entityType: 'reservation',
       entityId: id,
       agencyId,

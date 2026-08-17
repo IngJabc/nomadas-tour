@@ -80,6 +80,19 @@ vi.mock('../config/database.js', () => ({
             }),
           };
         }
+        if (table === 'agencies') {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: () =>
+                  Promise.resolve({
+                    data: { name: 'Agencia Central' },
+                    error: null,
+                  }),
+              }),
+            }),
+          };
+        }
         throw new Error(`Unexpected from('${table}')`);
       },
     };
@@ -143,6 +156,14 @@ describe('reservationService.cancelAgencyReservation (F5-001)', () => {
       freed_seats: 2,
     });
     expect(mockCreateForAgency).toHaveBeenCalled();
+    const notif = mockCreateForAgency.mock.calls[0]?.[0] as {
+      type: string;
+      body: string;
+    };
+    expect(notif.type).toBe('reservation_cancelled');
+    expect(notif.body).toContain('Agencia Central');
+    expect(notif.body).toContain('A → B');
+    expect(notif.body).not.toMatch(/La reserva de Ana fue cancelada/);
   });
 
   it('maps actor mismatch to ValidationError without notifying', async () => {

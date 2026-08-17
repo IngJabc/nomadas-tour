@@ -112,6 +112,7 @@ export interface NotificationFanoutDeps {
     reservationId: string,
     tripId: string,
   ) => Promise<ReservationNotificationContext | null>;
+  loadAgencyName: (agencyId: string) => Promise<string>;
   formatDeparture: (iso: string) => string;
   loadTripAgencyIds?: (tripId: string) => Promise<string[]>;
   loadLiveOccupancy?: (
@@ -263,6 +264,15 @@ export function createDefaultNotificationFanoutDeps(): NotificationFanoutDeps {
         destination: routeRow?.destination ?? null,
       };
     },
+    async loadAgencyName(agencyId) {
+      const { data } = await supabaseAdmin
+        .from('agencies')
+        .select('name')
+        .eq('id', agencyId)
+        .maybeSingle();
+
+      return (data as { name?: string } | null)?.name || 'agencia';
+    },
     formatDeparture: formatDateForEmail,
     async loadTripAgencyIds(tripId) {
       const { data, error } = await supabaseAdmin
@@ -340,6 +350,7 @@ async function buildRowsForEvent(
           ctx.origin && ctx.destination
             ? `${ctx.origin} → ${ctx.destination}`
             : 'viaje';
+        const agencyName = await deps.loadAgencyName(parsed.data.agency_id);
         // Mirrors createForAgency(actor: 'agency') → superadmin only.
         return {
           ok: true,
@@ -347,7 +358,7 @@ async function buildRowsForEvent(
             {
               type: 'reservation_created',
               title: 'Nueva reserva',
-              body: `${ctx.booker_name} realizó una reserva de ${ctx.passenger_count} pasajeros para ${routeLabel}`,
+              body: `${agencyName} realizó una reserva de ${ctx.passenger_count} pasajeros para ${routeLabel}`,
               entity_type: 'reservation',
               entity_id: parsed.data.reservation_id,
               agency_id: null,

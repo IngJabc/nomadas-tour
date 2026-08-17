@@ -180,6 +180,7 @@ function makeDeps(
       origin: 'Caracas',
       destination: 'Mérida',
     })),
+    loadAgencyName: vi.fn(async () => 'Agencia Central'),
     formatDeparture: () => 'viernes, 10 de agosto de 2026, 08:00',
     ...overrides,
   };
@@ -311,7 +312,16 @@ describe('WKR-007 C4 — NotificationFanout', () => {
   );
 
   it('creates reservation_created for superadmin only', async () => {
-    const deps = makeDeps();
+    const deps = makeDeps({
+      loadReservationContext: vi.fn(async () => ({
+        booker_name: 'Juan Pérez',
+        passenger_count: 2,
+        trip_id: TRIP_ID,
+        origin: 'Caracas',
+        destination: 'Mérida',
+      })),
+      loadAgencyName: vi.fn(async () => 'Agencia Central'),
+    });
     const handler = createNotificationFanoutHandler(
       'reservation.created',
       deps,
@@ -330,8 +340,11 @@ describe('WKR-007 C4 — NotificationFanout', () => {
       entity_id: RES_ID,
       source_event_id: EVENT_ID,
     });
-    expect(rows[0].body).toContain('Ana');
+    expect(rows[0].body).toContain('Agencia Central');
     expect(rows[0].body).toContain('2 pasajeros');
+    expect(rows[0].body).not.toContain('Juan Pérez');
+    expect(rows[0].metadata).toMatchObject({ booker_name: 'Juan Pérez' });
+    expect(deps.loadAgencyName).toHaveBeenCalledWith(AGENCY_A);
   });
 
   it('returns already_delivered when source_event_id rows already exist', async () => {
