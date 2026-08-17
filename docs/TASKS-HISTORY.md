@@ -565,4 +565,80 @@ Fundación append-only multi-tenant de auditoría operativa (sin UI/API de lectu
 - **Harness SQL** `supabase/tests/f5_001_verification.sql` (BEGIN/ROLLBACK) — schema/RLS/atomicidad/PII (ajustes PG15: `tgconstraint`, CTE walk)
 - **Tests:** boarding tip `f5-001`; unitarios PII / cancel RPC / metadata; tips F4-003/004 apuntan a 065
 - **Fuera de scope:** read API/UI; invitaciones; correlation ID; retención; analytics; migrar `boarding_logs`; outbox-as-audit
-- **Siguiente:** ops apply/harness → F5-002+ (lectura/UI / invitaciones) o siguiente ticket de Fase 5
+- **Siguiente (cerrado después):** F5-002 Read API → F5-003 UI
+
+---
+
+## Sprint 22 — F5-002 Audit Trail Read API (2026-08-16)
+
+API de lectura read-only sobre `audit_log` (sin writers nuevos, sin invitaciones).
+
+[x] **F5-002 — Audit Trail Read API**
+- `GET /api/admin/audit` (SUPERADMIN) y `GET /api/agency/audit` (agencia; `agency_id` nunca enviado por el cliente — lo fija el backend desde `req.ctx`)
+- Cursor pagination, filtros (`action`, `entity_type`, `entity_id`, `actor_user_id`, `from`/`to`), ventana máxima 90 días
+- Sanitización de `before`/`after` (allowlist) y metadata por rol (agencia sin `ip` / `user_agent`)
+- Tests: `audit.service`, `audit.controller`, `audit-cursor`, `audit-changes`
+
+---
+
+## Sprint 23 — F5-003 Audit Trail UI (2026-08-16)
+
+Consulta del audit trail en el centro de operaciones (no CRUD).
+
+[x] **F5-003 — Audit Trail UI**
+- Páginas `/admin/audit` y `/agency/audit`; sidebars con History; feed, filtros, accordion (una card abierta + scroll)
+- Clientes `adminApi.listAudit` / `agencyApi.listAudit`; componentes `AuditFeed` / `AuditEventCard` / `AuditDiff` / `AuditFilters`
+- **Gate UI temporal:** solo el SUPERADMIN `d865a719-df4b-4677-8f94-e9bd2d5f5664` ve `/admin/audit`; `/agency/audit` oculto para agencias. No sustituye autorización de la API (F5-002)
+- Tests: `tests/audit/*` (feed, card, filtros, gate, seguridad de clientes)
+- **Fuera de scope:** invitaciones/usuarios; correlation ID; retención/purge
+
+---
+
+## Sprint 24 — Reservas en viajes ya salidos (2026-08-16)
+
+Integridad: no crear reserva si `departure_time <= now()`, aunque `trips.status = 'active'`.
+
+[x] **Post-sprint — Bloquear reservas tras salida**
+- Migración `066_create_agency_reservation_departed.sql`: RPC `create_agency_reservation` → `ERR_TRIP_DEPARTED` (409 `ConflictError`)
+- Harness `supabase/tests/reserv_departure_time_verification.sql`
+- UX: `filterBookableTrips` / `isTripOpenForReservation` (wizard, CTA “Nueva Reserva”, pasajeros); badge **«Ya salió»** en viajes active+departed
+- Tests: `reservation.service` (mapeo 409), `reservation-wizard-bookable-trips.test.ts`
+
+---
+
+## Sprint 25 — Copy de notificaciones in-app (2026-08-16 / 2026-08-17)
+
+Presentación únicamente: `booker_name` y `origin` permanecen en dominio/metadata.
+
+[x] **Actor = agencia** (creación/cancelación de reserva)
+- Body tipo `"Agencia Central realizó una reserva"` vía lookup `agencies.name` (fanout + legacy)
+- Dedupe `source_event_id` si local `TRIP_EFFECTS_VIA_OUTBOX=false` y worker remoto `true`
+
+[x] **Ruta = solo destino** (bodies in-app)
+- Helper `notificationDestinationLabel()`; fanout, `reservation.service`, `trip.service`, `superadmin.service` (legacy)
+- Sin cambio en emails, boletos ni digests en este sprint
+
+---
+
+## Sprint 26 — Boleto: solo destino (2026-08-17)
+
+[x] **Post-sprint — Ticket UX destination-only**
+- Renderer UI `components/reservations/ReservationTicket.tsx`
+- PNG adjunto `backend/src/templates/ticket-png.tsx` y bloque visual `reservation-ticket-email.tsx`
+- `origin` intacto en tipos/DTOs/modelo; otras pantallas (`origin → destination`) sin tocar
+- Test: `tests/boarding/reservation-ticket-destination.test.tsx`
+
+---
+
+## Sprint 27 — Backup & Disaster Recovery MVP (2026-08-17)
+
+Copia externa diaria (RPO 24 h) independiente de Render/Supabase Storage-as-backup. Auth no está en el dump lógico.
+
+[x] **Backup & DR MVP**
+- Workflow `.github/workflows/backup.yml` (cron `03:00 UTC` = `23:00 America/Caracas` del día anterior + `workflow_dispatch`; `permissions: contents: read`)
+- Dump `roles.sql` + `schema.sql` + `data.sql` (`supabase db dump`); Storage bytes de todos los buckets; `age` (recipient offline + verify CI); SHA-256; R2 `nomadas-backups`
+- Scripts: `scripts/backup/{lib,database,storage,finalize,verify,retention,restore,test-local}.sh`
+- Docs: [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md), [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md)
+- Tests locales: `bash scripts/backup/test-local.sh` (12/12; sin red de producción)
+- **Ops:** cargar secrets de GitHub + bucket R2 + primer `workflow_dispatch`
+- **Pendiente por diseño:** restore drill manual trimestral (proyecto aislado)

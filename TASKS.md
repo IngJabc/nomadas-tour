@@ -1,27 +1,32 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
+> **Estado:** backlog disponible, **sin tarea activa**.
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
 
 ---
 
-## Completado recientemente — Fase 5
+## Completado recientemente — Fase 5 + post-sprint UX
 
 - [x] **F5-001** — Audit Trail (foundation) — **Implementado**
-  - Tabla append-only `public.audit_log` + `audit_append()` + RLS/grants
-  - 9 acciones: trip create/update/cancel, reservation create/cancel, boarding board/unboard, branding, notification prefs
-  - RPCs atómicos (`cancel_agency_reservation`, branding/prefs) + triggers trips/reservations; `trips.updated_by`
-  - Drop policies cliente `bl_agency_insert` / `reservations_agency_insert`
-  - Actor solo desde `req.ctx`; PII minimizado (whitelist)
-  - Migración `065_audit_log.sql` (tip; sin tocar 001–064)
-  - Harness `supabase/tests/f5_001_verification.sql` (BEGIN/ROLLBACK) — listo post-apply
   - Diseño: [`docs/F5-001-audit-trail-design.md`](docs/F5-001-audit-trail-design.md)
+- [x] **F5-002** — Audit Trail Read API — **Implementado**
+  - `GET /api/admin/audit` y `GET /api/agency/audit` (read-only, cursor, 90d, sanitización por rol)
+- [x] **F5-003** — Audit Trail UI — **Implementado**
+  - `/admin/audit`, `/agency/audit`; gate UI temporal (un SUPERADMIN; agencias ocultas)
+- [x] **Post-sprint** — Bloquear reservas si `departure_time <= now()` — **Implementado** (`066`, UX «Ya salió»)
+- [x] **Post-sprint** — Notificaciones: actor = nombre de agencia — **Implementado**
+- [x] **Post-sprint** — Notificaciones in-app: solo destino — **Implementado**
+- [x] **Post-sprint** — Boleto: solo destino — **Implementado** (`origin` conservado en modelo)
+- [x] **Infra / Ops** — Backup & Disaster Recovery MVP — **Implementado** (GitHub Actions → age → R2)
 
-**Ops pendientes (F5-001):** aplicar migración `065` en Supabase (si aún no) → ejecutar harness → confirmar PASS.
+Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–27). Runbook: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md).
 
-**Fuera de F5-001 (follow-ups):** read API / UI; invitaciones/usuarios; correlation ID; retención/purge; analytics/realtime audit.
+Migraciones `065` y `066` aplicadas en Supabase; harnesses PASS.
+
+**GitHub (backup) — secrets a cargar (nombres; sin valores):** `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_AGE_RECIPIENT`, `BACKUP_AGE_VERIFY_RECIPIENT`, `BACKUP_AGE_VERIFY_IDENTITY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Bucket R2 `nomadas-backups`. Primer PASS: `workflow_dispatch`. Restore drill: manual trimestral.
 
 ---
 
@@ -62,34 +67,25 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 | Orden | Ticket / Fase | Tema | Estado |
 |-------|---------------|------|--------|
-| — | **F5-001** | Audit Trail foundation | Implementado — ops apply/harness |
-| — | **F5-002+** / Fase 5 resto | Read API / UI audit; invitaciones/usuarios | Futura |
+| — | **F5 resto** | Invitaciones/usuarios en audit; correlation ID; retención/purge; quitar gate UI temporal | Futura |
 | — | Futuro / Fase 6 | Métricas históricas y reporting | Futura |
-| — | Infraestructura / Operaciones | Backup & Disaster Recovery | Futura |
+| — | Infraestructura / Operaciones | Restore drill trimestral (manual); copias offline extra de R2 | Futura |
 | — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` | Futura |
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
 | — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas en el design del ticket. | Futura |
-| — | **Post-sprint** | Notificaciones de reservas: agencia como actor visible (copy) | Futura |
-| — | **Post-sprint** | Boleto: mostrar solo destino (conservar `origin` en modelo) | Futura |
 | — | **Futura capacidad** | Reserva asistida por enlace (después de seleccionar asientos) | Futura |
-| — | **Post-sprint** | Bloquear nuevas reservas si `departure_time <= now()` | Futura |
+| — | **Futura capacidad** | Backup local de contingencia (cifrado, manual, fuera del scheduler) | Futura |
 
-### Post F5-003 (no activos — no mezclar con el sprint)
+### Futura capacidad — Reserva asistida por enlace
 
-Trabajo posterior documentado. **Ninguno es la tarea activa.** Detalle de producto: [`docs/ROADMAP.md`](docs/ROADMAP.md).
+Tras seleccionar viaje/asientos, opción: registrar datos ahora **o** enviar enlace seguro al reservante (completa datos; reserva sigue flujo normal). El wizard manual permanece. Diseño futuro debe cubrir: token no adivinable, expiración, seat locks, estado temporal, invalidación, campos permitidos al cliente, impedir cambiar viaje/asientos/precio, posible recuperación de progreso.
 
-1. **Post-sprint — Notificaciones de reservas (copy)**
-   Hoy el actor visible puede ser el reservante (`"José Bonilla realizó una reserva"`). Debe identificar a la **agencia** (`"Agencia Central realizó una reserva"`). Aplica a creación, cancelación y copies equivalentes. Cambio de presentación únicamente: no eliminar `booker_name` / `booker_document` ni otros datos de dominio; no cambiar backend ahora.
+### Futura capacidad — Backup local de contingencia
 
-2. **Post-sprint — Boleto: solo destino**
-   El boleto debe mostrar únicamente el destino. **No eliminar `origin`** del backend/modelo de rutas (soporte futuro multi-origen). Solo representación del boleto.
+Permitir ejecutar manualmente un backup cifrado de PostgreSQL + Storage y conservarlo localmente como última capa de contingencia independiente de GitHub Actions, Cloudflare R2 y Supabase.
 
-3. **Futura capacidad — Reserva asistida por enlace**
-   Tras seleccionar viaje/asientos, opción: registrar datos ahora **o** enviar enlace seguro al reservante (completa datos; reserva sigue flujo normal). El wizard manual permanece. Diseño futuro debe cubrir: token no adivinable, expiración, seat locks, estado temporal, invalidación, campos permitidos al cliente, impedir cambiar viaje/asientos/precio, posible recuperación de progreso.
-
-4. **Post-sprint — Reservas en viajes ya salidos**
-   Bug/fix de integridad: no permitir crear reserva si `departure_time <= now()`, aunque `trips.status = 'active'`. Regla: `departure_time > now()` obligatorio. Enforcement futuro en backend/RPC (no solo frontend), test de regresión, todos los caminos de creación.
+Restricciones: manual; encrypted (`age`); no reemplaza el backup automático; no forma parte del scheduler; no requiere sincronización continua; no almacenar secretos en el repo; no asumir que la PC del operador es infraestructura de producción.
 
 Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -97,7 +93,7 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Bloqueadores
 
-_Ninguno. F4-001…F4-004 CLOSED. F5-001 implementado en tip; sin bloqueadores de código. Ops: aplicar `065` + harness si aún no están en el entorno objetivo._
+_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup MVP en repo (falta cargar secrets + primer `workflow_dispatch`). Sin sprint activo._
 
 ---
 
@@ -110,4 +106,5 @@ _Ninguno. F4-001…F4-004 CLOSED. F5-001 implementado en tip; sin bloqueadores d
 - **Email occupancy_alerts** — requiere Resend comercial
 - **UI prefs `superadmin_digest`** — v1 es seed + gate de envío
 - **Dashboard superadmin de alertas activas** — v1 usa in-app existente
-- **UI / API de lectura del audit trail** — fuera de F5-001
+- **Quitar gate UI del audit trail** — cuando la UI deje de ser demasiado técnica
+- **Audit: invitaciones / correlation / retención** — fuera de F5-001…F5-003
