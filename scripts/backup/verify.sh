@@ -37,18 +37,8 @@ fi
 assert_nonempty_file "${WORK}/database.tar.gz.age" "downloaded database ciphertext"
 assert_nonempty_file "${WORK}/storage.tar.gz.age" "downloaded storage ciphertext"
 
-verify_sidecar() {
-  local f="$1"
-  local side="${f}.sha256"
-  [[ -f "$side" ]] || die "missing sha256 sidecar for $(basename "$f")"
-  local expected actual
-  expected="$(awk '{print $1}' "$side")"
-  actual="$(sha256_file "$f")"
-  [[ "$expected" == "$actual" ]] || die "SHA-256 mismatch for $(basename "$f")"
-}
-
-verify_sidecar "${WORK}/database.tar.gz.age"
-verify_sidecar "${WORK}/storage.tar.gz.age"
+verify_sha256_sidecar "${WORK}/database.tar.gz.age"
+verify_sha256_sidecar "${WORK}/storage.tar.gz.age"
 log "SHA-256 of downloaded ciphertexts matches sidecars"
 
 age_decrypt "${WORK}/database.tar.gz.age" "${WORK}/database.tar.gz"

@@ -24,6 +24,8 @@ GitHub Actions (03:00 UTC = 23:00 America/Caracas del día anterior)
 
 El backup **no depende** de API Render, worker ni frontend. Si la app está caída y Supabase + R2 responden, el job puede completar.
 
+**Copia local de contingencia (manual):** `scripts/backup/local.sh` descarga ciphertexts ya verificados en R2. No regenera dumps. No está en el cron. Tras la descarga, `local-verify.sh` y `local-restore.sh` no necesitan R2. Detalle: operations.
+
 El workflow es **solo lectura** respecto a producción: no corre migraciones, no hace UPDATE/DELETE, no despliega Render, no cambia settings de Supabase.
 
 ---
@@ -153,6 +155,16 @@ bash scripts/backup/restore.sh
 
 Opcional Storage hacia el proyecto aislado: `RESTORE_STORAGE=1` + `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` del **target**.
 
+Si R2 no está disponible y existe una copia local verificada:
+
+```bash
+CONFIRM_RESTORE=RESTORE \
+RESTORE_ISOLATED=yes \
+RESTORE_TARGET_DB_URL='postgres://…-isolated…' \
+BACKUP_AGE_IDENTITY_FILE=/path/to/master.age \
+bash scripts/backup/local-restore.sh '<id>' /mnt/c/Users/<usuario>/nomadas-backups
+```
+
 El script rechaza producción implícita. No imprime credenciales.
 
 Orden de referencia (CLI Supabase / restore-from-platform):
@@ -228,7 +240,7 @@ Smoke mínimo:
 
 ### R2 desaparece
 
-Los backups dejan de ser recuperables desde R2. El código y las migraciones siguen en Git. Mitigación: copiar periódicamente (fuera de este MVP) un ciphertext mensual offline. Recrear bucket `nomadas-backups` y secrets; el próximo job vuelve a generar copias **hacia adelante** (RPO: se perdió el historial en R2).
+Los backups dejan de ser recuperables **desde R2**. Mitigación: copia local de contingencia (`local.sh`) de un `backup_id` ya verificado — ciphertexts `age`, no regenerados. Recrear bucket `nomadas-backups` y secrets; el próximo job vuelve a generar copias **hacia adelante** (RPO: se perdió el historial en R2 salvo las copias locales que el operador haya bajado).
 
 ### GitHub Actions desaparece
 
@@ -256,7 +268,12 @@ Ver [`backend-deploy.md`](backend-deploy.md) y [`RECOVERY-CHECKLIST.md`](RECOVER
 | `scripts/backup/verify.sh` | Download + decrypt + checks (antes del manifest de éxito) |
 | `scripts/backup/finalize.sh` | Manifest de éxito + copias weekly/monthly (solo si verify PASS) |
 | `scripts/backup/retention.sh` | GFS (`--dry-run` / `--apply`) |
-| `scripts/backup/restore.sh` | Restore manual a target explícito |
+| `scripts/backup/restore.sh` | Restore manual a target explícito (fuente R2) |
+| `scripts/backup/local.sh` | Descarga manual de artefactos R2 a disco local (no regenera) |
+| `scripts/backup/local-list.sh` | Lista copias locales + estado de checksums |
+| `scripts/backup/local-verify.sh` | Verify offline (sin R2) |
+| `scripts/backup/local-restore.sh` | Restore desde filesystem local (mismos guards) |
+| `scripts/backup/local-retention.sh` | Retención GFS local, default dry-run, solo `--apply` borra |
 | `scripts/backup/test-local.sh` | Tests sin red de producción |
 
 Tests locales:

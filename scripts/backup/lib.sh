@@ -154,6 +154,13 @@ r2_cp_up() {
 r2_cp_down() {
   local key="$1"
   local dest="$2"
+  mkdir -p "$(dirname "$dest")"
+  if [[ -n "${BACKUP_R2_FIXTURE_DIR:-}" ]]; then
+    local src="${BACKUP_R2_FIXTURE_DIR}/${key}"
+    [[ -f "$src" ]] || die "R2 fixture missing: ${key}"
+    cp -p "$src" "$dest"
+    return 0
+  fi
   r2_env
   require_cmd aws
   aws s3 cp "s3://$(r2_bucket)/${key}" "$dest" \
@@ -331,4 +338,147 @@ tar_czf() {
   tar -czf "$archive" "$@"
   [[ -s "$archive" ]] || die "compression produced an empty archive: $archive"
   gzip -t "$archive" || die "gzip integrity check failed: $archive"
+}
+
+verify_sha256_sidecar() {
+  local f="$1"
+  local side="${f}.sha256"
+  [[ -f "$side" ]] || die "missing sha256 sidecar for $(basename "$f")"
+  local expected actual
+  expected="$(awk '{print $1}' "$side")"
+  actual="$(sha256_file "$f")"
+  [[ "$expected" == "$actual" ]] || die "SHA-256 mismatch for $(basename "$f")"
+}
+
+assert_age_ciphertext() {
+  local f="$1"
+  assert_nonempty_file "$f" "$(basename "$f")"
+  head -c 21 "$f" | grep -q 'age-encryption.org/v1' \
+    || die "not an age ciphertext: $(basename "$f")"
+}
+
+assert_manifest_for_backup() {
+  local f="$1"
+  local id="$2"
+  require_cmd jq
+  assert_nonempty_file "$f" "manifest.json"
+  jq -e . "$f" >/dev/null 2>&1 || die "manifest.json is not valid JSON"
+  local mid
+  mid="$(jq -r '.backup_id // empty' "$f")"
+  [[ "$mid" == "$id" ]] || die "manifest backup_id does not match requested backup"
+}
+
+local_daily_dir() {
+  local root="$1"
+  local id="$2"
+  printf '%s/daily/%s' "${root%/}" "$id"
+}
+
+assert_local_backup_artifacts() {
+  local dir="$1"
+  local f
+  for f in database.tar.gz.age database.tar.gz.age.sha256 \
+           storage.tar.gz.age storage.tar.gz.age.sha256 manifest.json; do
+    assert_nonempty_file "${dir}/${f}" "$f"
+  done
+}
+
+# Returns 0 if the five artifacts exist and both SHA-256 sidecars match.
+# Does not abort the caller on mismatch (unlike verify_sha256_sidecar).
+local_backup_checksums_ok() {
+  local dir="$1"
+  local f
+  for f in database.tar.gz.age database.tar.gz.age.sha256 \
+           storage.tar.gz.age storage.tar.gz.age.sha256 manifest.json; do
+    [[ -s "${dir}/${f}" ]] || return 1
+  done
+  ( verify_sha256_sidecar "${dir}/database.tar.gz.age" && verify_sha256_sidecar "${dir}/storage.tar.gz.age" ) \
+    >/dev/null 2>&1 || return 1
+  return 0
+}
+
+restore_require_guards() {
+  require_env RESTORE_TARGET_DB_URL
+  if [[ "${CONFIRM_RESTORE:-}" != "RESTORE" ]]; then
+    die "refusing to restore: set CONFIRM_RESTORE=RESTORE"
+  fi
+  if [[ "${RESTORE_ISOLATED:-}" != "yes" ]]; then
+    die "refusing to restore: set RESTORE_ISOLATED=yes (isolated target only)"
+  fi
+  if [[ -n "${PRODUCTION_DB_URL_MARKER:-}" ]]; then
+    case "${RESTORE_TARGET_DB_URL}" in
+      *"${PRODUCTION_DB_URL_MARKER}"*)
+        if [[ "${RESTORE_ALLOW_PRODUCTION:-}" != "I_UNDERSTAND" ]]; then
+          die "target URL looks like production; aborting"
+        fi
+        ;;
+    esac
+  fi
+}
+
+restore_apply_database() {
+  local dbdir="$1"
+  assert_roles_sql "${dbdir}/roles.sql"
+  assert_schema_sql "${dbdir}/schema.sql"
+  assert_data_sql_backup_contract "${dbdir}/data.sql"
+  if [[ "${RESTORE_DRY_RUN:-0}" == "1" ]]; then
+    log "RESTORE_DRY_RUN=1 — skipping psql apply"
+    return 0
+  fi
+  require_cmd psql
+  local -a PSQL
+  PSQL=(psql --single-transaction --variable ON_ERROR_STOP=1 --dbname "${RESTORE_TARGET_DB_URL}")
+  if [[ "${SKIP_ROLES:-0}" != "1" ]]; then
+    log "restoring roles.sql"
+    "${PSQL[@]}" --file "${dbdir}/roles.sql"
+  else
+    log "SKIP_ROLES=1 — skipping roles.sql"
+  fi
+  log "restoring schema.sql"
+  "${PSQL[@]}" --file "${dbdir}/schema.sql"
+  log "restoring data.sql"
+  "${PSQL[@]}" --file "${dbdir}/data.sql"
+  log "database restore statements applied"
+}
+
+restore_apply_storage() {
+  local treedir="$1"
+  [[ -d "$treedir" ]] || die "storage tree missing"
+  if [[ "${RESTORE_DRY_RUN:-0}" == "1" ]]; then
+    log "RESTORE_DRY_RUN=1 — skipping Storage upload"
+    return 0
+  fi
+  require_env SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
+  require_cmd python3 curl
+  python3 - "$treedir" <<'PY'
+import os, sys, urllib.parse, subprocess
+root = sys.argv[1]
+url = os.environ["SUPABASE_URL"].rstrip("/")
+key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+for dirpath, _, files in os.walk(root):
+    for name in files:
+        full = os.path.join(dirpath, name)
+        rel = os.path.relpath(full, root).replace("\\", "/")
+        bucket, _, path = rel.partition("/")
+        if not path:
+            continue
+        encoded = urllib.parse.quote(path, safe="/")
+        dest = f"{url}/storage/v1/object/{bucket}/{encoded}"
+        subprocess.check_call([
+            "curl", "-fsS", "-X", "POST", dest,
+            "-H", f"Authorization: Bearer {key}",
+            "-H", f"apikey: {key}",
+            "-H", "x-upsert: true",
+            "-F", f"file=@{full}",
+        ])
+        print(f"restored {bucket}/{path}", file=sys.stderr)
+PY
+  log "storage objects uploaded to target project"
+}
+
+restore_log_finished() {
+  log "restore finished. Auth user data and identities are restored from data.sql."
+  log "Users must re-login after restore. Old JWTs, sessions, and refresh tokens are not considered reusable."
+  log "External OAuth/SSO/SMTP/platform configuration requires manual reconfiguration."
+  log "Next: configure project, deploy API/worker, smoke tests (isolated). See docs/backup-disaster-recovery-runbook.md"
 }

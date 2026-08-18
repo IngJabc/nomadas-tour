@@ -44,25 +44,11 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   exit 0
 fi
 
-require_env BACKUP_ID RESTORE_TARGET_DB_URL
-
-if [[ "${CONFIRM_RESTORE:-}" != "RESTORE" ]]; then
-  die "refusing to restore: set CONFIRM_RESTORE=RESTORE"
-fi
-if [[ "${RESTORE_ISOLATED:-}" != "yes" ]]; then
-  die "refusing to restore: set RESTORE_ISOLATED=yes (isolated target only)"
-fi
-
-require_cmd tar gzip age aws psql jq
-
-if [[ -n "${PRODUCTION_DB_URL_MARKER:-}" ]]; then
-  case "${RESTORE_TARGET_DB_URL}" in
-    *"${PRODUCTION_DB_URL_MARKER}"*)
-      if [[ "${RESTORE_ALLOW_PRODUCTION:-}" != "I_UNDERSTAND" ]]; then
-        die "target URL looks like production; aborting"
-      fi
-      ;;
-  esac
+require_env BACKUP_ID
+restore_require_guards
+require_cmd tar gzip age jq
+if [[ "${BACKUP_R2_FIXTURE_DIR:-}" == "" ]]; then
+  require_cmd aws
 fi
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/nomadas-restore.XXXXXX")"
@@ -76,60 +62,15 @@ r2_cp_down "$DB_KEY" "${WORK}/database.tar.gz.age"
 age_decrypt "${WORK}/database.tar.gz.age" "${WORK}/database.tar.gz"
 mkdir -p "${WORK}/db"
 tar -xzf "${WORK}/database.tar.gz" -C "${WORK}/db"
-assert_roles_sql "${WORK}/db/roles.sql"
-assert_schema_sql "${WORK}/db/schema.sql"
-assert_data_sql_backup_contract "${WORK}/db/data.sql"
-
-PSQL=(psql --single-transaction --variable ON_ERROR_STOP=1 --dbname "${RESTORE_TARGET_DB_URL}")
-
-if [[ "${SKIP_ROLES:-0}" != "1" ]]; then
-  log "restoring roles.sql"
-  "${PSQL[@]}" --file "${WORK}/db/roles.sql"
-else
-  log "SKIP_ROLES=1 — skipping roles.sql"
-fi
-
-log "restoring schema.sql"
-"${PSQL[@]}" --file "${WORK}/db/schema.sql"
-log "restoring data.sql"
-"${PSQL[@]}" --file "${WORK}/db/data.sql"
-log "database restore statements applied"
+restore_apply_database "${WORK}/db"
 
 if [[ "${RESTORE_STORAGE:-0}" == "1" ]]; then
-  require_env SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY
   log "downloading storage ciphertext"
   r2_cp_down "$ST_KEY" "${WORK}/storage.tar.gz.age"
   age_decrypt "${WORK}/storage.tar.gz.age" "${WORK}/storage.tar.gz"
   mkdir -p "${WORK}/st"
   tar -xzf "${WORK}/storage.tar.gz" -C "${WORK}/st"
-  require_cmd python3 curl
-  python3 - "$WORK/st" <<'PY'
-import os, sys, urllib.parse, subprocess
-root = sys.argv[1]
-url = os.environ["SUPABASE_URL"].rstrip("/")
-key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-for dirpath, _, files in os.walk(root):
-    for name in files:
-        full = os.path.join(dirpath, name)
-        rel = os.path.relpath(full, root).replace("\\", "/")
-        bucket, _, path = rel.partition("/")
-        if not path:
-            continue
-        encoded = urllib.parse.quote(path, safe="/")
-        dest = f"{url}/storage/v1/object/{bucket}/{encoded}"
-        subprocess.check_call([
-            "curl", "-fsS", "-X", "POST", dest,
-            "-H", f"Authorization: Bearer {key}",
-            "-H", f"apikey: {key}",
-            "-H", "x-upsert: true",
-            "-F", f"file=@{full}",
-        ])
-        print(f"restored {bucket}/{path}", file=sys.stderr)
-PY
-  log "storage objects uploaded to target project"
+  restore_apply_storage "${WORK}/st"
 fi
 
-log "restore finished. Auth user data and identities are restored from data.sql."
-log "Users must re-login after restore. Old JWTs, sessions, and refresh tokens are not considered reusable."
-log "External OAuth/SSO/SMTP/platform configuration requires manual reconfiguration."
-log "Next: configure project, deploy API/worker, smoke tests (isolated). See docs/backup-disaster-recovery-runbook.md"
+restore_log_finished

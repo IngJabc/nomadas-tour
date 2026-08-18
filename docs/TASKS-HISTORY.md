@@ -645,3 +645,18 @@ Copia externa diaria (RPO 24 h) independiente de Render/Supabase Storage-as-back
 - **Pendiente por diseño (al cierre del sprint):** restore drill manual trimestral (proyecto aislado)
 
 **Corrección histórica (2026-08-18):** Previous documentation incorrectly stated that `auth.users` was excluded from logical backup. Audit confirmed that `--data-only` includes `auth.*` data. Restore drill on `20260818T002023Z-32084093832` verified email/password login, new JWT, and RLS. Current BDR contract explicitly includes core Auth data (`users`, `identities`, `mfa_factors`, `audit_log_entries`) and excludes transient/managed Auth tables (`flow_state`, `saml_relay_states`, `oauth_client_states`, `mfa_challenges`, `webauthn_challenges`, `instances`, `schema_migrations`). Users must re-login after restore; old JWTs/sessions are not reusable; OAuth/SSO/SMTP/WebAuthn remain platform configuration.
+
+---
+
+## Sprint 28 — Backup local de contingencia (2026-08-18)
+
+Copia **manual** de artefactos ya cifrados en R2. No regenera dumps. No re-cifra. No modifica el workflow automático.
+
+[x] **Backup local de contingencia**
+- Scripts: `scripts/backup/local.sh`, `local-list.sh`, `local-verify.sh`, `local-restore.sh`, `local-retention.sh`
+- Reutiliza `lib.sh` (`r2_cp_down`, SHA-256, `age_decrypt`, asserts SQL, helpers de restore)
+- Layout: `<LOCAL_DIR>/daily/<BACKUP_ID>/` (cinco artefactos; ciphertexts byte-identical a R2)
+- Verify/restore offline tras la descarga; retención local manual (`--apply`); sin cron
+- Tests: `bash scripts/backup/test-local.sh` (suite ampliada: download, checksum, manifest, age, offline verify, restore dry-run, retention)
+- Docs: operations, runbook, [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md), [`ROADMAP.md`](ROADMAP.md)
+- **No cambia:** `.github/workflows/backup.yml`, frecuencia, contrato Auth/dump/Storage, R2, keys `age`

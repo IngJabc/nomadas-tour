@@ -203,5 +203,172 @@ assert_fail "restore without RESTORE_ISOLATED" \
   env BACKUP_ID=test RESTORE_TARGET_DB_URL=postgres://x CONFIRM_RESTORE=RESTORE RESTORE_ISOLATED= \
     bash "${ROOT}/scripts/backup/restore.sh"
 
+# --- local contingency copy (R2 fixture, no network) ---
+LOCAL_ROOT="${TMP}/local-backups"
+FIXTURE_R2="${TMP}/r2-fixture"
+BID="19700101T120000Z-localcopy"
+export BACKUP_ID="$BID"
+export BACKUP_WORK_DIR="${TMP}/work-localcopy"
+rm -rf "${BACKUP_WORK_DIR}"
+mkdir -p "${BACKUP_WORK_DIR}/database" "${BACKUP_WORK_DIR}/storage/tree/agency-assets"
+printf 'ALTER ROLE postgres WITH LOGIN;\n' >"${BACKUP_WORK_DIR}/database/roles.sql"
+printf 'CREATE TABLE public.trips (id uuid);\n' >"${BACKUP_WORK_DIR}/database/schema.sql"
+write_valid_data_sql "${BACKUP_WORK_DIR}/database/data.sql"
+printf 'x' >"${BACKUP_WORK_DIR}/storage/tree/agency-assets/a.bin"
+bash "${ROOT}/scripts/backup/database.sh"
+bash "${ROOT}/scripts/backup/storage.sh"
+bash "${ROOT}/scripts/backup/finalize.sh"
+
+mkdir -p \
+  "${FIXTURE_R2}/production/database/daily/${BID}" \
+  "${FIXTURE_R2}/production/storage/daily/${BID}" \
+  "${FIXTURE_R2}/production/manifests/daily/${BID}"
+cp "${BACKUP_WORK_DIR}/database/database.tar.gz.age" \
+  "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age"
+cp "${BACKUP_WORK_DIR}/database/database.tar.gz.age.sha256" \
+  "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age.sha256"
+cp "${BACKUP_WORK_DIR}/storage/storage.tar.gz.age" \
+  "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age"
+cp "${BACKUP_WORK_DIR}/storage/storage.tar.gz.age.sha256" \
+  "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age.sha256"
+cp "${BACKUP_WORK_DIR}/manifest/manifest.json" \
+  "${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json"
+export BACKUP_R2_FIXTURE_DIR="${FIXTURE_R2}"
+DEST="$(local_daily_dir "$LOCAL_ROOT" "$BID")"
+
+assert_fail "local.sh missing BACKUP_ID" \
+  bash "${ROOT}/scripts/backup/local.sh"
+assert_fail "local.sh missing LOCAL_DIR" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID"
+assert_fail "local.sh missing R2 credentials" \
+  env -u BACKUP_R2_FIXTURE_DIR -u R2_ACCOUNT_ID -u R2_ACCESS_KEY_ID -u R2_SECRET_ACCESS_KEY \
+    bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+
+mv "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age" \
+  "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age.off"
+assert_fail "local.sh missing artifact" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+[[ ! -e "$DEST" ]]
+mv "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age.off" \
+  "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age"
+
+cp "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age.sha256" \
+  "${TMP}/database.tar.gz.age.sha256.good"
+echo "deadbeef  database.tar.gz.age" \
+  >"${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age.sha256"
+assert_fail "local.sh checksum mismatch" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+[[ ! -e "$DEST" ]]
+cp "${TMP}/database.tar.gz.age.sha256.good" \
+  "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age.sha256"
+
+jq '.backup_id="wrong-id"' "${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json" \
+  >"${TMP}/manifest.bad.json"
+cp "${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json" "${TMP}/manifest.good.json"
+cp "${TMP}/manifest.bad.json" "${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json"
+assert_fail "local.sh manifest backup_id mismatch" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+[[ ! -e "$DEST" ]]
+printf '{not-json' >"${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json"
+assert_fail "local.sh invalid manifest" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+[[ ! -e "$DEST" ]]
+cp "${TMP}/manifest.good.json" "${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json"
+
+cp "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age" "${TMP}/database.tar.gz.age.good"
+printf 'not-an-age-file' >"${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age"
+write_sha256_sidecar "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age" >/dev/null
+assert_fail "local.sh invalid age ciphertext" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+[[ ! -e "$DEST" ]]
+cp "${TMP}/database.tar.gz.age.good" \
+  "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age"
+write_sha256_sidecar "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age" >/dev/null
+
+PERM_ROOT="${TMP}/local-noperm"
+mkdir -p "$PERM_ROOT"
+chmod a-w "$PERM_ROOT"
+assert_fail "local.sh destination permissions" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$PERM_ROOT"
+chmod u+w "$PERM_ROOT"
+
+assert_ok "local.sh downloads fixture artifacts" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+
+assert_ok "local ciphertext byte-identical to R2 fixture (database)" \
+  cmp "${DEST}/database.tar.gz.age" \
+    "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age"
+assert_ok "local ciphertext byte-identical to R2 fixture (storage)" \
+  cmp "${DEST}/storage.tar.gz.age" \
+    "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age"
+assert_ok "local dest has no persistent plaintext archives" \
+  bash -c "[[ ! -e '${DEST}/database.tar.gz' && ! -e '${DEST}/storage.tar.gz' && ! -e '${DEST}/data.sql' ]]"
+assert_ok "temporary plaintext cleaned after local.sh" \
+  bash -c "! compgen -G '${TMPDIR:-/tmp}/nomadas-local-plain.*' >/dev/null"
+
+assert_fail "local.sh refuses existing destination" \
+  bash "${ROOT}/scripts/backup/local.sh" "$BID" "$LOCAL_ROOT"
+
+assert_ok "local-list.sh" bash "${ROOT}/scripts/backup/local-list.sh" "$LOCAL_ROOT"
+
+assert_ok "local-verify.sh offline (no R2)" \
+  env -u BACKUP_R2_FIXTURE_DIR -u R2_ACCOUNT_ID -u R2_ACCESS_KEY_ID -u R2_SECRET_ACCESS_KEY \
+    bash "${ROOT}/scripts/backup/local-verify.sh" "$BID" "$LOCAL_ROOT"
+
+assert_fail "local-restore without CONFIRM_RESTORE" \
+  env CONFIRM_RESTORE= RESTORE_ISOLATED=yes RESTORE_TARGET_DB_URL=postgres://x \
+    bash "${ROOT}/scripts/backup/local-restore.sh" "$BID" "$LOCAL_ROOT"
+
+assert_ok "local-restore dry-run from local copy" \
+  env CONFIRM_RESTORE=RESTORE RESTORE_ISOLATED=yes RESTORE_TARGET_DB_URL=postgres://x \
+      RESTORE_DRY_RUN=1 RESTORE_STORAGE=1 \
+    bash "${ROOT}/scripts/backup/local-restore.sh" "$BID" "$LOCAL_ROOT"
+
+# checksum mismatch
+echo "deadbeef  database.tar.gz.age" >"${DEST}/database.tar.gz.age.sha256"
+assert_fail "local-verify checksum mismatch" \
+  bash "${ROOT}/scripts/backup/local-verify.sh" "$BID" "$LOCAL_ROOT"
+# restore good sidecar from fixture
+cp "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age.sha256" \
+  "${DEST}/database.tar.gz.age.sha256"
+
+# invalid manifest backup_id
+jq '.backup_id="wrong-id"' "${DEST}/manifest.json" >"${DEST}/manifest.json.tmp"
+mv "${DEST}/manifest.json.tmp" "${DEST}/manifest.json"
+assert_fail "local-verify manifest backup_id mismatch" \
+  bash "${ROOT}/scripts/backup/local-verify.sh" "$BID" "$LOCAL_ROOT"
+cp "${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json" "${DEST}/manifest.json"
+
+# invalid JSON
+printf '{not-json' >"${DEST}/manifest.json"
+assert_fail "local-verify invalid manifest" \
+  bash "${ROOT}/scripts/backup/local-verify.sh" "$BID" "$LOCAL_ROOT"
+cp "${FIXTURE_R2}/production/manifests/daily/${BID}/manifest.json" "${DEST}/manifest.json"
+
+# invalid age ciphertext
+printf 'not-an-age-file' >"${DEST}/database.tar.gz.age"
+write_sha256_sidecar "${DEST}/database.tar.gz.age" >/dev/null
+assert_fail "local-verify invalid age ciphertext" \
+  bash "${ROOT}/scripts/backup/local-verify.sh" "$BID" "$LOCAL_ROOT"
+cp "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age" "${DEST}/database.tar.gz.age"
+cp "${FIXTURE_R2}/production/database/daily/${BID}/database.tar.gz.age.sha256" "${DEST}/database.tar.gz.age.sha256"
+
+# missing artifact
+rm -f "${DEST}/storage.tar.gz.age"
+assert_fail "local-verify missing artifact" \
+  bash "${ROOT}/scripts/backup/local-verify.sh" "$BID" "$LOCAL_ROOT"
+cp "${FIXTURE_R2}/production/storage/daily/${BID}/storage.tar.gz.age" "${DEST}/storage.tar.gz.age"
+
+# retention: extra older id + dry-run keeps all, apply keeps newest 1
+mkdir -p "${LOCAL_ROOT}/daily/19691231T000000Z-old"
+printf 'x' >"${LOCAL_ROOT}/daily/19691231T000000Z-old/placeholder"
+assert_ok "local-retention dry-run" \
+  bash "${ROOT}/scripts/backup/local-retention.sh" "$LOCAL_ROOT" --dry-run --keep-daily 1
+[[ -d "${LOCAL_ROOT}/daily/19691231T000000Z-old" ]]
+assert_ok "local-retention apply keep 1" \
+  bash "${ROOT}/scripts/backup/local-retention.sh" "$LOCAL_ROOT" --apply --keep-daily 1
+[[ ! -d "${LOCAL_ROOT}/daily/19691231T000000Z-old" ]]
+[[ -d "${LOCAL_ROOT}/daily/${BID}" ]]
+
 printf '\n%s passed, %s failed\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
