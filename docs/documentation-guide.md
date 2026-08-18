@@ -40,6 +40,7 @@ docs/
 ├── backend-deploy.md       → Build y deploy del backend
 ├── backup-disaster-recovery-operations.md → Instalación y operación del backup (R2, age, secrets, workflow)
 ├── backup-disaster-recovery-runbook.md    → Desastre, restore, cutover, RTO/RPO
+├── backup-local-contingency.md            → Tutorial operativo: copia local manual (R2 → disco → verify offline)
 ├── RECOVERY-CHECKLIST.md   → Checklist rápida de recuperación
 ├── decisions/              → Decisiones arquitectónicas aceptadas
 ├── archive/README.md       → Índice de documentación histórica no vigente
@@ -168,6 +169,6 @@ No duplicar el ROADMAP completo en el README.
 |-------|-----------|
 | `TASKS.md` | ROADMAP, TASKS-HISTORY, esta guía (opcional) |
 | `ROADMAP.md` | TASKS, TASKS-HISTORY, architecture |
-| Ops backup | `backup-disaster-recovery-operations.md` (cómo configurar) vs runbook (cómo recuperar) |
+| Ops backup | `backup-disaster-recovery-operations.md` (cómo configurar) vs runbook (cómo recuperar) vs `backup-local-contingency.md` (copia local manual) |
 | `AGENTS.md` | TASKS (checklist), ROADMAP (contexto) |
 | Nuevo doc en `docs/` | Añadir fila al mapa de §2 si es permanente |

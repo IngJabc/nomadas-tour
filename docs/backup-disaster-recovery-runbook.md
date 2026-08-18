@@ -24,7 +24,7 @@ GitHub Actions (03:00 UTC = 23:00 America/Caracas del día anterior)
 
 El backup **no depende** de API Render, worker ni frontend. Si la app está caída y Supabase + R2 responden, el job puede completar.
 
-**Copia local de contingencia (manual):** `scripts/backup/local.sh` descarga ciphertexts ya verificados en R2. No regenera dumps. No está en el cron. Tras la descarga, `local-verify.sh` y `local-restore.sh` no necesitan R2. Detalle: operations.
+**Copia local de contingencia (manual):** `scripts/backup/local.sh` descarga ciphertexts ya verificados en R2. Tutorial operativo: [`backup-local-contingency.md`](backup-local-contingency.md). Detalle técnico breve: [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md#local-contingency-backup).
 
 El workflow es **solo lectura** respecto a producción: no corre migraciones, no hace UPDATE/DELETE, no despliega Render, no cambia settings de Supabase.
 
