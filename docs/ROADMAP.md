@@ -318,7 +318,7 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 **Objetivo:** Proteger los datos del SaaS ante pérdida de base de datos, corrupción, eliminación accidental, incidentes de infraestructura, fallo catastrófico del proveedor y necesidad de restauración operativa.
 
-**MVP (en repo):** GitHub Actions diario (03:00 UTC = 23:00 America/Caracas del día anterior) → `roles.sql` + `schema.sql` + `data.sql` + bytes de Storage → `age` → Cloudflare R2 (`nomadas-backups`). RPO 24 h; RTO target 8 h; RTO estimado ~90 min (no es SLA). Auth **no** viene en el dump. Runbook: [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md).
+**MVP (en repo):** GitHub Actions diario (03:00 UTC = 23:00 America/Caracas del día anterior) → `roles.sql` + `schema.sql` + `data.sql` (incluye Auth core: `auth.users` / `auth.identities`; excluye Auth transitorio y Storage internals) + bytes de Storage → `age` → Cloudflare R2 (`nomadas-backups`). RPO 24 h; RTO target 8 h; RTO estimado ~90 min (no es SLA). Tras restore: re-login; JWTs viejos inválidos; OAuth/SSO/SMTP son config de plataforma. Operación: [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md). Emergencia: [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md).
 
 **Aún fuera del MVP:** PITR; restore drill automático; creación automática de proyectos Supabase; garantía de pérdida cero; backup local de contingencia.
 

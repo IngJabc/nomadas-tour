@@ -38,6 +38,9 @@ docs/
 ├── business-rules.md       → Reglas de negocio
 ├── permissions.md          → Permisos por rol
 ├── backend-deploy.md       → Build y deploy del backend
+├── backup-disaster-recovery-operations.md → Instalación y operación del backup (R2, age, secrets, workflow)
+├── backup-disaster-recovery-runbook.md    → Desastre, restore, cutover, RTO/RPO
+├── RECOVERY-CHECKLIST.md   → Checklist rápida de recuperación
 ├── decisions/              → Decisiones arquitectónicas aceptadas
 ├── archive/README.md       → Índice de documentación histórica no vigente
 ├── security-*.md           → Hardening (referencia cerrada)
@@ -165,5 +168,6 @@ No duplicar el ROADMAP completo en el README.
 |-------|-----------|
 | `TASKS.md` | ROADMAP, TASKS-HISTORY, esta guía (opcional) |
 | `ROADMAP.md` | TASKS, TASKS-HISTORY, architecture |
+| Ops backup | `backup-disaster-recovery-operations.md` (cómo configurar) vs runbook (cómo recuperar) |
 | `AGENTS.md` | TASKS (checklist), ROADMAP (contexto) |
 | Nuevo doc en `docs/` | Añadir fila al mapa de §2 si es permanente |

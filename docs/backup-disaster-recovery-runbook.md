@@ -1,10 +1,11 @@
 # Backup & Disaster Recovery — Runbook
 
-**Alcance:** capacidad MVP de backup lógico off-site. No es un SLA ni una garantía de pérdida cero.  
-**RPO:** 24 h. **RTO target:** 8 h. **RTO esperado actual:** ~90 min (estimación operativa, no un compromiso).  
+**Alcance:** capacidad MVP de backup lógico off-site. No es un SLA ni una garantía de pérdida cero.
+**RPO:** 24 h. **RTO target:** 8 h. **RTO esperado actual:** ~90 min (estimación operativa, no un compromiso).
 **Formulación correcta:** el sistema mantiene una copia externa diaria y un procedimiento para recuperar la plataforma, con una pérdida máxima **objetivo** de hasta 24 horas de datos.
 
-Ejecución operativa de sprint: [`TASKS.md`](../TASKS.md). Checklist de reconstrucción: [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md).
+**Operación (instalación, secrets, R2, age, workflow, drills paso a paso):** [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md).
+Ejecución de sprint: [`TASKS.md`](../TASKS.md). Checklist de reconstrucción: [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md).
 
 ---
 
@@ -15,7 +16,7 @@ GitHub Actions (03:00 UTC = 23:00 America/Caracas del día anterior)
       │
       ├── supabase db dump --role-only     → roles.sql
       ├── supabase db dump                 → schema.sql   (estructura; NO contiene filas)
-      ├── supabase db dump --data-only --use-copy → data.sql  (filas reales; excluye storage.buckets_vectors y storage.vector_indexes)
+      ├── supabase db dump --data-only --use-copy → data.sql  (filas reales + Auth core; excluye Storage internals y tablas Auth transitorias)
       ├── Storage API                      → bytes de todos los buckets
       ├── tar.gz + age (dos recipients) + SHA-256
       └── upload a Cloudflare R2 (bucket privado nomadas-backups)
@@ -36,11 +37,13 @@ El workflow es **solo lectura** respecto a producción: no corre migraciones, no
 | Filas reales (`data.sql` con `COPY`) | Sí — criterio de éxito |
 | Bytes de Storage (todos los buckets descubiertos) | Sí — archivo aparte (`storage.tar.gz.age`) |
 | Tablas internas Supabase Storage (`storage.buckets_vectors`, `storage.vector_indexes`) | **No** en `data.sql` — el dump las excluye con `-x`; no son datos de negocio |
-| `auth.users` / GoTrue / sesiones | **No.** El CLI excluye el schema `auth` del dump estándar |
+| Auth core (`auth.users`, `auth.identities`, `auth.mfa_factors`, `auth.audit_log_entries`) | **Sí** — `supabase db dump --data-only` incluye el schema `auth`; verify exige `COPY "auth"."users"` y `COPY "auth"."identities"` |
+| Auth sessions / refresh_tokens / mfa_amr_claims | Presentes en el dump por defecto; **no** se consideran reutilizables tras restore (JWT signing keys del proyecto nuevo) |
+| Auth transitorio (`flow_state`, `saml_relay_states`, `oauth_client_states`, `mfa_challenges`, `webauthn_challenges`, `instances`, `schema_migrations`) | **No** — excluidas con `-x` |
 | Schema `storage` (catálogo) | **No** en el dump lógico. Los bytes reales van en el archive de Storage |
 | PITR / clone administrado de Supabase | Distinto de este MVP; no se usa (plan Free) |
 
-No afirmar que Auth quedó recuperado porque existan `roles.sql` / `schema.sql` / `data.sql`.
+Los usuarios y hashes de contraseña **sí** se restauran desde `data.sql`. Eso **no** implica que JWTs viejos, sesiones, OAuth/SSO, SMTP o WebAuthn sigan válidos en el proyecto nuevo.
 
 El mecanismo administrado de Supabase (restore/clone de proyecto) es **otra** herramienta, no este dump. El MVP no lo automatiza.
 
@@ -128,11 +131,11 @@ El job **falla** si dump, Storage, compresión, cifrado, checksum, upload o veri
 
 Verify **no** se da por bueno con un `aws s3 cp` en código 0. Hace:
 
-1. Download desde R2  
-2. Comparar SHA-256  
-3. Decrypt (identity de verificación)  
-4. `gzip -t` + extraer  
-5. Comprobar `roles.sql` / `schema.sql` / `data.sql` (este último **debe** contener `COPY` o `INSERT` de tablas de negocio y **no** debe contener `COPY storage.buckets_vectors` ni `COPY storage.vector_indexes`)
+1. Download desde R2
+2. Comparar SHA-256
+3. Decrypt (identity de verificación)
+4. `gzip -t` + extraer
+5. Comprobar `roles.sql` / `schema.sql` / `data.sql` (negocio con `COPY`/`INSERT`; **debe** contener `COPY "auth"."users"` y `COPY "auth"."identities"`; **no** debe contener tablas Storage internas ni Auth transitorio)
 
 ---
 
@@ -154,40 +157,47 @@ El script rechaza producción implícita. No imprime credenciales.
 
 Orden de referencia (CLI Supabase / restore-from-platform):
 
-1. Download → decrypt → decompress  
-2. `roles.sql` → `schema.sql` → `data.sql`  
-3. Restore Storage (bytes)  
-4. **Reconfigurar Auth** (usuarios, providers, URLs, JWT) — no viene en el dump  
-5. Configurar proyecto (env, DNS, Render)  
-6. Deploy app + worker  
-7. Smoke tests  
+1. Download → decrypt → decompress
+2. `roles.sql` → `schema.sql` → `data.sql` (incluye Auth users/identities)
+3. Restore Storage (bytes)
+4. **Reconfigurar plataforma Auth** (OAuth/SSO, SMTP, Site URL, Redirect URLs). Usuarios **re-login**; JWTs viejos inválidos
+5. Configurar proyecto (env, DNS, Render)
+6. Deploy app + worker
+7. Smoke tests (login con password original, JWT/RLS)
 
 No se automatiza la creación de un proyecto Supabase nuevo.
 
-### Auth (limitación)
+### Auth (contrato)
 
-Tras un desastre hay que crear/vincular un proyecto Auth nuevo o reconstruir usuarios (invitaciones, passwords). El dump lógico **no** es un backup de `auth.users`. Documentar en el drill qué cuentas se re-crearon.
+`data.sql` restaura `auth.users` e `auth.identities` (y MFA factors / audit log si existen). Drill verificado: login email/password, access token nuevo, JWT aceptado por PostgREST, RLS sobre `public.users` / reservations / trips.
+
+Tras el restore:
+
+- Los usuarios **deben volver a iniciar sesión** (el proyecto nuevo tiene signing keys distintas).
+- JWTs, sessions y refresh tokens **antiguos no se consideran reutilizables**.
+- OAuth/SSO externo, SMTP, Site URL y Redirect URLs son configuración de plataforma: reconfiguración manual.
+- WebAuthn/Passkeys: re-registro (el RP ID cambia por proyecto).
 
 ---
 
 ## Restore drill (MVP)
 
-**Manual, trimestral.** No hay `restore-drill.sh`.
+**Manual, trimestral.** No hay `restore-drill.sh`. Procedimiento completo (proyecto aislado, `psql`, Storage, validación de filas): [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md).
 
 Demostrar en un **proyecto aislado**:
 
 ```text
-backup real → DB con filas reales → Storage recuperado
-→ Auth/reconfiguración → API → Worker → smoke tests → PASS
+backup real → DB + Auth users/identities → Storage recuperado
+→ re-login + reconfig plataforma Auth → API → Worker → smoke tests → PASS
 ```
 
 Guardar evidencia bajo `restore-drills/` en R2 (notas, timestamps, IDs). No borrar producción.
 
 Smoke mínimo:
 
-- DB: conexión, tablas/funciones/triggers/RLS, conteos críticos, versión de migración si aplica  
-- App: `/health`, worker `/healthz`, login, listar trips/reservations, una reserva de prueba **solo en aislado**, audit trail  
-- Storage: al menos un objeto real accesible  
+- DB: conexión, tablas/funciones/triggers/RLS, conteos críticos, versión de migración si aplica
+- App: `/health`, worker `/healthz`, login, listar trips/reservations, una reserva de prueba **solo en aislado**, audit trail
+- Storage: al menos un objeto real accesible
 
 ---
 
@@ -209,11 +219,11 @@ Smoke mínimo:
 
 ### Supabase desaparece
 
-1. Crear proyecto nuevo (manual).  
-2. Restore DB + Storage desde R2 (`restore.sh`).  
-3. Reconfigurar Auth y URLs.  
-4. Apuntar Render (`DATABASE_URL` / keys) al proyecto nuevo.  
-5. Deploy + smoke.  
+1. Crear proyecto nuevo (manual).
+2. Restore DB + Storage desde R2 (`restore.sh`). Auth users/identities vienen en `data.sql`.
+3. Reconfigurar OAuth/SSO, SMTP, Site URL, Redirect URLs; usuarios re-login.
+4. Apuntar Render (`DATABASE_URL` / keys) al proyecto nuevo.
+5. Deploy + smoke.
 6. DNS si aplica.
 
 ### R2 desaparece
@@ -226,9 +236,9 @@ Correr los scripts en un runner local con las mismas env vars. El código de bac
 
 ### Compromiso de credenciales
 
-1. Rotar `SUPABASE_DB_URL` password / service role / R2 tokens.  
-2. Si se filtró `BACKUP_AGE_VERIFY_IDENTITY`: rotar el par de verificación (los backups viejos siguen descifrables con el master offline).  
-3. Si se filtró el **master** `BACKUP_AGE_SECRET_KEY`: tratar backups existentes como comprometidos; generar nuevo par; re-cifrar no es automático — el atacante puede leer copias antiguas.  
+1. Rotar `SUPABASE_DB_URL` password / service role / R2 tokens.
+2. Si se filtró `BACKUP_AGE_VERIFY_IDENTITY`: rotar el par de verificación (los backups viejos siguen descifrables con el master offline).
+3. Si se filtró el **master** `BACKUP_AGE_SECRET_KEY`: tratar backups existentes como comprometidos; generar nuevo par; re-cifrar no es automático — el atacante puede leer copias antiguas.
 4. No commitear keys. Revisar logs de Actions (no deberían imprimir secretos).
 
 ### Render hay que reconstruirlo

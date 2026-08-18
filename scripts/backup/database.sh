@@ -43,7 +43,7 @@ else
   supabase db dump --db-url "${SUPABASE_DB_URL}" --role-only -f "${DB_DIR}/roles.sql"
   log "dumping schema (structure only — no rows)"
   supabase db dump --db-url "${SUPABASE_DB_URL}" -f "${DB_DIR}/schema.sql"
-  log "dumping data (COPY statements; real rows; excludes Supabase Storage internals)"
+  log "dumping data (COPY rows including core Auth; excludes Storage internals + transient Auth)"
   dump_data_args=(
     --db-url "${SUPABASE_DB_URL}"
     --data-only
@@ -58,8 +58,12 @@ fi
 
 assert_roles_sql "${DB_DIR}/roles.sql"
 assert_schema_sql "${DB_DIR}/schema.sql"
-assert_data_sql_has_rows "${DB_DIR}/data.sql"
-assert_data_sql_excludes_internal_storage "${DB_DIR}/data.sql"
+assert_data_sql_backup_contract "${DB_DIR}/data.sql"
+
+AUTH_USERS="$(auth_table_count users "${DB_DIR}/data.sql")"
+AUTH_IDENTITIES="$(auth_table_count identities "${DB_DIR}/data.sql")"
+AUTH_MFA_FACTORS="$(auth_table_count mfa_factors "${DB_DIR}/data.sql")"
+log "auth counts users=${AUTH_USERS} identities=${AUTH_IDENTITIES} mfa_factors=${AUTH_MFA_FACTORS}"
 
 log "packaging database artifacts"
 (
@@ -93,7 +97,12 @@ cat >"${MANIFEST_DIR}/database.json" <<EOF
   "sha256": $(printf '%s' "$DB_SHA" | jq -Rs .),
   "bytes": $(wc -c <"${DB_DIR}/database.tar.gz.age" | tr -d ' '),
   "artifacts": ["roles.sql", "schema.sql", "data.sql"],
-  "auth_included": false,
+  "auth_included": true,
+  "auth": {
+    "users": ${AUTH_USERS},
+    "identities": ${AUTH_IDENTITIES},
+    "mfa_factors": ${AUTH_MFA_FACTORS}
+  },
   "storage_schema_included": false,
   "repo_latest_migration": $(printf '%s' "$(latest_repo_migration)" | jq -Rs .)
 }

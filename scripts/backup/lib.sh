@@ -7,9 +7,27 @@ set -euo pipefail
 BACKUP_LOG_PREFIX="${BACKUP_LOG_PREFIX:-backup}"
 
 # Supabase Storage internals — excluded from logical data dump (object bytes live in storage.sh).
-BACKUP_DATA_EXCLUDE_TABLES=(
+BACKUP_DATA_EXCLUDE_STORAGE_TABLES=(
   storage.buckets_vectors
   storage.vector_indexes
+)
+
+# Transient / platform-managed Auth tables — excluded from data dump.
+# Core Auth (users, identities, mfa_factors, audit_log_entries) is kept.
+# sessions / refresh_tokens / mfa_amr_claims are kept by default (not treated as reusable after restore).
+BACKUP_DATA_EXCLUDE_AUTH_TABLES=(
+  auth.flow_state
+  auth.saml_relay_states
+  auth.oauth_client_states
+  auth.mfa_challenges
+  auth.webauthn_challenges
+  auth.instances
+  auth.schema_migrations
+)
+
+BACKUP_DATA_EXCLUDE_TABLES=(
+  "${BACKUP_DATA_EXCLUDE_STORAGE_TABLES[@]}"
+  "${BACKUP_DATA_EXCLUDE_AUTH_TABLES[@]}"
 )
 
 log() {
@@ -189,6 +207,57 @@ latest_repo_migration() {
   fi
 }
 
+# pg_dump may emit COPY schema.table or COPY "schema"."table".
+data_sql_has_copy_table() {
+  local f="$1"
+  local schema="$2"
+  local table="$3"
+  grep -Eq "^COPY ${schema}\\.${table} |^COPY \"${schema}\"\\.\"${table}\" " "$f"
+}
+
+# Count COPY tuples only (never prints row payloads).
+count_copy_rows() {
+  local f="$1"
+  local schema="$2"
+  local table="$3"
+  awk -v schema="$schema" -v table="$table" '
+    BEGIN { inblk = 0; n = 0 }
+    $0 ~ "^COPY " schema "[.]" table " " { inblk = 1; next }
+    $0 ~ "^COPY \"" schema "\"[.]\"" table "\" " { inblk = 1; next }
+    inblk && ($0 == "\\." || $0 == "\\.\r") { print n; found = 1; exit }
+    inblk { n++ }
+    END { if (!found) print 0 }
+  ' "$f"
+}
+
+# Read-only Auth counts. Prefers a live SELECT when psql + SUPABASE_DB_URL exist;
+# otherwise counts COPY tuples in data.sql (the production dump snapshot).
+# Whitelisted table names only. Prints a single integer. Never logs row data.
+auth_table_count() {
+  local table="$1"
+  local data_sql="${2:-}"
+  local from_db=""
+  case "$table" in
+    users|identities|mfa_factors) ;;
+    *) die "refusing unknown auth table count" ;;
+  esac
+  if [[ "${BACKUP_SKIP_DUMP:-0}" != "1" && -n "${SUPABASE_DB_URL:-}" ]] \
+    && command -v psql >/dev/null 2>&1; then
+    from_db="$(
+      psql --no-psqlrc --quiet --tuples-only --no-align \
+        --dbname "${SUPABASE_DB_URL}" \
+        --command "SELECT count(*)::bigint FROM auth.${table};" 2>/dev/null \
+        | tr -d '[:space:]' || true
+    )"
+  fi
+  if [[ "$from_db" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$from_db"
+    return 0
+  fi
+  [[ -n "$data_sql" && -f "$data_sql" ]] || die "cannot count auth.${table}: no dump and no live query"
+  count_copy_rows "$data_sql" auth "$table"
+}
+
 assert_data_sql_has_rows() {
   local f="$1"
   assert_nonempty_file "$f" "data.sql"
@@ -197,16 +266,49 @@ assert_data_sql_has_rows() {
   fi
 }
 
+assert_data_sql_has_auth_users() {
+  local f="$1"
+  data_sql_has_copy_table "$f" auth users \
+    || die "data.sql missing COPY auth.users — Auth users are required"
+}
+
+assert_data_sql_has_auth_identities() {
+  local f="$1"
+  data_sql_has_copy_table "$f" auth identities \
+    || die "data.sql missing COPY auth.identities — Auth identities are required"
+}
+
 assert_data_sql_excludes_internal_storage() {
   local f="$1"
   local t schema table
-  for t in "${BACKUP_DATA_EXCLUDE_TABLES[@]}"; do
+  for t in "${BACKUP_DATA_EXCLUDE_STORAGE_TABLES[@]}"; do
     schema="${t%%.*}"
     table="${t#*.}"
-    if grep -Eq "^COPY ${schema}\\.${table} |^COPY \"${schema}\"\\.\"${table}\" " "$f"; then
+    if data_sql_has_copy_table "$f" "$schema" "$table"; then
       die "data.sql must not COPY ${t} — restore uses storage.tar.gz.age for object bytes"
     fi
   done
+}
+
+assert_data_sql_excludes_transient_auth() {
+  local f="$1"
+  local t schema table
+  for t in "${BACKUP_DATA_EXCLUDE_AUTH_TABLES[@]}"; do
+    schema="${t%%.*}"
+    table="${t#*.}"
+    if data_sql_has_copy_table "$f" "$schema" "$table"; then
+      die "data.sql must not COPY ${t} — transient/managed Auth table"
+    fi
+  done
+}
+
+assert_data_sql_backup_contract() {
+  local f="$1"
+  assert_data_sql_has_rows "$f"
+  assert_data_sql_has_auth_users "$f"
+  assert_data_sql_has_auth_identities "$f"
+  assert_data_sql_excludes_transient_auth "$f"
+  assert_data_sql_excludes_internal_storage "$f"
 }
 
 assert_schema_sql() {
