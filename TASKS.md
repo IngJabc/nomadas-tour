@@ -21,12 +21,13 @@
 - [x] **Post-sprint** — Notificaciones in-app: solo destino — **Implementado**
 - [x] **Post-sprint** — Boleto: solo destino — **Implementado** (`origin` conservado en modelo)
 - [x] **Infra / Ops** — Backup & Disaster Recovery MVP — **Implementado** (GitHub Actions → age → R2)
+- [x] **Infra / Ops** — Backup local de contingencia — **Implementado** (copia manual cifrada de artefactos R2; no scheduler)
 
 Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–27). Operación: [`docs/backup-disaster-recovery-operations.md`](docs/backup-disaster-recovery-operations.md). Emergencia: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md).
 
 Migraciones `065` y `066` aplicadas en Supabase; harnesses PASS.
 
-**GitHub (backup):** 9 secrets cargados; bucket R2 `nomadas-backups` privado; primer `workflow_dispatch` PASS; exclusiones `storage.buckets_vectors` / `storage.vector_indexes` en `data.sql`. Restore drill trimestral **pendiente** (no reutilizar backup `20260817T233641Z-32081141864`). Nombres de secrets: ver operations.
+**GitHub (backup):** 9 secrets cargados; bucket R2 `nomadas-backups` privado; primer `workflow_dispatch` PASS; exclusiones `storage.buckets_vectors` / `storage.vector_indexes` en `data.sql`. Copia local de contingencia: `scripts/backup/local.sh` (manual). Restore drill trimestral **pendiente** (no reutilizar backup `20260817T233641Z-32081141864`). Nombres de secrets: ver operations.
 
 ---
 
@@ -69,23 +70,16 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 |-------|---------------|------|--------|
 | — | **F5 resto** | Invitaciones/usuarios en audit; correlation ID; retención/purge; quitar gate UI temporal | Futura |
 | — | Futuro / Fase 6 | Métricas históricas y reporting | Futura |
-| — | Infraestructura / Operaciones | Restore drill trimestral (manual); copias offline extra de R2 | Futura |
+| — | Infraestructura / Operaciones | Restore drill trimestral (manual) | Futura |
 | — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` | Futura |
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
 | — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas en el design del ticket. | Futura |
 | — | **Futura capacidad** | Reserva asistida por enlace (después de seleccionar asientos) | Futura |
-| — | **Futura capacidad** | Backup local de contingencia (cifrado, manual, fuera del scheduler) | Futura |
 
 ### Futura capacidad — Reserva asistida por enlace
 
 Tras seleccionar viaje/asientos, opción: registrar datos ahora **o** enviar enlace seguro al reservante (completa datos; reserva sigue flujo normal). El wizard manual permanece. Diseño futuro debe cubrir: token no adivinable, expiración, seat locks, estado temporal, invalidación, campos permitidos al cliente, impedir cambiar viaje/asientos/precio, posible recuperación de progreso.
-
-### Futura capacidad — Backup local de contingencia
-
-Permitir ejecutar manualmente un backup cifrado de PostgreSQL + Storage y conservarlo localmente como última capa de contingencia independiente de GitHub Actions, Cloudflare R2 y Supabase.
-
-Restricciones: manual; encrypted (`age`); no reemplaza el backup automático; no forma parte del scheduler; no requiere sincronización continua; no almacenar secretos en el repo; no asumir que la PC del operador es infraestructura de producción.
 
 Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -93,7 +87,7 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Bloqueadores
 
-_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup MVP operativo en GitHub Actions (restore drill trimestral pendiente). Sin sprint activo._
+_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup MVP operativo en GitHub Actions. Backup local de contingencia implementado (manual). Restore drill trimestral pendiente. Sin sprint activo._
 
 ---
 

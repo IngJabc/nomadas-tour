@@ -98,7 +98,7 @@ FASE 4 — Automatizaciones (producto)
 FASE Infraestructura / Operaciones
   Backup & Disaster Recovery MVP         ✅
   Restore drill trimestral               → futura (manual)
-  Backup local de contingencia           → futura capacidad
+  Backup local de contingencia           ✅
 
 FASE 5 — Audit Trail
   F5-001  Audit trail foundation         ✅
@@ -314,13 +314,15 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 ### Fase Infraestructura / Operaciones
 
-**Prioridad:** MVP de backup implementado. Restore drill trimestral y backup local de contingencia siguen futuras.
+**Prioridad:** MVP de backup implementado. Copia local de contingencia implementada (manual). Restore drill trimestral sigue futura.
 
 **Objetivo:** Proteger los datos del SaaS ante pérdida de base de datos, corrupción, eliminación accidental, incidentes de infraestructura, fallo catastrófico del proveedor y necesidad de restauración operativa.
 
 **MVP (en repo):** GitHub Actions diario (03:00 UTC = 23:00 America/Caracas del día anterior) → `roles.sql` + `schema.sql` + `data.sql` (incluye Auth core: `auth.users` / `auth.identities`; excluye Auth transitorio y Storage internals) + bytes de Storage → `age` → Cloudflare R2 (`nomadas-backups`). RPO 24 h; RTO target 8 h; RTO estimado ~90 min (no es SLA). Tras restore: re-login; JWTs viejos inválidos; OAuth/SSO/SMTP son config de plataforma. Operación: [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md). Emergencia: [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md).
 
-**Aún fuera del MVP:** PITR; restore drill automático; creación automática de proyectos Supabase; garantía de pérdida cero; backup local de contingencia.
+**Copia local (manual):** `scripts/backup/local.sh` descarga artefactos **ya** cifrados en R2 (copy, don't regenerate). Offline verify/restore después de la descarga. Fuera del scheduler. No trata la PC como producción.
+
+**Aún fuera del MVP:** PITR; restore drill automático; creación automática de proyectos Supabase; garantía de pérdida cero.
 
 **Roles de almacenamiento:** R2 = backup automático principal. Backup local = contingencia manual (fuera del scheduler).
 
@@ -449,15 +451,6 @@ Las fases iniciales del producto (backend, reservas, abordaje, dashboards, legac
 ### Futura capacidad — Reserva asistida por enlace
 
 Después de seleccionar asientos, permitir opcionalmente que la agencia genere un enlace seguro para que el reservante complete los datos (alternativa al wizard manual, que permanece). El diseño futuro deberá resolver token seguro y no adivinable, expiración, relación con seat locks, estado temporal, invalidación al confirmar/cancelar/expirar, campos permitidos al cliente, impedir cambiar viaje/asientos/precio y posible recuperación de progreso.
-
-### Futura capacidad — Backup local de contingencia
-
-Copia local **manual y cifrada** (`age`) del backup como último recurso, independiente de GitHub Actions, Cloudflare R2 y Supabase. Debe compartir el formato del MVP y permanecer **fuera del flujo automático**.
-
-- **R2** = backup automático principal
-- **Backup local** = contingencia manual
-
-No es scheduler, no sustituye R2 y no trata la PC del operador como infraestructura de producción.
 
 ---
 

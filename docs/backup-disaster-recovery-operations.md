@@ -56,7 +56,7 @@ Este documento **no contiene secretos**. Donde hace falta un valor, usa placehol
 22. [Real incidents / lessons learned](#real-incidents--lessons-learned)
 23. [Git / branch workflow](#git--branch-workflow)
 24. [First production backups](#first-production-backups)
-25. [Future local backup](#future-local-backup-not-implemented)
+25. [Local contingency backup](#local-contingency-backup)
 26. [Key rotation](#key-rotation)
 27. [Do not do](#do-not-do)
 28. [Quick reference](#quick-reference)
@@ -198,7 +198,11 @@ backup.yml                          # orquestador CI (cron + dispatch)
    └── retention.sh --apply         # 14 daily / 4 weekly / 2 monthly
          └── lib.sh
 
-restore.sh                          # MANUAL. No forma parte del backup diario.
+restore.sh                          # MANUAL. No forma parte del backup diario. Fuente = R2.
+      └── lib.sh
+
+local.sh / local-list.sh / local-verify.sh / local-restore.sh / local-retention.sh
+                                    # MANUAL. Copia de contingencia. No cron. No CI.
       └── lib.sh
 
 test-local.sh                       # LOCAL. No toca producción ni R2.
@@ -220,7 +224,7 @@ checkout
 → cleanup
 ```
 
-`restore.sh` nunca corre en el cron. `test-local.sh` nunca corre en CI.
+`restore.sh` nunca corre en el cron. Los scripts `local*.sh` nunca corren en el cron ni en GitHub Actions. `test-local.sh` nunca corre en CI.
 
 Cada script operativo hace:
 
@@ -240,11 +244,13 @@ source "${SCRIPT_DIR}/lib.sh"
 |------|-----------|
 | Logging / errors | `log`, `die` |
 | Env / commands | `require_cmd`, `require_env`, `redact` |
-| SHA-256 | `sha256_file`, `write_sha256_sidecar` |
-| age | `age_encrypt` (dos recipients), `age_decrypt` |
-| R2 | `r2_endpoint`, `r2_env`, `r2_bucket`, `r2_cp_up`, `r2_cp_down`, `r2_cp_copy`, `r2_ls`, `r2_rm` |
+| SHA-256 | `sha256_file`, `write_sha256_sidecar`, `verify_sha256_sidecar` |
+| age | `age_encrypt` (dos recipients), `age_decrypt`, `assert_age_ciphertext` |
+| R2 | `r2_endpoint`, `r2_env`, `r2_bucket`, `r2_cp_up`, `r2_cp_down`, `r2_cp_copy`, `r2_ls`, `r2_rm` (`r2_cp_down` honra `BACKUP_R2_FIXTURE_DIR` en tests) |
 | IDs | `utc_now`, `new_backup_id`, `latest_repo_migration` |
-| SQL validation | `assert_nonempty_file`, `assert_data_sql_has_rows`, `assert_data_sql_excludes_internal_storage`, `assert_schema_sql`, `assert_roles_sql` |
+| SQL validation | `assert_nonempty_file`, `assert_data_sql_has_rows`, `assert_data_sql_excludes_internal_storage`, `assert_schema_sql`, `assert_roles_sql`, `assert_data_sql_backup_contract` |
+| Manifest / local | `assert_manifest_for_backup`, `local_daily_dir`, `assert_local_backup_artifacts`, `local_backup_checksums_ok` |
+| Restore | `restore_require_guards`, `restore_apply_database`, `restore_apply_storage`, `restore_log_finished` |
 | Archive | `tar_czf` |
 
 **Exclusiones de data dump** (`BACKUP_DATA_EXCLUDE_TABLES`):
@@ -490,9 +496,60 @@ Opcional: `SKIP_ROLES=1` si `roles.sql` no es aplicable en el proyecto nuevo (`s
 - No usar este script de forma casual.
 - El operador debe saber **exactamente** qué `<NEW_DB_URL>` está usando (`psql ... -c '\conninfo'`).
 
-El script descarga desde R2, descifra con la identity disponible (master o verify), extrae y aplica `roles.sql` → `schema.sql` → `data.sql` con `psql --single-transaction --variable ON_ERROR_STOP=1`. Auth users/identities viajan en `data.sql`.
+El script descarga desde R2, descifra con la identity disponible (master o verify), extrae y aplica `roles.sql` → `schema.sql` → `data.sql` con `psql --single-transaction --variable ON_ERROR_STOP=1`. Auth users/identities viajan en `data.sql`. Para restore desde una copia local ya descargada (sin R2), usar `local-restore.sh` (mismos guards y mismo apply).
 
 **`SET session_replication_role = replica`:** no se añade en `restore.sh`. `supabase db dump --data-only` ya emite ese `SET` **dentro** de `data.sql`. El `--command` extra del drill manual es redundante para esos dumps. Los 7 usuarios de Auth aparecieron por `COPY "auth"."users"` / `COPY "auth"."identities"`, no por ese `SET` adicional. Si `roles.sql` falla por roles administrados de Supabase, no editar el dump: usar `SKIP_ROLES=1` o omitir `--file roles.sql`.
+
+---
+
+## `scripts/backup/local.sh`
+
+**Tipo:** contingencia **manual**. Copy, don't regenerate.
+
+Descarga los **cinco** artefactos ya producidos en R2 (`production/.../daily/<BACKUP_ID>/`) a:
+
+```text
+<LOCAL_DIR>/daily/<BACKUP_ID>/
+  database.tar.gz.age
+  database.tar.gz.age.sha256
+  storage.tar.gz.age
+  storage.tar.gz.age.sha256
+  manifest.json
+```
+
+No corre `pg_dump`, no llama Storage API, no re-cifra. Los ciphertexts locales son byte-identical a R2. Valida SHA-256, JSON del manifest, `backup_id`, header `age`, y un decrypt temporal (`gzip -t`) que se borra con `trap`. Si algo falla, no deja un directorio de destino aparentemente usable (staging + `mv` al final).
+
+```bash
+bash scripts/backup/local.sh <BACKUP_ID> /mnt/c/Users/<usuario>/nomadas-backups
+```
+
+El operador elige `<LOCAL_DIR>`. No hardcodear rutas de usuario. Requiere `aws`/`age`/`jq` y credenciales R2 (salvo tests con `BACKUP_R2_FIXTURE_DIR`). Identity `age` para el check criptográfico: las mismas variables que `lib.sh` (`BACKUP_AGE_IDENTITY_FILE`, `BACKUP_AGE_VERIFY_IDENTITY`, o `BACKUP_AGE_SECRET_KEY`).
+
+No imprime passwords, connection strings, keys, JWTs, emails ni hashes de filas.
+
+---
+
+## `scripts/backup/local-list.sh`
+
+Lista `daily/` (y `weekly/` / `monthly/` si existen). Marca `verified-checksums` solo si los cinco archivos existen y los sidecars SHA-256 coinciden. No inventa PASS estructural solo por existencia de archivos.
+
+---
+
+## `scripts/backup/local-verify.sh`
+
+Verify **offline**: no R2, no GitHub, no Supabase. Checksums + manifest + decrypt temporal + `gzip -t` + contrato SQL (`assert_roles_sql`, `assert_schema_sql`, `assert_data_sql_backup_contract`) + extract Storage. Limpia plaintext. Imprime `local verify PASS`.
+
+---
+
+## `scripts/backup/local-restore.sh`
+
+Igual que `restore.sh` (mismos guards `CONFIRM_RESTORE` / `RESTORE_ISOLATED` / `RESTORE_TARGET_DB_URL`, `ON_ERROR_STOP`, transacción única, Auth y Storage). La única diferencia: fuente = filesystem local, no R2. Opcional `RESTORE_STORAGE=1`. Identity `age` vía `lib.sh`. `RESTORE_DRY_RUN=1` descifra y valida sin `psql` ni PUT (tests).
+
+---
+
+## `scripts/backup/local-retention.sh`
+
+Retención **manual** GFS local. Default `--dry-run`. Keep 7 daily / 2 weekly / 1 monthly. No cron. No GitHub Actions. No modifica `retention.sh` ni R2. No borra sin `--apply`.
 
 ---
 
@@ -512,9 +569,16 @@ Cubre:
 - checksum inválido;
 - ciphertext malformado;
 - identity incorrecta;
-- guards de `restore.sh`.
+- guards de `restore.sh`;
+- copia local desde fixture R2 (`local.sh`) sin regenerar ni re-cifrar;
+- ciphertexts byte-identical (`cmp`);
+- SHA-256 / manifest / age inválidos (download y verify);
+- destino existente / permisos / copia parcial rechazada;
+- `local-verify.sh` offline (sin R2);
+- `local-restore.sh` dry-run desde filesystem;
+- retención local `--dry-run` vs `--apply`.
 
-**Resultado actual (contrato Auth):** la suite local debe pasar completa (sin red de producción). El primer corte del MVP marcó 12/12; tras Storage internals 15/15; el contrato Auth añade asserts de COPY Auth y exclusiones transitorias.
+**Resultado actual:** la suite local debe pasar completa (sin red de producción). El primer corte del MVP marcó 12/12; tras Storage internals 15/15; el contrato Auth añade asserts de COPY Auth; la copia local de contingencia amplía la suite (ver salida de `test-local.sh`).
 
 ---
 
@@ -542,6 +606,11 @@ bash -n scripts/backup/verify.sh
 bash -n scripts/backup/finalize.sh
 bash -n scripts/backup/retention.sh
 bash -n scripts/backup/restore.sh
+bash -n scripts/backup/local.sh
+bash -n scripts/backup/local-list.sh
+bash -n scripts/backup/local-verify.sh
+bash -n scripts/backup/local-restore.sh
+bash -n scripts/backup/local-retention.sh
 bash -n scripts/backup/test-local.sh
 ```
 
@@ -648,13 +717,30 @@ wsl -e bash -c "export PATH=/home/<USER>/.local/bin:/usr/bin:/bin && cd /mnt/d/n
 Si el repo está en `C:`:
 
 ```bash
-cd /mnt/c/Users/<USER>/path/to/nomadas-tour
+cd /mnt/c/Users/<usuario>/path/to/nomadas-tour
 ```
+
+## Destino de la copia local (WSL / Windows)
+
+El operador elige el directorio. Ejemplo (acceso desde el Explorador de Windows):
+
+```text
+/mnt/c/Users/<usuario>/nomadas-backups
+```
+
+No hay ruta personal hardcodeada. Recomendación:
+
+- **Temporales** (`mktemp`, decrypt): filesystem Linux de WSL (`/tmp`). Permisos Unix reales; los scripts limpian plaintext con `trap`.
+- **Destino persistente:** puede ser el disco Windows (`/mnt/c/...`) si se necesita abrir la carpeta desde Windows.
+- **Cifrado:** `age` es la barrera. Los archivos locales siguen siendo ciphertext. No re-cifrar.
+- **Permisos NTFS** no equivalen a `chmod` Linux. No asumir que un ACL de Windows sustituye a la identity `age` ni a guardar la private key aparte de los backups.
+
+No se configura el sistema operativo desde estos scripts.
 
 ## Expected output
 
 ```text
-15 passed, 0 failed
+todos PASS, 0 failed
 ```
 
 ## Do not do
@@ -1631,19 +1717,61 @@ grep COPY/INSERT de tablas de negocio → presente
 
 ---
 
-# Future local backup (not implemented)
+# Local contingency backup
 
-Documentación únicamente. **No** está construido.
+Copia **manual** de un backup **ya existente en R2**. No genera un dump nuevo. No reemplaza R2. No modifica GitHub Actions ni la frecuencia del backup automático. No usa scheduler. La PC del operador **no** es infraestructura de producción.
 
 ```text
-PRIMARY
-GitHub Actions → R2 (este MVP)
+R2 = primary automated backup
 
-CONTINGENCY
-manual encrypted local backup (misma forma: tar.gz.age + SHA-256)
+Local = manual encrypted contingency copy
+       = offline-capable after download
+       = independent of R2/GitHub/Supabase for verify
+       = not scheduled
 ```
 
-Debe ser último recurso, **fuera del scheduler**, cifrado con `age`, sin secretos en el repo, sin tratar el PC del operador como infraestructura de producción. No reemplaza R2.
+Principio: **copy, don't regenerate.** Mismos artefactos cifrados (`tar.gz.age` + sidecar SHA-256 + `manifest.json`). Byte-identical.
+
+## Workflow
+
+```text
+1. identify backup_id (último verify PASS; p. ej. en R2 o Actions)
+2. bash scripts/backup/local.sh <BACKUP_ID> <LOCAL_DIR>
+3. bash scripts/backup/local-verify.sh <BACKUP_ID> <LOCAL_DIR>
+4. optionally: bash scripts/backup/local-retention.sh <LOCAL_DIR> --dry-run
+               (solo --apply cuando el operador confirma)
+```
+
+Ejemplo de destino (el usuario elige el path):
+
+```bash
+bash scripts/backup/local.sh 20260818T045852Z-32101100102 \
+  /mnt/c/Users/<usuario>/nomadas-backups
+```
+
+Tras `local.sh` + `local-verify.sh`, verify y restore **no** necesitan R2.
+
+## Disaster restore from local
+
+```text
+1. choose verified local backup
+2. bash scripts/backup/local-verify.sh <BACKUP_ID> <LOCAL_DIR>
+3. CONFIRM_RESTORE=RESTORE RESTORE_ISOLATED=yes RESTORE_TARGET_DB_URL=...
+   bash scripts/backup/local-restore.sh <BACKUP_ID> <LOCAL_DIR>
+4. optionally RESTORE_STORAGE=1 (SUPABASE_URL / SERVICE_ROLE del target)
+5. validate Auth users/identities
+6. validate password login
+7. validate JWT / RLS
+8. validate business data (trips, reservations, Storage)
+```
+
+Mismos guards que `restore.sh`. Identity `age` master offline (`BACKUP_AGE_IDENTITY_FILE` o `BACKUP_AGE_SECRET_KEY`). No dejar plaintext persistente.
+
+Layout local (inicialmente `daily/`; `weekly/` y `monthly/` se listan/retienen si existen):
+
+```text
+<LOCAL_DIR>/daily/<BACKUP_ID>/{database,storage}.tar.gz.age{,.sha256} + manifest.json
+```
 
 Detalle de producto: [`ROADMAP.md`](ROADMAP.md) / [`TASKS.md`](../TASKS.md).
 
@@ -1713,6 +1841,13 @@ Never:
 ## Daily
 
 Normalmente nada manual. Cron `0 3 * * *` (03:00 UTC).
+
+## Local contingency copy (manual)
+
+```bash
+bash scripts/backup/local.sh <BACKUP_ID> /mnt/c/Users/<usuario>/nomadas-backups
+bash scripts/backup/local-verify.sh <BACKUP_ID> /mnt/c/Users/<usuario>/nomadas-backups
+```
 
 ## Manual backup
 

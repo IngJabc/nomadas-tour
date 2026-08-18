@@ -52,6 +52,12 @@ RPO 24 h / RTO target 8 h / RTO estimado ~90 min (no es SLA).
 
 El par `BACKUP_AGE_VERIFY_*` solo sirve para verificar en CI; **no** sustituye la master offline. Sin la master no hay restore ante desastre.
 
+### Copia local de contingencia
+
+- [ ] `LOCAL_DIR` elegido por el operador (p. ej. `/mnt/c/Users/<usuario>/nomadas-backups`)
+- [ ] Copia verificada en `<LOCAL_DIR>/daily/<backup_id>/` (cinco artefactos + SHA-256)
+- [ ] Private key `age` **no** está junto a esa carpeta
+
 ### R2
 
 - [ ] Bucket `nomadas-backups` (privado)
@@ -78,7 +84,8 @@ El par `BACKUP_AGE_VERIFY_*` solo sirve para verificar en CI; **no** sustituye l
 ## 4. Orden de recuperación
 
 - [ ] Crear proyecto Supabase aislado/nuevo (manual)
-- [ ] Restore database including Auth users/identities (`restore.sh` o `psql` manual)
+- [ ] Elegir fuente: R2 (`restore.sh`) **o** copia local verificada (`local-verify.sh` luego `local-restore.sh`)
+- [ ] Restore database including Auth users/identities
 - [ ] Verify Auth users restored
 - [ ] Verify Auth identities restored
 - [ ] Storage desde `storage.tar.gz.age` (`RESTORE_STORAGE=1` o upload preservando paths)
