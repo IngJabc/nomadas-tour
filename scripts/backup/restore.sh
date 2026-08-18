@@ -70,6 +70,7 @@ tar -xzf "${WORK}/database.tar.gz" -C "${WORK}/db"
 assert_roles_sql "${WORK}/db/roles.sql"
 assert_schema_sql "${WORK}/db/schema.sql"
 assert_data_sql_has_rows "${WORK}/db/data.sql"
+assert_data_sql_excludes_internal_storage "${WORK}/db/data.sql"
 
 PSQL=(psql --single-transaction --variable ON_ERROR_STOP=1 --dbname "${RESTORE_TARGET_DB_URL}")
 

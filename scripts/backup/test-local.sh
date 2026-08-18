@@ -70,6 +70,22 @@ printf 'SET session_replication_role = replica;\n-- no rows\n' >"$schema_only"
 assert_fail "data.sql without COPY/INSERT" \
   bash -c "source '${ROOT}/scripts/backup/lib.sh'; assert_data_sql_has_rows '${schema_only}'"
 
+# --- Supabase Storage internals must not appear in data.sql ---
+bad_vectors="${TMP}/bad-vectors.sql"
+printf 'COPY public.trips (id) FROM stdin;\n11111111-1111-1111-1111-111111111111\n\\.\nCOPY storage.buckets_vectors (id) FROM stdin;\n\\.\n' >"$bad_vectors"
+assert_fail "data.sql with storage.buckets_vectors COPY" \
+  bash -c "source '${ROOT}/scripts/backup/lib.sh'; assert_data_sql_has_rows '${bad_vectors}'; assert_data_sql_excludes_internal_storage '${bad_vectors}'"
+
+bad_indexes="${TMP}/bad-indexes.sql"
+printf 'COPY public.trips (id) FROM stdin;\n11111111-1111-1111-1111-111111111111\n\\.\nCOPY storage.vector_indexes (id) FROM stdin;\n\\.\n' >"$bad_indexes"
+assert_fail "data.sql with storage.vector_indexes COPY" \
+  bash -c "source '${ROOT}/scripts/backup/lib.sh'; assert_data_sql_has_rows '${bad_indexes}'; assert_data_sql_excludes_internal_storage '${bad_indexes}'"
+
+good_data="${TMP}/good-business.sql"
+printf 'COPY public.trips (id) FROM stdin;\n11111111-1111-1111-1111-111111111111\n\\.\nCOPY public.agencies (id) FROM stdin;\n22222222-2222-2222-2222-222222222222\n\\.\n' >"$good_data"
+assert_ok "business data.sql passes row + storage exclusion checks" \
+  bash -c "source '${ROOT}/scripts/backup/lib.sh'; assert_data_sql_has_rows '${good_data}'; assert_data_sql_excludes_internal_storage '${good_data}'"
+
 # --- happy path fixtures ---
 export BACKUP_WORK_DIR="${TMP}/work"
 export BACKUP_ID="19700101T000000Z-test"

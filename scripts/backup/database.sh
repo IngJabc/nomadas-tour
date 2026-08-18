@@ -43,13 +43,23 @@ else
   supabase db dump --db-url "${SUPABASE_DB_URL}" --role-only -f "${DB_DIR}/roles.sql"
   log "dumping schema (structure only — no rows)"
   supabase db dump --db-url "${SUPABASE_DB_URL}" -f "${DB_DIR}/schema.sql"
-  log "dumping data (COPY statements; real rows)"
-  supabase db dump --db-url "${SUPABASE_DB_URL}" --data-only --use-copy -f "${DB_DIR}/data.sql"
+  log "dumping data (COPY statements; real rows; excludes Supabase Storage internals)"
+  dump_data_args=(
+    --db-url "${SUPABASE_DB_URL}"
+    --data-only
+    --use-copy
+    -f "${DB_DIR}/data.sql"
+  )
+  for excluded in "${BACKUP_DATA_EXCLUDE_TABLES[@]}"; do
+    dump_data_args+=(-x "$excluded")
+  done
+  supabase db dump "${dump_data_args[@]}"
 fi
 
 assert_roles_sql "${DB_DIR}/roles.sql"
 assert_schema_sql "${DB_DIR}/schema.sql"
 assert_data_sql_has_rows "${DB_DIR}/data.sql"
+assert_data_sql_excludes_internal_storage "${DB_DIR}/data.sql"
 
 log "packaging database artifacts"
 (

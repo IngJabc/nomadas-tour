@@ -15,7 +15,7 @@ GitHub Actions (03:00 UTC = 23:00 America/Caracas del día anterior)
       │
       ├── supabase db dump --role-only     → roles.sql
       ├── supabase db dump                 → schema.sql   (estructura; NO contiene filas)
-      ├── supabase db dump --data-only --use-copy → data.sql  (filas reales)
+      ├── supabase db dump --data-only --use-copy → data.sql  (filas reales; excluye storage.buckets_vectors y storage.vector_indexes)
       ├── Storage API                      → bytes de todos los buckets
       ├── tar.gz + age (dos recipients) + SHA-256
       └── upload a Cloudflare R2 (bucket privado nomadas-backups)
@@ -34,9 +34,10 @@ El workflow es **solo lectura** respecto a producción: no corre migraciones, no
 | Roles de Postgres (dump `--role-only`) | Sí |
 | Schema `public` (y lo que el CLI no filtra) | Sí — **sin datos** en `schema.sql` |
 | Filas reales (`data.sql` con `COPY`) | Sí — criterio de éxito |
-| Bytes de Storage (todos los buckets descubiertos) | Sí — archivo aparte |
+| Bytes de Storage (todos los buckets descubiertos) | Sí — archivo aparte (`storage.tar.gz.age`) |
+| Tablas internas Supabase Storage (`storage.buckets_vectors`, `storage.vector_indexes`) | **No** en `data.sql` — el dump las excluye con `-x`; no son datos de negocio |
 | `auth.users` / GoTrue / sesiones | **No.** El CLI excluye el schema `auth` del dump estándar |
-| Schema `storage` (catálogo) | **No.** Los bytes van en el archive de Storage |
+| Schema `storage` (catálogo) | **No** en el dump lógico. Los bytes reales van en el archive de Storage |
 | PITR / clone administrado de Supabase | Distinto de este MVP; no se usa (plan Free) |
 
 No afirmar que Auth quedó recuperado porque existan `roles.sql` / `schema.sql` / `data.sql`.
@@ -131,7 +132,7 @@ Verify **no** se da por bueno con un `aws s3 cp` en código 0. Hace:
 2. Comparar SHA-256  
 3. Decrypt (identity de verificación)  
 4. `gzip -t` + extraer  
-5. Comprobar `roles.sql` / `schema.sql` / `data.sql` (este último **debe** contener `COPY` o `INSERT`)
+5. Comprobar `roles.sql` / `schema.sql` / `data.sql` (este último **debe** contener `COPY` o `INSERT` de tablas de negocio y **no** debe contener `COPY storage.buckets_vectors` ni `COPY storage.vector_indexes`)
 
 ---
 
@@ -195,6 +196,7 @@ Smoke mínimo:
 | Síntoma | Qué mirar |
 |---------|-----------|
 | `data.sql has no COPY/INSERT` | El dump salió sin filas o se usó el dump de schema por error |
+| `permission denied for table buckets_vectors` en restore | Backup generado **antes** del fix que excluye `storage.buckets_vectors` / `storage.vector_indexes`. Generar un backup nuevo con el workflow y repetir el restore drill; los bytes de Storage siguen en `storage.tar.gz.age` |
 | `claim` / Docker en `supabase db dump` | El runner necesita Docker (ubuntu-latest lo trae) |
 | Verify decrypt fail | Identity de verificación no coincide con `BACKUP_AGE_VERIFY_RECIPIENT` |
 | Storage 401 | `SUPABASE_SERVICE_ROLE_KEY` o URL incorrectos |

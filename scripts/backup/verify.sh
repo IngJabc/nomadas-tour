@@ -63,6 +63,7 @@ tar -xzf "${WORK}/storage.tar.gz" -C "${WORK}/st"
 assert_roles_sql "${WORK}/db/roles.sql"
 assert_schema_sql "${WORK}/db/schema.sql"
 assert_data_sql_has_rows "${WORK}/db/data.sql"
+assert_data_sql_excludes_internal_storage "${WORK}/db/data.sql"
 [[ -d "${WORK}/st" ]] || die "storage tree missing after decompress"
 
 log "verify PASS (download/checksum/decrypt/decompress/structure)"

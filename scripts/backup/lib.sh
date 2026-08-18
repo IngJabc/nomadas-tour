@@ -6,6 +6,12 @@ set -euo pipefail
 
 BACKUP_LOG_PREFIX="${BACKUP_LOG_PREFIX:-backup}"
 
+# Supabase Storage internals — excluded from logical data dump (object bytes live in storage.sh).
+BACKUP_DATA_EXCLUDE_TABLES=(
+  storage.buckets_vectors
+  storage.vector_indexes
+)
+
 log() {
   printf '[%s] %s\n' "${BACKUP_LOG_PREFIX}" "$*" >&2
 }
@@ -189,6 +195,18 @@ assert_data_sql_has_rows() {
   if ! grep -Eq '^COPY |^INSERT ' "$f"; then
     die "data.sql has no COPY/INSERT statements — refusing schema-only dump"
   fi
+}
+
+assert_data_sql_excludes_internal_storage() {
+  local f="$1"
+  local t schema table
+  for t in "${BACKUP_DATA_EXCLUDE_TABLES[@]}"; do
+    schema="${t%%.*}"
+    table="${t#*.}"
+    if grep -Eq "^COPY ${schema}\\.${table} |^COPY \"${schema}\"\\.\"${table}\" " "$f"; then
+      die "data.sql must not COPY ${t} — restore uses storage.tar.gz.age for object bytes"
+    fi
+  done
 }
 
 assert_schema_sql() {
