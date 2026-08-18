@@ -1,6 +1,6 @@
 # Recovery checklist
 
-Usar junto con [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md) (emergencia) y [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md) (instalación y operación).
+Usar junto con [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md) (emergencia), [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md) (instalación y operación del backup automático) y [`backup-local-contingency.md`](backup-local-contingency.md) (copia local manual: descargar, verify offline, restore desde disco).
 **No pegar valores secretos en este archivo ni en tickets públicos.**
 
 RPO 24 h / RTO target 8 h / RTO estimado ~90 min (no es SLA).
@@ -54,8 +54,12 @@ El par `BACKUP_AGE_VERIFY_*` solo sirve para verificar en CI; **no** sustituye l
 
 ### Copia local de contingencia
 
+Tutorial paso a paso: [`backup-local-contingency.md`](backup-local-contingency.md).
+
 - [ ] `LOCAL_DIR` elegido por el operador (p. ej. `/mnt/c/Users/<usuario>/nomadas-backups`)
-- [ ] Copia verificada en `<LOCAL_DIR>/daily/<backup_id>/` (cinco artefactos + SHA-256)
+- [ ] Copia descargada con `local.sh` → log **`local copy PASS`**
+- [ ] `local-verify.sh` offline → log **`local verify PASS`**
+- [ ] Cinco artefactos bajo `<LOCAL_DIR>/daily/<backup_id>/` (sin plaintext persistente)
 - [ ] Private key `age` **no** está junto a esa carpeta
 
 ### R2
@@ -84,7 +88,7 @@ El par `BACKUP_AGE_VERIFY_*` solo sirve para verificar en CI; **no** sustituye l
 ## 4. Orden de recuperación
 
 - [ ] Crear proyecto Supabase aislado/nuevo (manual)
-- [ ] Elegir fuente: R2 (`restore.sh`) **o** copia local verificada (`local-verify.sh` luego `local-restore.sh`)
+- [ ] Elegir fuente: R2 (`restore.sh`) **o** copia local verificada — ver [`backup-local-contingency.md`](backup-local-contingency.md) §16 (`local-verify.sh` → `local-restore.sh`)
 - [ ] Restore database including Auth users/identities
 - [ ] Verify Auth users restored
 - [ ] Verify Auth identities restored

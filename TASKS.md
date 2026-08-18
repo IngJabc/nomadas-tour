@@ -21,13 +21,14 @@
 - [x] **Post-sprint** — Notificaciones in-app: solo destino — **Implementado**
 - [x] **Post-sprint** — Boleto: solo destino — **Implementado** (`origin` conservado en modelo)
 - [x] **Infra / Ops** — Backup & Disaster Recovery MVP — **Implementado** (GitHub Actions → age → R2)
-- [x] **Infra / Ops** — Backup local de contingencia — **Implementado** (copia manual cifrada de artefactos R2; no scheduler)
+- [x] **Infra / Ops** — Backup local de contingencia — **Implementado** (copia manual cifrada de artefactos R2; scripts `local*.sh`; no scheduler)
+  - Tutorial operativo: [`docs/backup-local-contingency.md`](docs/backup-local-contingency.md)
 
-Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–27). Operación: [`docs/backup-disaster-recovery-operations.md`](docs/backup-disaster-recovery-operations.md). Emergencia: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md).
+Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–29). Operación backup automático: [`docs/backup-disaster-recovery-operations.md`](docs/backup-disaster-recovery-operations.md). Emergencia: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md). Copia local: [`docs/backup-local-contingency.md`](docs/backup-local-contingency.md).
 
 Migraciones `065` y `066` aplicadas en Supabase; harnesses PASS.
 
-**GitHub (backup):** 9 secrets cargados; bucket R2 `nomadas-backups` privado; primer `workflow_dispatch` PASS; exclusiones `storage.buckets_vectors` / `storage.vector_indexes` en `data.sql`. Copia local de contingencia: `scripts/backup/local.sh` (manual). Restore drill trimestral **pendiente** (no reutilizar backup `20260817T233641Z-32081141864`). Nombres de secrets: ver operations.
+**GitHub (backup):** 9 secrets cargados; bucket R2 `nomadas-backups` privado; cron diario + `workflow_dispatch` operativos; contrato Auth en dump (`auth_included=true`). Copia local manual: `scripts/backup/local*.sh` + tutorial [`docs/backup-local-contingency.md`](docs/backup-local-contingency.md). Restore drill trimestral **pendiente** (no reutilizar backup `20260817T233641Z-32081141864`). Referencia de backup validado reciente: `20260818T045852Z-32101100102`. Secrets: ver operations.
 
 ---
 
@@ -87,7 +88,7 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Bloqueadores
 
-_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup MVP operativo en GitHub Actions. Backup local de contingencia implementado (manual). Restore drill trimestral pendiente. Sin sprint activo._
+_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup automático (R2) + backup local de contingencia operativos. Tutorial operativo en `docs/backup-local-contingency.md`. Restore drill trimestral pendiente. Sin sprint activo._
 
 ---
 
