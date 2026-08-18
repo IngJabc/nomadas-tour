@@ -46,10 +46,17 @@ jq -n \
     workflow_url: $workflow_url,
     database: $db[0],
     storage: $st[0],
-    auth_included: false,
+    auth_included: true,
+    auth: ($db[0].auth // {users: 0, identities: 0, mfa_factors: 0}),
     limitations: [
-      "Logical dump does not include auth.users or GoTrue state. Auth must be reconfigured on restore.",
-      "storage schema is excluded from supabase db dump; object bytes are in the storage archive.",
+      "Users and identities are restored from data.sql.",
+      "Users must re-login after disaster recovery because the restored project has new signing keys.",
+      "Old JWTs are invalid after restore.",
+      "Old sessions and refresh tokens must not be considered reusable.",
+      "OAuth/SSO external configuration requires reconfiguration.",
+      "SMTP/Site URL/Redirect URLs are platform configuration and require manual restoration.",
+      "WebAuthn/Passkeys require re-registration because the RP ID changes per project.",
+      "storage schema catalog is excluded from supabase db dump; object bytes are in the storage archive.",
       "RPO 24h means up to 24 hours of data may be missing after a disaster. This is not zero-loss."
     ]
   }' >"$OUT"

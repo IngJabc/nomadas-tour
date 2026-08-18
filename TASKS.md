@@ -22,11 +22,11 @@
 - [x] **Post-sprint** — Boleto: solo destino — **Implementado** (`origin` conservado en modelo)
 - [x] **Infra / Ops** — Backup & Disaster Recovery MVP — **Implementado** (GitHub Actions → age → R2)
 
-Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–27). Runbook: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md).
+Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–27). Operación: [`docs/backup-disaster-recovery-operations.md`](docs/backup-disaster-recovery-operations.md). Emergencia: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md).
 
 Migraciones `065` y `066` aplicadas en Supabase; harnesses PASS.
 
-**GitHub (backup) — secrets a cargar (nombres; sin valores):** `SUPABASE_DB_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_AGE_RECIPIENT`, `BACKUP_AGE_VERIFY_RECIPIENT`, `BACKUP_AGE_VERIFY_IDENTITY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`. Bucket R2 `nomadas-backups`. Primer PASS: `workflow_dispatch`. Restore drill: manual trimestral.
+**GitHub (backup):** 9 secrets cargados; bucket R2 `nomadas-backups` privado; primer `workflow_dispatch` PASS; exclusiones `storage.buckets_vectors` / `storage.vector_indexes` en `data.sql`. Restore drill trimestral **pendiente** (no reutilizar backup `20260817T233641Z-32081141864`). Nombres de secrets: ver operations.
 
 ---
 
@@ -93,7 +93,7 @@ Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Bloqueadores
 
-_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup MVP en repo (falta cargar secrets + primer `workflow_dispatch`). Sin sprint activo._
+_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup MVP operativo en GitHub Actions (restore drill trimestral pendiente). Sin sprint activo._
 
 ---
 

@@ -632,13 +632,16 @@ Presentación únicamente: `booker_name` y `origin` permanecen en dominio/metada
 
 ## Sprint 27 — Backup & Disaster Recovery MVP (2026-08-17)
 
-Copia externa diaria (RPO 24 h) independiente de Render/Supabase Storage-as-backup. Auth no está en el dump lógico.
+Copia externa diaria (RPO 24 h) independiente de Render/Supabase Storage-as-backup. La documentación inicial afirmó incorrectamente que Auth no estaba en el dump lógico.
 
 [x] **Backup & DR MVP**
 - Workflow `.github/workflows/backup.yml` (cron `03:00 UTC` = `23:00 America/Caracas` del día anterior + `workflow_dispatch`; `permissions: contents: read`)
-- Dump `roles.sql` + `schema.sql` + `data.sql` (`supabase db dump`); Storage bytes de todos los buckets; `age` (recipient offline + verify CI); SHA-256; R2 `nomadas-backups`
+- Dump `roles.sql` + `schema.sql` + `data.sql` (`supabase db dump`, `-x storage.buckets_vectors` / `storage.vector_indexes`); Storage bytes de todos los buckets; `age` (recipient offline + verify CI); SHA-256; R2 `nomadas-backups`
 - Scripts: `scripts/backup/{lib,database,storage,finalize,verify,retention,restore,test-local}.sh`
-- Docs: [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md), [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md)
-- Tests locales: `bash scripts/backup/test-local.sh` (12/12; sin red de producción)
-- **Ops:** cargar secrets de GitHub + bucket R2 + primer `workflow_dispatch`
-- **Pendiente por diseño:** restore drill manual trimestral (proyecto aislado)
+- Docs: [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md), [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md), [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md)
+- Tests locales: `bash scripts/backup/test-local.sh` (15/15 al cierre del sprint; suite ampliada después del contrato Auth)
+- **Ops:** secrets GitHub + bucket R2 privado + `workflow_dispatch` de producción PASS (`f81f203`; primer `backup_id` `20260817T233641Z-32081141864`)
+- **Fix:** exclusiones internas Storage (`6267576`); segundo backup de producción PASS; no reutilizar el primer ID para restore
+- **Pendiente por diseño (al cierre del sprint):** restore drill manual trimestral (proyecto aislado)
+
+**Corrección histórica (2026-08-18):** Previous documentation incorrectly stated that `auth.users` was excluded from logical backup. Audit confirmed that `--data-only` includes `auth.*` data. Restore drill on `20260818T002023Z-32084093832` verified email/password login, new JWT, and RLS. Current BDR contract explicitly includes core Auth data (`users`, `identities`, `mfa_factors`, `audit_log_entries`) and excludes transient/managed Auth tables (`flow_state`, `saml_relay_states`, `oauth_client_states`, `mfa_challenges`, `webauthn_challenges`, `instances`, `schema_migrations`). Users must re-login after restore; old JWTs/sessions are not reusable; OAuth/SSO/SMTP/WebAuthn remain platform configuration.

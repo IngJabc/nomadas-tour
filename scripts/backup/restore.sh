@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 # Manual restore from an R2 backup into an EXPLICIT isolated target.
-# Never defaults to production. Does not reconfigure Auth (see runbook).
+# Never defaults to production.
+# Auth user data and identities are restored from data.sql.
+# Users must re-login after restore. Old JWTs, sessions, and refresh tokens
+# are not considered reusable. External OAuth/SSO/SMTP/platform configuration
+# requires manual reconfiguration.
+#
+# session_replication_role: not set here. supabase db dump --data-only already
+# emits SET session_replication_role = replica inside data.sql. The extra
+# --command used in the manual drill is redundant for those dumps. Auth rows
+# appear because data.sql contains COPY "auth"."users" / COPY "auth"."identities".
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -69,8 +78,7 @@ mkdir -p "${WORK}/db"
 tar -xzf "${WORK}/database.tar.gz" -C "${WORK}/db"
 assert_roles_sql "${WORK}/db/roles.sql"
 assert_schema_sql "${WORK}/db/schema.sql"
-assert_data_sql_has_rows "${WORK}/db/data.sql"
-assert_data_sql_excludes_internal_storage "${WORK}/db/data.sql"
+assert_data_sql_backup_contract "${WORK}/db/data.sql"
 
 PSQL=(psql --single-transaction --variable ON_ERROR_STOP=1 --dbname "${RESTORE_TARGET_DB_URL}")
 
@@ -121,5 +129,7 @@ PY
   log "storage objects uploaded to target project"
 fi
 
-log "restore finished. Auth is NOT restored from this dump — follow docs/backup-disaster-recovery-runbook.md"
-log "Next: configure project, deploy API/worker, smoke tests (isolated)."
+log "restore finished. Auth user data and identities are restored from data.sql."
+log "Users must re-login after restore. Old JWTs, sessions, and refresh tokens are not considered reusable."
+log "External OAuth/SSO/SMTP/platform configuration requires manual reconfiguration."
+log "Next: configure project, deploy API/worker, smoke tests (isolated). See docs/backup-disaster-recovery-runbook.md"
