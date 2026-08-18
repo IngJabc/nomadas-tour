@@ -7,6 +7,8 @@
 - [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md)
 - [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md)
 
+**Copia local manual (contingencia):** tutorial operativo en [`backup-local-contingency.md`](backup-local-contingency.md).
+
 **RPO:** 24 h. **RTO target:** 8 h. **RTO esperado actual:** ~90 min (estimación operativa, no SLA).
 
 **Formulación correcta:** copia externa diaria cifrada + procedimiento de recuperación. Pérdida máxima **objetivo** de hasta 24 horas de datos. No es pérdida cero.

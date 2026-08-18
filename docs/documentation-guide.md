@@ -4,7 +4,7 @@
 
 **Cuándo usar este documento:** Al cerrar un sprint, al iniciar una fase del roadmap, al agregar documentación nueva o cuando un agente/humano no sepa dónde escribir algo.
 
-**Última actualización:** 2026-08-04
+**Última actualización:** 2026-08-18
 
 ---
 

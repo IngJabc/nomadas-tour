@@ -660,3 +660,14 @@ Copia **manual** de artefactos ya cifrados en R2. No regenera dumps. No re-cifra
 - Tests: `bash scripts/backup/test-local.sh` (suite ampliada: download, checksum, manifest, age, offline verify, restore dry-run, retention)
 - Docs: operations, runbook, [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md), [`ROADMAP.md`](ROADMAP.md)
 - **No cambia:** `.github/workflows/backup.yml`, frecuencia, contrato Auth/dump/Storage, R2, keys `age`
+
+---
+
+## Sprint 29 — Tutorial operativo backup local (2026-08-18)
+
+Documentación operativa para que el operador ejecute el flujo completo sin depender de memoria ni de otros docs obligatorios.
+
+[x] **Tutorial backup local de contingencia**
+- [`backup-local-contingency.md`](backup-local-contingency.md) — procedimiento rápido, staging autosuficiente, criterios de copia/restore válidos, troubleshooting
+- Enlaces desde [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md), [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md), [`documentation-guide.md`](documentation-guide.md), [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md)
+- Validación documental: `git diff --check` PASS

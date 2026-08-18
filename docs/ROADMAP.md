@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-17
+**Última actualización:** 2026-08-18
 
 ---
 
@@ -37,7 +37,8 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Integridad: no reservar tras `departure_time` | Operativo (RPC `066` + UX «Ya salió») |
 | Notificaciones in-app: actor = agencia; ruta = destino | Operativo (copy; dominio intacto) |
 | Boleto: solo destino | Operativo (`origin` conservado en modelo) |
-| Backup & DR (dump lógico diario cifrado en R2) | Operativo / MVP (GitHub Actions; drill trimestral pendiente) |
+| Backup & DR automático (dump lógico diario cifrado en R2) | Operativo / MVP (GitHub Actions 03:00 UTC; Auth core en `data.sql`; drill trimestral pendiente) |
+| Backup local de contingencia (copia manual offline) | Operativo (scripts `local*.sh`; tutorial [`backup-local-contingency.md`](backup-local-contingency.md)) |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -320,7 +321,7 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 **MVP (en repo):** GitHub Actions diario (03:00 UTC = 23:00 America/Caracas del día anterior) → `roles.sql` + `schema.sql` + `data.sql` (incluye Auth core: `auth.users` / `auth.identities`; excluye Auth transitorio y Storage internals) + bytes de Storage → `age` → Cloudflare R2 (`nomadas-backups`). RPO 24 h; RTO target 8 h; RTO estimado ~90 min (no es SLA). Tras restore: re-login; JWTs viejos inválidos; OAuth/SSO/SMTP son config de plataforma. Operación: [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md). Emergencia: [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md).
 
-**Copia local (manual):** `scripts/backup/local.sh` descarga artefactos **ya** cifrados en R2 (copy, don't regenerate). Offline verify/restore después de la descarga. Fuera del scheduler. No trata la PC como producción.
+**Copia local (manual):** `scripts/backup/local.sh` descarga artefactos **ya** cifrados en R2 (copy, don't regenerate). Verify y restore offline tras la descarga. Fuera del scheduler. Tutorial operativo autosuficiente: [`backup-local-contingency.md`](backup-local-contingency.md).
 
 **Aún fuera del MVP:** PITR; restore drill automático; creación automática de proyectos Supabase; garantía de pérdida cero.
 
