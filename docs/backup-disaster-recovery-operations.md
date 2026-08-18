@@ -1719,6 +1719,8 @@ grep COPY/INSERT de tablas de negocio → presente
 
 # Local contingency backup
 
+> **Tutorial paso a paso para el operador:** [`backup-local-contingency.md`](backup-local-contingency.md)
+
 Copia **manual** de un backup **ya existente en R2**. No genera un dump nuevo. No reemplaza R2. No modifica GitHub Actions ni la frecuencia del backup automático. No usa scheduler. La PC del operador **no** es infraestructura de producción.
 
 ```text
