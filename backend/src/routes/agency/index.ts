@@ -7,6 +7,7 @@ import { notificationController } from '../../controllers/notification.controlle
 import { notificationPreferenceController } from '../../controllers/notification-preference.controller.js';
 import { agencySettingsController } from '../../controllers/agency-settings.controller.js';
 import { auditController } from '../../controllers/audit.controller.js';
+import { reservationLinkController } from '../../controllers/reservation-link.controller.js';
 
 const router = Router();
 
@@ -17,7 +18,31 @@ router.get('/trips', (req, res, next) => reservationController.getAgencyTrips(re
 router.get('/trips/:tripId', (req, res, next) => reservationController.getAgencyTripById(req, res, next));
 router.get('/trips/:tripId/passengers', (req, res, next) => reservationController.getAgencyTripPassengers(req, res, next));
 router.get('/reservations', (req, res, next) => reservationController.getAgencyReservations(req, res, next));
+router.get('/reservations/links', (req, res, next) =>
+  reservationLinkController.list(req, res, next),
+);
+router.get('/reservations/links/:id', (req, res, next) =>
+  reservationLinkController.getById(req, res, next),
+);
 router.get('/reservations/:id', (req, res, next) => reservationController.getAgencyReservationById(req, res, next));
+router.post('/reservations/links', (req, res, next) =>
+  reservationLinkController.create(req, res, next),
+);
+router.post('/reservations/links/:id/confirm', (req, res, next) =>
+  reservationLinkController.confirm(req, res, next),
+);
+router.post('/reservations/links/:id/cancel', (req, res, next) =>
+  reservationLinkController.cancel(req, res, next),
+);
+router.post('/reservations/links/:id/invalidate', (req, res, next) =>
+  reservationLinkController.invalidate(req, res, next),
+);
+router.post('/reservations/links/:id/regenerate', (req, res, next) =>
+  reservationLinkController.regenerate(req, res, next),
+);
+router.patch('/reservations/links/:id/data', (req, res, next) =>
+  reservationLinkController.patchData(req, res, next),
+);
 router.post('/reservations', (req, res, next) => reservationController.createAgencyReservation(req, res, next));
 router.patch('/reservations/:id/cancel', (req, res, next) => reservationController.cancelAgencyReservation(req, res, next));
 router.patch('/reservations/:id/passengers/:passengerId/cancel', (req, res, next) => reservationController.cancelPassenger(req, res, next));

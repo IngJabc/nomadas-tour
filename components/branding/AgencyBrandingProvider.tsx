@@ -15,8 +15,9 @@ import {
   agencyApi,
   type AgencyBrandingSettings,
 } from '@/lib/api';
+import { buildAgencyBrandingStyle, type BrandingStyle } from '@/lib/brand/utils';
 
-const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
+const AgencyBrandingContext = createContext<AgencyBrandingContextValue | null>(null);
 
 interface AgencyBrandingContextValue {
   branding: AgencyBrandingSettings | null;
@@ -24,46 +25,6 @@ interface AgencyBrandingContextValue {
   error: boolean;
   updateBranding: (branding: AgencyBrandingSettings) => void;
   refresh: () => Promise<void>;
-}
-
-const AgencyBrandingContext =
-  createContext<AgencyBrandingContextValue | null>(null);
-
-type BrandingStyle = CSSProperties &
-  Partial<Record<`--${string}`, string>>;
-
-function isHexColor(value: unknown): value is string {
-  return typeof value === 'string' && HEX_COLOR.test(value);
-}
-
-export function buildAgencyBrandingStyle(
-  branding: Partial<AgencyBrandingSettings> | null,
-): BrandingStyle {
-  if (!branding) return {};
-
-  const style: BrandingStyle = {};
-
-  if (isHexColor(branding.accent_color)) {
-    style['--color-brand-cyan'] = branding.accent_color;
-    style['--color-cyan-bg'] =
-      'color-mix(in srgb, var(--color-brand-cyan) 10%, transparent)';
-  }
-
-  if (isHexColor(branding.secondary_color)) {
-    style['--color-brand-blue'] = branding.secondary_color;
-    style['--color-brand-blue-bg'] =
-      'color-mix(in srgb, var(--color-brand-blue) 10%, transparent)';
-  }
-
-  if (isHexColor(branding.primary_color)) {
-    style['--color-brand-navy'] = branding.primary_color;
-    style['--color-brand-dark'] =
-      'color-mix(in srgb, var(--color-brand-navy) 34%, black)';
-    style['--color-brand-mid'] =
-      'color-mix(in srgb, var(--color-brand-navy) 96%, white)';
-  }
-
-  return style;
 }
 
 export function AgencyBrandingProvider({

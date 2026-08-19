@@ -3,6 +3,14 @@ import type { AuditListResponse, AuditQueryParams } from '@/types/audit';
 import type { AppUser } from '@/lib/auth/types';
 import { ApiError } from '@/lib/errors/api-error';
 import { logoutInactiveAgency } from '@/lib/auth/session-handler';
+import type {
+  AgencyReservationLinkDetail,
+  AgencyReservationLinkListItem,
+  CreateReservationLinkResult,
+  LinkDataForm,
+  PublicReservationLinkBody,
+  RegenerateReservationLinkResult,
+} from '@/lib/reservation-links';
 
 export interface NotificationPreferenceCategory {
   key: string;
@@ -328,7 +336,7 @@ export const agencyApi = {
   cancelPassenger: (reservationId: string, passengerId: string) =>
     request<any>(`/agency/reservations/${reservationId}/passengers/${passengerId}/cancel`, { method: 'PATCH' }),
   lockSeat: (trip_id: string, seat_id: string) =>
-    request<{ locked: boolean; seat_id: string; locked_at: string }>('/agency/seats/lock', {
+    request<{ locked: boolean; seat_id: string; locked_at: string; lock_expires_at?: string | null }>('/agency/seats/lock', {
       method: 'POST',
       body: JSON.stringify({ trip_id, seat_id }),
     }),
@@ -374,5 +382,49 @@ export const agencyApi = {
   listAudit: (params?: Omit<AuditQueryParams, 'agency_id'>) =>
     request<AuditListResponse>('/agency/audit', {
       params: params as Record<string, string | undefined>,
+    }),
+
+  listReservationLinks: (params?: { trip_id?: string; status?: string }) =>
+    request<AgencyReservationLinkListItem[]>('/agency/reservations/links', {
+      params,
+    }),
+  getReservationLink: (id: string) =>
+    request<AgencyReservationLinkDetail>(`/agency/reservations/links/${id}`),
+  createReservationLink: (data: { trip_id: string; seat_ids: string[] }) =>
+    request<CreateReservationLinkResult>('/agency/reservations/links', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  confirmReservationLink: (id: string) =>
+    request<{ reservation_id: string; qr_code: string; ticket_code: string; qr_data_url?: string }>(
+      `/agency/reservations/links/${id}/confirm`,
+      { method: 'POST' },
+    ),
+  cancelReservationLink: (id: string) =>
+    request<{ success: true }>(`/agency/reservations/links/${id}/cancel`, {
+      method: 'POST',
+    }),
+  invalidateReservationLink: (id: string) =>
+    request<{ success: true }>(`/agency/reservations/links/${id}/invalidate`, {
+      method: 'POST',
+    }),
+  regenerateReservationLink: (id: string) =>
+    request<RegenerateReservationLinkResult>(`/agency/reservations/links/${id}/regenerate`, {
+      method: 'POST',
+    }),
+  patchReservationLinkData: (id: string, link_data: LinkDataForm) =>
+    request<{ link_data: LinkDataForm }>(`/agency/reservations/links/${id}/data`, {
+      method: 'PATCH',
+      body: JSON.stringify({ link_data }),
+    }),
+};
+
+export const publicReservationLinkApi = {
+  get: (token: string) =>
+    request<PublicReservationLinkBody>(`/public/reservation-links/${token}`),
+  save: (token: string, linkData: LinkDataForm) =>
+    request<PublicReservationLinkBody>(`/public/reservation-links/${token}/save`, {
+      method: 'POST',
+      body: JSON.stringify(linkData),
     }),
 };

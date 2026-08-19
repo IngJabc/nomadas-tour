@@ -94,6 +94,7 @@ export interface Seat {
   status: 'available' | 'locked' | 'reserved' | 'blocked';
   locked_by: string | null;
   locked_at: string | null;
+  lock_expires_at?: string | null;
   updated_at: string;
 }
 

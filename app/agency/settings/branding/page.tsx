@@ -10,12 +10,10 @@ import {
 } from '@/lib/api';
 import {
   buildAgencyBrandingStyle,
-  useAgencyBranding,
-} from '@/components/branding/AgencyBrandingProvider';
-import {
-  ColorPicker,
   HEX_COLOR_PATTERN,
-} from '@/components/branding/ColorPicker';
+} from '@/lib/brand/utils';
+import { useAgencyBranding } from '@/components/branding/AgencyBrandingProvider';
+import { ColorPicker } from '@/components/branding/ColorPicker';
 import { PlatformLogoMark } from '@/components/brand/PlatformLogoMark';
 import { LogoUploader } from '@/components/agency/LogoUploader';
 import { PageHeader } from '@/components/ui/PageHeader';

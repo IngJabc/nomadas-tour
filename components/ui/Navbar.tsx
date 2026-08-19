@@ -16,7 +16,7 @@ export function Navbar() {
   }, []);
 
   // Hide navbar on admin and agency pages (they have their own sidebar layout)
-  if (pathname.startsWith("/admin") || pathname.startsWith("/agency")) return null;
+  if (pathname.startsWith("/admin") || pathname.startsWith("/agency") || pathname.startsWith("/reservations/link")) return null;
 
   return (
     <header

@@ -23,6 +23,16 @@ const BRANDING_FIELDS = [
   'accent_color',
 ] as const;
 
+const RESERVATION_LINK_FIELDS = [
+  'seat_codes',
+  'status',
+  'trip_id',
+  'reservation_id',
+  'old_link_id',
+  'new_link_id',
+  'reason',
+] as const;
+
 const PREF_CHANNEL_KEYS = new Set(['in_app', 'email']);
 const PREF_CATEGORIES = new Set<string>(NOTIFICATION_CATEGORIES);
 
@@ -116,6 +126,17 @@ export function sanitizeAuditChanges(
       return {
         before: sanitizeNotificationPrefsDiff(before),
         after: sanitizeNotificationPrefsDiff(after),
+      };
+
+    case 'reservation_link.created':
+    case 'reservation_link.cancelled':
+    case 'reservation_link.confirmed':
+    case 'reservation_link.regenerated':
+    case 'reservation_link.passenger_data_saved':
+    case 'reservation_link.expired':
+      return {
+        before: pickAllowedKeys(before, RESERVATION_LINK_FIELDS),
+        after: pickAllowedKeys(after, RESERVATION_LINK_FIELDS),
       };
 
     default: {

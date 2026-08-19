@@ -122,4 +122,18 @@ describe('sanitizeAuditChanges (F5-002.1 F-2)', () => {
     sanitizeAuditChanges('trip.cancelled', null, input);
     expect(input).toEqual(snapshot);
   });
+
+  it('keeps reservation_link status/seat_codes and drops token/PII', () => {
+    const { after } = sanitizeAuditChanges('reservation_link.created', null, {
+      seat_codes: ['A1', 'A2'],
+      trip_id: 'trip-1',
+      token: 'raw-token',
+      name: 'Juan',
+      document: '123',
+    });
+    expect(after).toEqual({
+      seat_codes: ['A1', 'A2'],
+      trip_id: 'trip-1',
+    });
+  });
 });

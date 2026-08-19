@@ -59,7 +59,7 @@ vi.mock('../config/env.js', () => ({
     RESEND_API_KEY: 'test-resend',
     EMAIL_FROM: 'test@example.com',
     FRONTEND_URL: 'http://localhost:3000',
-    LOCK_TTL_SECONDS: 300,
+    LOCK_TTL_SECONDS: 600,
     EMAIL_VIA_OUTBOX: false,
     TRIP_EFFECTS_VIA_OUTBOX: false,
     OUTBOX_POLL_MS: 2000,

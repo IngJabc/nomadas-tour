@@ -3,6 +3,7 @@ import {
   Ban,
   Bell,
   CalendarClock,
+  Link2,
   Palette,
   Plus,
   Ticket,
@@ -35,6 +36,7 @@ const ENTITY_LABELS: Record<AuditEntityType, string> = {
   reservation_passenger: 'Pasajero',
   agency_settings: 'Branding',
   notification_preferences: 'Notificaciones',
+  reservation_link: 'Enlace',
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -139,6 +141,48 @@ export const AUDIT_ACTION_CONFIG: Record<AuditAction, AuditActionConfig> = {
     icon: Bell,
     tone: 'violet',
     entityLabel: ENTITY_LABELS.notification_preferences,
+    summarize: () => null,
+  },
+  'reservation_link.created': {
+    label: 'Enlace creado',
+    icon: Link2,
+    tone: 'cyan',
+    entityLabel: ENTITY_LABELS.reservation_link,
+    summarize: (event) => seatCodesLabel(event.after?.seat_codes),
+  },
+  'reservation_link.cancelled': {
+    label: 'Enlace cancelado',
+    icon: XCircle,
+    tone: 'red',
+    entityLabel: ENTITY_LABELS.reservation_link,
+    summarize: () => null,
+  },
+  'reservation_link.confirmed': {
+    label: 'Enlace confirmado',
+    icon: Ticket,
+    tone: 'green',
+    entityLabel: ENTITY_LABELS.reservation_link,
+    summarize: () => null,
+  },
+  'reservation_link.regenerated': {
+    label: 'Enlace regenerado',
+    icon: Link2,
+    tone: 'blue',
+    entityLabel: ENTITY_LABELS.reservation_link,
+    summarize: () => null,
+  },
+  'reservation_link.passenger_data_saved': {
+    label: 'Datos de pasajero',
+    icon: UserCheck,
+    tone: 'amber',
+    entityLabel: ENTITY_LABELS.reservation_link,
+    summarize: () => null,
+  },
+  'reservation_link.expired': {
+    label: 'Enlace expirado',
+    icon: Ban,
+    tone: 'slate',
+    entityLabel: ENTITY_LABELS.reservation_link,
     summarize: () => null,
   },
 };

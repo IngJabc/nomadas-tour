@@ -1216,6 +1216,33 @@ export class SuperadminService {
           `No se puede reducir capacidad: los asientos ${reserved.map((s) => s.seat_code).join(", ")} tienen actividad`
         );
       }
+      const { data: excessSeats } = await supabaseAdmin
+        .from("seats")
+        .select("id")
+        .eq("trip_id", id)
+        .in("seat_code", excessCodes);
+      const excessIds = (excessSeats || []).map((s) => s.id);
+      if (excessIds.length > 0) {
+        const { data: activeLinks, error: linkErr } = await supabaseAdmin
+          .from("reservation_link_seats")
+          .select("id")
+          .in("seat_id", excessIds)
+          .eq("is_active", true)
+          .limit(1);
+        if (linkErr) throw new ValidationError(linkErr.message);
+        if (activeLinks && activeLinks.length > 0) {
+          await supabaseAdmin
+            .from("trips")
+            .update({
+              capacity: oldCapacity,
+              vehicle_type: ctx.trip.vehicle_type,
+            })
+            .eq("id", id);
+          throw new ValidationError(
+            "No se puede reducir capacidad: hay un enlace activo en esos asientos",
+          );
+        }
+      }
       const { error: deleteError } = await supabaseAdmin
         .from("seats")
         .delete()
@@ -1521,7 +1548,7 @@ export class SuperadminService {
     if (status === "cancelled") {
       await supabaseAdmin
         .from("seats")
-        .update({ status: "available", locked_by: null, locked_at: null })
+        .update({ status: "available", locked_by: null, locked_at: null, lock_expires_at: null })
         .eq("trip_id", id)
         .in("status", ["locked", "reserved", "blocked"]);
     }

@@ -1,8 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-
-export const HEX_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+import { HEX_COLOR_PATTERN } from '@/lib/brand/utils';
 
 interface ColorPickerProps {
   id: string;

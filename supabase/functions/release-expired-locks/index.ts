@@ -1,6 +1,7 @@
 // Supabase Edge Function — Scheduled: every 5 minutes
 // Deploy with: supabase functions deploy release-expired-locks --no-verify-jwt
 // Schedule with: supabase functions schedule create --cron "*/5 * * * *" release-expired-locks
+// F5-004: expire by lock_expires_at only. Do not use locked_at + TTL.
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -12,12 +13,11 @@ serve(async (_req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const lockTtlSeconds = Number(Deno.env.get('LOCK_TTL_SECONDS') ?? 300);
     const { data, error } = await supabase
       .from('seats')
-      .update({ status: 'available', locked_by: null, locked_at: null })
+      .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('status', 'locked')
-      .lt('locked_at', new Date(Date.now() - lockTtlSeconds * 1000).toISOString());
+      .lt('lock_expires_at', new Date().toISOString());
 
     if (error) throw error;
 

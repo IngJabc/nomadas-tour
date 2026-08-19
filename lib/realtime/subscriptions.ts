@@ -358,3 +358,37 @@ export function subscribeToNotifications(
     supabase.removeChannel(channel);
   };
 }
+
+/** Agency wizard: subscribe to `link_data` updates on one reservation_link. Public page stays without realtime. */
+export function subscribeToReservationLink(
+  linkId: string,
+  onUpdate: (row: Record<string, any>) => void,
+): CleanupFn {
+  if (!linkId) return () => {};
+  const supabase = createClient();
+  const channelName = `reservation_links:id=eq.${linkId}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'reservation_links',
+        filter: `id=eq.${linkId}`,
+      },
+      (payload: RealtimePostgresChangesPayload<any>) => {
+        if (payload.new) onUpdate(payload.new);
+      },
+    )
+    .subscribe((status) => {
+      if (status !== 'SUBSCRIBED') {
+        console.warn('[Realtime] Reservation link channel not SUBSCRIBED — status:', status);
+      }
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}

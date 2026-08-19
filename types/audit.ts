@@ -10,6 +10,12 @@ export const AUDIT_ACTIONS = [
   'boarding.unboard',
   'agency_settings.updated',
   'notification_preferences.updated',
+  'reservation_link.created',
+  'reservation_link.cancelled',
+  'reservation_link.confirmed',
+  'reservation_link.regenerated',
+  'reservation_link.passenger_data_saved',
+  'reservation_link.expired',
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
@@ -20,11 +26,12 @@ export const AUDIT_ENTITY_TYPES = [
   'reservation_passenger',
   'agency_settings',
   'notification_preferences',
+  'reservation_link',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
 
-export type AuditActorRole = 'superadmin' | 'agency';
+export type AuditActorRole = 'superadmin' | 'agency' | 'system';
 
 export interface AuditActor {
   user_id: string;

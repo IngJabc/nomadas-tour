@@ -17,7 +17,7 @@ interface UseLockCountdownReturn {
 
 export function useLockCountdown({
   selectedSeats,
-  ttlSeconds = 300,
+  ttlSeconds = 600,
   onExpired,
 }: UseLockCountdownOptions): UseLockCountdownReturn {
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
@@ -48,17 +48,20 @@ export function useLockCountdown({
       return;
     }
 
-    const locksAt = selectedSeats
-      .map((s) => (s.locked_at ? new Date(s.locked_at).getTime() : Infinity))
+    const expiries = selectedSeats
+      .map((s) => {
+        if (s.lock_expires_at) return new Date(s.lock_expires_at).getTime();
+        if (s.locked_at) return new Date(s.locked_at).getTime() + ttlSeconds * 1000;
+        return Infinity;
+      })
       .filter((t) => t < Infinity);
 
-    if (locksAt.length === 0) {
+    if (expiries.length === 0) {
       setRemainingSeconds(null);
       return;
     }
 
-    const earliestLock = Math.min(...locksAt);
-    const expiresAt = earliestLock + ttlSeconds * 1000;
+    const expiresAt = Math.min(...expiries);
 
     const tick = () => {
       const now = Date.now();

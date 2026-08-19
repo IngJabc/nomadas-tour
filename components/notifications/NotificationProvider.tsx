@@ -58,6 +58,8 @@ function resolveNotificationRoute(notification: Notification, role: string): str
       return `/agency/reservations/${notification.entity_id}`;
     case 'passenger':
       return `/agency/reservations/${notification.entity_id}`;
+    case 'reservation_link':
+      return '/agency/trips';
     default:
       return '/agency';
   }

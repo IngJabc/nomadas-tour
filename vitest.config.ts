@@ -14,6 +14,7 @@ export default defineConfig({
       'tests/auth/**/*.test.{ts,tsx}',
       'tests/boarding/**/*.test.{ts,tsx}',
       'tests/audit/**/*.test.{ts,tsx}',
+      'tests/reservation-links/**/*.test.{ts,tsx}',
       'tests/security/**/*.test.ts',
       'tests/security/**/*.test.tsx',
     ],

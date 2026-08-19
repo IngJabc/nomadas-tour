@@ -12,8 +12,6 @@ import {
 
 initSentryFromEnv('api');
 
-const LOCK_TTL_MS = env.LOCK_TTL_SECONDS * 1000;
-
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err);
   captureException(err, {
@@ -36,12 +34,11 @@ process.on('unhandledRejection', (reason) => {
 // Auto-expiration for locked seats (every 60s)
 setInterval(async () => {
   try {
-    const cutoff = new Date(Date.now() - LOCK_TTL_MS).toISOString();
     const { data, error } = await supabaseAdmin
       .from('seats')
-      .update({ status: 'available', locked_by: null, locked_at: null })
+      .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('status', 'locked')
-      .lt('locked_at', cutoff)
+      .lt('lock_expires_at', new Date().toISOString())
       .select();
     if (error) {
       console.error('[LockCleanup] Error:', error.message);

@@ -4,24 +4,11 @@ import { PassengerData } from '@/types';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Mail } from 'lucide-react';
-
-const LETTER_RE = /[^a-zA-ZáéíóúñüÁÉÍÓÚÑÜ\s\-']/g;
-const PHONE_RE = /[^\d+]/g;
-
-function filterName(v: string): string {
-  return v.replace(LETTER_RE, '');
-}
-
-function filterDigits(v: string): string {
-  return v.replace(/\D/g, '');
-}
-
-function filterPhone(v: string): string {
-  const clean = v.replace(PHONE_RE, '');
-  const plusIndex = clean.indexOf('+');
-  if (plusIndex > 0) return '+' + clean.replace(/\+/g, '').slice(0, 12);
-  return clean.replace(/(?<=.)\+/g, '').slice(0, 13);
-}
+import {
+  filterPassengerDocument,
+  filterPassengerName,
+  filterPassengerPhone,
+} from '@/lib/reservations/passengerFieldFilters';
 
 interface PassengerFormProps {
   passengers: PassengerData[];
@@ -68,7 +55,7 @@ export function PassengerForm({
             label="Nombre"
             placeholder="Nombre completo"
             value={bookerName}
-            onChange={(e) => onBookerNameChange(filterName(e.target.value))}
+            onChange={(e) => onBookerNameChange(filterPassengerName(e.target.value))}
             error={bookerErrors.name}
             autoComplete="name"
             enterKeyHint="next"
@@ -77,7 +64,7 @@ export function PassengerForm({
             label="Documento"
             placeholder="7 u 8 dígitos"
             value={bookerDocument}
-            onChange={(e) => onBookerDocumentChange(filterDigits(e.target.value))}
+            onChange={(e) => onBookerDocumentChange(filterPassengerDocument(e.target.value))}
             error={bookerErrors.document}
             inputMode="numeric"
             autoComplete="off"
@@ -158,7 +145,7 @@ export function PassengerForm({
                   label="Nombre"
                   placeholder="Nombre completo"
                   value={passenger.name}
-                  onChange={(e) => onUpdate(passenger.seat_id, 'name', filterName(e.target.value))}
+                  onChange={(e) => onUpdate(passenger.seat_id, 'name', filterPassengerName(e.target.value))}
                   error={errors[`${passenger.seat_id}_name`]}
                   autoComplete="name"
                   enterKeyHint="next"
@@ -167,7 +154,7 @@ export function PassengerForm({
                   label="Documento"
                   placeholder="7 u 8 dígitos"
                   value={passenger.document}
-                  onChange={(e) => onUpdate(passenger.seat_id, 'document', filterDigits(e.target.value))}
+                  onChange={(e) => onUpdate(passenger.seat_id, 'document', filterPassengerDocument(e.target.value))}
                   error={errors[`${passenger.seat_id}_document`]}
                   inputMode="numeric"
                   autoComplete="off"
@@ -178,7 +165,7 @@ export function PassengerForm({
                   label="Teléfono"
                   placeholder="04xx-xxxxxxx"
                   value={passenger.phone || ''}
-                  onChange={(e) => onUpdate(passenger.seat_id, 'phone', filterPhone(e.target.value))}
+                  onChange={(e) => onUpdate(passenger.seat_id, 'phone', filterPassengerPhone(e.target.value))}
                   error={errors[`${passenger.seat_id}_phone`]}
                   inputMode="tel"
                   autoComplete="tel"
@@ -191,8 +178,8 @@ export function PassengerForm({
         </div>
       </div>
 
-      <div className="flex justify-end pt-2">
-        <Button variant="primary" onClick={onNext}>
+      <div className="flex sm:justify-end pt-2">
+        <Button variant="primary" onClick={onNext} className="w-full sm:w-auto">
           Continuar
         </Button>
       </div>

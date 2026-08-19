@@ -62,6 +62,17 @@ import {
 } from './notification-fanout.handler.js';
 import { createReminderFanoutHandler } from './reminder-fanout.handler.js';
 import { createReservationCreatedHandler } from './reservation-created.handler.js';
+import {
+  createReservationLinkAckHandler,
+  createReservationLinkPassengerSavedHandler,
+} from './reservation-link.handler.js';
+import {
+  RESERVATION_LINK_CANCELLED_V1_TYPE,
+  RESERVATION_LINK_CONFIRMED_V1_TYPE,
+  RESERVATION_LINK_CREATED_V1_TYPE,
+  RESERVATION_LINK_EVENT_VERSION,
+  RESERVATION_LINK_SAVED_V1_TYPE,
+} from '../../events/reservation-link.v1.js';
 
 export async function loadReservationEmailFlags(reservationId: string) {
   const { data, error } = await supabaseAdmin
@@ -205,6 +216,24 @@ export function buildDefaultHandlers(): Map<string, OutboxHandler> {
       ...createDefaultNotificationFanoutDeps(),
       isEffectsEnabled: () => env.OCCUPANCY_URGENCY_VIA_WORKER,
     }),
+  );
+
+  // F5-004 — Reservation-link lifecycle. Only passenger_data_saved notifies.
+  map.set(
+    `${RESERVATION_LINK_CREATED_V1_TYPE}:${RESERVATION_LINK_EVENT_VERSION}`,
+    createReservationLinkAckHandler('created'),
+  );
+  map.set(
+    `${RESERVATION_LINK_CONFIRMED_V1_TYPE}:${RESERVATION_LINK_EVENT_VERSION}`,
+    createReservationLinkAckHandler('confirmed'),
+  );
+  map.set(
+    `${RESERVATION_LINK_CANCELLED_V1_TYPE}:${RESERVATION_LINK_EVENT_VERSION}`,
+    createReservationLinkAckHandler('cancelled'),
+  );
+  map.set(
+    `${RESERVATION_LINK_SAVED_V1_TYPE}:${RESERVATION_LINK_EVENT_VERSION}`,
+    createReservationLinkPassengerSavedHandler(),
   );
 
   return map;
