@@ -1,4 +1,4 @@
-import { Bell, Ticket, Calendar, UserCheck, XCircle, Trash2, AlertTriangle, type LucideIcon } from 'lucide-react';
+import { Bell, Ticket, Calendar, UserCheck, XCircle, Trash2, AlertTriangle, Link2, type LucideIcon } from 'lucide-react';
 
 export const NOTIFICATION_ICONS: Record<string, { icon: LucideIcon; bg: string; color: string }> = {
   trip_created: { icon: Calendar, bg: 'bg-[var(--color-cyan-bg)]', color: 'text-[var(--color-brand-cyan)]' },
@@ -12,4 +12,5 @@ export const NOTIFICATION_ICONS: Record<string, { icon: LucideIcon; bg: string; 
   reservation_cancelled: { icon: XCircle, bg: 'bg-[var(--color-brand-dark-bg)]', color: 'text-[var(--color-brand-blue)]' },
   passenger_cancelled: { icon: UserCheck, bg: 'bg-[var(--color-brand-dark-bg)]', color: 'text-[var(--color-brand-blue)]' },
   occupancy_alert: { icon: AlertTriangle, bg: 'bg-[#fffbeb]', color: 'text-[#92400e]' },
+  reservation_link_passenger_data: { icon: Link2, bg: 'bg-[var(--color-cyan-bg)]', color: 'text-[var(--color-brand-cyan)]' },
 };

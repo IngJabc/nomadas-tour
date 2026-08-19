@@ -22,8 +22,8 @@ function event(partial: Partial<AuditEventDTO> = {}): AuditEventDTO {
 }
 
 describe('audit-config', () => {
-  it('covers all 9 actions with label/icon/tone/entityLabel/summarize', () => {
-    expect(AUDIT_ACTIONS).toHaveLength(9);
+  it('covers all actions with label/icon/tone/entityLabel/summarize', () => {
+    expect(AUDIT_ACTIONS).toHaveLength(15);
     for (const action of AUDIT_ACTIONS) {
       const cfg = AUDIT_ACTION_CONFIG[action];
       expect(cfg.label).toBeTruthy();

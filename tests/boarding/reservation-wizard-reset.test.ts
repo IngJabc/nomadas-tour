@@ -44,7 +44,11 @@ describe('reservation wizard — "Nueva reserva" reset navigation', () => {
 
   it('cleans the URL as the first effective operation of handleReset', () => {
     const firstStatement = body.trimStart().split('\n')[0].trim();
-    expect(firstStatement).toBe(`${NAVIGATION};`);
+    // 2026-08: handleReset now fires cancelActiveLinkWithRelease() first
+    // (fire-and-forget, non-blocking). The URL cleanup must follow immediately.
+    const lines = body.trimStart().split('\n').map(l => l.trim()).filter(Boolean);
+    expect(lines[0]).toMatch(/^void cancelActiveLinkWithRelease/);
+    expect(lines[1]).toBe(`${NAVIGATION};`);
   });
 
   it('clears ticket state so the wizard can start again', () => {

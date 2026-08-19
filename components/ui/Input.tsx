@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -53,11 +54,19 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             {helperText}
           </p>
         )}
-        {error && (
-          <p className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[#ef4444]">
-            {error}
-          </p>
-        )}
+        <AnimatePresence>
+          {error && (
+            <motion.p
+              initial={{ opacity: 0, y: -4, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: -4, height: 0 }}
+              transition={{ duration: 0.15 }}
+              className="font-[family-name:var(--font-body)] font-normal text-[12px] text-[#ef4444] overflow-hidden"
+            >
+              {error}
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
     );
   }

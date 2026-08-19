@@ -21,10 +21,12 @@ import {
   Clock,
   Bus as BusIcon,
   Share2,
+  Link2,
+  Copy,
 } from "lucide-react";
 import { formatDateTimeShort, formatDateLong, formatTime12h } from "@/lib/timezone";
 import { agencyApi } from "@/lib/api";
-import { subscribeToTripSeats, subscribeToTrips } from "@/lib/realtime/subscriptions";
+import { subscribeToTripSeats, subscribeToTrips, subscribeToReservationLink } from "@/lib/realtime/subscriptions";
 import {
   Seat,
   PassengerData,
@@ -48,12 +50,22 @@ import { ReservationSummary } from "@/components/booking/ReservationSummary";
 import { AgencyTripCardSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { AgencyTripCard } from "@/components/agency/AgencyTripCard";
 import { ReservationTicket } from "@/components/reservations/ReservationTicket";
 import { ReservationTicketActions } from "@/components/reservations/ReservationTicketActions";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
 import { isForcedLogout } from "@/lib/auth/session-handler";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { ApiError } from "@/lib/errors/api-error";
+import {
+  rememberLinkUrl,
+  rememberActiveLink,
+  recallActiveLink,
+  clearActiveLinkMemory,
+  mergePassengersFromLinkData,
+  type LinkDataForm,
+} from "@/lib/reservation-links";
 
 // ─── Page wrapper ────────────────────────────────────────────────────
 export default function NewAgencyReservationPage() {
@@ -111,16 +123,41 @@ function NewReservationContent() {
   const hadSeatsRef = useRef(false);
   const prevWizardStepRef = useRef<string | null>(null);
   const [refreshingSeats, setRefreshingSeats] = useState(false);
+  const [creatingLink, setCreatingLink] = useState(false);
+  const [cancelLinkOpen, setCancelLinkOpen] = useState(false);
+  const [cancellingLink, setCancellingLink] = useState(false);
+  const [activeLink, setActiveLink] = useState<{ id: string; url: string } | null>(null);
+  const activeLinkRef = useRef<{ id: string; url: string } | null>(null);
+  const ignoreLinkRealtimeRef = useRef(false);
+  activeLinkRef.current = activeLink;
+  const linkSeatCodesRef = useRef<string[]>([]);
+  const pendingInvalidationRef = useRef<Promise<unknown> | null>(null);
   const locking = useSeatLocking({ userId, onSeatLost: (seatCode) => {
     addToast(`El asiento ${seatCode} ya no está disponible`, "info");
   }, onTripCancelled: () => {
     if (tripCancelledHandledRef.current) return;
     tripCancelledHandledRef.current = true;
+    const link = activeLinkRef.current;
+    const tripId = locking.selectedTrip?.id;
+    if (link) {
+      ignoreLinkRealtimeRef.current = true;
+      activeLinkRef.current = null;
+      if (tripId) clearActiveLinkMemory(tripId);
+      agencyApi.cancelReservationLink(link.id).catch(() => {});
+    }
     toast.error("Este viaje fue cancelado por el administrador. La reserva no puede continuar.");
     setTimeout(() => router.push("/agency/trips"), 300);
   }, onTripCompleted: () => {
     if (tripCompletedHandledRef.current) return;
     tripCompletedHandledRef.current = true;
+    const link = activeLinkRef.current;
+    const tripId = locking.selectedTrip?.id;
+    if (link) {
+      ignoreLinkRealtimeRef.current = true;
+      activeLinkRef.current = null;
+      if (tripId) clearActiveLinkMemory(tripId);
+      agencyApi.cancelReservationLink(link.id).catch(() => {});
+    }
     toast.error("Este viaje fue completado por el administrador. La reserva no puede continuar.");
     setTimeout(() => router.push("/agency/trips"), 300);
   }, onTripUpdated: (changes) => {
@@ -132,11 +169,57 @@ function NewReservationContent() {
     toast(`El viaje fue actualizado (${labels.join(', ')}). Los datos se han refrescado.`, { icon: '🔄' });
   }});
 
+  const clearActiveLinkLocal = useCallback(() => {
+    ignoreLinkRealtimeRef.current = true;
+    activeLinkRef.current = null;
+    setActiveLink(null);
+    linkSeatCodesRef.current = [];
+  }, []);
+
+  /** Seat selection changed — link dies, locks stay until TTL or manual unlock. */
+  const invalidateActiveLink = useCallback(async (): Promise<boolean> => {
+    const link = activeLinkRef.current;
+    const tripId = locking.selectedTrip?.id;
+    if (!link) return true;
+    const p = agencyApi.invalidateReservationLink(link.id);
+    pendingInvalidationRef.current = p;
+    try {
+      await p;
+      clearActiveLinkLocal();
+      if (tripId) clearActiveLinkMemory(tripId);
+      return true;
+    } catch {
+      // HTTP failed — activeLinkRef still holds the old link.
+      // handleCreateLink will detect this and retry.
+      return false;
+    } finally {
+      if (pendingInvalidationRef.current === p) {
+        pendingInvalidationRef.current = null;
+      }
+    }
+  }, [clearActiveLinkLocal, locking.selectedTrip?.id]);
+
+  /** Explicit cancel — also releases agency-owned locks on link seats. */
+  const cancelActiveLinkWithRelease = useCallback(async () => {
+    const link = activeLinkRef.current;
+    const tripId = locking.selectedTrip?.id;
+    if (!link) return;
+    clearActiveLinkLocal();
+    if (tripId) clearActiveLinkMemory(tripId);
+    try {
+      await agencyApi.cancelReservationLink(link.id);
+    } catch {
+      /* already cancelled or expired */
+    }
+    locking.syncSeatsAfterCancel();
+  }, [clearActiveLinkLocal, locking]);
+
   const handleLockExpired = useCallback(async () => {
     if (lockExpiredHandledRef.current) return;
     if (isSubmittingRef.current) return;
     lockExpiredHandledRef.current = true;
     hadSeatsRef.current = false;
+    await invalidateActiveLink();
     setRefreshingSeats(true);
     try {
       await locking.unlockAllCurrent();
@@ -147,11 +230,11 @@ function NewReservationContent() {
       toast.error("El tiempo para completar la reserva expiró. Tus asientos fueron liberados. Selecciona nuevamente para continuar.");
       wizard.goToSeatSelection();
     }
-  }, [locking, wizard]);
+  }, [locking, wizard, invalidateActiveLink]);
 
   const { remainingSeconds, formattedTime, stop: stopCountdown } = useLockCountdown({
     selectedSeats: locking.selectedSeats,
-    ttlSeconds: Number(process.env.NEXT_PUBLIC_LOCK_TTL_SECONDS || 300),
+    ttlSeconds: Number(process.env.NEXT_PUBLIC_LOCK_TTL_SECONDS || 600),
     onExpired: handleLockExpired,
   });
 
@@ -222,6 +305,16 @@ function NewReservationContent() {
   );
 
   const onSuccess = useCallback((reservationId: string) => {
+    const link = activeLinkRef.current;
+    const tripId = locking.selectedTrip?.id;
+    if (link) {
+      ignoreLinkRealtimeRef.current = true;
+      activeLinkRef.current = null;
+      setActiveLink(null);
+      linkSeatCodesRef.current = [];
+      if (tripId) clearActiveLinkMemory(tripId);
+      agencyApi.cancelReservationLink(link.id).catch(() => {});
+    }
     lockExpiredHandledRef.current = true;
     locking.unlockAllCurrent();
     stopCountdown();
@@ -438,15 +531,70 @@ function NewReservationContent() {
     });
   }, [tripIdParam]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ─── Recover active link after remount ─────────────────────────────
+  const recoveredRef = useRef(false);
+  useEffect(() => {
+    if (recoveredRef.current) return;
+    if (!locking.selectedTrip?.id) return;
+    const tripId = locking.selectedTrip.id;
+    const stored = recallActiveLink(tripId);
+    if (!stored) return;
+    recoveredRef.current = true;
+
+    // Validate with backend — link must still be active
+    agencyApi.getReservationLink(stored.linkId).then((detail) => {
+      if (detail.status !== 'active') {
+        clearActiveLinkMemory(tripId);
+        return;
+      }
+      const next = { id: detail.id, url: stored.url };
+      activeLinkRef.current = next;
+      setActiveLink(next);
+      linkSeatCodesRef.current = detail.seats;
+      ignoreLinkRealtimeRef.current = false;
+    }).catch(() => {
+      clearActiveLinkMemory(tripId);
+    });
+  }, [locking.selectedTrip?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Smart comparison: invalidate link only if seat set changed ────
+  const prevSelectionRef = useRef<string>('');
+  useEffect(() => {
+    if (!activeLinkRef.current) {
+      prevSelectionRef.current = '';
+      return;
+    }
+    if (linkSeatCodesRef.current.length === 0) return;
+
+    const currentKey = [...locking.selectedSeats.map((s) => s.seat_code)].sort().join(',');
+    if (currentKey === prevSelectionRef.current) return;
+    prevSelectionRef.current = currentKey;
+
+    const currentSet = new Set(locking.selectedSeats.map((s) => s.seat_code));
+    const linkSet = new Set(linkSeatCodesRef.current);
+    const isSame =
+      currentSet.size === linkSet.size &&
+      [...currentSet].every((code) => linkSet.has(code));
+
+    if (!isSame) {
+      void invalidateActiveLink().then((ok) => {
+        if (ok) {
+          toast("El enlace se canceló porque cambió la selección de asientos.");
+        }
+      });
+    }
+  }, [locking.selectedSeats, invalidateActiveLink]);
+
   // ─── Step transitions ─────────────────────────────────────────────
   const handleBackFromSeats = useCallback(async () => {
+    await cancelActiveLinkWithRelease();
     await locking.unlockAllCurrent();
     locking.resetSeats();
     lockExpiredHandledRef.current = false;
     hadSeatsRef.current = false;
     stopCountdown();
     wizard.goBackFromSeats();
-  }, [locking, wizard, stopCountdown]);
+  }, [locking, wizard, stopCountdown, cancelActiveLinkWithRelease]);
 
   const handleSelectTrip = useCallback(
     async (tripId: string) => {
@@ -463,20 +611,122 @@ function NewReservationContent() {
         parseInt(a.seat_code.slice(1), 10) - parseInt(b.seat_code.slice(1), 10)
       );
     });
-    // Initialize passengers for sorted seats
-    setPassengers(
-      sorted.map((s) => ({
-        seat_id: s.id,
-        seat_code: s.seat_code,
-        name: "",
-        document: "",
-        phone: "",
-      }))
-    );
+    // Initialize passengers for sorted seats, keeping data already typed
+    setPassengers((prev) => {
+      const byId = new Map(prev.map((p) => [p.seat_id, p]));
+      return sorted.map((s) =>
+        byId.get(s.id) ?? {
+          seat_id: s.id,
+          seat_code: s.seat_code,
+          name: "",
+          document: "",
+          phone: "",
+        },
+      );
+    });
     setErrors({});
     lockExpiredHandledRef.current = false;
     wizard.goToPassengerForm();
   }, [locking.selectedSeats, wizard]);
+
+  const handleCreateLink = useCallback(async () => {
+    const trip = locking.selectedTrip;
+    if (!trip || locking.selectedSeats.length === 0 || creatingLink) return;
+
+    // 1. Await any pending invalidation from the smart comparison useEffect
+    if (pendingInvalidationRef.current) {
+      await pendingInvalidationRef.current;
+    }
+
+    // 2. If old link still active after pending invalidation, determine next step
+    if (activeLinkRef.current) {
+      const currentSeatCodes = new Set(locking.selectedSeats.map((s) => s.seat_code));
+      const linkSeatCodes = new Set(linkSeatCodesRef.current);
+      const seatsMatch =
+        currentSeatCodes.size === linkSeatCodes.size &&
+        [...currentSeatCodes].every((code) => linkSeatCodes.has(code));
+
+      if (seatsMatch) {
+        // Seats unchanged — link is intentionally active, continue with it
+        wizard.goToPassengerForm();
+        try {
+          await navigator.clipboard.writeText(activeLinkRef.current.url);
+          toast.success("El enlace sigue activo y copiado");
+        } catch {
+          toast.success("El enlace sigue activo");
+        }
+        return;
+      }
+
+      // Seats changed — link is stale, retry invalidation deterministically
+      const retryId = locking.selectedTrip?.id;
+      try {
+        await agencyApi.invalidateReservationLink(activeLinkRef.current.id);
+        clearActiveLinkLocal();
+        if (retryId) clearActiveLinkMemory(retryId);
+      } catch {
+        toast.error("No se pudo invalidar el enlace anterior. Intenta de nuevo.");
+        return;
+      }
+    }
+
+    // 3. Create new link — guaranteed no stale active link in DB
+    setCreatingLink(true);
+    try {
+      const seatCodes = locking.selectedSeats.map((s) => s.seat_code);
+      const result = await agencyApi.createReservationLink({
+        trip_id: trip.id,
+        seat_ids: locking.selectedSeats.map((s) => s.id),
+      });
+      rememberLinkUrl(result.link_id, result.url);
+      rememberActiveLink({
+        linkId: result.link_id,
+        url: result.url,
+        tripId: trip.id,
+        seatCodes,
+      });
+      locking.applyLockExpiresAt(result.expires_at);
+      ignoreLinkRealtimeRef.current = false;
+      const next = { id: result.link_id, url: result.url };
+      activeLinkRef.current = next;
+      setActiveLink(next);
+      linkSeatCodesRef.current = seatCodes;
+
+      const sorted = [...locking.selectedSeats].sort((a, b) => {
+        return (
+          parseInt(a.seat_code.slice(1), 10) - parseInt(b.seat_code.slice(1), 10)
+        );
+      });
+      setPassengers((prev) => {
+        const byId = new Map(prev.map((p) => [p.seat_id, p]));
+        return sorted.map((s) =>
+          byId.get(s.id) ?? {
+            seat_id: s.id,
+            seat_code: s.seat_code,
+            name: "",
+            document: "",
+            phone: "",
+          },
+        );
+      });
+      setErrors({});
+      lockExpiredHandledRef.current = false;
+      wizard.goToPassengerForm();
+
+      try {
+        await navigator.clipboard.writeText(result.url);
+        toast.success("Enlace creado y copiado");
+      } catch {
+        toast.success("Enlace creado");
+      }
+    } catch (err) {
+      const message =
+        err instanceof ApiError ? err.message : "No se pudo crear el enlace";
+      toast.error(message);
+    } finally {
+      setCreatingLink(false);
+    }
+  }, [locking, creatingLink, wizard, clearActiveLinkLocal]);
 
   const handleProceedToSummary = useCallback(() => {
     const err = validateForm(
@@ -529,6 +779,7 @@ function NewReservationContent() {
   ]);
 
   const handleReset = useCallback(() => {
+    void cancelActiveLinkWithRelease();
     router.replace('/agency/reservations/new');
     setBookerName("");
     setBookerDocument("");
@@ -547,7 +798,7 @@ function NewReservationContent() {
     wizard.resetWizard();
     tripCancelledHandledRef.current = false;
     tripCompletedHandledRef.current = false;
-  }, [submit, locking, wizard, router, stopCountdown]);
+  }, [submit, locking, wizard, router, stopCountdown, cancelActiveLinkWithRelease]);
 
   const handleBookerNameChange = useCallback((v: string) => setBookerName(v), []);
   const handleBookerDocumentChange = useCallback((v: string) => setBookerDocument(v), []);
@@ -561,12 +812,51 @@ function NewReservationContent() {
     []
   );
 
+  const handleCopyLink = useCallback(async () => {
+    const url = activeLinkRef.current?.url;
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Enlace copiado");
+    } catch {
+      toast.error("No se pudo copiar el enlace");
+    }
+  }, []);
+
+  const handleConfirmCancelLink = useCallback(async () => {
+    setCancellingLink(true);
+    try {
+      await cancelActiveLinkWithRelease();
+      toast.success("Enlace cancelado");
+      setCancelLinkOpen(false);
+    } finally {
+      setCancellingLink(false);
+    }
+  }, [cancelActiveLinkWithRelease]);
+
+  useEffect(() => {
+    if (!activeLink?.id) return;
+    return subscribeToReservationLink(activeLink.id, (row) => {
+      if (ignoreLinkRealtimeRef.current) return;
+      if (row.status && row.status !== "active") {
+        toast("El enlace ya no está activo. Completa los datos aquí.");
+      }
+      const linkData = row.link_data as Partial<LinkDataForm> | undefined;
+      if (!linkData || typeof linkData !== "object") return;
+      if (typeof linkData.booker_name === "string") setBookerName(linkData.booker_name);
+      if (typeof linkData.booker_document === "string") {
+        setBookerDocument(linkData.booker_document);
+      }
+      setPassengers((prev) => mergePassengersFromLinkData(prev, linkData));
+    });
+  }, [activeLink?.id]);
+
   const handleEditPassengers = useCallback(() => {
     wizard.goToPassengerEntry();
   }, [wizard]);
 
   const handleToggleSeat = useCallback(
-    (seat: Seat) => {
+    async (seat: Seat) => {
       if (refreshingSeats) return;
       locking.toggleSeat(seat, addToast);
     },
@@ -583,6 +873,7 @@ function NewReservationContent() {
       wizard.step === "summary";
     if (isOnActiveStep && locking.selectedSeats.length === 0) {
       hadSeatsRef.current = false;
+      invalidateActiveLink();
       addToast(
         "Tus asientos fueron liberados. Selecciona nuevamente.",
         "info"
@@ -590,6 +881,19 @@ function NewReservationContent() {
       wizard.goToSeatSelection();
     }
   }, [wizard.step, locking.selectedSeats.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Wizard abandonment — invalidate link on unmount ─────────────────
+  useEffect(() => {
+    return () => {
+      const link = activeLinkRef.current;
+      const tripId = locking.selectedTrip?.id;
+      if (!link) return;
+      activeLinkRef.current = null;
+      linkSeatCodesRef.current = [];
+      if (tripId) clearActiveLinkMemory(tripId);
+      agencyApi.invalidateReservationLink(link.id).catch(() => {});
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Derived state ────────────────────────────────────────────────
   const availableTrips = useMemo(() => {
@@ -809,7 +1113,7 @@ function NewReservationContent() {
 
                 {locking.tripLoading ? (
                   <div className="flex flex-col lg:flex-row gap-6">
-                    <div className="lg:w-[300px] shrink-0 space-y-3 bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)]">
+                    <div className="w-full lg:w-[300px] shrink-0 space-y-3 bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)]">
                       <div className="h-4 w-32 bg-slate-200 rounded animate-pulse" />
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 bg-slate-200 rounded-lg animate-pulse" />
@@ -901,7 +1205,7 @@ function NewReservationContent() {
                         initial={{ opacity: 0, x: -12 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.25 }}
-                        className="lg:w-[300px] shrink-0 self-start bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
+                        className="w-full lg:w-[300px] shrink-0 self-start bg-[var(--color-brand-surface)] rounded-2xl p-5 border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)]"
                       >
                         <p className="font-[family-name:var(--font-heading)] font-bold text-[13px] text-[var(--color-brand-navy)] uppercase tracking-wider mb-4 border-l-4 border-[var(--color-brand-cyan)] pl-3">
                           Resumen del viaje
@@ -1018,7 +1322,31 @@ function NewReservationContent() {
                     </div>
 
                     {/* Footer */}
-                    <div className="flex flex-col gap-3 mt-6 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-3 mt-6">
+                      {activeLink && (
+                        <div className="rounded-2xl bg-[var(--color-brand-surface)] border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6">
+                          <p className="font-[family-name:var(--font-body)] font-semibold text-[14px] text-[var(--color-brand-navy)]">
+                            Enlace activo
+                          </p>
+                          <p className="mt-2 font-[family-name:var(--font-body)] text-[13px] text-[var(--color-brand-muted)]">
+                            Si cambias la selección, el enlace se cancela. Los asientos siguen bloqueados hasta que los liberes manualmente o expire el tiempo.
+                          </p>
+                          <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
+                            <Button variant="secondary" size="sm" onClick={handleCopyLink}>
+                              <Copy className="w-4 h-4" />
+                              Copiar enlace
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => setCancelLinkOpen(true)}
+                            >
+                              Cancelar enlace
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <span className="font-[family-name:var(--font-body)] font-medium text-sm text-[var(--color-brand-muted)]">
                         {locking.selectedSeats.length} asiento
                         {locking.selectedSeats.length !== 1 ? "s" : ""}{" "}
@@ -1035,13 +1363,23 @@ function NewReservationContent() {
                           Compartir mapa
                         </Button>
                         <Button
+                          variant="secondary"
+                          onClick={handleCreateLink}
+                          disabled={locking.selectedSeats.length === 0}
+                          loading={creatingLink}
+                        >
+                          <Link2 className="w-4 h-4" />
+                          Crear enlace
+                        </Button>
+                        <Button
                           variant="primary"
                           onClick={handleProceedToForm}
-                          disabled={locking.selectedSeats.length === 0}
+                          disabled={locking.selectedSeats.length === 0 || creatingLink}
                         >
                           Continuar
                           <ArrowRight className="w-4 h-4" />
                         </Button>
+                      </div>
                       </div>
                     </div>
                   </>
@@ -1069,6 +1407,33 @@ function NewReservationContent() {
                 </button>
 
                 <LockCountdown seconds={remainingSeconds} formattedTime={formattedTime} />
+
+                {activeLink && (
+                  <div className="mb-6 rounded-2xl bg-[var(--color-brand-surface)] border border-[rgba(0,0,0,0.06)] shadow-[0_1px_3px_rgba(0,0,0,0.06)] p-6">
+                    <h3 className="border-l-4 border-[var(--color-brand-cyan)] pl-3 font-[family-name:var(--font-heading)] font-bold text-[20px] text-[var(--color-brand-navy)]">
+                      Enlace para el pasajero
+                    </h3>
+                    <p className="mt-2 font-[family-name:var(--font-body)] font-normal text-[14px] text-[var(--color-brand-muted)]">
+                      El pasajero puede completar estos datos. También puedes completarlos aquí.
+                    </p>
+                    <p className="mt-4 font-[family-name:var(--font-body)] text-[13px] text-[var(--color-brand-navy)] break-all">
+                      {activeLink.url}
+                    </p>
+                    <div className="mt-4 flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
+                      <Button variant="secondary" size="sm" onClick={handleCopyLink}>
+                        <Copy className="w-4 h-4" />
+                        Copiar enlace
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setCancelLinkOpen(true)}
+                      >
+                        Cancelar enlace
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <PassengerForm
                   passengers={passengers}
@@ -1216,6 +1581,18 @@ function NewReservationContent() {
           </div>
         </motion.div>
       )}
+
+      <ConfirmModal
+        open={cancelLinkOpen}
+        title="Cancelar enlace"
+        message="El pasajero ya no va a poder usar este enlace. Los asientos del enlace también se liberarán."
+        confirmLabel="Cancelar enlace"
+        cancelLabel="Volver"
+        variant="danger"
+        loading={cancellingLink}
+        onConfirm={handleConfirmCancelLink}
+        onCancel={() => setCancelLinkOpen(false)}
+      />
     </main>
   );
 }

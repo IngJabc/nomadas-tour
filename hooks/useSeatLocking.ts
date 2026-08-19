@@ -30,9 +30,12 @@ interface UseSeatLockingReturn {
   loadDeepLinkTrip: (tripId: string) => Promise<boolean>;
   toggleSeat: (seat: Seat, onError: (message: string, type: 'error' | 'info') => void) => void;
   unlockAllCurrent: () => Promise<void>;
+  retainLocksOnUnmount: () => void;
+  applyLockExpiresAt: (expiresAt: string) => void;
   resetSeats: () => void;
   clearSelection: () => void;
   refreshSeats: () => Promise<void>;
+  syncSeatsAfterCancel: () => Promise<void>;
   deepLinkError: boolean;
 }
 
@@ -56,6 +59,7 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
   const tripCancelledRef = useRef(false);
   const tokenRef = useRef<string | null>(null);
   const unlockSentRef = useRef(false);
+  const retainLocksRef = useRef(false);
   const prevTripFieldsRef = useRef<{
     route_id: string | null;
     departure_time: string | null;
@@ -94,6 +98,7 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
 
   const sendUnlockKeepalive = useCallback(() => {
     if (unlockSentRef.current) return;
+    if (retainLocksRef.current) return;
     const tid = tripIdRef.current;
     if (!tid) return;
     unlockSentRef.current = true;
@@ -132,6 +137,16 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
 
   // ─── Core operations ───────────────────────────────────────────────
 
+  const retainLocksOnUnmount = useCallback(() => {
+    retainLocksRef.current = true;
+  }, []);
+
+  const applyLockExpiresAt = useCallback((expiresAt: string) => {
+    setSelectedSeats((prev) =>
+      prev.map((s) => ({ ...s, lock_expires_at: expiresAt })),
+    );
+  }, []);
+
   const unlockAllCurrent = useCallback(async () => {
     const tid = tripIdRef.current;
     if (!tid) return;
@@ -163,6 +178,22 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
     try {
       const fresh: Trip = await agencyApi.getTrip(tid);
       setSeatsMap(buildSeatsMap(fresh.seats || []));
+    } catch { /* silent */ }
+  }, [buildSeatsMap]);
+
+  /** Refetch seats and drop any that were released by a cancelled link. */
+  const syncSeatsAfterCancel = useCallback(async () => {
+    const tid = tripIdRef.current;
+    if (!tid) return;
+    try {
+      const fresh: Trip = await agencyApi.getTrip(tid);
+      setSeatsMap(buildSeatsMap(fresh.seats || []));
+      setSelectedSeats((prev) =>
+        prev.filter((s) => {
+          const freshSeat = (fresh.seats || []).find((fs) => fs.id === s.id);
+          return freshSeat && freshSeat.status === 'locked' && freshSeat.locked_by === userIdRef.current;
+        }),
+      );
     } catch { /* silent */ }
   }, [buildSeatsMap]);
 
@@ -255,7 +286,14 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
     } else {
       try {
         const result = await agencyApi.lockSeat(tripId, seat.id);
-        setSelectedSeats((prev) => [...prev, { ...seat, locked_at: result.locked_at }]);
+        setSelectedSeats((prev) => [
+          ...prev,
+          {
+            ...seat,
+            locked_at: result.locked_at,
+            lock_expires_at: result.lock_expires_at ?? null,
+          },
+        ]);
       } catch {
         try { await refreshSeats(); } catch { /* silent */ }
         onError('Asiento ocupado por otro usuario', 'error');
@@ -402,9 +440,12 @@ export function useSeatLocking({ userId, onSeatLost, onTripCancelled, onTripComp
     loadDeepLinkTrip,
     toggleSeat,
     unlockAllCurrent,
+    retainLocksOnUnmount,
+    applyLockExpiresAt,
     resetSeats,
     clearSelection,
     refreshSeats,
+    syncSeatsAfterCancel,
     deepLinkError,
   };
 }

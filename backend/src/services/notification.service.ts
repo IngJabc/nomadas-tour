@@ -13,9 +13,10 @@ export type NotificationType =
   | 'occupancy_alert'
   | 'reservation_created'
   | 'reservation_cancelled'
-  | 'passenger_cancelled';
+  | 'passenger_cancelled'
+  | 'reservation_link_passenger_data';
 
-export type EntityType = 'trip' | 'reservation' | 'passenger';
+export type EntityType = 'trip' | 'reservation' | 'passenger' | 'reservation_link';
 export type RecipientRole = 'agency' | 'superadmin';
 export type NotificationActor = 'superadmin' | 'agency' | 'system';
 

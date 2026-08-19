@@ -26,14 +26,15 @@ const migration065 = read('supabase/migrations/065_audit_log.sql');
 const harness = read('supabase/tests/f5_001_verification.sql');
 
 describe('F5-001 — migration isolation', () => {
-  it('keeps 064→065 contiguous; 066 is tip after departed-reservation fix', () => {
+  it('keeps 064→065→066 contiguous; tip is 069 (F5-004)', () => {
     const migrations = listMigrations();
     const i064 = migrations.indexOf('064_occupancy_urgency_alerts.sql');
     const i065 = migrations.indexOf('065_audit_log.sql');
     const i066 = migrations.indexOf('066_create_agency_reservation_departed.sql');
+    const i069 = migrations.indexOf('069_reservation_link_rpcs.sql');
     expect(i065).toBe(i064 + 1);
     expect(i066).toBe(i065 + 1);
-    expect(i066).toBe(migrations.length - 1);
+    expect(i069).toBe(migrations.length - 1);
   });
 
   it('has no tracked modifications in migrations 001–064', () => {

@@ -266,6 +266,24 @@ describe("F4-003 — OCCUPANCY_ALERT_* environment", () => {
   });
 });
 
+describe("F5-004 — LOCK_TTL_SECONDS default", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it("defaults to 600 when unset", async () => {
+    process.env = { ...originalEnv, ...requiredEnv };
+    delete process.env.LOCK_TTL_SECONDS;
+    vi.resetModules();
+    const { env } = await import("./env.js");
+    expect(env.LOCK_TTL_SECONDS).toBe(600);
+  });
+});
+
 async function parseOccupancyUrgencyViaWorker(value?: string) {
   process.env = { ...originalEnv, ...requiredEnv };
   if (value === undefined) {

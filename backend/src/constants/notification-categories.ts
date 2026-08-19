@@ -27,6 +27,7 @@ export const NOTIFICATION_TYPE_TO_CATEGORY = {
   reservation_created: null,
   reservation_cancelled: null,
   passenger_cancelled: null,
+  reservation_link_passenger_data: null,
 } as const satisfies Record<string, NotificationCategory | null>;
 
 export function getCategoryForNotificationType(

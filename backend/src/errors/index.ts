@@ -44,3 +44,15 @@ export class ValidationError extends AppError {
     super(message, 400, 'VALIDATION_ERROR');
   }
 }
+
+export class GoneError extends AppError {
+  constructor(message: string = 'Gone', code: string = 'GONE') {
+    super(message, 410, code);
+  }
+}
+
+export class UnprocessableError extends AppError {
+  constructor(message: string = 'Unprocessable entity', code: string = 'UNPROCESSABLE') {
+    super(message, 422, code);
+  }
+}

@@ -1282,12 +1282,14 @@ export class ReservationService {
     if (seat.status !== 'available') throw new ConflictError('Seat is not available');
 
     const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + env.LOCK_TTL_SECONDS * 1000).toISOString();
     const { data: updated, error: updateError } = await supabaseAdmin
       .from('seats')
       .update({
         status: 'locked',
         locked_by: userId,
         locked_at: now,
+        lock_expires_at: expiresAt,
       })
       .eq('id', seatId)
       .eq('status', 'available')
@@ -1295,7 +1297,7 @@ export class ReservationService {
 
     if (updateError) throw new ConflictError('Seat was locked by another user');
     if (!updated || updated.length === 0) throw new ConflictError('Seat is not available');
-    return { locked: true, seat_id: seatId, locked_at: now };
+    return { locked: true, seat_id: seatId, locked_at: now, lock_expires_at: expiresAt };
   }
 
   async unlockSeat(tripId: string, seatId: string, userId: string, agencyId: string) {
@@ -1309,7 +1311,7 @@ export class ReservationService {
 
     const { data, error } = await supabaseAdmin
       .from('seats')
-      .update({ status: 'available', locked_by: null, locked_at: null })
+      .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('id', seatId)
       .eq('status', 'locked')
       .eq('locked_by', userId)
@@ -1332,7 +1334,7 @@ export class ReservationService {
 
     const { data, error } = await supabaseAdmin
       .from('seats')
-      .update({ status: 'available', locked_by: null, locked_at: null })
+      .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('trip_id', tripId)
       .eq('status', 'locked')
       .eq('locked_by', userId)
@@ -1345,7 +1347,7 @@ export class ReservationService {
   async unlockAllSeatsForUser(userId: string) {
     const { data, error } = await supabaseAdmin
       .from('seats')
-      .update({ status: 'available', locked_by: null, locked_at: null })
+      .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('status', 'locked')
       .eq('locked_by', userId)
       .select();
@@ -1355,12 +1357,11 @@ export class ReservationService {
   }
 
   async releaseExpiredLocks() {
-    const cutoff = new Date(Date.now() - env.LOCK_TTL_SECONDS * 1000).toISOString();
     const { data, error } = await supabaseAdmin
       .from('seats')
-      .update({ status: 'available', locked_by: null, locked_at: null })
+      .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('status', 'locked')
-      .lt('locked_at', cutoff)
+      .lt('lock_expires_at', new Date().toISOString())
       .select();
 
     if (error) throw new ValidationError(error.message);

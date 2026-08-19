@@ -130,6 +130,36 @@ Tutorial paso a paso: [`backup-local-contingency.md`](backup-local-contingency.m
 - [ ] Lectura de reservas
 - [ ] Crear **una** reserva de prueba **solo en aislado**
 - [ ] Audit trail lectura
+- [ ] Enlaces de reserva: si `reservation_links` tiene filas `active`, ejecutar el cleanup post-restore (abajo) **antes** de abrir agencia
+
+---
+
+## 5b. Post-restore — reservation links (F5-004)
+
+Los enlaces son borradores con TTL. Tras un restore, no reactivar drafts viejos. Las reservas confirmadas y asientos `reserved` **no se tocan**.
+
+```sql
+-- 1. Expire every still-active link (do not delete historical rows).
+UPDATE reservation_links
+SET status = 'expired'
+WHERE status = 'active';
+
+-- 2. Release leftover locks for those links if the locker still belongs
+--    to the link's agency. Never touch reserved / confirmed seats.
+UPDATE seats s
+SET status = 'available',
+    locked_by = NULL,
+    locked_at = NULL,
+    lock_expires_at = NULL
+FROM reservation_link_seats rls
+JOIN reservation_links rl ON rl.id = rls.link_id
+JOIN public.users u ON u.id = s.locked_by AND u.agency_id = rl.agency_id
+WHERE rls.seat_id = s.id
+  AND rl.status = 'expired'
+  AND s.status = 'locked';
+```
+
+`trip_id` es `ON DELETE RESTRICT`: restaurar `trips` antes que `reservation_links`, o el replay de FK fallará. Un viaje faltante en runtime se trata como `TRIP_MISSING` (410), no como CASCADE.
 
 ### Storage
 

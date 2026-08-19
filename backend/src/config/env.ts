@@ -30,7 +30,7 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => parseAllowedRecipients(v ?? "")),
-  LOCK_TTL_SECONDS: z.coerce.number().default(300),
+  LOCK_TTL_SECONDS: z.coerce.number().default(600),
   /** When true, ticket email is sent by outbox worker; HTTP path skips fire-and-forget. */
   EMAIL_VIA_OUTBOX: z
     .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
