@@ -67,4 +67,5 @@ describe('F5-004 — migration isolation', () => {
     expect(sql).not.toContain('GRANT INSERT');
     expect(sql).not.toContain('GRANT UPDATE');
   });
-});
+
+  });

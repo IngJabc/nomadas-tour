@@ -74,7 +74,9 @@ describe('F5-004 ReservationLinkController', () => {
       params: { token: 'a'.repeat(64) },
       body: {
         booker_name: 'Juan',
-        passengers: [{ seat_code: 'A1', name: 'Juan', document: '1', phone: '' }],
+        booker_document: '12345678',
+        booker_phone: '04241234567',
+        passengers: [{ seat_code: 'A1', name: 'Juan', document: '12345678', phone: '' }],
       },
     } as unknown as Request;
     await reservationLinkController.publicSave(req, res, next);

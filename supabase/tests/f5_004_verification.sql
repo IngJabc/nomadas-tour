@@ -106,14 +106,66 @@ BEGIN
   END IF;
   RAISE NOTICE 'PASS: RLS enabled';
 
-  IF has_table_privilege('anon', 'public.reservation_links', 'SELECT')
-     OR has_table_privilege('authenticated', 'public.reservation_links', 'SELECT')
-     OR has_table_privilege('anon', 'public.reservation_link_seats', 'SELECT')
+-- reservation_links:
+  --   anon SELECT: DENIED
+  --   authenticated SELECT: ALLOWED for Realtime (RLS restricts rows to agency)
+  IF has_table_privilege('anon', 'public.reservation_links', 'SELECT') THEN
+    RAISE EXCEPTION 'FAIL: anon must not SELECT reservation_links';
+  END IF;
+  IF NOT has_table_privilege('authenticated', 'public.reservation_links', 'SELECT') THEN
+    RAISE EXCEPTION 'FAIL: authenticated must have SELECT on reservation_links for Realtime';
+  END IF;
+
+  -- reservation_link_seats:
+  --   anon SELECT: DENIED
+  --   authenticated SELECT: DENIED (no direct access; RPCs only)
+  IF has_table_privilege('anon', 'public.reservation_link_seats', 'SELECT')
      OR has_table_privilege('authenticated', 'public.reservation_link_seats', 'SELECT')
   THEN
-    RAISE EXCEPTION 'FAIL: anon/authenticated must not SELECT link tables';
+    RAISE EXCEPTION 'FAIL: anon/authenticated must not SELECT reservation_link_seats';
   END IF;
-  RAISE NOTICE 'PASS: GRANT deny anon/authenticated';
+
+RAISE NOTICE 'PASS: GRANT model correct (anon denied, authenticated SELECT on links only)';
+END $$;
+
+-- ── RLS policy: agency-scoped SELECT on reservation_links ─────────
+-- Verifies the policy exists and restricts rows by agency_id
+
+DO $$
+DECLARE
+  v_poldef TEXT;
+BEGIN
+  -- Check policy exists
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policy
+    WHERE polrelid = 'public.reservation_links'::regclass
+      AND polname = 'reservation_links_agency_select'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: policy reservation_links_agency_select missing';
+  END IF;
+
+  -- Check policy is FOR SELECT
+  SELECT pg_get_expr(polqual, polrelid) INTO v_poldef
+  FROM pg_policy
+  WHERE polrelid = 'public.reservation_links'::regclass
+    AND polname = 'reservation_links_agency_select';
+
+  IF v_poldef IS NULL THEN
+    RAISE EXCEPTION 'FAIL: reservation_links_agency_select has no USING clause';
+  END IF;
+
+  -- Verify the policy checks auth_app_role = 'agency' AND agency_id = auth_app_agency_id()
+  IF v_poldef NOT ILIKE '%auth_app_role()%' THEN
+    RAISE EXCEPTION 'FAIL: policy missing auth_app_role check';
+  END IF;
+  IF v_poldef NOT ILIKE '%auth_app_agency_id()%' THEN
+    RAISE EXCEPTION 'FAIL: policy missing auth_app_agency_id check';
+  END IF;
+  IF v_poldef NOT ILIKE '%agency_id%' THEN
+    RAISE EXCEPTION 'FAIL: policy missing agency_id restriction';
+  END IF;
+
+  RAISE NOTICE 'PASS: reservation_links_agency_select restricts by agency';
 END $$;
 
 -- ── FUNCTIONS ────────────────────────────────────────────────
