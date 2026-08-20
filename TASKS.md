@@ -23,10 +23,13 @@
 - [x] **Infra / Ops** — Backup & Disaster Recovery MVP — **Implementado** (GitHub Actions → age → R2)
 - [x] **Infra / Ops** — Backup local de contingencia — **Implementado** (copia manual cifrada de artefactos R2; scripts `local*.sh`; no scheduler)
   - Tutorial operativo: [`docs/backup-local-contingency.md`](docs/backup-local-contingency.md)
+- [x] **F5-004** — Reserva asistida por enlace — **CLOSED**
+  - Diseño: [`docs/F5-004-reserva-asistida-por-enlace-design.md`](docs/F5-004-reserva-asistida-por-enlace-design.md)
+  - Migrations tip `072`; wizard + página pública `/reservations/link`; Realtime agencia (`070`); tutorial CLI: [`docs/TUTORIAL-SUPABASE-MIGRACIONES.md`](docs/TUTORIAL-SUPABASE-MIGRACIONES.md)
 
-Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–29). Operación backup automático: [`docs/backup-disaster-recovery-operations.md`](docs/backup-disaster-recovery-operations.md). Emergencia: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md). Copia local: [`docs/backup-local-contingency.md`](docs/backup-local-contingency.md).
+Detalle: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md) (sprints 21–30). Operación backup automático: [`docs/backup-disaster-recovery-operations.md`](docs/backup-disaster-recovery-operations.md). Emergencia: [`docs/backup-disaster-recovery-runbook.md`](docs/backup-disaster-recovery-runbook.md). Copia local: [`docs/backup-local-contingency.md`](docs/backup-local-contingency.md).
 
-Migraciones `065` y `066` aplicadas en Supabase; harnesses PASS.
+Migraciones `065`–`072` aplicadas / validadas en el flujo Staging→Prod documentado; harnesses F5-001 / F5-004 PASS donde corresponda.
 
 **GitHub (backup):** 9 secrets cargados; bucket R2 `nomadas-backups` privado; cron diario + `workflow_dispatch` operativos; contrato Auth en dump (`auth_included=true`). Copia local manual: `scripts/backup/local*.sh` + tutorial [`docs/backup-local-contingency.md`](docs/backup-local-contingency.md). Restore drill trimestral **pendiente** (no reutilizar backup `20260817T233641Z-32081141864`). Referencia de backup validado reciente: `20260818T045852Z-32101100102`. Secrets: ver operations.
 
@@ -76,19 +79,12 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
 | — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas en el design del ticket. | Futura |
-| — | **Futura capacidad** | Reserva asistida por enlace (después de seleccionar asientos) | Futura |
-
-### Futura capacidad — Reserva asistida por enlace
-
-Tras seleccionar viaje/asientos, opción: registrar datos ahora **o** enviar enlace seguro al reservante (completa datos; reserva sigue flujo normal). El wizard manual permanece. Diseño futuro debe cubrir: token no adivinable, expiración, seat locks, estado temporal, invalidación, campos permitidos al cliente, impedir cambiar viaje/asientos/precio, posible recuperación de progreso.
-
-Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
 ## Bloqueadores
 
-_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-003 implementados. Follow-ups post-sprint implementados. Backup automático (R2) + backup local de contingencia operativos. Tutorial operativo en `docs/backup-local-contingency.md`. Restore drill trimestral pendiente. Sin sprint activo._
+_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-004 cerrados (F5-004 = reserva asistida por enlace). Follow-ups post-sprint implementados. Backup automático (R2) + backup local de contingencia operativos. Tutorial operativo en `docs/backup-local-contingency.md`. Tutorial migraciones CLI: `docs/TUTORIAL-SUPABASE-MIGRACIONES.md`. Restore drill trimestral pendiente. Sin sprint activo._
 
 ---
 

@@ -1,7 +1,8 @@
 # F5-004: Reserva Asistida por Enlace — Design Document v1.3
 
-> **Status:** DESIGN COMPLETE — VERIFIED READY
-> **Date:** 2026-08-18 (v1.3 second adversarial audit)
+> **Status:** CLOSED — IMPLEMENTED (producto operativo; tip migrations `072`)
+> **Date:** 2026-08-20 (cierre de follow-up en ROADMAP / TASKS)
+> **Design locked:** 2026-08-18 (v1.3 second adversarial audit)
 > **Supersedes:** v1.2
 > **v1.3 closed:** B1–B13 plus derived write-paths (outbox workers, audit/notification CHECKs, public RPCs, `update_trip` active-link seats, wizard TTL 600s). Do not treat v1.2 as implementable.
 

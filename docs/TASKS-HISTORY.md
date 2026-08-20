@@ -671,3 +671,17 @@ Documentación operativa para que el operador ejecute el flujo completo sin depe
 - [`backup-local-contingency.md`](backup-local-contingency.md) — procedimiento rápido, staging autosuficiente, criterios de copia/restore válidos, troubleshooting
 - Enlaces desde [`backup-disaster-recovery-operations.md`](backup-disaster-recovery-operations.md), [`backup-disaster-recovery-runbook.md`](backup-disaster-recovery-runbook.md), [`documentation-guide.md`](documentation-guide.md), [`RECOVERY-CHECKLIST.md`](RECOVERY-CHECKLIST.md)
 - Validación documental: `git diff --check` PASS
+
+---
+
+## Sprint 30 — F5-004 Reserva asistida por enlace (2026-08-18 / 2026-08-20)
+
+Capacidad de producto: tras seleccionar asientos en el wizard, la agencia puede generar un enlace para que el reservante complete datos (alternativa opcional al formulario manual).
+
+[x] **F5-004 — Reserva asistida por enlace** (**CLOSED**)
+- Diseño: [`F5-004-reserva-asistida-por-enlace-design.md`](F5-004-reserva-asistida-por-enlace-design.md) (v1.3)
+- Migrations: `067`…`072` (tip `072_reservation_link_agency_branding.sql`); harness [`supabase/tests/f5_004_verification.sql`](../supabase/tests/f5_004_verification.sql)
+- Agencia: CTA «Crear enlace» en wizard; confirmación vía RPC de enlace; Realtime propio (`070` GRANT+RLS)
+- Público: `/reservations/link?token=…` (sin mapa de asientos, sin precio, sin realtime público)
+- Ops: flujo Staging→Prod documentado en [`TUTORIAL-SUPABASE-MIGRACIONES.md`](TUTORIAL-SUPABASE-MIGRACIONES.md)
+- **Cierre de follow-up:** removido de «Futura capacidad» en [`ROADMAP.md`](ROADMAP.md) y [`TASKS.md`](../TASKS.md)
