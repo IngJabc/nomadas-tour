@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [`TASKS.md`](../TASKS.md).
 
-**Última actualización:** 2026-08-18
+**Última actualización:** 2026-08-20
 
 ---
 
@@ -37,6 +37,7 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Integridad: no reservar tras `departure_time` | Operativo (RPC `066` + UX «Ya salió») |
 | Notificaciones in-app: actor = agencia; ruta = destino | Operativo (copy; dominio intacto) |
 | Boleto: solo destino | Operativo (`origin` conservado en modelo) |
+| Reserva asistida por enlace (wizard + página pública) | Operativo (F5-004; tip `072`) |
 | Backup & DR automático (dump lógico diario cifrado en R2) | Operativo / MVP (GitHub Actions 03:00 UTC; Auth core en `data.sql`; drill trimestral pendiente) |
 | Backup local de contingencia (copia manual offline) | Operativo (scripts `local*.sh`; tutorial [`backup-local-contingency.md`](backup-local-contingency.md)) |
 
@@ -433,7 +434,7 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 | [`architecture.md`](architecture.md) | Arquitectura técnica actual |
 | [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones SEC-001…008 (cerradas); SEC-009 futura |
 | Serie `WKR-00x-*.md` | Workers/outbox (incl. [WKR-006.1](WKR-006.1-worker-observability-implementation.md), [Sentry design](WKR-006.2-sentry-foundation-design.md)) |
-| Serie `F4-00x-*.md` / [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md) | Automatizaciones y audit trail (contratos de implementación) |
+| Serie `F4-00x-*.md` / [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md) / [`F5-004-reserva-asistida-por-enlace-design.md`](F5-004-reserva-asistida-por-enlace-design.md) | Automatizaciones, audit trail y reserva asistida por enlace |
 | [`system-spec.md`](system-spec.md) | Especificación funcional base |
 | [`AGENTS.md`](../AGENTS.md) | Reglas de diseño e implementación |
 
@@ -447,11 +448,9 @@ Las fases iniciales del producto (backend, reservas, abordaje, dashboards, legac
 
 ## Follow-ups de producto
 
-**Cerrados:** actor de notificaciones = agencia; notificaciones in-app y boleto con solo destino (`origin` conservado en modelo); no reservar si `departure_time <= now()`. Detalle: [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
+**Cerrados:** actor de notificaciones = agencia; notificaciones in-app y boleto con solo destino (`origin` conservado en modelo); no reservar si `departure_time <= now()`; **reserva asistida por enlace (F5-004)**. Detalle: [`TASKS-HISTORY.md`](TASKS-HISTORY.md). Diseño: [`F5-004-reserva-asistida-por-enlace-design.md`](F5-004-reserva-asistida-por-enlace-design.md).
 
-### Futura capacidad — Reserva asistida por enlace
-
-Después de seleccionar asientos, permitir opcionalmente que la agencia genere un enlace seguro para que el reservante complete los datos (alternativa al wizard manual, que permanece). El diseño futuro deberá resolver token seguro y no adivinable, expiración, relación con seat locks, estado temporal, invalidación al confirmar/cancelar/expirar, campos permitidos al cliente, impedir cambiar viaje/asientos/precio y posible recuperación de progreso.
+_No hay follow-ups de producto abiertos en esta sección._
 
 ---
 
