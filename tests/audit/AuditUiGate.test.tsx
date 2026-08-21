@@ -122,6 +122,18 @@ describe('TEMPORARY UI GATE — /admin/audit', () => {
     expect(screen.getByText('Auditoría')).toBeTruthy();
   });
 
+  it('keeps Auditoría visible while auth revalidates (no blank flash)', async () => {
+    mockUseAuthUser.mockReturnValue({
+      ...authUser({ id: AUDIT_UI_ALLOWED_SUPERADMIN_ID, role: 'superadmin' }),
+      loading: true,
+    });
+    render(<AdminAuditPage />);
+    expect(screen.getByText('Auditoría')).toBeTruthy();
+    await waitFor(() => {
+      expect(mockAdminListAudit).toHaveBeenCalled();
+    });
+  });
+
   it('does not render AuditFeed or call listAudit for other SUPERADMINs', async () => {
     mockUseAuthUser.mockReturnValue(
       authUser({

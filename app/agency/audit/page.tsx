@@ -6,11 +6,12 @@ import { useAuthUser } from '@/hooks/useAuthUser';
 import { canAccessAdminAuditUi } from '@/lib/audit-ui-gate';
 
 export default function AgencyAuditPage() {
-  const { user, loading: authLoading } = useAuthUser();
+  const { user } = useAuthUser();
   const allowed = canAccessAdminAuditUi(user);
 
-  // Match AuthRoleGuard: return null while loading / unauthorized (UX only).
-  if (authLoading || !allowed) {
+  // Match AuthRoleGuard (AUD-019.3): do not blank on auth revalidation.
+  // Returning null while loading flashed white when switching tabs/routes.
+  if (!allowed) {
     return null;
   }
 
