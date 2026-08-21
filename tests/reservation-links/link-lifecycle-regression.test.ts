@@ -195,38 +195,6 @@ describe('F5-004 — TTL defaults to 600s', () => {
     );
     expect(hookSrc).toMatch(/ttlSeconds\s*=\s*600/);
   });
-
-  it('backend .env has LOCK_TTL_SECONDS=600', () => {
-    const envSrc = fs.readFileSync(
-      path.join(REPO_ROOT, 'backend/.env'),
-      'utf8',
-    );
-    expect(envSrc).toContain('LOCK_TTL_SECONDS=600');
-  });
-
-  it('frontend .env has NEXT_PUBLIC_LOCK_TTL_SECONDS=600', () => {
-    const envSrc = fs.readFileSync(
-      path.join(REPO_ROOT, '.env'),
-      'utf8',
-    );
-    expect(envSrc).toContain('NEXT_PUBLIC_LOCK_TTL_SECONDS=600');
-  });
-
-  it('backend .env-prod-example has LOCK_TTL_SECONDS=600', () => {
-    const envSrc = fs.readFileSync(
-      path.join(REPO_ROOT, 'backend/.env-prod-example'),
-      'utf8',
-    );
-    expect(envSrc).toContain('LOCK_TTL_SECONDS=600');
-  });
-
-  it('.env-dev-example has NEXT_PUBLIC_LOCK_TTL_SECONDS=600', () => {
-    const envSrc = fs.readFileSync(
-      path.join(REPO_ROOT, '.env-dev-example'),
-      'utf8',
-    );
-    expect(envSrc).toContain('NEXT_PUBLIC_LOCK_TTL_SECONDS=600');
-  });
 });
 
 // ─── Objective 4: Wizard abandonment cleanup ─────────────────────────

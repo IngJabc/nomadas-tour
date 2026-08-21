@@ -23,7 +23,7 @@ function listMigrations(): string[] {
     .sort();
 }
 
-const migration049 = read('supabase/migrations/049_outbox_events.sql');
+const migration049 = read('supabase/migrations/049_outbox_events.sql').replace(/\r\n/g, '\n');
 const migration056 = read(
   'supabase/migrations/056_outbox_trigger_retrofit_dedup_key.sql',
 );
@@ -32,7 +32,7 @@ const harness = read('supabase/tests/wkr_007_2_verification.sql');
 describe('WKR-007.2 — migration isolation', () => {
   it('keeps 049 as the original non-deduplicated event publisher', () => {
     expect(createHash('sha256').update(migration049).digest('hex')).toBe(
-      '8511dc4d5872b405ee557ab7cd7585075c61490452913bf905fdb4f087f0873e',
+      '21d94032345b9aa142a428e6605a28d86af86aa4e9f2c19650a9a99435b3a550',
     );
     expect(migration049).toContain(
       'CREATE OR REPLACE FUNCTION public.outbox_emit_reservation_created()',
