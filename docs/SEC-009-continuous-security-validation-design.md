@@ -103,15 +103,15 @@ SEC-009 must become a sustained capability, not another re-hardening project.
 
 ### 2.6 Dependencies
 
-| Tool             | Status                                                                                                                                 |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Package manager  | npm (root + backend) with lockfiles                                                                                                    |
-| Dependabot       | ❌ Not configured (FUTURE / optional; not SEC-009.2)                                                                                   |
-| npm audit        | ✅ **IMPLEMENTED** (SEC-009.2): `audit:deps` + CI job `dependency-scan`. HIGH/CRITICAL fail the job. Required Status Check **pending** |
-| License scanning | ❌ None (FUTURE)                                                                                                                       |
-| SBOM             | ❌ None (FUTURE)                                                                                                                       |
+| Tool             | Status                                                                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Package manager  | npm (root + backend) with lockfiles                                                                                                       |
+| Dependabot       | ❌ Not configured (FUTURE / optional; not SEC-009.2)                                                                                      |
+| npm audit        | ✅ **IMPLEMENTED** (SEC-009.2): `audit:deps` + CI job `dependency-scan`. HIGH/CRITICAL fail the job. Required Status Check **configured** |
+| License scanning | ❌ None (FUTURE)                                                                                                                          |
+| SBOM             | ❌ None (FUTURE)                                                                                                                          |
 
-SEC-009.2 **IMPLEMENTED:** `npm audit --audit-level=high` on root + backend via `npm run audit:deps`; CI job `dependency-scan` (`checkout@v4`, `setup-node@v4`, Node 22, `npm ci` both trees). Post-remediation: root **0 vulnerabilities**, backend **0 vulnerabilities** (`next` 16.3.2). Job fails on HIGH/CRITICAL; MODERATE/LOW do not fail `--audit-level=high`. Required Status Check `dependency-scan` is **pending** manual GitHub Ruleset configuration — the job does **not** yet block merge.
+SEC-009.2 **IMPLEMENTED / COMPLETED:** `npm audit --audit-level=high` on root + backend via `npm run audit:deps`; CI job `dependency-scan` (`checkout@v4`, `setup-node@v4`, Node 22, `npm ci` both trees). Post-remediation: root **0 vulnerabilities**, backend **0 vulnerabilities** (`next` 16.3.2). Job fails on HIGH/CRITICAL; MODERATE/LOW do not fail `--audit-level=high`. Required Status Check `dependency-scan` is **configured** on the `main` Ruleset and **blocks merge** on failure.
 
 ### 2.7 Code Security
 
@@ -152,28 +152,27 @@ SEC-009.2 **IMPLEMENTED:** `npm audit --audit-level=high` on root + backend via 
 
 This matrix is **CURRENT reality only**. Planned is not current.
 
-| Control                          | Exists | Automated | When Runs                                      | Blocks Merge/Deploy                                                                 | Coverage                                     |
-| -------------------------------- | ------ | --------- | ---------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------- |
-| **Auth/Authorization tests**     | ✅     | ✅        | CI (every PR / push `main`)                    | ✅                                                                                  | High                                         |
-| **API security tests**           | ✅     | ✅        | CI                                             | ✅                                                                                  | Medium                                       |
-| **Audit log PII tests**          | ✅     | ✅        | CI                                             | ✅                                                                                  | High                                         |
-| **Security regression tests**    | ✅     | ✅        | CI (`test:security`)                           | ✅                                                                                  | High                                         |
-| **Migration chain verification** | ✅     | ✅        | CI                                             | ✅                                                                                  | Medium                                       |
-| **Sentry token redaction**       | ✅     | ✅        | CI                                             | ✅                                                                                  | Medium                                       |
-| **TypeScript strict**            | ✅     | ✅        | CI (`typecheck`) + build                       | ✅                                                                                  | High                                         |
-| **Secret scanning**              | ✅     | ✅        | CI (`secret-scan`, every PR / push `main`)     | ✅ Required Status Check                                                            | High (SEC-009.1 COMPLETED; Ruleset required) |
-| **RLS SQL harnesses**            | ✅     | ❌        | Manual (SQL Editor)                            | ❌                                                                                  | High (manual only; spike still required)     |
-| **Dependency scanning**          | ✅     | ✅        | CI (`dependency-scan`, every PR / push `main`) | ⏳ Job fails on HIGH/CRITICAL; Required Status Check **pending** (manual GitHub UI) | High (SEC-009.2 IMPLEMENTED)                 |
-| **SAST**                         | ❌     | ❌        | Future                                         | ❌                                                                                  | None                                         |
-| **License scanning**             | ❌     | ❌        | Future                                         | ❌                                                                                  | None                                         |
-| **SBOM**                         | ❌     | ❌        | Future                                         | ❌                                                                                  | None                                         |
+| Control                          | Exists | Automated | When Runs                                      | Blocks Merge/Deploy      | Coverage                                     |
+| -------------------------------- | ------ | --------- | ---------------------------------------------- | ------------------------ | -------------------------------------------- |
+| **Auth/Authorization tests**     | ✅     | ✅        | CI (every PR / push `main`)                    | ✅                       | High                                         |
+| **API security tests**           | ✅     | ✅        | CI                                             | ✅                       | Medium                                       |
+| **Audit log PII tests**          | ✅     | ✅        | CI                                             | ✅                       | High                                         |
+| **Security regression tests**    | ✅     | ✅        | CI (`test:security`)                           | ✅                       | High                                         |
+| **Migration chain verification** | ✅     | ✅        | CI                                             | ✅                       | Medium                                       |
+| **Sentry token redaction**       | ✅     | ✅        | CI                                             | ✅                       | Medium                                       |
+| **TypeScript strict**            | ✅     | ✅        | CI (`typecheck`) + build                       | ✅                       | High                                         |
+| **Secret scanning**              | ✅     | ✅        | CI (`secret-scan`, every PR / push `main`)     | ✅ Required Status Check | High (SEC-009.1 COMPLETED; Ruleset required) |
+| **RLS SQL harnesses**            | ✅     | ❌        | Manual (SQL Editor)                            | ❌                       | High (manual only; spike still required)     |
+| **Dependency scanning**          | ✅     | ✅        | CI (`dependency-scan`, every PR / push `main`) | ✅ Required Status Check | High (SEC-009.2 IMPLEMENTED / COMPLETED)     |
+| **SAST**                         | ❌     | ❌        | Future                                         | ❌                       | None                                         |
+| **License scanning**             | ❌     | ❌        | Future                                         | ❌                       | None                                         |
+| **SBOM**                         | ❌     | ❌        | Future                                         | ❌                       | None                                         |
 
 There is **one** secret-scanning row. Local `gitleaks` is advisory feedback, not a second control in this matrix.
 
 **Classification (from the rows above):**
 
-- 🟢 **Automated in CI + Required Status Check blocks merge: 8** — auth/authorization, API security, audit PII, security regression, migration chain, Sentry redaction, TypeScript strict, secret scanning
-- 🟢 **Automated in CI (job fails; Required Status Check pending): 1** — dependency scanning (SEC-009.2)
+- 🟢 **Automated in CI + Required Status Check blocks merge: 9** — auth/authorization, API security, audit PII, security regression, migration chain, Sentry redaction, TypeScript strict, secret scanning, dependency scanning
 - 🟡 **Semi-automated (exists, manual, no merge block): 1** — RLS SQL harnesses
 - 🔴 **Missing entirely: 3** — SAST, license scanning, SBOM
 
@@ -181,22 +180,22 @@ There is **one** secret-scanning row. Local `gitleaks` is advisory feedback, not
 
 ## 4. Threat Model (Prioritized for Nómadas Tour)
 
-| #   | Category                           | Risk                                       | Current Mitigation                                                                                                                                                                                              | Gap for SEC-009                                                    |
-| --- | ---------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| 1   | **Tenant isolation breach**        | Agency A reads Agency B data               | RLS policies + middleware tenant + RPC validation                                                                                                                                                               | ✅ Automated tests exist; need SQL harness automation              |
-| 2   | **Auth bypass / identity forgery** | Forged JWT `user_metadata.role=superadmin` | Backend reads `public.users` not `user_metadata`; `authorize()` guard; C1 tests                                                                                                                                 | ✅ Automated C1 regression tests                                   |
-| 3   | **Auth bypass / stale sessions**   | Expired/invalid JWT accepted               | Supabase `getUser()` validates; middleware checks                                                                                                                                                               | ✅ Auth tests                                                      |
-| 4   | **Authorization bypass**           | Agency accesses another's data             | RLS policies + `tenant` middleware + RPC agency checks                                                                                                                                                          | ✅ Tests exist; need SQL harness automation                        |
-| 5   | **Direct RPC execution**           | Client calls privileged RPCs               | `EXECUTE` only to `service_role`; revoked from `authenticated`                                                                                                                                                  | ✅ SQL harness verifies grants                                     |
-| 6   | **PII exposure**                   | Leaks in logs/Sentry/outbox                | Sentry `beforeSend` redacts tokens/PII; audit log PII scanner; outbox minimal payload                                                                                                                           | ✅ Tests exist                                                     |
-| 7   | **Token leakage**                  | Raw reservation-link tokens in logs/Sentry | `redactReservationLinkUrl()` in Sentry `beforeSend`                                                                                                                                                             | ✅ Tested                                                          |
-| 8   | **SQL injection**                  | Malicious input to RPCs                    | `SECURITY DEFINER` + `search_path=public`; Zod validation; parameterized queries                                                                                                                                | ✅ Type-safe RPCs                                                  |
-| 9   | **XSS**                            | Unsanitized output                         | No server-rendered HTML with user data; frontend escapes                                                                                                                                                        | Low risk                                                           |
-| 10  | **API abuse / rate limit bypass**  | Brute force, enumeration                   | Per-route rate limits on auth/public; trust proxy=1                                                                                                                                                             | ⚠️ Missing on agency/admin                                         |
-| 11  | **Supply chain / vulnerable deps** | Malicious/outdated packages                | SEC-009.2 **IMPLEMENTED**: `dependency-scan` + `audit:deps`; `npm audit --audit-level=high` root + backend; 0 HIGH/CRITICAL after remediation (`next` 16.3.2). No Dependabot. Required Status Check **pending** | ⏳ Job exists; merge block via Ruleset still pending               |
-| 12  | **Secret leakage**                 | Service role key in repo/logs              | SEC-009.1 **IMPLEMENTED**: `secret-scan` on every PR / push `main`; Required Status Check on `main` **blocks merge** on failure; local `gitleaks git --redact .` → `no leaks found`; no pre-commit; no baseline | ✅ **Closed for CI enforcement** (local gitleaks remains advisory) |
-| 13  | **Configuration drift**            | Staging ≠ Production RLS/grants            | Manual SQL harnesses only                                                                                                                                                                                       | 🔴 Not automated                                                   |
-| 14  | **Migration drift**                | Applied migrations differ from repo        | Migration chain test exists; SQL harnesses manual                                                                                                                                                               | 🟡 Semi-automated                                                  |
+| #   | Category                           | Risk                                       | Current Mitigation                                                                                                                                                                                                                                                      | Gap for SEC-009                                                    |
+| --- | ---------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1   | **Tenant isolation breach**        | Agency A reads Agency B data               | RLS policies + middleware tenant + RPC validation                                                                                                                                                                                                                       | ✅ Automated tests exist; need SQL harness automation              |
+| 2   | **Auth bypass / identity forgery** | Forged JWT `user_metadata.role=superadmin` | Backend reads `public.users` not `user_metadata`; `authorize()` guard; C1 tests                                                                                                                                                                                         | ✅ Automated C1 regression tests                                   |
+| 3   | **Auth bypass / stale sessions**   | Expired/invalid JWT accepted               | Supabase `getUser()` validates; middleware checks                                                                                                                                                                                                                       | ✅ Auth tests                                                      |
+| 4   | **Authorization bypass**           | Agency accesses another's data             | RLS policies + `tenant` middleware + RPC agency checks                                                                                                                                                                                                                  | ✅ Tests exist; need SQL harness automation                        |
+| 5   | **Direct RPC execution**           | Client calls privileged RPCs               | `EXECUTE` only to `service_role`; revoked from `authenticated`                                                                                                                                                                                                          | ✅ SQL harness verifies grants                                     |
+| 6   | **PII exposure**                   | Leaks in logs/Sentry/outbox                | Sentry `beforeSend` redacts tokens/PII; audit log PII scanner; outbox minimal payload                                                                                                                                                                                   | ✅ Tests exist                                                     |
+| 7   | **Token leakage**                  | Raw reservation-link tokens in logs/Sentry | `redactReservationLinkUrl()` in Sentry `beforeSend`                                                                                                                                                                                                                     | ✅ Tested                                                          |
+| 8   | **SQL injection**                  | Malicious input to RPCs                    | `SECURITY DEFINER` + `search_path=public`; Zod validation; parameterized queries                                                                                                                                                                                        | ✅ Type-safe RPCs                                                  |
+| 9   | **XSS**                            | Unsanitized output                         | No server-rendered HTML with user data; frontend escapes                                                                                                                                                                                                                | Low risk                                                           |
+| 10  | **API abuse / rate limit bypass**  | Brute force, enumeration                   | Per-route rate limits on auth/public; trust proxy=1                                                                                                                                                                                                                     | ⚠️ Missing on agency/admin                                         |
+| 11  | **Supply chain / vulnerable deps** | Malicious/outdated packages                | SEC-009.2 **IMPLEMENTED / COMPLETED**: `dependency-scan` + `audit:deps`; `npm audit --audit-level=high` root + backend; 0 HIGH/CRITICAL after remediation (`next` 16.3.2). No Dependabot. Required Status Check **configured / active** (blocks merge on HIGH/CRITICAL) | ✅ **Closed for CI enforcement**                                   |
+| 12  | **Secret leakage**                 | Service role key in repo/logs              | SEC-009.1 **IMPLEMENTED**: `secret-scan` on every PR / push `main`; Required Status Check on `main` **blocks merge** on failure; local `gitleaks git --redact .` → `no leaks found`; no pre-commit; no baseline                                                         | ✅ **Closed for CI enforcement** (local gitleaks remains advisory) |
+| 13  | **Configuration drift**            | Staging ≠ Production RLS/grants            | Manual SQL harnesses only                                                                                                                                                                                                                                               | 🔴 Not automated                                                   |
+| 14  | **Migration drift**                | Applied migrations differ from repo        | Migration chain test exists; SQL harnesses manual                                                                                                                                                                                                                       | 🟡 Semi-automated                                                  |
 
 ---
 
@@ -293,15 +292,15 @@ secret-scan CI = enforcement
 
 **CURRENT (SEC-009.0 + SEC-009.1 + SEC-009.2 COMPLETED):**
 
-| Control             | Tool / job                                    | Blocks Merge                                                     |
-| ------------------- | --------------------------------------------- | ---------------------------------------------------------------- |
-| Security tests      | `security-tests` (`npm run test:security`)    | ✅                                                               |
-| Root/frontend tests | `tests` (`npm test`)                          | ✅                                                               |
-| Backend tests       | `backend-tests`                               | ✅                                                               |
-| Typecheck           | `typecheck` (`tsc --noEmit` root + backend)   | ✅                                                               |
-| Build               | `build` (Next + backend `tsc`)                | ✅                                                               |
-| Secret scanning     | `secret-scan` (`gitleaks/gitleaks-action@v3`) | ✅ Required Status Check on `main`                               |
-| Dependency scanning | `dependency-scan` (`npm run audit:deps`)      | ⏳ Job fails on HIGH/CRITICAL; Required Status Check **pending** |
+| Control             | Tool / job                                    | Blocks Merge                       |
+| ------------------- | --------------------------------------------- | ---------------------------------- |
+| Security tests      | `security-tests` (`npm run test:security`)    | ✅                                 |
+| Root/frontend tests | `tests` (`npm test`)                          | ✅                                 |
+| Backend tests       | `backend-tests`                               | ✅                                 |
+| Typecheck           | `typecheck` (`tsc --noEmit` root + backend)   | ✅                                 |
+| Build               | `build` (Next + backend `tsc`)                | ✅                                 |
+| Secret scanning     | `secret-scan` (`gitleaks/gitleaks-action@v3`) | ✅ Required Status Check on `main` |
+| Dependency scanning | `dependency-scan` (`npm run audit:deps`)      | ✅ Required Status Check on `main` |
 
 **PLANNED (not current):**
 
@@ -555,14 +554,14 @@ Unexpected exposed table/schema
 
 ## 11. Tool Evaluation (2026 Current State)
 
-| Category        | Candidates                           | Status                                                                                                            |
-| --------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| **Secrets**     | gitleaks                             | **SELECTED / IMPLEMENTED** (SEC-009.1). TruffleHog / GitHub Secret Scanning remain out of 009.1                   |
-| **SCA**         | npm audit                            | **SELECTED / IMPLEMENTED** (SEC-009.2). Required Status Check pending. OSV-Scanner / Dependabot = future/optional |
-| **SAST**        | GitHub CodeQL (free tier), Semgrep   | **FUTURE** — not selected, not implemented, not in CI                                                             |
-| **DAST**        | Nuclei (ProjectDiscovery), OWASP ZAP | **FUTURE**                                                                                                        |
-| **Fuzzing**     | TypeScript/Node/API compatible tools | **FUTURE** (post-MVP)                                                                                             |
-| **AI-assisted** | Strix, CodeQL AI, Semgrep Assistant  | 🔍 Watch                                                                                                          |
+| Category        | Candidates                           | Status                                                                                                                   |
+| --------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **Secrets**     | gitleaks                             | **SELECTED / IMPLEMENTED** (SEC-009.1). TruffleHog / GitHub Secret Scanning remain out of 009.1                          |
+| **SCA**         | npm audit                            | **SELECTED / IMPLEMENTED** (SEC-009.2). Required Status Check **configured**. OSV-Scanner / Dependabot = future/optional |
+| **SAST**        | GitHub CodeQL (free tier), Semgrep   | **FUTURE** — not selected, not implemented, not in CI                                                                    |
+| **DAST**        | Nuclei (ProjectDiscovery), OWASP ZAP | **FUTURE**                                                                                                               |
+| **Fuzzing**     | TypeScript/Node/API compatible tools | **FUTURE** (post-MVP)                                                                                                    |
+| **AI-assisted** | Strix, CodeQL AI, Semgrep Assistant  | 🔍 Watch                                                                                                                 |
 
 **Corrections:**
 
@@ -578,13 +577,13 @@ Unexpected exposed table/schema
 
 ### MVP Capabilities (5)
 
-| Priority | Capability                      | Why                                          | Status                                                                                                             |
-| -------- | ------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **1**    | **Secret scanning (gitleaks)**  | Service role / credential exposure in Git    | ✅ **IMPLEMENTED** (SEC-009.1)                                                                                     |
-| **2**    | **Dependency scanning**         | Supply chain; `npm audit --audit-level=high` | ✅ **IMPLEMENTED** (SEC-009.2). Job in CI; Required Status Check **pending**. OSV-Scanner is **not** part of 009.2 |
-| **3**    | **Security regression suite**   | Existing tests must keep blocking in CI      | 🟢 **CURRENT** via SEC-009.0 (`test:security` + related CI jobs). Further SEC-009 work may continue                |
-| **4**    | **Tenant isolation validation** | First-class suite beyond existing tests      | 🔴 **PLANNED**                                                                                                     |
-| **5**    | **SAST (CodeQL)**               | Static analysis                              | 🔴 **PLANNED / FUTURE** — not in CI                                                                                |
+| Priority | Capability                      | Why                                          | Status                                                                                                                                     |
+| -------- | ------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **1**    | **Secret scanning (gitleaks)**  | Service role / credential exposure in Git    | ✅ **IMPLEMENTED** (SEC-009.1)                                                                                                             |
+| **2**    | **Dependency scanning**         | Supply chain; `npm audit --audit-level=high` | ✅ **IMPLEMENTED / COMPLETED** (SEC-009.2). Job in CI; Required Status Check **configured / active**. OSV-Scanner is **not** part of 009.2 |
+| **3**    | **Security regression suite**   | Existing tests must keep blocking in CI      | 🟢 **CURRENT** via SEC-009.0 (`test:security` + related CI jobs). Further SEC-009 work may continue                                        |
+| **4**    | **Tenant isolation validation** | First-class suite beyond existing tests      | 🔴 **PLANNED**                                                                                                                             |
+| **5**    | **SAST (CodeQL)**               | Static analysis                              | 🔴 **PLANNED / FUTURE** — not in CI                                                                                                        |
 
 ### Technical Spike (Pre-MVP Decision)
 
@@ -799,7 +798,7 @@ ROLE: current source of truth for SEC-009 (documentation only)
 STATUS:
   SEC-009.0 = COMPLETED
   SEC-009.1 = COMPLETED / IMPLEMENTED (secret-scan Required Status Check on main)
-  SEC-009.2 = COMPLETED / IMPLEMENTED (dependency-scan in CI; Required Status Check pending)
+  SEC-009.2 = COMPLETED / IMPLEMENTED (dependency-scan in CI; Required Status Check configured / active)
   SEC-009   = NOT COMPLETE
 
 CURRENT CI JOBS:
@@ -807,11 +806,10 @@ CURRENT CI JOBS:
 
 NOT CURRENT:
   CodeQL, gitleaks pre-commit, eslint-plugin-security,
-  gitleaks-baseline.json, nightly DAST, SQL harness CI, SBOM, license scan,
-  dependency-scan Required Status Check
+  gitleaks-baseline.json, nightly DAST, SQL harness CI, SBOM, license scan
 
 OPEN QUESTIONS: 8 remaining (DAST staging, SAST choice, nightly access,
   rotation, alerts, pre-deploy SQL gate, budget, Supabase local spike)
 RESOLVED: gitleaks selected; no Husky for 009.1; secret-scan Ruleset configured;
-  npm audit selected and implemented (009.2); dependency-scan RSC still pending
+  npm audit selected and implemented (009.2); dependency-scan RSC configured / active
 ```

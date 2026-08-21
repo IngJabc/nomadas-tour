@@ -1,7 +1,7 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** **SEC-009** abierto. **SEC-009.0** COMPLETED. **SEC-009.1** COMPLETED. **SEC-009.2** IMPLEMENTED / COMPLETED (Required Status Check `dependency-scan` pendiente).
+> **Estado:** **SEC-009** abierto. **SEC-009.0** COMPLETED. **SEC-009.1** COMPLETED. **SEC-009.2** IMPLEMENTED / COMPLETED (Required Status Check `dependency-scan` configurado / activo).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
@@ -27,7 +27,7 @@
   - Remediación previa (commit aparte): `next` 16.2.9 → 16.3.2; root y backend **0 vulnerabilities** (`--audit-level=high`).
   - Validación: tests 399 / security 19 / backend 567; tsc y build root+backend PASS; `npm run audit:deps` PASS.
   - Design: [`docs/SEC-009.2-dependency-scanning-implementation-design.md`](docs/SEC-009.2-dependency-scanning-implementation-design.md)
-  - Required Status Check `dependency-scan` en el Ruleset de `main`: **pendiente** (configuración manual en GitHub). El job falla en HIGH/CRITICAL; **aún no bloquea merge** por Ruleset.
+  - Required Status Check `dependency-scan` en el Ruleset de `main`: **configurado / activo** (bloquea merge si falla).
 
 ---
 
@@ -93,21 +93,21 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 ## Después (producto / follow-ups)
 
-| Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                                                                 | Estado      |
-| ----- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
-| —     | **F5 resto**                  | Invitaciones/usuarios en audit; correlation ID; retención/purge; quitar gate UI temporal                                                                                                                                                                                                                                                                                             | Futura      |
-| —     | Futuro / Fase 6               | Métricas históricas y reporting                                                                                                                                                                                                                                                                                                                                                      | Futura      |
-| —     | Infraestructura / Operaciones | Restore drill trimestral (manual)                                                                                                                                                                                                                                                                                                                                                    | Futura      |
-| —     | Follow-up                     | Migración timers `LockCleanup` / `completeExpiredTrips`                                                                                                                                                                                                                                                                                                                              | Futura      |
-| —     | Follow-up                     | Retention `boarding_attempts`                                                                                                                                                                                                                                                                                                                                                        | Futura      |
-| —     | Follow-up                     | Normalizar occupancy en `reservation.service.ts`                                                                                                                                                                                                                                                                                                                                     | Futura      |
-| —     | **SEC-009**                   | Continuous Security Validation (≠ Sentry, ≠ Fase 8). **009.0** COMPLETED. **009.1** COMPLETED. **009.2** IMPLEMENTED / COMPLETED (`dependency-scan` Required Status Check pendiente). SEC-009 permanece **abierto**. Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md) | En progreso |
+| Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                                                              | Estado      |
+| ----- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| —     | **F5 resto**                  | Invitaciones/usuarios en audit; correlation ID; retención/purge; quitar gate UI temporal                                                                                                                                                                                                                                                                                          | Futura      |
+| —     | Futuro / Fase 6               | Métricas históricas y reporting                                                                                                                                                                                                                                                                                                                                                   | Futura      |
+| —     | Infraestructura / Operaciones | Restore drill trimestral (manual)                                                                                                                                                                                                                                                                                                                                                 | Futura      |
+| —     | Follow-up                     | Migración timers `LockCleanup` / `completeExpiredTrips`                                                                                                                                                                                                                                                                                                                           | Futura      |
+| —     | Follow-up                     | Retention `boarding_attempts`                                                                                                                                                                                                                                                                                                                                                     | Futura      |
+| —     | Follow-up                     | Normalizar occupancy en `reservation.service.ts`                                                                                                                                                                                                                                                                                                                                  | Futura      |
+| —     | **SEC-009**                   | Continuous Security Validation (≠ Sentry, ≠ Fase 8). **009.0** COMPLETED. **009.1** COMPLETED. **009.2** IMPLEMENTED / COMPLETED (`dependency-scan` Required Status Check activo). SEC-009 permanece **abierto**. Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md) | En progreso |
 
 ---
 
 ## Bloqueadores
 
-_Ninguno. Sprint: SEC-009 abierto. 009.0 COMPLETED. 009.1 COMPLETED (`secret-scan` Required Status Check activo). 009.2 IMPLEMENTED (`dependency-scan` en CI; Required Status Check pendiente de configuración manual). F4/F5 cerrados. Backup + tutoriales operativos. Restore drill trimestral pendiente._
+_Ninguno. Sprint: SEC-009 abierto. 009.0 COMPLETED. 009.1 COMPLETED (`secret-scan` Required Status Check activo). 009.2 IMPLEMENTED / COMPLETED (`dependency-scan` en CI; Required Status Check activo). F4/F5 cerrados. Backup + tutoriales operativos. Restore drill trimestral pendiente._
 
 ---
 
