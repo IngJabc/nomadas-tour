@@ -1,9 +1,12 @@
 # SEC-009 — Continuous Security Validation: Design Document
 
-> **Status:** DESIGN COMPLETE — IMPLEMENTATION IN PROGRESS  
-> **Active ticket:** SEC-009.0 — CI Security Foundation (`.github/workflows/ci.yml`)  
-> **Date:** 2026-08-20  
-> **Note:** MVP capabilities (gitleaks, dependency scan, CodeQL, tenant suite, SQL harness spike) remain future tickets.
+> **Status:** DESIGN COMPLETE — IMPLEMENTATION IN PROGRESS
+> **Active tickets:**
+>
+> - SEC-009.0 — CI Security Foundation (`.github/workflows/ci.yml`)
+> - SEC-009.1 — Secret Scanning MVP (gitleaks + CI gate `secret-scan`; pre-commit and baseline out of this ticket). Design: [`SEC-009.1-secret-scanning-implementation-design.md`](SEC-009.1-secret-scanning-implementation-design.md)
+>   **Date:** 2026-08-20
+>   **Note:** Remaining MVP capabilities (dependency scan, CodeQL, tenant suite, SQL harness spike, DAST, fuzzing) remain future tickets. Required Status Check `secret-scan` on `main` is a manual GitHub Ruleset step.
 
 ---
 
@@ -76,7 +79,7 @@ SEC-009 must become a sustained capability, not another re-hardening project.
 | `SUPABASE_DB_URL`           | GitHub Secrets (backup workflow)                      | Manual                                                   |
 | R2 credentials              | GitHub Secrets (backup workflow)                      | Manual                                                   |
 
-**Gaps:** No secret scanning (gitleaks/trufflehog), no pre-commit hooks.
+**Gaps:** Secret scanning tool for SEC-009.1 is gitleaks in CI (`secret-scan`). Pre-commit hooks and `gitleaks-baseline.json` are out of SEC-009.1.
 
 ### 2.6 Dependencies
 
@@ -151,22 +154,22 @@ SEC-009 must become a sustained capability, not another re-hardening project.
 
 ## 4. Threat Model (Prioritized for Nómadas Tour)
 
-| #   | Category                           | Risk                                       | Current Mitigation                                                                    | Gap for SEC-009                                       |
-| --- | ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| 1   | **Tenant isolation breach**        | Agency A reads Agency B data               | RLS policies + middleware tenant + RPC validation                                     | ✅ Automated tests exist; need SQL harness automation |
-| 2   | **Auth bypass / identity forgery** | Forged JWT `user_metadata.role=superadmin` | Backend reads `public.users` not `user_metadata`; `authorize()` guard; C1 tests       | ✅ Automated C1 regression tests                      |
-| 3   | **Auth bypass / stale sessions**   | Expired/invalid JWT accepted               | Supabase `getUser()` validates; middleware checks                                     | ✅ Auth tests                                         |
-| 4   | **Authorization bypass**           | Agency accesses another's data             | RLS policies + `tenant` middleware + RPC agency checks                                | ✅ Tests exist; need SQL harness automation           |
-| 5   | **Direct RPC execution**           | Client calls privileged RPCs               | `EXECUTE` only to `service_role`; revoked from `authenticated`                        | ✅ SQL harness verifies grants                        |
-| 6   | **PII exposure**                   | Leaks in logs/Sentry/outbox                | Sentry `beforeSend` redacts tokens/PII; audit log PII scanner; outbox minimal payload | ✅ Tests exist                                        |
-| 7   | **Token leakage**                  | Raw reservation-link tokens in logs/Sentry | `redactReservationLinkUrl()` in Sentry `beforeSend`                                   | ✅ Tested                                             |
-| 8   | **SQL injection**                  | Malicious input to RPCs                    | `SECURITY DEFINER` + `search_path=public`; Zod validation; parameterized queries      | ✅ Type-safe RPCs                                     |
-| 9   | **XSS**                            | Unsanitized output                         | No server-rendered HTML with user data; frontend escapes                              | Low risk                                              |
-| 10  | **API abuse / rate limit bypass**  | Brute force, enumeration                   | Per-route rate limits on auth/public; trust proxy=1                                   | ⚠️ Missing on agency/admin                            |
-| 11  | **Supply chain / vulnerable deps** | Malicious/outdated packages                | ❌ No Dependabot, no npm audit CI                                                     | 🔴 **Critical gap**                                   |
-| 12  | **Secret leakage**                 | Service role key in repo/logs              | ❌ No secret scanner                                                                  | 🔴 **Critical gap**                                   |
-| 13  | **Configuration drift**            | Staging ≠ Production RLS/grants            | Manual SQL harnesses only                                                             | 🔴 Not automated                                      |
-| 14  | **Migration drift**                | Applied migrations differ from repo        | Migration chain test exists; SQL harnesses manual                                     | 🟡 Semi-automated                                     |
+| #   | Category                           | Risk                                       | Current Mitigation                                                                          | Gap for SEC-009                                                               |
+| --- | ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1   | **Tenant isolation breach**        | Agency A reads Agency B data               | RLS policies + middleware tenant + RPC validation                                           | ✅ Automated tests exist; need SQL harness automation                         |
+| 2   | **Auth bypass / identity forgery** | Forged JWT `user_metadata.role=superadmin` | Backend reads `public.users` not `user_metadata`; `authorize()` guard; C1 tests             | ✅ Automated C1 regression tests                                              |
+| 3   | **Auth bypass / stale sessions**   | Expired/invalid JWT accepted               | Supabase `getUser()` validates; middleware checks                                           | ✅ Auth tests                                                                 |
+| 4   | **Authorization bypass**           | Agency accesses another's data             | RLS policies + `tenant` middleware + RPC agency checks                                      | ✅ Tests exist; need SQL harness automation                                   |
+| 5   | **Direct RPC execution**           | Client calls privileged RPCs               | `EXECUTE` only to `service_role`; revoked from `authenticated`                              | ✅ SQL harness verifies grants                                                |
+| 6   | **PII exposure**                   | Leaks in logs/Sentry/outbox                | Sentry `beforeSend` redacts tokens/PII; audit log PII scanner; outbox minimal payload       | ✅ Tests exist                                                                |
+| 7   | **Token leakage**                  | Raw reservation-link tokens in logs/Sentry | `redactReservationLinkUrl()` in Sentry `beforeSend`                                         | ✅ Tested                                                                     |
+| 8   | **SQL injection**                  | Malicious input to RPCs                    | `SECURITY DEFINER` + `search_path=public`; Zod validation; parameterized queries            | ✅ Type-safe RPCs                                                             |
+| 9   | **XSS**                            | Unsanitized output                         | No server-rendered HTML with user data; frontend escapes                                    | Low risk                                                                      |
+| 10  | **API abuse / rate limit bypass**  | Brute force, enumeration                   | Per-route rate limits on auth/public; trust proxy=1                                         | ⚠️ Missing on agency/admin                                                    |
+| 11  | **Supply chain / vulnerable deps** | Malicious/outdated packages                | ❌ No Dependabot, no npm audit CI                                                           | 🔴 **Critical gap**                                                           |
+| 12  | **Secret leakage**                 | Service role key in repo/logs              | SEC-009.1: `gitleaks/gitleaks-action@v3` job `secret-scan` (CI); no pre-commit; no baseline | 🟡 **SEC-009.1 in implementation**; Required Status Check on `main` is manual |
+| 13  | **Configuration drift**            | Staging ≠ Production RLS/grants            | Manual SQL harnesses only                                                                   | 🔴 Not automated                                                              |
+| 14  | **Migration drift**                | Applied migrations differ from repo        | Migration chain test exists; SQL harnesses manual                                           | 🟡 Semi-automated                                                             |
 
 ---
 

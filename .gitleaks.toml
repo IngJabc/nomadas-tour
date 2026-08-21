@@ -1,0 +1,23 @@
+title = "Nómadas Tour — Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Global allowlist for verified false positives"
+
+regexes = [
+  '''ci-anon-key-not-a-secret''',
+  '''your-supabase-service-role-key''',
+  '''your-jwt-secret-min-32-chars''',
+  '''re_xxxxxxxx''',
+  '''test-service-role''',
+  '''test-jwt-secret''',
+  '''test-resend''',
+  '''\$2a\$10\$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy''',
+  '''firma_invalida''',
+]
+
+paths = [
+  '''tests/boarding/wkr-007\.2\.test\.ts''',
+]

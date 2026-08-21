@@ -12,34 +12,34 @@
 
 Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma opera como un **centro de operaciones multi-tenant** con capacidades de producción validadas:
 
-| Capacidad | Estado |
-|-----------|--------|
-| Multi-tenant (aislamiento comercial + operación compartida controlada) | Operativo |
-| Reservas por agencia (wizard, pasajeros, QR) | Operativo |
-| Seat locks + concurrencia + idempotencia | Operativo |
-| Scanner / Boarding por pasajero | Operativo |
-| Realtime (asientos, reservas, dashboards) | Operativo |
-| Seguridad endurecida (RLS desde `public.users`, suite SEC-007/008) | Operativo |
-| Notificaciones (in-app + email) | Operativo |
-| Deploy estabilizado (`dist` fuera de Git, build en Render) | Operativo |
-| Cancelación de viajes con reservas | Operativo |
-| Agencia desactivada con logout forzado | Operativo |
-| Edición de viajes con reservas existentes | Operativo |
-| Estados inválidos protegidos | Operativo |
-| Branding configurable por agencia (logo + colores runtime) | Operativo |
-| Transactional Outbox + EmailWorker (`reservation.created.v1`) | Operativo (WKR-004/005) |
-| Reminders T-48h / T-24h | Operativo (WKR-008) |
-| Digest diario agencias | Operativo (F4-001) |
-| Digest diario superadmin | Operativo (F4-002) |
-| Alertas de ocupación (in-app) | Operativo / Completado (F4-003) |
-| Escalación de urgencia de ocupación (T-24h, in-app) | Operativo / Completado (F4-004) |
-| Audit trail (append-only + lectura API/UI) | Operativo (F5-001…F5-003; gate UI temporal) |
-| Integridad: no reservar tras `departure_time` | Operativo (RPC `066` + UX «Ya salió») |
-| Notificaciones in-app: actor = agencia; ruta = destino | Operativo (copy; dominio intacto) |
-| Boleto: solo destino | Operativo (`origin` conservado en modelo) |
-| Reserva asistida por enlace (wizard + página pública) | Operativo (F5-004; tip `072`) |
-| Backup & DR automático (dump lógico diario cifrado en R2) | Operativo / MVP (GitHub Actions 03:00 UTC; Auth core en `data.sql`; drill trimestral pendiente) |
-| Backup local de contingencia (copia manual offline) | Operativo (scripts `local*.sh`; tutorial [`backup-local-contingency.md`](backup-local-contingency.md)) |
+| Capacidad                                                              | Estado                                                                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Multi-tenant (aislamiento comercial + operación compartida controlada) | Operativo                                                                                              |
+| Reservas por agencia (wizard, pasajeros, QR)                           | Operativo                                                                                              |
+| Seat locks + concurrencia + idempotencia                               | Operativo                                                                                              |
+| Scanner / Boarding por pasajero                                        | Operativo                                                                                              |
+| Realtime (asientos, reservas, dashboards)                              | Operativo                                                                                              |
+| Seguridad endurecida (RLS desde `public.users`, suite SEC-007/008)     | Operativo                                                                                              |
+| Notificaciones (in-app + email)                                        | Operativo                                                                                              |
+| Deploy estabilizado (`dist` fuera de Git, build en Render)             | Operativo                                                                                              |
+| Cancelación de viajes con reservas                                     | Operativo                                                                                              |
+| Agencia desactivada con logout forzado                                 | Operativo                                                                                              |
+| Edición de viajes con reservas existentes                              | Operativo                                                                                              |
+| Estados inválidos protegidos                                           | Operativo                                                                                              |
+| Branding configurable por agencia (logo + colores runtime)             | Operativo                                                                                              |
+| Transactional Outbox + EmailWorker (`reservation.created.v1`)          | Operativo (WKR-004/005)                                                                                |
+| Reminders T-48h / T-24h                                                | Operativo (WKR-008)                                                                                    |
+| Digest diario agencias                                                 | Operativo (F4-001)                                                                                     |
+| Digest diario superadmin                                               | Operativo (F4-002)                                                                                     |
+| Alertas de ocupación (in-app)                                          | Operativo / Completado (F4-003)                                                                        |
+| Escalación de urgencia de ocupación (T-24h, in-app)                    | Operativo / Completado (F4-004)                                                                        |
+| Audit trail (append-only + lectura API/UI)                             | Operativo (F5-001…F5-003; gate UI temporal)                                                            |
+| Integridad: no reservar tras `departure_time`                          | Operativo (RPC `066` + UX «Ya salió»)                                                                  |
+| Notificaciones in-app: actor = agencia; ruta = destino                 | Operativo (copy; dominio intacto)                                                                      |
+| Boleto: solo destino                                                   | Operativo (`origin` conservado en modelo)                                                              |
+| Reserva asistida por enlace (wizard + página pública)                  | Operativo (F5-004; tip `072`)                                                                          |
+| Backup & DR automático (dump lógico diario cifrado en R2)              | Operativo / MVP (GitHub Actions 03:00 UTC; Auth core en `data.sql`; drill trimestral pendiente)        |
+| Backup local de contingencia (copia manual offline)                    | Operativo (scripts `local*.sh`; tutorial [`backup-local-contingency.md`](backup-local-contingency.md)) |
 
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [`TASKS-HISTORY.md`](TASKS-HISTORY.md).
 
@@ -88,7 +88,7 @@ FASE 3 — Workers
 
 FASE Seguridad continua
   SEC-001 … SEC-008                        ✅ (hardening cerrado)
-  SEC-009  Continuous security validation  → futura
+  SEC-009  Continuous security validation  → en progreso (009.0 CI; 009.1 secret-scan en implementación)
 
 FASE 4 — Automatizaciones (producto)
   F4-001  Agency Daily Digest            ✅
@@ -162,22 +162,22 @@ Los tokens de diseño del sistema (`AGENTS.md`) siguen siendo la base; la agenci
 
 #### Progreso WKR
 
-| Ticket | Tema | Estado |
-|--------|------|--------|
-| [WKR-001](WKR-001-event-inventory-audit.md) | Inventario de eventos | ✅ |
-| [WKR-002](WKR-002-events-workers-architecture-adr.md) | ADR arquitectura events/workers | ✅ |
-| [WKR-003](WKR-003-transactional-outbox-foundation-design.md) | Diseño outbox (+ readiness / boundaries) | ✅ |
-| [WKR-004](WKR-004-outbox-foundation-implementation.md) | Tabla `outbox_events` + `reservation.created.v1` | ✅ |
-| [WKR-005](WKR-005-email-worker-implementation.md) | Relay + EmailWorker | ✅ |
-| [WKR-006](WKR-006-worker-observability-foundation.md) | Observability foundation (auditoría + diseño) | ✅ |
-| [WKR-006.1](WKR-006.1-worker-observability-implementation.md) | Worker observability (logs, metrics, heartbeat, stuck reaper) | ✅ |
-| [WKR-006.2.1](WKR-006.2-sentry-foundation-design.md) | Sentry foundation design (docs only) | ✅ |
-| [WKR-006.2](WKR-006.2-sentry-foundation-implementation.md) | Sentry wiring (API + worker; sin frontend) | ✅ |
-| [WKR-006.3](WKR-006.3-outbox-retention-dlq-runbook.md) | Retention + DLQ runbook (docs) | ✅ |
-| [WKR-006.4](WKR-006.4-worker-health-endpoint.md) | Worker `/healthz` (Render Free Web Service) | ✅ |
-| [WKR-007](WKR-007-trip-notification-event-workers-design.md) | Trip / notification event workers (wiring + cutover) | ✅ |
-| [WKR-008](WKR-008-reminder-workers-audit.md) | Reminder workers (T-48h/T-24h + cutover) | ✅ |
-| [WKR-009](WKR-009-outbox-retention-workers-design.md) | Outbox Retention Worker (purga `completed` ≥30d) | ✅ |
+| Ticket                                                        | Tema                                                          | Estado |
+| ------------------------------------------------------------- | ------------------------------------------------------------- | ------ |
+| [WKR-001](WKR-001-event-inventory-audit.md)                   | Inventario de eventos                                         | ✅     |
+| [WKR-002](WKR-002-events-workers-architecture-adr.md)         | ADR arquitectura events/workers                               | ✅     |
+| [WKR-003](WKR-003-transactional-outbox-foundation-design.md)  | Diseño outbox (+ readiness / boundaries)                      | ✅     |
+| [WKR-004](WKR-004-outbox-foundation-implementation.md)        | Tabla `outbox_events` + `reservation.created.v1`              | ✅     |
+| [WKR-005](WKR-005-email-worker-implementation.md)             | Relay + EmailWorker                                           | ✅     |
+| [WKR-006](WKR-006-worker-observability-foundation.md)         | Observability foundation (auditoría + diseño)                 | ✅     |
+| [WKR-006.1](WKR-006.1-worker-observability-implementation.md) | Worker observability (logs, metrics, heartbeat, stuck reaper) | ✅     |
+| [WKR-006.2.1](WKR-006.2-sentry-foundation-design.md)          | Sentry foundation design (docs only)                          | ✅     |
+| [WKR-006.2](WKR-006.2-sentry-foundation-implementation.md)    | Sentry wiring (API + worker; sin frontend)                    | ✅     |
+| [WKR-006.3](WKR-006.3-outbox-retention-dlq-runbook.md)        | Retention + DLQ runbook (docs)                                | ✅     |
+| [WKR-006.4](WKR-006.4-worker-health-endpoint.md)              | Worker `/healthz` (Render Free Web Service)                   | ✅     |
+| [WKR-007](WKR-007-trip-notification-event-workers-design.md)  | Trip / notification event workers (wiring + cutover)          | ✅     |
+| [WKR-008](WKR-008-reminder-workers-audit.md)                  | Reminder workers (T-48h/T-24h + cutover)                      | ✅     |
+| [WKR-009](WKR-009-outbox-retention-workers-design.md)         | Outbox Retention Worker (purga `completed` ≥30d)              | ✅     |
 
 #### Capacidades ya en el sistema (WKR-004/005)
 
@@ -213,12 +213,12 @@ Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** —
 
 **Separación conceptual (no mezclar en el mismo ticket):**
 
-| Capacidad | Rol | Ticket / Fase |
-|-----------|-----|---------------|
-| **Logs / métricas / health / Sentry** | Observabilidad y operación en producción | **WKR-006.x** |
-| **SCA / SAST / secrets / DAST / fuzzing / security drift / tenant isolation** | Seguridad continua y prevención de regresiones | **SEC-009** |
-| **Load / stress / capacity / latency / costos** | Escalabilidad y rendimiento | **Fase 8** |
-| **Hexagonal / Ports & Adapters** | Decisión arquitectónica incremental en features nuevas complejas | **Política de roadmap** (no es SEC-009 ni Fase 8) |
+| Capacidad                                                                     | Rol                                                              | Ticket / Fase                                     |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------- |
+| **Logs / métricas / health / Sentry**                                         | Observabilidad y operación en producción                         | **WKR-006.x**                                     |
+| **SCA / SAST / secrets / DAST / fuzzing / security drift / tenant isolation** | Seguridad continua y prevención de regresiones                   | **SEC-009**                                       |
+| **Load / stress / capacity / latency / costos**                               | Escalabilidad y rendimiento                                      | **Fase 8**                                        |
+| **Hexagonal / Ports & Adapters**                                              | Decisión arquitectónica incremental en features nuevas complejas | **Política de roadmap** (no es SEC-009 ni Fase 8) |
 
 #### WKR-007 ✅ — Trip / notification event workers
 
@@ -254,12 +254,12 @@ SEC-001…008
 → hardening / corrección arquitectónica (cerrado)
 
 SEC-009
-→ prevención de regresiones + validación continua (futura)
+→ prevención de regresiones + validación continua (en progreso)
 ```
 
 #### SEC-009 — Continuous Security Validation
 
-**Estado:** Design complete — **implementation in progress** (activo: **SEC-009.0** CI Security Foundation / `.github/workflows/ci.yml`). MVP restante (secrets, SCA, SAST, tenant suite, SQL harness spike) aún no implementado. Detalle: [`SEC-009-continuous-security-validation-design.md`](SEC-009-continuous-security-validation-design.md).
+**Estado:** Design complete — **implementation in progress** (activo: **SEC-009.0** CI Security Foundation / `.github/workflows/ci.yml`; **SEC-009.1** Secret Scanning MVP **en implementación** — job `secret-scan` + `.gitleaks.toml`). SEC-009 permanece abierto. MVP restante (SCA, SAST, tenant suite, SQL harness spike) aún no implementado. Detalle: [`SEC-009-continuous-security-validation-design.md`](SEC-009-continuous-security-validation-design.md), [`SEC-009.1-secret-scanning-implementation-design.md`](SEC-009.1-secret-scanning-implementation-design.md). Required Status Check `secret-scan` en el Ruleset de `main`: paso manual.
 
 **Objetivo:**
 
@@ -269,7 +269,7 @@ sobre código, dependencias, secretos, aplicación desplegada y
 controles específicos de multi-tenancy / Supabase.
 ```
 
-En una frase: automatizar parte de las auditorías que hoy son manuales o semi-manuales, de modo que el proyecto detecte automáticamente —antes o poco después de un cambio— *“introdujimos una regresión de seguridad”*, en lugar de depender exclusivamente de una auditoría manual posterior.
+En una frase: automatizar parte de las auditorías que hoy son manuales o semi-manuales, de modo que el proyecto detecte automáticamente —antes o poco después de un cambio— _“introdujimos una regresión de seguridad”_, en lugar de depender exclusivamente de una auditoría manual posterior.
 
 **Definición conceptual de éxito:** un cambio que rompa aislamiento de tenant, RLS/grants, exposición de secretos, o un invariante de autorización conocido, debe fallar en pipeline/suite/scheduled check con señal accionable — no solo descubrirse en una revisión humana weeks later.
 
@@ -398,26 +398,26 @@ Detalle histórico de remediaciones C1–C4 y hardening: [`security-audit-remedi
 
 Ninguna está seleccionada. La selección ocurre cuando SEC-009 pase de roadmap a sprint (design del ticket). Verificar precios/licencias/capacidades **en ese momento**. Priorizar costo cero / open source / free tier; considerar privacidad y datos enviados a terceros. No asumir que algo gratuito hoy seguirá siéndolo.
 
-| Categoría | Candidatos |
-|-----------|------------|
-| SCA | Dependabot, npm audit, OSV-Scanner |
-| SAST | CodeQL, Semgrep |
-| Secret scanning | GitHub Secret Scanning, gitleaks, trufflehog |
-| DAST | OWASP ZAP, otras open source/free OWASP-compatible |
-| Offensive / AI-assisted | Strix, otras candidatas |
-| Fuzzing | herramientas open source adecuadas al stack |
-| API security | tooling OWASP-compatible |
+| Categoría               | Candidatos                                         |
+| ----------------------- | -------------------------------------------------- |
+| SCA                     | Dependabot, npm audit, OSV-Scanner                 |
+| SAST                    | CodeQL, Semgrep                                    |
+| Secret scanning         | GitHub Secret Scanning, gitleaks, trufflehog       |
+| DAST                    | OWASP ZAP, otras open source/free OWASP-compatible |
+| Offensive / AI-assisted | Strix, otras candidatas                            |
+| Fuzzing                 | herramientas open source adecuadas al stack        |
+| API security            | tooling OWASP-compatible                           |
 
 **Criterios de evaluación (cuando se abra el ticket):** cobertura real del stack Next.js + TypeScript + Node/Supabase; integración local/CI; falsos positivos; mantenimiento; privacidad; costo cero cuando sea posible; Strix como candidato, no como solución automática.
 
 ##### SEC-009 vs Fase 8
 
-| SEC-009 | Fase 8 — Escalabilidad |
-|---------|-------------------------|
-| SCA, SAST, secret scanning, DAST | Load / stress / capacity testing |
-| Security regression + tenant isolation | Performance regression, throughput, p95/p99 |
-| Supabase/RLS validation, fuzzing, drift | DB query performance, connection saturation |
-| Scheduled security validation | Realtime scale, cost/performance optimization |
+| SEC-009                                 | Fase 8 — Escalabilidad                        |
+| --------------------------------------- | --------------------------------------------- |
+| SCA, SAST, secret scanning, DAST        | Load / stress / capacity testing              |
+| Security regression + tenant isolation  | Performance regression, throughput, p95/p99   |
+| Supabase/RLS validation, fuzzing, drift | DB query performance, connection saturation   |
+| Scheduled security validation           | Realtime scale, cost/performance optimization |
 
 > Las pruebas de 1.000+ requests por segundo pertenecen principalmente a **Escalabilidad / Fase 8**, aunque pruebas **limitadas** de abuse / rate limiting pueden formar parte de SEC-009.
 
@@ -455,12 +455,12 @@ La definición final de tickets se hará en el design de SEC-009. **No** impleme
 
 **Progreso**
 
-| Ticket | Tema | Estado |
-|--------|------|--------|
-| F4-001 | Digest diario agencias (email) | Operativo / Completado |
+| Ticket | Tema                             | Estado                 |
+| ------ | -------------------------------- | ---------------------- |
+| F4-001 | Digest diario agencias (email)   | Operativo / Completado |
 | F4-002 | Digest diario superadmin (email) | Operativo / Completado |
-| F4-003 | Alertas de ocupación (in-app) | Operativo / Completado |
-| F4-004 | Occupancy Urgency Alerts | Operativo / Completado |
+| F4-003 | Alertas de ocupación (in-app)    | Operativo / Completado |
+| F4-004 | Occupancy Urgency Alerts         | Operativo / Completado |
 
 **Fase 4 operativa:** F4-001 a F4-004 CLOSED. Recordatorios T-48h/T-24h viven en WKR-008; la escalación T-24h de ocupación vive en F4-004. Audit Trail F5-001…F5-003 cerrado.
 
@@ -496,12 +496,12 @@ La definición final de tickets se hará en el design de SEC-009. **No** impleme
 
 **Progreso**
 
-| Ticket | Tema | Estado |
-|--------|------|--------|
-| [F5-001](F5-001-audit-trail-design.md) | Foundation: `audit_log` append-only + writers atómicos (9 acciones) | ✅ |
-| F5-002 | Read API (`GET /admin/audit`, `GET /agency/audit`) | ✅ |
-| F5-003 | UI `/admin/audit` y `/agency/audit` (gate UI temporal) | ✅ |
-| F5 resto | Invitaciones / usuarios; correlation ID; retención; quitar gate UI | Futura |
+| Ticket                                 | Tema                                                                | Estado |
+| -------------------------------------- | ------------------------------------------------------------------- | ------ |
+| [F5-001](F5-001-audit-trail-design.md) | Foundation: `audit_log` append-only + writers atómicos (9 acciones) | ✅     |
+| F5-002                                 | Read API (`GET /admin/audit`, `GET /agency/audit`)                  | ✅     |
+| F5-003                                 | UI `/admin/audit` y `/agency/audit` (gate UI temporal)              | ✅     |
+| F5 resto                               | Invitaciones / usuarios; correlation ID; retención; quitar gate UI  | Futura |
 
 **F5-001 cubre:**
 
@@ -663,17 +663,17 @@ No mezclar estos tres temas en un único ticket. No crear ADR hexagonal todavía
 
 ## Relación con documentación técnica
 
-| Documento | Rol |
-|-----------|-----|
-| [`TASKS.md`](../TASKS.md) | Sprint actual y backlog inmediato |
-| [`TASKS-HISTORY.md`](TASKS-HISTORY.md) | Historial de sprints completados |
-| [`documentation-guide.md`](documentation-guide.md) | Cómo mantener docs organizadas |
-| [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones SEC-001…008 (cerradas); puntero a SEC-009 en ROADMAP |
-| [`architecture.md`](architecture.md) | Arquitectura técnica actual + política hexagonal (incremental) |
-| Serie `WKR-00x-*.md` | Workers/outbox (incl. [WKR-006.1](WKR-006.1-worker-observability-implementation.md), [Sentry design](WKR-006.2-sentry-foundation-design.md)) |
-| Serie `F4-00x-*.md` / [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md) / [`F5-004-reserva-asistida-por-enlace-design.md`](F5-004-reserva-asistida-por-enlace-design.md) | Automatizaciones, audit trail y reserva asistida por enlace |
-| [`system-spec.md`](system-spec.md) | Especificación funcional base |
-| [`AGENTS.md`](../AGENTS.md) | Reglas de diseño e implementación |
+| Documento                                                                                                                                                                             | Rol                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`TASKS.md`](../TASKS.md)                                                                                                                                                             | Sprint actual y backlog inmediato                                                                                                            |
+| [`TASKS-HISTORY.md`](TASKS-HISTORY.md)                                                                                                                                                | Historial de sprints completados                                                                                                             |
+| [`documentation-guide.md`](documentation-guide.md)                                                                                                                                    | Cómo mantener docs organizadas                                                                                                               |
+| [`security-hardening-implementation.md`](security-hardening-implementation.md)                                                                                                        | Remediaciones SEC-001…008 (cerradas); puntero a SEC-009 en ROADMAP                                                                           |
+| [`architecture.md`](architecture.md)                                                                                                                                                  | Arquitectura técnica actual + política hexagonal (incremental)                                                                               |
+| Serie `WKR-00x-*.md`                                                                                                                                                                  | Workers/outbox (incl. [WKR-006.1](WKR-006.1-worker-observability-implementation.md), [Sentry design](WKR-006.2-sentry-foundation-design.md)) |
+| Serie `F4-00x-*.md` / [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md) / [`F5-004-reserva-asistida-por-enlace-design.md`](F5-004-reserva-asistida-por-enlace-design.md) | Automatizaciones, audit trail y reserva asistida por enlace                                                                                  |
+| [`system-spec.md`](system-spec.md)                                                                                                                                                    | Especificación funcional base                                                                                                                |
+| [`AGENTS.md`](../AGENTS.md)                                                                                                                                                           | Reglas de diseño e implementación                                                                                                            |
 
 ---
 
