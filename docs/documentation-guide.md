@@ -4,7 +4,7 @@
 
 **Cuándo usar este documento:** Al cerrar un sprint, al iniciar una fase del roadmap, al agregar documentación nueva o cuando un agente/humano no sepa dónde escribir algo.
 
-**Última actualización:** 2026-08-18
+**Última actualización:** 2026-08-21
 
 ---
 
@@ -12,15 +12,15 @@
 
 Cada tipo de documento responde **una sola pregunta**. No mezclar.
 
-| Documento | Pregunta que responde | Qué va aquí | Qué NO va aquí |
-|-----------|----------------------|-------------|----------------|
-| [`ROADMAP.md`](ROADMAP.md) | ¿Hacia dónde evoluciona el producto? | Fases, objetivos, principios, valor de negocio | Tickets técnicos, PRs, checklist de sprint |
-| [`TASKS.md`](../TASKS.md) | ¿Qué hacemos **ahora**? | Sprint actual, próximo sprint, bloqueadores, backlog inmediato | Historial largo de sprints completados |
-| [`TASKS-HISTORY.md`](TASKS-HISTORY.md) | ¿Qué **ya** hicimos? | Detalle de sprints cerrados, con fecha si es posible | Tareas pendientes o visión futura |
-| [`architecture.md`](architecture.md) | ¿Cómo está construido el sistema? | Capas, dominios, flujos técnicos estables | Backlog de producto |
-| [`system-spec.md`](system-spec.md) | ¿Cuáles son las reglas funcionales base? | Spec original multi-tenant, roles, reglas de negocio | Estado del sprint |
-| [`AGENTS.md`](../AGENTS.md) | ¿Cómo debe implementar el agente? | Design tokens, reglas de UI, protocolo de trabajo | Roadmap comercial |
-| Docs de seguridad (`security-*.md`) | ¿Qué se remediò y cómo validarlo? | Auditoría, migraciones, tests SEC-007/008 | Nuevas features de producto |
+| Documento                              | Pregunta que responde                    | Qué va aquí                                                    | Qué NO va aquí                             |
+| -------------------------------------- | ---------------------------------------- | -------------------------------------------------------------- | ------------------------------------------ |
+| [`ROADMAP.md`](ROADMAP.md)             | ¿Hacia dónde evoluciona el producto?     | Fases, objetivos, principios, valor de negocio                 | Tickets técnicos, PRs, checklist de sprint |
+| [`TASKS.md`](../TASKS.md)              | ¿Qué hacemos **ahora**?                  | Sprint actual, próximo sprint, bloqueadores, backlog inmediato | Historial largo de sprints completados     |
+| [`TASKS-HISTORY.md`](TASKS-HISTORY.md) | ¿Qué **ya** hicimos?                     | Detalle de sprints cerrados, con fecha si es posible           | Tareas pendientes o visión futura          |
+| [`architecture.md`](architecture.md)   | ¿Cómo está construido el sistema?        | Capas, dominios, flujos técnicos estables                      | Backlog de producto                        |
+| [`system-spec.md`](system-spec.md)     | ¿Cuáles son las reglas funcionales base? | Spec original multi-tenant, roles, reglas de negocio           | Estado del sprint                          |
+| [`AGENTS.md`](../AGENTS.md)            | ¿Cómo debe implementar el agente?        | Design tokens, reglas de UI, protocolo de trabajo              | Roadmap comercial                          |
+| Docs de seguridad (`security-*.md`)    | ¿Qué se remediò y cómo validarlo?        | Auditoría, migraciones, tests SEC-007/008                      | Nuevas features de producto                |
 
 **Regla práctica:** Si no sabes dónde poner algo, pregúntate: ¿es visión, ejecución, historial o referencia técnica?
 
@@ -41,6 +41,7 @@ docs/
 ├── backup-disaster-recovery-operations.md → Instalación y operación del backup (R2, age, secrets, workflow)
 ├── backup-disaster-recovery-runbook.md    → Desastre, restore, cutover, RTO/RPO
 ├── backup-local-contingency.md            → Tutorial operativo: copia local manual (R2 → disco → verify offline)
+├── SEC-009.1-gitleaks-local-setup.md      → Tutorial: Gitleaks local en Windows (feedback; CI es el gate)
 ├── RECOVERY-CHECKLIST.md   → Checklist rápida de recuperación
 ├── decisions/              → Decisiones arquitectónicas aceptadas
 ├── archive/README.md       → Índice de documentación histórica no vigente
@@ -72,6 +73,7 @@ Seguir este flujo:
 ## Sprint N — Nombre (YYYY-MM-DD)
 
 [x] Tarea principal
+
 - Detalle relevante
 - Archivos o endpoints clave
 - Validación: tsc ✓, build ✓, tests ✓
@@ -90,13 +92,13 @@ Seguir este flujo:
 
 ## 5. Evitar duplicados y archivos legacy
 
-| Situación | Acción |
-|-----------|--------|
+| Situación                                                           | Acción                                                                                              |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Existe conflicto de nombres `roadmap.md` vs `ROADMAP.md` en Windows | Usar **solo `ROADMAP.md`**. No crear `roadmap.md` separado (el filesystem no distingue mayúsculas). |
-| Misma info en TASKS y ROADMAP | ROADMAP = *qué/por qué*; TASKS = *cómo/cuándo*. |
-| Tarea completada hace meses en TASKS | Mover a TASKS-HISTORY; no borrar sin archivar. |
-| Doc de seguridad con pendientes de producto | Mover pendientes a TASKS → *Ideas futuras* o ROADMAP. |
-| Documento contradice las fuentes vigentes | Mover a `archive/` y registrarlo en `archive/README.md`. |
+| Misma info en TASKS y ROADMAP                                       | ROADMAP = _qué/por qué_; TASKS = _cómo/cuándo_.                                                     |
+| Tarea completada hace meses en TASKS                                | Mover a TASKS-HISTORY; no borrar sin archivar.                                                      |
+| Doc de seguridad con pendientes de producto                         | Mover pendientes a TASKS → _Ideas futuras_ o ROADMAP.                                               |
+| Documento contradice las fuentes vigentes                           | Mover a `archive/` y registrarlo en `archive/README.md`.                                            |
 
 ---
 
@@ -106,7 +108,7 @@ Los archivos `security-hardening-implementation.md` y `security-audit-remediatio
 
 - **No agregar** nuevas features de producto ahí.
 - **Sí actualizar** si hay un incidente de seguridad, nueva migración crítica o cambio en `tests/security/`.
-- Pendientes opcionales de seguridad → `TASKS.md` → sección *Ideas futuras*.
+- Pendientes opcionales de seguridad → `TASKS.md` → sección _Ideas futuras_.
 
 ---
 
@@ -165,10 +167,10 @@ No duplicar el ROADMAP completo en el README.
 
 ## Referencias cruzadas
 
-| Desde | Enlazar a |
-|-------|-----------|
-| `TASKS.md` | ROADMAP, TASKS-HISTORY, esta guía (opcional) |
-| `ROADMAP.md` | TASKS, TASKS-HISTORY, architecture |
-| Ops backup | `backup-disaster-recovery-operations.md` (cómo configurar) vs runbook (cómo recuperar) vs `backup-local-contingency.md` (copia local manual) |
-| `AGENTS.md` | TASKS (checklist), ROADMAP (contexto) |
-| Nuevo doc en `docs/` | Añadir fila al mapa de §2 si es permanente |
+| Desde                | Enlazar a                                                                                                                                    |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TASKS.md`           | ROADMAP, TASKS-HISTORY, esta guía (opcional)                                                                                                 |
+| `ROADMAP.md`         | TASKS, TASKS-HISTORY, architecture                                                                                                           |
+| Ops backup           | `backup-disaster-recovery-operations.md` (cómo configurar) vs runbook (cómo recuperar) vs `backup-local-contingency.md` (copia local manual) |
+| `AGENTS.md`          | TASKS (checklist), ROADMAP (contexto)                                                                                                        |
+| Nuevo doc en `docs/` | Añadir fila al mapa de §2 si es permanente                                                                                                   |

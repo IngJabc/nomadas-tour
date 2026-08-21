@@ -1,7 +1,7 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** tarea activa — **SEC-009.0** (CI Security Foundation) + **SEC-009.1** (Secret Scanning MVP, en implementación).
+> **Estado:** **SEC-009** abierto. **SEC-009.0** COMPLETED. **SEC-009.1** COMPLETED. **SEC-009.2** DESIGN COMPLETE / READY FOR IMPLEMENTATION (siguiente ticket).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
@@ -10,15 +10,23 @@
 
 ## Activo — SEC-009 (Continuous Security Validation)
 
-- [ ] **SEC-009.0** — CI Security Foundation — **en implementación**
-  - Primer pipeline de PR: `.github/workflows/ci.yml` (`test:security`, `npm test`, backend tests, `tsc --noEmit`, builds).
-  - Design: [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md)
-  - **No** declara SEC-009 MVP completo (audit / CodeQL / tenant suite / SQL harness → tickets posteriores).
-- [ ] **SEC-009.1** — Secret Scanning MVP — **en implementación**
-  - Gitleaks + CI gate (`.gitleaks.toml` + job `secret-scan` en `.github/workflows/ci.yml`).
+- [x] **SEC-009.0** — CI Security Foundation — **COMPLETED**
+  - Pipeline: `.github/workflows/ci.yml` (`security-tests`, `tests`, `backend-tests`, `typecheck`, `build`).
+  - Triggers: `pull_request` + `push` → `main`. Validado, pusheado y mergeado.
+  - Design padre: [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md)
+  - **No** declara SEC-009 MVP completo (009.2+, SAST, tenant suite, SQL harness → tickets posteriores).
+- [x] **SEC-009.1** — Secret Scanning MVP — **COMPLETED / IMPLEMENTED**
+  - `.gitleaks.toml` + job `secret-scan` (`gitleaks/gitleaks-action@v3`, `checkout@v6`, `contents: read`, comments off).
+  - Scan local: `gitleaks git --redact .` → `136 commits scanned` / `no leaks found`.
+  - Required Status Check `secret-scan` en el Ruleset de `main`: **configurado** (bloquea merge si falla).
+  - Setup local: [`docs/SEC-009.1-gitleaks-local-setup.md`](docs/SEC-009.1-gitleaks-local-setup.md)
   - Design: [`docs/SEC-009.1-secret-scanning-implementation-design.md`](docs/SEC-009.1-secret-scanning-implementation-design.md)
-  - Required Status Check `secret-scan` en el Ruleset de `main`: paso **manual** del operador.
-  - **No** incluye: baseline, `.gitleaksignore`, pre-commit hooks, SAST, SCA.
+  - **No** incluye: baseline, `.gitleaksignore`, pre-commit, SAST, SCA.
+- [ ] **SEC-009.2** — Dependency Scanning MVP — **DESIGN COMPLETE / READY FOR IMPLEMENTATION**
+  - Diseño: `npm audit --audit-level=high` (root + backend); job futuro `dependency-scan`; script futuro `audit:deps`.
+  - Inventario actual (sin remediar): root 7 HIGH + 1 MODERATE; backend 3 HIGH; total 10 HIGH + 1 MODERATE. Root: actualizar `next` 16.2.9 → 16.3.2. Backend: safe-fixable.
+  - Design: [`docs/SEC-009.2-dependency-scanning-implementation-design.md`](docs/SEC-009.2-dependency-scanning-implementation-design.md)
+  - **No implementado:** job CI, script `audit:deps`, remediación, Required Status Check. **No bloquea PRs hoy.**
 
 ---
 
@@ -84,21 +92,21 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 ## Después (producto / follow-ups)
 
-| Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                    | Estado      |
-| ----- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| —     | **F5 resto**                  | Invitaciones/usuarios en audit; correlation ID; retención/purge; quitar gate UI temporal                                                                                                                                                                                                                                                | Futura      |
-| —     | Futuro / Fase 6               | Métricas históricas y reporting                                                                                                                                                                                                                                                                                                         | Futura      |
-| —     | Infraestructura / Operaciones | Restore drill trimestral (manual)                                                                                                                                                                                                                                                                                                       | Futura      |
-| —     | Follow-up                     | Migración timers `LockCleanup` / `completeExpiredTrips`                                                                                                                                                                                                                                                                                 | Futura      |
-| —     | Follow-up                     | Retention `boarding_attempts`                                                                                                                                                                                                                                                                                                           | Futura      |
-| —     | Follow-up                     | Normalizar occupancy en `reservation.service.ts`                                                                                                                                                                                                                                                                                        | Futura      |
-| —     | **SEC-009**                   | Continuous Security Validation (≠ Sentry, ≠ Fase 8). Design complete; **implementation in progress** (activo: SEC-009.0 CI foundation + SEC-009.1 Secret Scanning MVP). Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md) | En progreso |
+| Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                                | Estado      |
+| ----- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| —     | **F5 resto**                  | Invitaciones/usuarios en audit; correlation ID; retención/purge; quitar gate UI temporal                                                                                                                                                                                                                                                            | Futura      |
+| —     | Futuro / Fase 6               | Métricas históricas y reporting                                                                                                                                                                                                                                                                                                                     | Futura      |
+| —     | Infraestructura / Operaciones | Restore drill trimestral (manual)                                                                                                                                                                                                                                                                                                                   | Futura      |
+| —     | Follow-up                     | Migración timers `LockCleanup` / `completeExpiredTrips`                                                                                                                                                                                                                                                                                             | Futura      |
+| —     | Follow-up                     | Retention `boarding_attempts`                                                                                                                                                                                                                                                                                                                       | Futura      |
+| —     | Follow-up                     | Normalizar occupancy en `reservation.service.ts`                                                                                                                                                                                                                                                                                                    | Futura      |
+| —     | **SEC-009**                   | Continuous Security Validation (≠ Sentry, ≠ Fase 8). **009.0** COMPLETED. **009.1** COMPLETED. **009.2** DESIGN COMPLETE / READY FOR IMPLEMENTATION. SEC-009 permanece **abierto**. Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md) | En progreso |
 
 ---
 
 ## Bloqueadores
 
-_Ninguno. Sprint activo: SEC-009.0 (CI Security Foundation) + SEC-009.1 (Secret Scanning MVP, en implementación). F4/F5 cerrados. Backup + tutoriales operativos. Restore drill trimestral pendiente._
+_Ninguno. Sprint: SEC-009 abierto. 009.0 COMPLETED. 009.1 COMPLETED (`secret-scan` Required Status Check activo). Siguiente: 009.2 DESIGN COMPLETE / READY FOR IMPLEMENTATION (sin job CI ni remediación aún). F4/F5 cerrados. Backup + tutoriales operativos. Restore drill trimestral pendiente._
 
 ---
 

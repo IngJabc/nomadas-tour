@@ -1,12 +1,19 @@
 # SEC-009 — Continuous Security Validation: Design Document
 
-> **Status:** DESIGN COMPLETE — IMPLEMENTATION IN PROGRESS
-> **Active tickets:**
+> **Status:** **OPEN** (SEC-009 MVP not complete). Implementation of remaining tickets continues; do not treat SEC-009 as closed.
 >
-> - SEC-009.0 — CI Security Foundation (`.github/workflows/ci.yml`)
-> - SEC-009.1 — Secret Scanning MVP (gitleaks + CI gate `secret-scan`; pre-commit and baseline out of this ticket). Design: [`SEC-009.1-secret-scanning-implementation-design.md`](SEC-009.1-secret-scanning-implementation-design.md)
->   **Date:** 2026-08-20
->   **Note:** Remaining MVP capabilities (dependency scan, CodeQL, tenant suite, SQL harness spike, DAST, fuzzing) remain future tickets. Required Status Check `secret-scan` on `main` is a manual GitHub Ruleset step.
+> | Ticket    | Name                    | Status                                         |
+> | --------- | ----------------------- | ---------------------------------------------- |
+> | SEC-009.0 | CI Security Foundation  | **COMPLETED**                                  |
+> | SEC-009.1 | Secret Scanning MVP     | **COMPLETED / IMPLEMENTED**                    |
+> | SEC-009.2 | Dependency Scanning MVP | **DESIGN COMPLETE — READY FOR IMPLEMENTATION** |
+>
+> - SEC-009.0: `.github/workflows/ci.yml` — jobs `security-tests`, `tests`, `backend-tests`, `typecheck`, `build`. Triggers: `pull_request` + `push` → `main`. Validated and merged.
+> - SEC-009.1: `.gitleaks.toml` + job `secret-scan` (`gitleaks/gitleaks-action@v3`). Required Status Check `secret-scan` is **configured** on the `main` Ruleset and blocks merge on failure. Local scan: `no leaks found`. Design: [`SEC-009.1-secret-scanning-implementation-design.md`](SEC-009.1-secret-scanning-implementation-design.md). Local setup: [`SEC-009.1-gitleaks-local-setup.md`](SEC-009.1-gitleaks-local-setup.md)
+> - SEC-009.2: not implemented. Design: [`SEC-009.2-dependency-scanning-implementation-design.md`](SEC-009.2-dependency-scanning-implementation-design.md)
+>
+> **Date:** 2026-08-21
+> **Remaining MVP (not started):** SAST/CodeQL, first-class tenant-isolation suite, SQL harness spike. DAST, fuzzing, nightly automation, license scanning, SBOM, Dependabot, OSV-Scanner, Husky/pre-commit, `eslint-plugin-security` are **FUTURE**, not current controls.
 
 ---
 
@@ -79,25 +86,40 @@ SEC-009 must become a sustained capability, not another re-hardening project.
 | `SUPABASE_DB_URL`           | GitHub Secrets (backup workflow)                      | Manual                                                   |
 | R2 credentials              | GitHub Secrets (backup workflow)                      | Manual                                                   |
 
-**Gaps:** Secret scanning tool for SEC-009.1 is gitleaks in CI (`secret-scan`). Pre-commit hooks and `gitleaks-baseline.json` are out of SEC-009.1.
+**Current (SEC-009.1 — IMPLEMENTED):**
+
+- CI job `secret-scan` (`gitleaks/gitleaks-action@v3`, `actions/checkout@v6`, `fetch-depth: 0`, `permissions: contents: read`, `GITLEAKS_ENABLE_COMMENTS: "false"`)
+- Config: `.gitleaks.toml` (`[extend] useDefault = true`, `[[allowlists]]`)
+- Required Status Check `secret-scan` is **configured** on the `main` Ruleset and **blocks merge** if the job fails
+- Local operator scan: `gitleaks git --redact .` → `136 commits scanned` / `no leaks found`
+- Local gitleaks is **feedback/advisory**. CI `secret-scan` is **enforcement**.
+
+**Out of SEC-009.1 (not implemented, not planned as part of 009.1):**
+
+- No Husky / gitleaks pre-commit hook
+- No `gitleaks-baseline.json`
+- No `.gitleaksignore`
+- No `pull_request_target`, `pull-requests: write`, or `security-events: write` for this job
 
 ### 2.6 Dependencies
 
-| Tool             | Status                              |
-| ---------------- | ----------------------------------- |
-| Package manager  | npm (root + backend) with lockfiles |
-| Dependabot       | ❌ Not configured                   |
-| npm audit        | ❌ Not automated in CI              |
-| License scanning | ❌ None                             |
-| SBOM             | ❌ None                             |
+| Tool             | Status                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------- |
+| Package manager  | npm (root + backend) with lockfiles                                                             |
+| Dependabot       | ❌ Not configured (FUTURE / optional; not SEC-009.2)                                            |
+| npm audit        | ❌ Not automated in CI. **SEC-009.2 = DESIGN COMPLETE — READY FOR IMPLEMENTATION** (not a gate) |
+| License scanning | ❌ None (FUTURE)                                                                                |
+| SBOM             | ❌ None (FUTURE)                                                                                |
+
+SEC-009.2 design (not implemented): `npm audit --audit-level=high` on root + backend; CI job `dependency-scan`; root script `audit:deps`. Design-time inventory: root 7 HIGH + 1 MODERATE; backend 3 HIGH; 10 HIGH + 1 MODERATE total, all with available fixes. **Does not block PRs today.**
 
 ### 2.7 Code Security
 
-| Tool                    | Status            |
-| ----------------------- | ----------------- |
-| ESLint security plugins | ❌ Not configured |
-| SAST (CodeQL/Semgrep)   | ❌ None           |
-| TypeScript strict mode  | ✅ Enabled        |
+| Tool                    | Status                                                                        |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| ESLint security plugins | ❌ Not configured (`eslint-plugin-security` is FUTURE, not a current control) |
+| SAST (CodeQL/Semgrep)   | ❌ None (FUTURE; CodeQL does **not** run in CI)                               |
+| TypeScript strict mode  | ✅ Enabled (CI job `typecheck` + local `tsc --noEmit`)                        |
 
 ### 2.8 Observability / Runtime Security
 
@@ -128,48 +150,53 @@ SEC-009 must become a sustained capability, not another re-hardening project.
 
 ## 3. Automation Maturity Matrix
 
-| Control                          | Exists | Automated | When Runs            | Blocks Merge/Deploy | Coverage          |
-| -------------------------------- | ------ | --------- | -------------------- | ------------------- | ----------------- |
-| **Auth/Authorization tests**     | ✅     | ✅        | CI (every PR)        | ✅                  | High              |
-| **RLS SQL harnesses**            | ✅     | ❌        | Manual               | ❌                  | High (but manual) |
-| **Secret scanning**              | ❌     | ❌        | Never                | ❌                  | None              |
-| **Dependency scanning**          | ❌     | ❌        | Never                | ❌                  | None              |
-| **SAST**                         | ❌     | ❌        | Never                | ❌                  | None              |
-| **License scanning**             | ❌     | ❌        | Never                | ❌                  | None              |
-| **Secret scanning in CI**        | ❌     | ❌        | Never                | ❌                  | None              |
-| **API security tests**           | ✅     | ✅        | CI                   | ✅                  | Medium            |
-| **Audit log PII tests**          | ✅     | ✅        | CI                   | ✅                  | High              |
-| **Security regression tests**    | ✅     | ✅        | CI (`test:security`) | ✅                  | High              |
-| **Migration chain verification** | ✅     | ✅        | CI                   | ✅                  | Medium            |
-| **Sentry token redaction**       | ✅     | ✅        | CI                   | ✅                  | Medium            |
-| **TypeScript strict**            | ✅     | ✅        | Build                | ✅                  | High              |
+This matrix is **CURRENT reality only**. Design-complete is not implemented. Planned is not current.
 
-**Classification:**
+| Control                          | Exists                        | Automated | When Runs                                  | Blocks Merge/Deploy | Coverage                                     |
+| -------------------------------- | ----------------------------- | --------- | ------------------------------------------ | ------------------- | -------------------------------------------- |
+| **Auth/Authorization tests**     | ✅                            | ✅        | CI (every PR / push `main`)                | ✅                  | High                                         |
+| **API security tests**           | ✅                            | ✅        | CI                                         | ✅                  | Medium                                       |
+| **Audit log PII tests**          | ✅                            | ✅        | CI                                         | ✅                  | High                                         |
+| **Security regression tests**    | ✅                            | ✅        | CI (`test:security`)                       | ✅                  | High                                         |
+| **Migration chain verification** | ✅                            | ✅        | CI                                         | ✅                  | Medium                                       |
+| **Sentry token redaction**       | ✅                            | ✅        | CI                                         | ✅                  | Medium                                       |
+| **TypeScript strict**            | ✅                            | ✅        | CI (`typecheck`) + build                   | ✅                  | High                                         |
+| **Secret scanning**              | ✅                            | ✅        | CI (`secret-scan`, every PR / push `main`) | ✅                  | High (SEC-009.1 COMPLETED; Ruleset required) |
+| **RLS SQL harnesses**            | ✅                            | ❌        | Manual (SQL Editor)                        | ❌                  | High (manual only; spike still required)     |
+| **Dependency scanning**          | Design ✅ / Implementation ❌ | ❌        | Pending SEC-009.2 implementation           | ❌                  | Pending (design: `npm audit` root + backend) |
+| **SAST**                         | ❌                            | ❌        | Future                                     | ❌                  | None                                         |
+| **License scanning**             | ❌                            | ❌        | Future                                     | ❌                  | None                                         |
+| **SBOM**                         | ❌                            | ❌        | Future                                     | ❌                  | None                                         |
 
-- 🟢 **Automated in CI** (blocks merge): 8 controls
-- 🟡 **Semi-automated** (manual SQL harnesses): 2 controls
-- 🔴 **Missing entirely**: 5 controls (secrets, deps, SAST, licenses, SBOM)
+There is **one** secret-scanning row. Local `gitleaks` is advisory feedback, not a second control in this matrix.
+
+**Classification (from the rows above):**
+
+- 🟢 **Automated in CI (blocks merge): 8** — auth/authorization, API security, audit PII, security regression, migration chain, Sentry redaction, TypeScript strict, secret scanning
+- 🟡 **Semi-automated (exists, manual, no merge block): 1** — RLS SQL harnesses
+- 🟡 **Design complete / not implemented: 1** — dependency scanning (SEC-009.2). Design complete ≠ implemented; it does **not** block PRs
+- 🔴 **Missing entirely: 3** — SAST, license scanning, SBOM
 
 ---
 
 ## 4. Threat Model (Prioritized for Nómadas Tour)
 
-| #   | Category                           | Risk                                       | Current Mitigation                                                                          | Gap for SEC-009                                                               |
-| --- | ---------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1   | **Tenant isolation breach**        | Agency A reads Agency B data               | RLS policies + middleware tenant + RPC validation                                           | ✅ Automated tests exist; need SQL harness automation                         |
-| 2   | **Auth bypass / identity forgery** | Forged JWT `user_metadata.role=superadmin` | Backend reads `public.users` not `user_metadata`; `authorize()` guard; C1 tests             | ✅ Automated C1 regression tests                                              |
-| 3   | **Auth bypass / stale sessions**   | Expired/invalid JWT accepted               | Supabase `getUser()` validates; middleware checks                                           | ✅ Auth tests                                                                 |
-| 4   | **Authorization bypass**           | Agency accesses another's data             | RLS policies + `tenant` middleware + RPC agency checks                                      | ✅ Tests exist; need SQL harness automation                                   |
-| 5   | **Direct RPC execution**           | Client calls privileged RPCs               | `EXECUTE` only to `service_role`; revoked from `authenticated`                              | ✅ SQL harness verifies grants                                                |
-| 6   | **PII exposure**                   | Leaks in logs/Sentry/outbox                | Sentry `beforeSend` redacts tokens/PII; audit log PII scanner; outbox minimal payload       | ✅ Tests exist                                                                |
-| 7   | **Token leakage**                  | Raw reservation-link tokens in logs/Sentry | `redactReservationLinkUrl()` in Sentry `beforeSend`                                         | ✅ Tested                                                                     |
-| 8   | **SQL injection**                  | Malicious input to RPCs                    | `SECURITY DEFINER` + `search_path=public`; Zod validation; parameterized queries            | ✅ Type-safe RPCs                                                             |
-| 9   | **XSS**                            | Unsanitized output                         | No server-rendered HTML with user data; frontend escapes                                    | Low risk                                                                      |
-| 10  | **API abuse / rate limit bypass**  | Brute force, enumeration                   | Per-route rate limits on auth/public; trust proxy=1                                         | ⚠️ Missing on agency/admin                                                    |
-| 11  | **Supply chain / vulnerable deps** | Malicious/outdated packages                | ❌ No Dependabot, no npm audit CI                                                           | 🔴 **Critical gap**                                                           |
-| 12  | **Secret leakage**                 | Service role key in repo/logs              | SEC-009.1: `gitleaks/gitleaks-action@v3` job `secret-scan` (CI); no pre-commit; no baseline | 🟡 **SEC-009.1 in implementation**; Required Status Check on `main` is manual |
-| 13  | **Configuration drift**            | Staging ≠ Production RLS/grants            | Manual SQL harnesses only                                                                   | 🔴 Not automated                                                              |
-| 14  | **Migration drift**                | Applied migrations differ from repo        | Migration chain test exists; SQL harnesses manual                                           | 🟡 Semi-automated                                                             |
+| #   | Category                           | Risk                                       | Current Mitigation                                                                                                                                                                                              | Gap for SEC-009                                                    |
+| --- | ---------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1   | **Tenant isolation breach**        | Agency A reads Agency B data               | RLS policies + middleware tenant + RPC validation                                                                                                                                                               | ✅ Automated tests exist; need SQL harness automation              |
+| 2   | **Auth bypass / identity forgery** | Forged JWT `user_metadata.role=superadmin` | Backend reads `public.users` not `user_metadata`; `authorize()` guard; C1 tests                                                                                                                                 | ✅ Automated C1 regression tests                                   |
+| 3   | **Auth bypass / stale sessions**   | Expired/invalid JWT accepted               | Supabase `getUser()` validates; middleware checks                                                                                                                                                               | ✅ Auth tests                                                      |
+| 4   | **Authorization bypass**           | Agency accesses another's data             | RLS policies + `tenant` middleware + RPC agency checks                                                                                                                                                          | ✅ Tests exist; need SQL harness automation                        |
+| 5   | **Direct RPC execution**           | Client calls privileged RPCs               | `EXECUTE` only to `service_role`; revoked from `authenticated`                                                                                                                                                  | ✅ SQL harness verifies grants                                     |
+| 6   | **PII exposure**                   | Leaks in logs/Sentry/outbox                | Sentry `beforeSend` redacts tokens/PII; audit log PII scanner; outbox minimal payload                                                                                                                           | ✅ Tests exist                                                     |
+| 7   | **Token leakage**                  | Raw reservation-link tokens in logs/Sentry | `redactReservationLinkUrl()` in Sentry `beforeSend`                                                                                                                                                             | ✅ Tested                                                          |
+| 8   | **SQL injection**                  | Malicious input to RPCs                    | `SECURITY DEFINER` + `search_path=public`; Zod validation; parameterized queries                                                                                                                                | ✅ Type-safe RPCs                                                  |
+| 9   | **XSS**                            | Unsanitized output                         | No server-rendered HTML with user data; frontend escapes                                                                                                                                                        | Low risk                                                           |
+| 10  | **API abuse / rate limit bypass**  | Brute force, enumeration                   | Per-route rate limits on auth/public; trust proxy=1                                                                                                                                                             | ⚠️ Missing on agency/admin                                         |
+| 11  | **Supply chain / vulnerable deps** | Malicious/outdated packages                | No Dependabot. No `npm audit` in CI. SEC-009.2 **DESIGN COMPLETE** (not implemented)                                                                                                                            | 🔴 **Current gap** — implementation pending                        |
+| 12  | **Secret leakage**                 | Service role key in repo/logs              | SEC-009.1 **IMPLEMENTED**: `secret-scan` on every PR / push `main`; Required Status Check on `main` **blocks merge** on failure; local `gitleaks git --redact .` → `no leaks found`; no pre-commit; no baseline | ✅ **Closed for CI enforcement** (local gitleaks remains advisory) |
+| 13  | **Configuration drift**            | Staging ≠ Production RLS/grants            | Manual SQL harnesses only                                                                                                                                                                                       | 🔴 Not automated                                                   |
+| 14  | **Migration drift**                | Applied migrations differ from repo        | Migration chain test exists; SQL harnesses manual                                                                                                                                                               | 🟡 Semi-automated                                                  |
 
 ---
 
@@ -246,56 +273,81 @@ drift / staging validation / nightly checks
 
 #### Layer 1 — Local (Developer Machine)
 
-| Control                | Tool                           | Must Pass Before Human Commit |
-| ---------------------- | ------------------------------ | ----------------------------- |
-| Secret scanning        | `gitleaks` pre-commit          | ✅                            |
-| Lint security rules    | `eslint-plugin-security`       | ✅                            |
-| Dependency audit       | `npm audit --audit-level=high` | ✅                            |
-| Focused security tests | `npm run test:security`        | ✅                            |
-| TypeScript strict      | `tsc --noEmit`                 | ✅                            |
+Local controls are **feedback**. They do **not** replace CI. There is **no** Husky/pre-commit enforcement.
 
-#### Layer 2 — Pull Request / CI (Every PR)
+| Control                | Tool                               | State                                     |
+| ---------------------- | ---------------------------------- | ----------------------------------------- |
+| Secret scanning        | `gitleaks git --redact .`          | **CURRENT** — advisory / feedback only    |
+| Focused security tests | `npm run test:security`            | **CURRENT** — also runs in CI             |
+| TypeScript strict      | `tsc --noEmit`                     | **CURRENT** — also CI job `typecheck`     |
+| Build                  | `npm run build` / backend `tsc`    | **CURRENT** — also CI job `build`         |
+| Dependency audit       | `npm audit` / planned `audit:deps` | **PLANNED** (SEC-009.2; not a local gate) |
+| Lint security rules    | `eslint-plugin-security`           | **FUTURE** — not configured               |
 
-| Control                    | Tool                                                                                                                                                                  | Blocks Merge             |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| Unit/security tests        | Vitest (`test:security`, `test`)                                                                                                                                      | ✅                       |
-| API security tests         | Vitest (backend + frontend)                                                                                                                                           | ✅                       |
-| Security regression suite  | `npm run test:security`                                                                                                                                               | ✅                       |
-| TypeScript strict          | `tsc --noEmit`                                                                                                                                                        | ✅                       |
-| Secret scanning            | `gitleaks` GitHub Action                                                                                                                                              | ✅                       |
-| Dependency audit           | `npm audit --audit-level=high` (root + backend)                                                                                                                       | ✅                       |
-| SAST                       | GitHub CodeQL (free tier)                                                                                                                                             | ⚠️ Warn                  |
-| Migration chain + security | Vitest (`f5-004.test.ts`, etc.)                                                                                                                                       | ✅                       |
-| SQL verification harnesses | **Planned / Spike required**<br/>• Feasibility pending technical spike<br/>• Preferred: Supabase local via Supabase CLI<br/>• Not a gate until spike proves viability | Planned / Spike required |
+```text
+gitleaks local = feedback/advisory
+secret-scan CI = enforcement
+```
+
+#### Layer 2 — Pull Request / CI (Every PR / push `main`)
+
+**CURRENT (SEC-009.0 COMPLETED + SEC-009.1 COMPLETED):**
+
+| Control             | Tool / job                                    | Blocks Merge                       |
+| ------------------- | --------------------------------------------- | ---------------------------------- |
+| Security tests      | `security-tests` (`npm run test:security`)    | ✅                                 |
+| Root/frontend tests | `tests` (`npm test`)                          | ✅                                 |
+| Backend tests       | `backend-tests`                               | ✅                                 |
+| Typecheck           | `typecheck` (`tsc --noEmit` root + backend)   | ✅                                 |
+| Build               | `build` (Next + backend `tsc`)                | ✅                                 |
+| Secret scanning     | `secret-scan` (`gitleaks/gitleaks-action@v3`) | ✅ Required Status Check on `main` |
+
+**PLANNED (not current):**
+
+| Control                         | Ticket / note                                 | Blocks Merge today |
+| ------------------------------- | --------------------------------------------- | ------------------ |
+| Dependency scanning             | SEC-009.2 job `dependency-scan` — design only | ❌                 |
+| SAST                            | CodeQL — FUTURE evaluation                    | ❌                 |
+| Tenant isolation extended suite | First-class SEC-009 suite — PLANNED           | ❌                 |
+
+**SPIKE REQUIRED:**
+
+| Control                    | Note                                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| SQL verification harnesses | 13 harnesses remain **manual**. Preferred path: Supabase local via CLI. **No CI gate** until spike proves feasibility. |
 
 #### Layer 3 — Nightly (Scheduled)
 
-| Control                        | Tool                                     | Action                           |
-| ------------------------------ | ---------------------------------------- | -------------------------------- |
-| Deep dependency scan           | `npm audit` + OSV-Scanner                | Alert                            |
-| DAST/API probing               | Nuclei against staging                   | Alert                            |
-| Extended RLS validation        | SQL harnesses against staging DB         | Alert (Planned / Spike required) |
-| Configuration drift            | Compare staging vs production RLS/grants | Alert                            |
-| Security regression full suite | Full test suite                          | Alert                            |
-| License compliance             | `license-checker`                        | Alert                            |
+**PLANNED / FUTURE** — no general SEC-009 nightly security automation exists today.
+
+| Control                        | Tool                                     | State          |
+| ------------------------------ | ---------------------------------------- | -------------- |
+| Deep dependency scan           | `npm audit` + optional OSV-Scanner       | Planned        |
+| DAST/API probing               | Nuclei against staging                   | Future         |
+| Extended RLS validation        | SQL harnesses against staging DB         | Spike required |
+| Configuration drift            | Compare staging vs production RLS/grants | Planned        |
+| Security regression full suite | Full test suite                          | Planned        |
+| License compliance             | `license-checker`                        | Future         |
 
 #### Layer 4 — Pre-production / Staging (Pre-deploy)
 
-| Control                    | Tool                                 | Action                            |
-| -------------------------- | ------------------------------------ | --------------------------------- |
-| Migration verification     | SQL harnesses against staging DB     | Target state / future after spike |
-| RLS/grants checks          | SQL harnesses                        | Target state / future after spike |
-| Public API security checks | Nuclei + custom scripts              | ✅ Block deploy                   |
-| Tenant isolation           | Integration tests against staging DB | ✅ Block deploy                   |
-| Smoke security tests       | Critical path auth/authz             | ✅ Block deploy                   |
+**TARGET / FUTURE** after spikes. Nothing here is a current deploy gate beyond existing Render/test practice.
+
+| Control                    | Tool                             | State                         |
+| -------------------------- | -------------------------------- | ----------------------------- |
+| Migration verification     | SQL harnesses against staging DB | Target / future after spike   |
+| RLS/grants checks          | SQL harnesses                    | Target / future after spike   |
+| Public API security checks | Nuclei + custom scripts          | Target / future               |
+| Tenant isolation           | First-class SEC-009 suite        | Planned (not newly delivered) |
+| Smoke security tests       | Critical path auth/authz         | Target / future               |
 
 ### 7.3 Severity Classification
 
-| Severity          | Meaning                          | Example                                                   |
-| ----------------- | -------------------------------- | --------------------------------------------------------- |
-| **BLOCK**         | Merge/deploy fails; must fix     | Secret leak, RLS missing, SAST critical, migration breaks |
-| **WARN**          | Non-blocking; requires attention | SAST medium, dependency moderate, license issue           |
-| **INFORMATIONAL** | Visibility only                  | License notice, dependency minor, test coverage delta     |
+| Severity          | Meaning                          | Current vs planned                                                                                                                                                                      |
+| ----------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **BLOCK**         | Merge/deploy fails; must fix     | **CURRENT:** secret leak (`secret-scan`), failing security/unit/typecheck/build jobs. **PLANNED (009.2):** dependency HIGH/CRITICAL. **FUTURE:** SAST critical, SQL harness after spike |
+| **WARN**          | Non-blocking; requires attention | **PLANNED/FUTURE:** dependency MODERATE (009.2 design), CodeQL initially WARN if adopted                                                                                                |
+| **INFORMATIONAL** | Visibility only                  | **FUTURE:** dependency LOW, license notices, coverage deltas                                                                                                                            |
 
 ---
 
@@ -349,16 +401,16 @@ Static parsing of `CREATE TABLE` vs `ALTER TABLE ENABLE RLS` is unreliable — a
 
 ### 8.3 Supabase-Specific Validation Patterns
 
-| Pattern                                                   | Detection Method                                                                                         | CI Stage             |
-| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------- |
-| Security-sensitive table missing RLS + grants + policies  | `pg_class.relrowsecurity = false` on public tables + `pg_policy` + `information_schema.table_privileges` | Nightly + Pre-deploy |
-| RPC with PUBLIC EXECUTE                                   | `pg_proc.proacl` contains `=X/PUBLIC`                                                                    | Nightly + Pre-deploy |
-| Authenticated GRANT + RLS disabled                        | Cross-ref `pg_class` + `pg_policy`                                                                       | Nightly              |
-| Table in Realtime + no RLS policy                         | `pg_publication_tables` join `pg_class.relrowsecurity`                                                   | Nightly              |
-| Service role key in code                                  | gitleaks rule                                                                                            | Pre-commit + CI      |
-| Privileged RPC with incorrect execution model             | `pg_proc.prosecdef` + `pg_proc.proacl` + `pg_proc.proconfig` + compare vs approved model                 | Nightly + Pre-deploy |
-| RPC with EXECUTE to PUBLIC/anon/authenticated             | `pg_proc.proacl` analysis                                                                                | Nightly + Pre-deploy |
-| Table in `supabase_realtime` without tenant-scoped policy | Cross-ref publication + policies                                                                         | Nightly              |
+| Pattern                                                   | Detection Method                                                                                         | CI Stage                                        |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Security-sensitive table missing RLS + grants + policies  | `pg_class.relrowsecurity = false` on public tables + `pg_policy` + `information_schema.table_privileges` | Nightly + Pre-deploy                            |
+| RPC with PUBLIC EXECUTE                                   | `pg_proc.proacl` contains `=X/PUBLIC`                                                                    | Nightly + Pre-deploy                            |
+| Authenticated GRANT + RLS disabled                        | Cross-ref `pg_class` + `pg_policy`                                                                       | Nightly                                         |
+| Table in Realtime + no RLS policy                         | `pg_publication_tables` join `pg_class.relrowsecurity`                                                   | Nightly                                         |
+| Service role key in code                                  | gitleaks rule (`secret-scan` CI; local gitleaks advisory)                                                | **CURRENT:** CI. Local advisory. Not pre-commit |
+| Privileged RPC with incorrect execution model             | `pg_proc.prosecdef` + `pg_proc.proacl` + `pg_proc.proconfig` + compare vs approved model                 | Nightly + Pre-deploy                            |
+| RPC with EXECUTE to PUBLIC/anon/authenticated             | `pg_proc.proacl` analysis                                                                                | Nightly + Pre-deploy                            |
+| Table in `supabase_realtime` without tenant-scoped policy | Cross-ref publication + policies                                                                         | Nightly                                         |
 
 ### 8.3 Implementation: SQL Validation Suite
 
@@ -388,6 +440,10 @@ WHERE n.nspname = 'public'
 ## 9. Tenant Isolation Validation (Core Capability)
 
 ### 9.1 Scope
+
+Application and security tests for tenant isolation **already exist** (see §2.9). That is **not** a new SEC-009 deliverable.
+
+The **first-class tenant-isolation suite** proposed below (fixtures, ephemeral DB matrix, staging nightly) is **PLANNED** and **not implemented**.
 
 SEC-009 must protect explicitly:
 
@@ -426,7 +482,7 @@ This is a **first-class Security Regression Suite**, not a DAST detail.
 
 ### 9.4 Implementation
 
-Reusable fixtures in `tests/security/tenant-isolation.fixture.ts`. Run via Vitest in CI (ephemeral DB) and against staging nightly.
+Reusable fixtures in `tests/security/tenant-isolation.fixture.ts` (**PLANNED**; not created by SEC-009 yet). Intended to run via Vitest in CI (ephemeral DB) and against staging nightly **after** that suite is implemented.
 
 ---
 
@@ -434,7 +490,9 @@ Reusable fixtures in `tests/security/tenant-isolation.fixture.ts`. Run via Vites
 
 ### 10.1 Baseline Model (Controls, Not Schema)
 
-**File:** `security-baseline.json` (committed, versioned)
+**Status:** **PLANNED** — `security-baseline.json` does **not** exist in the repo. This subsection is a design target, not a current control.
+
+**File (target):** `security-baseline.json` (committed, versioned)
 
 ```json
 {
@@ -497,19 +555,19 @@ Unexpected exposed table/schema
 
 ## 11. Tool Evaluation (2026 Current State)
 
-| Category        | Candidates                                   | Status      |
-| --------------- | -------------------------------------------- | ----------- |
-| **SAST**        | GitHub CodeQL (free tier), Semgrep           | ✅ Evaluate |
-| **SCA**         | npm audit, OSV-Scanner, Dependabot           | ✅ Evaluate |
-| **Secrets**     | gitleaks, TruffleHog, GitHub Secret Scanning | ✅ Evaluate |
-| **DAST**        | Nuclei (ProjectDiscovery), OWASP ZAP         | ✅ Evaluate |
-| **Fuzzing**     | TypeScript/Node/API compatible tools         | ✅ Evaluate |
-| **AI-assisted** | Strix, CodeQL AI, Semgrep Assistant          | 🔍 Watch    |
+| Category        | Candidates                           | Status                                                                                                  |
+| --------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| **Secrets**     | gitleaks                             | **SELECTED / IMPLEMENTED** (SEC-009.1). TruffleHog / GitHub Secret Scanning remain out of 009.1         |
+| **SCA**         | npm audit                            | **SELECTED / DESIGN COMPLETE** (SEC-009.2). Not implemented. OSV-Scanner / Dependabot = future/optional |
+| **SAST**        | GitHub CodeQL (free tier), Semgrep   | **FUTURE** — not selected, not implemented, not in CI                                                   |
+| **DAST**        | Nuclei (ProjectDiscovery), OWASP ZAP | **FUTURE**                                                                                              |
+| **Fuzzing**     | TypeScript/Node/API compatible tools | **FUTURE** (post-MVP)                                                                                   |
+| **AI-assisted** | Strix, CodeQL AI, Semgrep Assistant  | 🔍 Watch                                                                                                |
 
-**Important corrections:**
+**Corrections:**
 
-- **Nuclei** is ProjectDiscovery, not OWASP. Classify as "DAST / API / template-based security scanner".
-- **No tool selection now** — evaluate pricing/licenses/capabilities at implementation time.
+- **Nuclei** is ProjectDiscovery, not OWASP.
+- Do **not** treat remaining categories as "still evaluate everything equally": secrets and SCA (`npm audit`) already have decisions.
 - Prioritize: zero cost / free tier, low maintenance, low false positives, TypeScript/Next.js/Node/Supabase integration.
 
 ---
@@ -520,13 +578,13 @@ Unexpected exposed table/schema
 
 ### MVP Capabilities (5)
 
-| Priority | Capability                                        | Why                                          | Effort |
-| -------- | ------------------------------------------------- | -------------------------------------------- | ------ |
-| **1**    | **Secret scanning (gitleaks)**                    | Critical gap; service role key exposure risk | Low    |
-| **2**    | **Dependency scanning** (npm audit + OSV-Scanner) | Supply chain risk; zero cost                 | Low    |
-| **3**    | **Security regression suite**                     | Already exist; ensure they block             | Low    |
-| **4**    | **Tenant isolation validation**                   | Core domain risk; first-class suite          | Medium |
-| **5**    | **SAST (CodeQL)**                                 | Free, native, catches injection              | Low    |
+| Priority | Capability                      | Why                                          | Status                                                                                              |
+| -------- | ------------------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| **1**    | **Secret scanning (gitleaks)**  | Service role / credential exposure in Git    | ✅ **IMPLEMENTED** (SEC-009.1)                                                                      |
+| **2**    | **Dependency scanning**         | Supply chain; `npm audit --audit-level=high` | 🟡 **DESIGN COMPLETE** / implementation pending (SEC-009.2). OSV-Scanner is **not** part of 009.2   |
+| **3**    | **Security regression suite**   | Existing tests must keep blocking in CI      | 🟢 **CURRENT** via SEC-009.0 (`test:security` + related CI jobs). Further SEC-009 work may continue |
+| **4**    | **Tenant isolation validation** | First-class suite beyond existing tests      | 🔴 **PLANNED**                                                                                      |
+| **5**    | **SAST (CodeQL)**               | Static analysis                              | 🔴 **PLANNED / FUTURE** — not in CI                                                                 |
 
 ### Technical Spike (Pre-MVP Decision)
 
@@ -619,18 +677,18 @@ SEC-009 does not include hexagonal migration. Policy for future:
 
 ## 17. Privacy Boundaries
 
-| Data Type                              | Can Leave Repo/CI?     | Mitigation                                        |
-| -------------------------------------- | ---------------------- | ------------------------------------------------- |
-| Source code                            | ✅ Public repo         | —                                                 |
-| Env values                             | ❌ Never               | GitHub Secrets; never in logs                     |
-| Supabase schema                        | ✅ (migrations public) | —                                                 |
-| Database metadata                      | ⚠️ Staging only        | Never prod; read-only queries                     |
-| Logs                                   | ⚠️ Internal only       | No PII; audit log strips PII                      |
-| Sentry                                 | ⚠️ External            | `beforeSend` redacts tokens/PII; no code upload   |
-| SAST (CodeQL)                          | ⚠️ Code to GH          | CodeQL runs in GitHub infra; code never leaves GH |
-| OSV-Scanner                            | ✅ Local only          | Runs in CI container; no upload                   |
-| Nuclei                                 | ✅ Local               | Runs against staging; no data exfil               |
-| AI-assisted (Strix, Semgrep Assistant) | ⚠️ Code to GH          | Evaluate privacy policy before adoption           |
+| Data Type                              | Can Leave Repo/CI?     | Mitigation                                                                              |
+| -------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------- |
+| Source code                            | ✅ Public repo         | —                                                                                       |
+| Env values                             | ❌ Never               | GitHub Secrets; never in logs                                                           |
+| Supabase schema                        | ✅ (migrations public) | —                                                                                       |
+| Database metadata                      | ⚠️ Staging only        | Never prod; read-only queries                                                           |
+| Logs                                   | ⚠️ Internal only       | No PII; audit log strips PII                                                            |
+| Sentry                                 | ⚠️ External            | `beforeSend` redacts tokens/PII; no code upload                                         |
+| SAST (CodeQL)                          | ⚠️ Code to GH          | **FUTURE** if adopted. CodeQL does **not** run today. CodeQL would stay in GitHub infra |
+| OSV-Scanner                            | ✅ Local only          | **FUTURE / optional**. Not SEC-009.2. Not a current control                             |
+| Nuclei                                 | ✅ Local               | **FUTURE** DAST against staging. Not current                                            |
+| AI-assisted (Strix, Semgrep Assistant) | ⚠️ Code to GH          | Evaluate privacy policy before adoption                                                 |
 
 **Hard rule:** No production data, secrets, or PII leave infrastructure boundary.
 
@@ -638,14 +696,28 @@ SEC-009 does not include hexagonal migration. Policy for future:
 
 ## 18. CI / Local / Nightly / Staging — Summary
 
-Legend for SQL / RLS harness automation (must match §7.2 and §12):
+Legend (must match §7.2 and §12):
 
-| Label              | Meaning                                                       |
-| ------------------ | ------------------------------------------------------------- |
-| **Current**        | What already exists today                                     |
-| **Planned**        | What SEC-009 will implement once designed/approved            |
-| **Spike required** | Must be validated technically before becoming a gate or alert |
-| **Target state**   | Desired behavior after the spike proves feasibility           |
+| Label               | Meaning                                                       |
+| ------------------- | ------------------------------------------------------------- |
+| **Current**         | What already exists today                                     |
+| **Implemented**     | Delivered by a closed SEC-009.x ticket                        |
+| **Design complete** | Approved design; **not** running in CI                        |
+| **Planned**         | What SEC-009 will implement once designed/approved            |
+| **Spike required**  | Must be validated technically before becoming a gate or alert |
+| **Target / Future** | Desired behavior; not a current control                       |
+
+```text
+SEC-009.0 = COMPLETED
+SEC-009.1 = COMPLETED / IMPLEMENTED
+SEC-009.2 = DESIGN COMPLETE
+SQL harness = SPIKE REQUIRED
+SAST / CodeQL = FUTURE
+DAST = FUTURE
+Fuzzing = FUTURE
+Nightly security layer = FUTURE
+Tenant isolation suite (first-class) = FUTURE
+```
 
 ```text
 SQL harness automation
@@ -654,52 +726,56 @@ SQL harness automation
 → no gate until feasibility is proven
 ```
 
-| Level                  | Controls                                                                                                                                                                                                              | Severity / Status                          |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **Local**              | **Current / Planned gates:** gitleaks, security tests, npm audit, lint security, tsc                                                                                                                                  | **BLOCK**                                  |
-| **PR/CI**              | **Current / Planned gates:** security tests, API tests, regression suite, tsc, gitleaks, npm audit, CodeQL (**WARN**), migration checks<br/>**SQL harnesses:** Planned / Spike required — **no SQL harness gate yet** | **BLOCK / WARN** (SQL harness: not a gate) |
-| **Nightly**            | **Planned alerts:** deep dependency scan, DAST staging, drift, tenant isolation<br/>**SQL harnesses:** Planned / Spike required — **no SQL harness alert until feasibility is proven**                                | **ALERT** (SQL harness: not until spike)   |
-| **Staging/Pre-deploy** | **Planned gates:** tenant isolation, API security, smoke security<br/>**SQL/RLS harnesses:** Target state / future after spike — **no SQL harness deploy gate yet**                                                   | **BLOCK** (SQL harness: not a gate yet)    |
+| Level                  | Current                                                                                                                        | Planned / Design / Spike / Target                                                                                                                                   |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Local**              | **Current:** `npm run test:security`, `tsc --noEmit`, builds; `gitleaks git --redact .` **advisory**. **No pre-commit.**       | **Planned (009.2):** `audit:deps` / `npm audit --audit-level=high` as local feedback                                                                                |
+| **PR/CI**              | **Current:** `security-tests`, `tests`, `backend-tests`, `typecheck`, `build`, `secret-scan` (Required Status Check on `main`) | **Design complete:** `dependency-scan` (009.2, not active). **Planned:** CodeQL, extended tenant suite. **Spike required:** SQL harnesses — **no SQL harness gate** |
+| **Nightly**            | **Current:** none as a general SEC-009 nightly security layer                                                                  | **Planned/Future:** deep dependency scan, DAST staging, drift, tenant isolation. SQL harness alerts only after spike                                                |
+| **Staging/Pre-deploy** | **Current:** no SEC-009-specific deploy security gates beyond existing app CI                                                  | **Target/Future:** tenant isolation, API security, smoke security. SQL/RLS harness deploy gate only after spike                                                     |
 
 ---
 
 ## 19. Open Questions (Require Human Decision)
 
+Resolved (do not reopen as open questions):
+
+- Secret scanning tool: **gitleaks** (SEC-009.1 implemented).
+- Pre-commit / Husky for gitleaks: **no** for SEC-009.1. Local gitleaks is advisory; CI `secret-scan` is enforcement.
+- Required Status Check `secret-scan` on `main`: **configured**; merge blocked on failure.
+
+Still open (future phases):
+
 1. **Staging for DAST:** Dedicated staging Supabase + Render for nightly? Or ephemeral-only?
-2. **SAST choice:** CodeQL (free, native) vs Semgrep (more tunable)? CodeQL recommended.
+2. **SAST choice:** CodeQL (free, native) vs Semgrep (more tunable)? Not selected yet.
 3. **Nightly staging access:** Can CI connect to staging Supabase (read-only) for drift? Or ephemeral-only?
-4. **Secret rotation ownership:** Who owns quarterly rotation? Codify in baseline.
+4. **Secret rotation ownership:** Who owns quarterly rotation?
 5. **Alert routing:** Where do SEC-009 warnings/alerts go? (Slack, PagerDuty, GitHub Issues?)
-6. **Pre-deploy gate:** SQL harnesses required before Render deploy? (Currently only tests block)
-7. **Budget:** MVP tools free. Phase 2 (Snyk, StackHawk) may cost — confirm ceiling.
-8. **Pre-commit hook enforcement:** Require gitleaks in husky or rely on CI?
-9. **Supabase local in CI:** Verify feasibility via spike before committing to SQL harness automation.
+6. **Pre-deploy gate:** SQL harnesses required before Render deploy? (Currently only tests + `secret-scan` block merge)
+7. **Budget:** MVP tools free. Later paid scanners may cost — confirm ceiling.
+8. **Supabase local in CI:** Verify feasibility via spike before committing to SQL harness automation.
 
 ---
 
-## 20. Definition of Done (Design)
+## 20. Definition of Done (Design) and implementation status
 
-- [x] Current security controls fully documented
-- [x] Automation maturity matrix complete
+**Design DoD (this document):**
+
+- [x] Current security controls fully documented (as of 2026-08-21)
+- [x] Automation maturity matrix reflects **current** reality (no duplicate secret-scanning rows)
 - [x] Threat model prioritized for Nómadas Tour
 - [x] Security invariants extracted (18 invariants)
-- [x] Historical regressions catalogued (14 incidents)
-- [x] CI/Local/Nightly/Staging layers designed with BLOCK/WARN/INFO
-- [x] Tool evaluation complete (CodeQL, gitleaks, OSV-Scanner, Nuclei)
-- [x] Supabase-specific validation patterns designed (9 patterns, corrected rules)
-- [x] Tenant isolation test matrix defined (10 operations × 2 agencies)
-- [x] Security baseline schema designed (controls, not schema) + drift detection strategy
-- [x] Privacy boundaries defined for all external tools
-- [x] SEC-009 decomposition into phases with MVP prioritized
-- [x] MVP prioritized by value/risk (5 controls, no fixed duration)
-- [x] Risks/trade-offs documented
-- [x] Grant/RLS validation rules corrected (SECURITY DEFINER, authenticated GRANT)
-- [x] Baseline modeled as controls, not schema
+- [x] Historical regressions catalogued
+- [x] CI/Local/Nightly/Staging layers distinguished Current vs Planned vs Spike vs Target
+- [x] Tool evaluation records **decisions already taken** (gitleaks implemented; npm audit design-complete)
 - [x] SQL harness automation feasibility flagged (spike needed)
-- [x] DAST separated from business logic/tenant isolation
-- [x] Fuzzing post-MVP, load/stress in Phase 8
-- [x] Hexagonal separated from SEC-009
-- [x] MVP prioritized without artificial time commitment
+- [x] DAST / fuzzing / load testing / hexagonal remain out of current implementation
+
+**Implementation status (SEC-009 program):**
+
+- [x] SEC-009.0 COMPLETED
+- [x] SEC-009.1 COMPLETED / IMPLEMENTED (`secret-scan` Required Status Check on `main`)
+- [x] SEC-009.2 DESIGN COMPLETE — READY FOR IMPLEMENTATION (not implemented)
+- [ ] SEC-009 general **NOT complete** (dependency scanning, SAST, tenant-isolation suite, SQL harness spike, DAST, nightly, etc.)
 
 ---
 
@@ -715,23 +791,23 @@ npx.cmd prettier --check docs/SEC-009-continuous-security-validation-design.md
 ## 22. Report
 
 ```
-FILE CREATED: docs/SEC-009-continuous-security-validation-design.md
-KEY DESIGN CORRECTIONS APPLIED:
-  - Security baseline as controls, not schema dump
-  - Grant/RLS validation rules corrected (SECURITY DEFINER, authenticated GRANT)
-  - Validate result state, not parse migrations
-  - SQL harness automation feasibility flagged (Supabase local spike needed)
-  - Tenant isolation elevated to core capability
-  - Five-layer security model defined
-  - MVP prioritized by value/risk, no fixed duration
-  - DAST scope bounded; fuzzing post-MVP; load testing in Phase 8
-  - Hexagonal separated from SEC-009
-  - Privacy boundaries explicit
-  - MVP: secret scan, dep scan, regression suite, tenant isolation, SAST
-  - Open questions documented
+FILE UPDATED: docs/SEC-009-continuous-security-validation-design.md
+ROLE: current source of truth for SEC-009 (documentation only)
 
-MVP: secret scan, dep scan, regression suite, tenant isolation, SAST
-OPEN QUESTIONS: 9 (staging DAST, SAST choice, nightly access, rotation ownership, alerts, pre-deploy gate, budget, pre-commit, Supabase local)
-VALIDATION: git diff --check PASS
-STATUS: DESIGN COMPLETE — READY FOR IMPLEMENTATION DESIGN
+STATUS:
+  SEC-009.0 = COMPLETED
+  SEC-009.1 = COMPLETED / IMPLEMENTED (secret-scan Required Status Check on main)
+  SEC-009.2 = DESIGN COMPLETE — READY FOR IMPLEMENTATION (not in CI)
+  SEC-009   = NOT COMPLETE
+
+CURRENT CI JOBS:
+  security-tests, tests, backend-tests, typecheck, build, secret-scan
+
+NOT CURRENT:
+  dependency-scan, CodeQL, gitleaks pre-commit, eslint-plugin-security,
+  gitleaks-baseline.json, nightly DAST, SQL harness CI, SBOM, license scan
+
+OPEN QUESTIONS: 8 remaining (DAST staging, SAST choice, nightly access,
+  rotation, alerts, pre-deploy SQL gate, budget, Supabase local spike)
+RESOLVED: gitleaks selected; no Husky for 009.1; secret-scan Ruleset configured
 ```
