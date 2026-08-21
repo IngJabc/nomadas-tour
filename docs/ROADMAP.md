@@ -88,7 +88,7 @@ FASE 3 — Workers
 
 FASE Seguridad continua
   SEC-001 … SEC-008                        ✅ (hardening cerrado)
-  SEC-009  Continuous security validation  → en progreso (009.0 CI; 009.1 secret-scan en implementación)
+  SEC-009  Continuous security validation  → abierto (009.0 ✅ COMPLETED; 009.1 ✅ COMPLETED; 009.2 ✅ IMPLEMENTED)
 
 FASE 4 — Automatizaciones (producto)
   F4-001  Agency Daily Digest            ✅
@@ -259,7 +259,7 @@ SEC-009
 
 #### SEC-009 — Continuous Security Validation
 
-**Estado:** Design complete — **implementation in progress** (activo: **SEC-009.0** CI Security Foundation / `.github/workflows/ci.yml`; **SEC-009.1** Secret Scanning MVP **en implementación** — job `secret-scan` + `.gitleaks.toml`). SEC-009 permanece abierto. MVP restante (SCA, SAST, tenant suite, SQL harness spike) aún no implementado. Detalle: [`SEC-009-continuous-security-validation-design.md`](SEC-009-continuous-security-validation-design.md), [`SEC-009.1-secret-scanning-implementation-design.md`](SEC-009.1-secret-scanning-implementation-design.md). Required Status Check `secret-scan` en el Ruleset de `main`: paso manual.
+**Estado:** SEC-009 **abierto**. **SEC-009.0** CI Foundation **COMPLETED**. **SEC-009.1** Secret Scanning **COMPLETED** (job `secret-scan`, Required Status Check en `main` configurado). Setup: [`SEC-009.1-gitleaks-local-setup.md`](SEC-009.1-gitleaks-local-setup.md). **SEC-009.2** Dependency Scanning **IMPLEMENTED / COMPLETED** (`audit:deps`, job `dependency-scan` en CI; `npm audit --audit-level=high` root + backend; 0 HIGH/CRITICAL). Required Status Check `dependency-scan`: **pendiente** (configuración manual). Design: [`SEC-009.2-dependency-scanning-implementation-design.md`](SEC-009.2-dependency-scanning-implementation-design.md). MVP restante (SAST, tenant suite, SQL harness spike) **FUTURE**. Detalle: [`SEC-009-continuous-security-validation-design.md`](SEC-009-continuous-security-validation-design.md).
 
 **Objetivo:**
 
@@ -273,12 +273,12 @@ En una frase: automatizar parte de las auditorías que hoy son manuales o semi-m
 
 **Definición conceptual de éxito:** un cambio que rompa aislamiento de tenant, RLS/grants, exposición de secretos, o un invariante de autorización conocido, debe fallar en pipeline/suite/scheduled check con señal accionable — no solo descubrirse en una revisión humana weeks later.
 
-##### Capas a evaluar (ninguna herramienta seleccionada todavía)
+##### Capas a evaluar
 
 ###### SCA — Software Composition Analysis
 
 - Detectar dependencias vulnerables; alertar sobre paquetes comprometidos/obsoletos; revisar lockfiles.
-- Candidatos: GitHub Dependabot, `npm audit`, OSV-Scanner.
+- **SEC-009.2 (IMPLEMENTED):** `npm audit --audit-level=high` (root + backend) via `audit:deps` y job `dependency-scan`. Required Status Check todavía **pendiente**. Dependabot / OSV-Scanner = FUTURE / optional.
 
 ###### SAST — Static Application Security Testing
 
@@ -288,7 +288,8 @@ En una frase: automatizar parte de las auditorías que hoy son manuales o semi-m
 ###### Secret Scanning
 
 - API keys, Supabase service role keys, JWT secrets, tokens, credentials, secretos accidentales en Git.
-- Candidatos: GitHub Secret Scanning, gitleaks, trufflehog.
+- **SEC-009.1 (COMPLETED):** gitleaks en CI (`secret-scan`, Required Status Check en `main`). Setup local: [`SEC-009.1-gitleaks-local-setup.md`](SEC-009.1-gitleaks-local-setup.md).
+- Fuera de 009.1: GitHub Secret Scanning, TruffleHog, pre-commit, baseline.
 
 ###### DAST — Dynamic Application Security Testing
 
@@ -396,17 +397,17 @@ Detalle histórico de remediaciones C1–C4 y hardening: [`security-audit-remedi
 
 ##### Herramientas candidatas
 
-Ninguna está seleccionada. La selección ocurre cuando SEC-009 pase de roadmap a sprint (design del ticket). Verificar precios/licencias/capacidades **en ese momento**. Priorizar costo cero / open source / free tier; considerar privacidad y datos enviados a terceros. No asumir que algo gratuito hoy seguirá siéndolo.
+Ninguna herramienta de SAST/DAST está seleccionada todavía. Secret scanning: **gitleaks (SEC-009.1 COMPLETED)**. SCA: **`npm audit` (SEC-009.2 IMPLEMENTED)**; Required Status Check `dependency-scan` pendiente. El resto se selecciona cuando el ticket correspondiente pase a sprint. Verificar precios/licencias/capacidades **en ese momento**. Priorizar costo cero / open source / free tier; considerar privacidad y datos enviados a terceros. No asumir que algo gratuito hoy seguirá siéndolo.
 
-| Categoría               | Candidatos                                         |
-| ----------------------- | -------------------------------------------------- |
-| SCA                     | Dependabot, npm audit, OSV-Scanner                 |
-| SAST                    | CodeQL, Semgrep                                    |
-| Secret scanning         | GitHub Secret Scanning, gitleaks, trufflehog       |
-| DAST                    | OWASP ZAP, otras open source/free OWASP-compatible |
-| Offensive / AI-assisted | Strix, otras candidatas                            |
-| Fuzzing                 | herramientas open source adecuadas al stack        |
-| API security            | tooling OWASP-compatible                           |
+| Categoría               | Candidatos                                                                        |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| SCA                     | **`npm audit` (SEC-009.2 / CI).** FUTURE/optional: Dependabot, OSV-Scanner        |
+| SAST                    | CodeQL, Semgrep                                                                   |
+| Secret scanning         | **gitleaks (SEC-009.1 / CI).** Fuera de 009.1: GitHub Secret Scanning, TruffleHog |
+| DAST                    | OWASP ZAP, otras open source/free OWASP-compatible                                |
+| Offensive / AI-assisted | Strix, otras candidatas                                                           |
+| Fuzzing                 | herramientas open source adecuadas al stack                                       |
+| API security            | tooling OWASP-compatible                                                          |
 
 **Criterios de evaluación (cuando se abra el ticket):** cobertura real del stack Next.js + TypeScript + Node/Supabase; integración local/CI; falsos positivos; mantenimiento; privacidad; costo cero cuando sea posible; Strix como candidato, no como solución automática.
 
@@ -443,7 +444,7 @@ Después:
 10. Nightly authenticated security validation
 ```
 
-La definición final de tickets se hará en el design de SEC-009. **No** implementar herramientas ni workflows hasta entonces.
+Priorización histórica del ROADMAP (no sustituye el estado actual). **Hoy:** 009.0, 009.1 y 009.2 COMPLETED / IMPLEMENTED (`secret-scan` Required Status Check activo; `dependency-scan` en CI, Required Status Check pendiente). SAST, tenant suite, DAST, nightly = FUTURE. No implementar esas capas futuras hasta su ticket.
 
 ---
 
