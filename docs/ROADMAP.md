@@ -88,7 +88,7 @@ FASE 3 — Workers
 
 FASE Seguridad continua
   SEC-001 … SEC-008                        ✅ (hardening cerrado)
-  SEC-009  Continuous security validation  → abierto (009.0 ✅ COMPLETED; 009.1 ✅ COMPLETED; 009.2 🟡 DESIGN COMPLETE)
+  SEC-009  Continuous security validation  → abierto (009.0 ✅ COMPLETED; 009.1 ✅ COMPLETED; 009.2 ✅ IMPLEMENTED)
 
 FASE 4 — Automatizaciones (producto)
   F4-001  Agency Daily Digest            ✅
@@ -259,7 +259,7 @@ SEC-009
 
 #### SEC-009 — Continuous Security Validation
 
-**Estado:** SEC-009 **abierto**. **SEC-009.0** CI Foundation **COMPLETED**. **SEC-009.1** Secret Scanning **COMPLETED** (job `secret-scan`, `.gitleaks.toml`, Required Status Check en `main` configurado y bloquea merge; scan local `no leaks found`). Setup: [`SEC-009.1-gitleaks-local-setup.md`](SEC-009.1-gitleaks-local-setup.md). **SEC-009.2** Dependency Scanning **DESIGN COMPLETE / READY FOR IMPLEMENTATION** (`npm audit` root + backend; job/script **aún no existen**). Design: [`SEC-009.2-dependency-scanning-implementation-design.md`](SEC-009.2-dependency-scanning-implementation-design.md). Inventario 009.2 (sin remediar): 10 HIGH + 1 MODERATE. MVP restante (SAST, tenant suite, SQL harness spike) **FUTURE**. Detalle: [`SEC-009-continuous-security-validation-design.md`](SEC-009-continuous-security-validation-design.md).
+**Estado:** SEC-009 **abierto**. **SEC-009.0** CI Foundation **COMPLETED**. **SEC-009.1** Secret Scanning **COMPLETED** (job `secret-scan`, Required Status Check en `main` configurado). Setup: [`SEC-009.1-gitleaks-local-setup.md`](SEC-009.1-gitleaks-local-setup.md). **SEC-009.2** Dependency Scanning **IMPLEMENTED / COMPLETED** (`audit:deps`, job `dependency-scan` en CI; `npm audit --audit-level=high` root + backend; 0 HIGH/CRITICAL). Required Status Check `dependency-scan`: **pendiente** (configuración manual). Design: [`SEC-009.2-dependency-scanning-implementation-design.md`](SEC-009.2-dependency-scanning-implementation-design.md). MVP restante (SAST, tenant suite, SQL harness spike) **FUTURE**. Detalle: [`SEC-009-continuous-security-validation-design.md`](SEC-009-continuous-security-validation-design.md).
 
 **Objetivo:**
 
@@ -278,7 +278,7 @@ En una frase: automatizar parte de las auditorías que hoy son manuales o semi-m
 ###### SCA — Software Composition Analysis
 
 - Detectar dependencias vulnerables; alertar sobre paquetes comprometidos/obsoletos; revisar lockfiles.
-- **SEC-009.2 (DESIGN COMPLETE, no implementado):** `npm audit --audit-level=high` (root + backend). Dependabot / OSV-Scanner = FUTURE / optional.
+- **SEC-009.2 (IMPLEMENTED):** `npm audit --audit-level=high` (root + backend) via `audit:deps` y job `dependency-scan`. Required Status Check todavía **pendiente**. Dependabot / OSV-Scanner = FUTURE / optional.
 
 ###### SAST — Static Application Security Testing
 
@@ -397,11 +397,11 @@ Detalle histórico de remediaciones C1–C4 y hardening: [`security-audit-remedi
 
 ##### Herramientas candidatas
 
-Ninguna herramienta de SAST/DAST está seleccionada todavía. Secret scanning: **gitleaks (SEC-009.1 COMPLETED)**. SCA: **`npm audit` (SEC-009.2 DESIGN COMPLETE, no implementado)**. El resto se selecciona cuando el ticket correspondiente pase a sprint. Verificar precios/licencias/capacidades **en ese momento**. Priorizar costo cero / open source / free tier; considerar privacidad y datos enviados a terceros. No asumir que algo gratuito hoy seguirá siéndolo.
+Ninguna herramienta de SAST/DAST está seleccionada todavía. Secret scanning: **gitleaks (SEC-009.1 COMPLETED)**. SCA: **`npm audit` (SEC-009.2 IMPLEMENTED)**; Required Status Check `dependency-scan` pendiente. El resto se selecciona cuando el ticket correspondiente pase a sprint. Verificar precios/licencias/capacidades **en ese momento**. Priorizar costo cero / open source / free tier; considerar privacidad y datos enviados a terceros. No asumir que algo gratuito hoy seguirá siéndolo.
 
 | Categoría               | Candidatos                                                                        |
 | ----------------------- | --------------------------------------------------------------------------------- |
-| SCA                     | **`npm audit` (SEC-009.2 design).** FUTURE/optional: Dependabot, OSV-Scanner      |
+| SCA                     | **`npm audit` (SEC-009.2 / CI).** FUTURE/optional: Dependabot, OSV-Scanner        |
 | SAST                    | CodeQL, Semgrep                                                                   |
 | Secret scanning         | **gitleaks (SEC-009.1 / CI).** Fuera de 009.1: GitHub Secret Scanning, TruffleHog |
 | DAST                    | OWASP ZAP, otras open source/free OWASP-compatible                                |
@@ -444,7 +444,7 @@ Después:
 10. Nightly authenticated security validation
 ```
 
-Priorización histórica del ROADMAP (no sustituye el estado actual). **Hoy:** 009.0 y 009.1 COMPLETED; secret scanning y CI foundation ya existen. Dependency scanning es 009.2 (design complete, no implementado). SAST, tenant suite, DAST, nightly = FUTURE. No implementar esas capas futuras hasta su ticket.
+Priorización histórica del ROADMAP (no sustituye el estado actual). **Hoy:** 009.0, 009.1 y 009.2 COMPLETED / IMPLEMENTED (`secret-scan` Required Status Check activo; `dependency-scan` en CI, Required Status Check pendiente). SAST, tenant suite, DAST, nightly = FUTURE. No implementar esas capas futuras hasta su ticket.
 
 ---
 

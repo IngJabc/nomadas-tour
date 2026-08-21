@@ -1,7 +1,8 @@
 # SEC-009.0 — CI Security Foundation
 # SEC-009.1 — Secret Scanning MVP (secret-scan job)
-# PR pipeline: secret-scan, security tests, unit suites, typecheck, and builds.
-# Does not include npm audit / CodeQL (later SEC-009 tickets).
+# SEC-009.2 — Dependency Scanning MVP (dependency-scan job)
+# PR pipeline: secret-scan, dependency-scan, security tests, unit suites, typecheck, and builds.
+# Does not include CodeQL (later SEC-009 tickets).
 # Does not touch backup.yml.
 name: ci
 
@@ -47,6 +48,34 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: "false"
+
+  dependency-scan:
+    name: dependency-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      - name: Audit dependencies
+        run: npm run audit:deps
 
   security-tests:
     name: security-tests
