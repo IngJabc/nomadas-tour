@@ -3,7 +3,7 @@
 **Documento:** Plan técnico de implementación de remediaciones de seguridad  
 **Basado en:** [Security Assessment C1–C4](security-audit-remediation.md)  
 **Objetivo:** Eliminar vulnerabilidades críticas, reforzar límites de confianza y establecer un modelo seguro de autorización.  
-**Última actualización:** 2026-08-05 (SEC-009 documentada como fase futura en ROADMAP)
+**Última actualización:** 2026-08-20 (SEC-009: alcance ampliado en ROADMAP; sin implementación)
 **Entorno:** Supabase producción (pre-lanzamiento). Migración 039 aplicada e validada.
 
 ---
@@ -20,11 +20,13 @@
 | SEC-006 | Reescribir políticas RLS | C1 | P2 | **Completado (v2)** |
 | SEC-007 | Suite de regression tests | — | P2 | **Completado** |
 | SEC-008 | Eliminar user_metadata de accept-invitation | C1 | P2 | **Completado** |
-| SEC-009 | Continuous security validation (SAST, deps, multi-tenant, RLS) | — | Futura | **Planificada (no implementada)** |
+| SEC-009 | Continuous Security Validation (SCA/SAST/secrets/DAST/regressions/tenant/Supabase drift) | — | Futura | **Planificada (no implementada)** |
 
-> **SEC-009** es seguridad preventiva/continua (Strix u equivalentes, GitHub security tooling, SAST).
+> **SEC-001…008** = hardening / corrección arquitectónica (cerrado).
+> **SEC-009** = prevención de regresiones + validación continua (futura). Alcance completo, capas, MVP sugerido, candidatos de herramientas y límite con Fase 8: [`ROADMAP.md`](ROADMAP.md) § *Fase Seguridad continua*.
 > **No** es observabilidad de runtime: eso pertenece a **WKR-006.x** (logs, métricas, Sentry).
-> Diseño Sentry: [`WKR-006.2-sentry-foundation-design.md`](WKR-006.2-sentry-foundation-design.md). Ver [`ROADMAP.md`](ROADMAP.md).
+> Diseño Sentry: [`WKR-006.2-sentry-foundation-design.md`](WKR-006.2-sentry-foundation-design.md).
+> **Ninguna herramienta de SEC-009 está seleccionada ni instalada** hasta que el ticket pase a sprint.
 
 **Migraciones relacionadas:**
 

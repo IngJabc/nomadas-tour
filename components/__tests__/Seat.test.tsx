@@ -24,7 +24,7 @@ describe('Seat component', () => {
   it('renders available seat with cyan background', () => {
     render(<Seat seat={createSeat()} isSelected={false} onSelect={() => {}} />);
     const btn = screen.getByRole('button');
-    expect(btn.style.background).toContain('var(--color-brand-cyan)');
+    expect(btn.style.background).toContain('rgb(0, 212, 255)');
     expect(btn.style.cursor).toBe('pointer');
   });
 
@@ -38,7 +38,7 @@ describe('Seat component', () => {
     );
     const btn = screen.getByRole('button');
     expect(btn.style.background).toContain('rgb(55, 65, 81)');
-    expect(btn.style.cursor).toBe('not-allowed');
+    expect(btn.style.cursor).toBe('default');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -51,7 +51,7 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.style.background).toContain('rgb(55, 65, 81)');
+    expect(btn.style.background).toContain('rgb(124, 58, 237)');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -68,7 +68,7 @@ describe('Seat component', () => {
     expect((btn as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it('renders unknown status seat as slate and disabled', () => {
+  it('renders locked guide-code seat as blocked purple and disabled', () => {
     render(
       <Seat
         seat={createSeat({ seat_code: 'G', status: 'locked' })}
@@ -77,7 +77,7 @@ describe('Seat component', () => {
       />,
     );
     const btn = screen.getByRole('button');
-    expect(btn.style.background).toContain('rgb(55, 65, 81)');
+    expect(btn.style.background).toContain('rgb(124, 58, 237)');
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 

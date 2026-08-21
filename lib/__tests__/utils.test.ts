@@ -3,8 +3,9 @@ import { formatDateTime, cn, generateQRCode } from '@/lib/utils';
 
 describe('formatDateTime', () => {
   it('formats ISO date string correctly', () => {
+    // BUSINESS_TIMEZONE = America/Caracas (UTC-4); hour12 en-US
     const result = formatDateTime('2026-06-19T14:30:00Z');
-    expect(result).toBe('19/06/2026 \u00B7 14:30');
+    expect(result).toBe('19/06/2026 \u00B7 10:30 AM');
   });
 
   it('handles different timezone offset', () => {
