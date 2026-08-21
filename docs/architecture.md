@@ -104,6 +104,14 @@ opcional; health HTTP mínimo para hosting tipo Render Free Web Service
 Retención / DLQ lógica: [`WKR-006.3-outbox-retention-dlq-runbook.md`](WKR-006.3-outbox-retention-dlq-runbook.md).
 No mezclar con SEC-009.
 
+### Evolución arquitectónica (política)
+
+Nómadas **no** se reescribe globalmente a Hexagonal Architecture. La política vigente está en [`ROADMAP.md`](ROADMAP.md) § *Política arquitectónica — Hexagonal / Ports & Adapters*:
+
+- features nuevas **complejas** deben **evaluar** Ports & Adapters de forma explícita;
+- no es obligación por defecto;
+- hexagonal no sustituye RLS, autorización ni SEC-009.
+
 ### Audit trail
 
 `public.audit_log` es el registro append-only de acciones administrativas y

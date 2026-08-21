@@ -213,10 +213,12 @@ Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** —
 
 **Separación conceptual (no mezclar en el mismo ticket):**
 
-| Capacidad | Rol | Ticket |
-|-----------|-----|--------|
+| Capacidad | Rol | Ticket / Fase |
+|-----------|-----|---------------|
 | **Logs / métricas / health / Sentry** | Observabilidad y operación en producción | **WKR-006.x** |
-| **SAST / Dependabot / secret scanning / DAST / Strix (candidatos)** | Seguridad ofensiva/preventiva, vulnerabilidades, validación continua | **SEC-009** |
+| **SCA / SAST / secrets / DAST / fuzzing / security drift / tenant isolation** | Seguridad continua y prevención de regresiones | **SEC-009** |
+| **Load / stress / capacity / latency / costos** | Escalabilidad y rendimiento | **Fase 8** |
+| **Hexagonal / Ports & Adapters** | Decisión arquitectónica incremental en features nuevas complejas | **Política de roadmap** (no es SEC-009 ni Fase 8) |
 
 #### WKR-007 ✅ — Trip / notification event workers
 
@@ -243,51 +245,205 @@ Estrategia completa (tags, PII, entornos, Free plan, riesgos). **Docs only** —
 
 ### Fase Seguridad continua
 
-**Prioridad:** Paralela a Workers / Escalabilidad (no bloquea WKR-006.x).
+**Prioridad:** Paralela a Workers / Escalabilidad (no bloquea WKR-006.x ni Fase 8).
 
-El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implementation.md](security-hardening-implementation.md)). La siguiente capa es **validación continua**, no un re-hardening ad hoc.
+El hardening **SEC-001 … SEC-008** está cerrado ([security-hardening-implementation.md](security-hardening-implementation.md)). Esa etapa fue **corrección arquitectónica**. La siguiente capa es **prevención de regresiones + validación continua**, no un re-hardening ad hoc.
+
+```text
+SEC-001…008
+→ hardening / corrección arquitectónica (cerrado)
+
+SEC-009
+→ prevención de regresiones + validación continua (futura)
+```
 
 #### SEC-009 — Continuous Security Validation
 
-**Estado:** Futura (no es sprint activo; sin herramienta seleccionada).
+**Estado:** Design complete — **implementation in progress** (activo: **SEC-009.0** CI Security Foundation / `.github/workflows/ci.yml`). MVP restante (secrets, SCA, SAST, tenant suite, SQL harness spike) aún no implementado. Detalle: [`SEC-009-continuous-security-validation-design.md`](SEC-009-continuous-security-validation-design.md).
 
-**Objetivo:** Automatizar parte de las auditorías de seguridad que hoy son manuales o semi-manuales.
+**Objetivo:**
 
-**Alcance (futuro, sin elegir herramienta definitiva):**
+```text
+Evitar regresiones de seguridad y automatizar validaciones continuas
+sobre código, dependencias, secretos, aplicación desplegada y
+controles específicos de multi-tenancy / Supabase.
+```
 
-- Análisis automatizado de vulnerabilidades
-- SAST (static application security testing)
-- Dependency scanning
-- Regresiones de seguridad (ampliar suite tipo SEC-007)
-- Validaciones multi-tenant / aislamiento
-- Revisión continua de permisos y RLS
+En una frase: automatizar parte de las auditorías que hoy son manuales o semi-manuales, de modo que el proyecto detecte automáticamente —antes o poco después de un cambio— *“introdujimos una regresión de seguridad”*, en lugar de depender exclusivamente de una auditoría manual posterior.
 
-**Herramientas candidatas (evaluación abierta — ninguna seleccionada todavía):**
+**Definición conceptual de éxito:** un cambio que rompa aislamiento de tenant, RLS/grants, exposición de secretos, o un invariante de autorización conocido, debe fallar en pipeline/suite/scheduled check con señal accionable — no solo descubrirse en una revisión humana weeks later.
 
-La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del ticket). Hasta entonces ninguna herramienta se considera definitiva ni debe configurarse en el repo.
+##### Capas a evaluar (ninguna herramienta seleccionada todavía)
 
-| Candidato | Rol a evaluar |
-|-----------|----------------|
-| **Strix** | Evaluación de seguridad asistida por IA / testing ofensivo |
-| **GitHub CodeQL** | SAST |
-| **GitHub Dependabot** | Dependency scanning y alertas de dependencias vulnerables |
-| **GitHub secret scanning** | Disponibilidad y condiciones según plan/repositorio |
-| **SAST del ecosistema JavaScript/TypeScript** | Alternativas open source o gratuitas (además o en lugar de CodeQL) |
-| **DAST / API security scanners** | Herramientas gratuitas/open source para probar endpoints y detectar vulnerabilidades desde el exterior |
+###### SCA — Software Composition Analysis
 
-**Criterios de evaluación (cuando se abra el ticket):**
+- Detectar dependencias vulnerables; alertar sobre paquetes comprometidos/obsoletos; revisar lockfiles.
+- Candidatos: GitHub Dependabot, `npm audit`, OSV-Scanner.
 
-- Priorizar **costo cero / open source / free tier**: el proyecto **no dispone hoy de presupuesto dedicado** a herramientas de seguridad.
-- Cobertura real frente al stack **Next.js + TypeScript + Node/Supabase**.
-- Facilidad de integración (local y/o CI).
-- Tasa y manejabilidad de falsos positivos.
-- Carga de mantenimiento operativo.
-- Privacidad de datos (qué se envía a terceros).
-- Posibilidad de ejecutarlo localmente o en CI sin dependencias de pago.
-- **No asumir** que una herramienta gratuita hoy seguirá siendo gratuita al momento de ejecutar SEC-009: verificar precios y licencias en esa fecha.
-- **Strix** queda como **candidato**, no como solución automática definitiva.
+###### SAST — Static Application Security Testing
 
-**No mezclar con WKR-006.x:** SEC-009 no es observabilidad de runtime. **Sentry no sustituye SEC-009** (ni SAST, ni dependency scanning, ni pentest/DAST asistido).
+- Patrones vulnerables en código; errores de autorización; SQL/injection patterns; uso inseguro de APIs; manejo de datos sensibles.
+- Candidatos: GitHub CodeQL, Semgrep, otras open source/free para TypeScript/Node/Next.js.
+
+###### Secret Scanning
+
+- API keys, Supabase service role keys, JWT secrets, tokens, credentials, secretos accidentales en Git.
+- Candidatos: GitHub Secret Scanning, gitleaks, trufflehog.
+
+###### DAST — Dynamic Application Security Testing
+
+- Analizar la aplicación **en ejecución** desde la perspectiva de un atacante externo (XSS, injection, headers/configuración, auth/sesión, endpoints expuestos, validación de inputs, API security).
+- Candidatos: OWASP ZAP; otras open source/free compatibles con OWASP.
+
+> **Importante:** DAST automatizado **no sustituye** pruebas de autorización ni de business logic, especialmente en un SaaS multi-tenant.
+
+Ejemplo de lo que un scanner externo no necesariamente conoce:
+
+```text
+Agency A
+→ solicita reservation de Agency B
+→ debe recibir DENY
+```
+
+###### Security Regression Testing (capa central de SEC-009)
+
+Convertir los invariantes de seguridad de Nómadas Tour en tests **permanentes** (ampliar el espíritu de SEC-007). Esta capa es **específica del producto** y complementa SAST/DAST/SCA.
+
+Ejemplos de invariantes:
+
+```text
+Agency A cannot read Agency B reservations.
+Agency A cannot modify Agency B seats.
+Agency A cannot execute privileged RPCs.
+Public client cannot access internal link tables directly.
+Service role never reaches frontend.
+Raw reservation-link token never reaches Sentry.
+RLS identity comes from trusted DB identity.
+Authenticated agency cannot read another agency's realtime rows.
+```
+
+###### Nightly / scheduled security validation (futuro)
+
+Estrategia conceptual (no implementada):
+
+```text
+Nightly
+  ↓
+dependency scan (SCA)
+  ↓
+SAST / deep scan
+  ↓
+security regression suite
+  ↓
+staging security harness
+  ↓
+DAST
+  ↓
+tenant isolation checks
+  ↓
+report
+```
+
+###### Fuzzing (capacidad futura; no MVP obligatorio)
+
+Probar inputs inesperados/malformados contra API, validaciones Zod, public endpoints, RPC boundaries, reservation links, auth-related inputs.
+
+```text
+null | empty string | wrong type | very long string
+unexpected JSON | duplicate IDs | unknown seat codes | malformed tokens
+```
+
+Sirve para crashes, validation gaps y comportamientos inesperados. **No** sustituye tenant isolation ni business logic testing.
+
+###### Security drift detection (capacidad futura)
+
+Detectar divergencias entre el estado esperado definido en Git/migrations y el estado real de Staging/Producción.
+
+```text
+sensitive table without RLS
+unexpected GRANT
+unexpected RPC EXECUTE
+SECURITY DEFINER without expected hardening
+unexpected realtime publication
+tenant policy missing
+```
+
+Separado de `migration list`:
+
+```text
+migration history ≠ security baseline
+```
+
+El migration history puede estar correcto y aun así existir security drift.
+
+###### Validación específica Supabase / multi-tenant
+
+- RLS policy drift; grants/revokes; `SECURITY DEFINER`; `search_path`; public RPC execute; realtime publications; service_role exposure; tenant isolation; exposed schemas; auth identity helpers (`private.auth_app_role` / `private.auth_app_agency_id`).
+
+Ejemplos:
+
+```text
+New sensitive table → RLS absent → SEC-009 should detect it
+New RPC → PUBLIC EXECUTE granted → SEC-009 should detect it
+authenticated SELECT + missing tenant-scoped RLS → SEC-009 should detect it
+```
+
+##### Threat-model scope (mínimo)
+
+Tenant isolation; authentication; authorization; broken access control; business logic; injection; secrets; dependency/supply-chain risk; public API abuse; configuration drift; token/PII leakage.
+
+Detalle histórico de remediaciones C1–C4 y hardening: [`security-audit-remediation.md`](security-audit-remediation.md) (histórico) y [`security-hardening-implementation.md`](security-hardening-implementation.md).
+
+##### Herramientas candidatas
+
+Ninguna está seleccionada. La selección ocurre cuando SEC-009 pase de roadmap a sprint (design del ticket). Verificar precios/licencias/capacidades **en ese momento**. Priorizar costo cero / open source / free tier; considerar privacidad y datos enviados a terceros. No asumir que algo gratuito hoy seguirá siéndolo.
+
+| Categoría | Candidatos |
+|-----------|------------|
+| SCA | Dependabot, npm audit, OSV-Scanner |
+| SAST | CodeQL, Semgrep |
+| Secret scanning | GitHub Secret Scanning, gitleaks, trufflehog |
+| DAST | OWASP ZAP, otras open source/free OWASP-compatible |
+| Offensive / AI-assisted | Strix, otras candidatas |
+| Fuzzing | herramientas open source adecuadas al stack |
+| API security | tooling OWASP-compatible |
+
+**Criterios de evaluación (cuando se abra el ticket):** cobertura real del stack Next.js + TypeScript + Node/Supabase; integración local/CI; falsos positivos; mantenimiento; privacidad; costo cero cuando sea posible; Strix como candidato, no como solución automática.
+
+##### SEC-009 vs Fase 8
+
+| SEC-009 | Fase 8 — Escalabilidad |
+|---------|-------------------------|
+| SCA, SAST, secret scanning, DAST | Load / stress / capacity testing |
+| Security regression + tenant isolation | Performance regression, throughput, p95/p99 |
+| Supabase/RLS validation, fuzzing, drift | DB query performance, connection saturation |
+| Scheduled security validation | Realtime scale, cost/performance optimization |
+
+> Las pruebas de 1.000+ requests por segundo pertenecen principalmente a **Escalabilidad / Fase 8**, aunque pruebas **limitadas** de abuse / rate limiting pueden formar parte de SEC-009.
+
+**No mezclar con WKR-006.x:** SEC-009 no es observabilidad de runtime. **Sentry no sustituye SEC-009.**
+
+##### MVP propuesto (priorización; no tickets definitivos)
+
+```text
+SEC-009 MVP
+
+1. Security baseline
+2. Dependency scanning (SCA)
+3. Secret scanning
+4. SAST
+5. Security regression suite
+6. Tenant-isolation validation
+
+Después:
+
+7. DAST
+8. Fuzzing
+9. Security drift detection
+10. Nightly authenticated security validation
+```
+
+La definición final de tickets se hará en el design de SEC-009. **No** implementar herramientas ni workflows hasta entonces.
 
 ---
 
@@ -411,16 +567,97 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 
 **Objetivo:** Sostener más agencias, más viajes concurrentes y más tráfico Realtime sin degradación.
 
-**Alcance:**
+**Alcance (performance / capacidad — no es SEC-009):**
 
+- Load testing, stress testing, capacity testing
+- Performance regression; throughput; p95/p99 latency
 - Observabilidad avanzada (amplía WKR-006.x: trazas distribuidas, alertas SLO)
-- Performance (queries, N+1, índices)
+- Performance de queries (N+1, índices); saturación de conexiones
+- Realtime scale
 - Caché donde aporte (dashboards, listados)
-- Rate limiting refinado por ruta y tenant
+- Rate limiting refinado por ruta y tenant (también puede solaparse con abuse limitado en SEC-009)
 - Monitoreo y alertas de infraestructura
 - Optimización de costos (Supabase, email, compute)
 
+**Límite con SEC-009:** las pruebas de alto volumen (p. ej. 1.000+ RPS) son **Fase 8**. SEC-009 cubre seguridad continua (vulnerabilidades, regresiones de autorización, drift, scanners). No fusionar ambos en un solo ticket.
+
 **Valor:** Confianza para escalar comercialmente sin sorpresas operativas.
+
+---
+
+### Política arquitectónica — Hexagonal / Ports & Adapters
+
+**Decisión:** Nómadas Tour **no será reescrito globalmente** a arquitectura hexagonal.
+
+La arquitectura actual está en producción y ya posee mecanismos de seguridad e integridad relevantes: autorización en backend, RLS, trusted identity, RPCs, constraints, workers, outbox, Realtime. No introducir una re-arquitectura masiva por razones puramente teóricas.
+
+#### Principio para futuras features
+
+Al diseñar una **nueva feature de complejidad significativa**, evaluar **explícitamente** si conviene aplicar:
+
+```text
+Hexagonal Architecture
+Ports & Adapters
+Use Cases + Domain + Ports + Adapters
+```
+
+No es obligatorio por defecto. La decisión se basa en complejidad y valor arquitectónico.
+
+**Buenos candidatos** (evaluar hexagonal): reglas de negocio complejas; múltiples fuentes de infraestructura; integraciones externas; jobs/workers; alto riesgo de pruebas difíciles; varios canales de entrada; necesidad de desacoplar dominio de Supabase/HTTP; feature de vida útil larga y crecimiento previsto.
+
+**Malos candidatos** (no forzar hexagonal): CRUDs muy simples; pantallas puramente presentacionales; cambios pequeños; refactors sin beneficio claro.
+
+#### Estrategia recomendada
+
+```text
+Nómadas actual
+    ↓
+NO rewrite global
+    ↓
+Nueva feature compleja
+    ↓
+evaluar Hexagonal
+    ↓
+si aporta valor → implementar en ese bounded context
+    ↓
+evaluar experiencia
+    ↓
+reutilizar patrón en futuras features
+```
+
+Ejemplo conceptual cuando sí aplique:
+
+```text
+HTTP / UI
+    ↓
+Application / Use Case
+    ↓
+Domain / Ports
+    ↓
+Adapters
+    ├── Supabase / Postgres
+    ├── External APIs
+    ├── Email
+    └── Storage
+```
+
+El dominio no debería depender directamente de Supabase, HTTP, Render, Resend o Sentry **cuando el diseño de la feature justifique** esa separación.
+
+#### Relación con seguridad y con SEC-009
+
+> La arquitectura hexagonal **no es una herramienta de seguridad por sí misma**.
+
+Puede mejorar fronteras y reducir accesos directos a infraestructura, pero **no sustituye** RLS, authorization, DB constraints, RPCs seguros, tenant isolation, SAST, DAST ni security regression tests.
+
+SEC-009 debe **considerar** boundaries arquitectónicos en el análisis futuro, sin exigir migrar todo el sistema a Hexagonal. Reglas del estilo “use case no bypasea authorization boundary” solo se diseñarán cuando existan módulos que realmente usen Ports & Adapters.
+
+```text
+SEC-009          → seguridad continua / regresiones
+Fase 8           → escalabilidad / performance / costos
+Hexagonal        → decisión incremental en features nuevas complejas
+```
+
+No mezclar estos tres temas en un único ticket. No crear ADR hexagonal todavía (salvo necesidad futura explícita).
 
 ---
 
@@ -431,8 +668,8 @@ La selección se hará **cuando SEC-009 pase de roadmap a sprint** (design del t
 | [`TASKS.md`](../TASKS.md) | Sprint actual y backlog inmediato |
 | [`TASKS-HISTORY.md`](TASKS-HISTORY.md) | Historial de sprints completados |
 | [`documentation-guide.md`](documentation-guide.md) | Cómo mantener docs organizadas |
-| [`architecture.md`](architecture.md) | Arquitectura técnica actual |
-| [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones SEC-001…008 (cerradas); SEC-009 futura |
+| [`security-hardening-implementation.md`](security-hardening-implementation.md) | Remediaciones SEC-001…008 (cerradas); puntero a SEC-009 en ROADMAP |
+| [`architecture.md`](architecture.md) | Arquitectura técnica actual + política hexagonal (incremental) |
 | Serie `WKR-00x-*.md` | Workers/outbox (incl. [WKR-006.1](WKR-006.1-worker-observability-implementation.md), [Sentry design](WKR-006.2-sentry-foundation-design.md)) |
 | Serie `F4-00x-*.md` / [`F5-001-audit-trail-design.md`](F5-001-audit-trail-design.md) / [`F5-004-reserva-asistida-por-enlace-design.md`](F5-004-reserva-asistida-por-enlace-design.md) | Automatizaciones, audit trail y reserva asistida por enlace |
 | [`system-spec.md`](system-spec.md) | Especificación funcional base |

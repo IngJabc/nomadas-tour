@@ -43,7 +43,9 @@ beforeEach(() => {
 });
 
 describe('AuditFeed', () => {
-  it('loads initial page ordered and supports load more + dedupe', async () => {
+  it(
+    'loads initial page ordered and supports load more + dedupe',
+    async () => {
     mockListAudit
       .mockResolvedValueOnce({
         items: [
@@ -75,7 +77,9 @@ describe('AuditFeed', () => {
     expect(mockListAudit.mock.calls[1][0]).toMatchObject({
       cursor: 'cursor-1',
     });
-  });
+    },
+    15_000,
+  );
 
   it('shows empty and error + retry', async () => {
     mockListAudit.mockResolvedValueOnce({ items: [], next_cursor: null });

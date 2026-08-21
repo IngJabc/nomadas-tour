@@ -1,10 +1,19 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** backlog disponible, **sin tarea activa**.
+> **Estado:** tarea activa — **SEC-009.0** (CI Security Foundation).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
+
+---
+
+## Activo — SEC-009 (Continuous Security Validation)
+
+- [ ] **SEC-009.0** — CI Security Foundation — **en implementación**
+  - Primer pipeline de PR: `.github/workflows/ci.yml` (`test:security`, `npm test`, backend tests, `tsc --noEmit`, builds).
+  - Design: [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md)
+  - **No** declara SEC-009 MVP completo (gitleaks / audit / CodeQL / tenant suite / SQL harness → tickets posteriores).
 
 ---
 
@@ -78,13 +87,13 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 | — | Follow-up | Migración timers `LockCleanup` / `completeExpiredTrips` | Futura |
 | — | Follow-up | Retention `boarding_attempts` | Futura |
 | — | Follow-up | Normalizar occupancy en `reservation.service.ts` | Futura |
-| — | **SEC-009** | Continuous Security Validation — Futura (≠ Sentry). Selección de herramientas en el design del ticket. | Futura |
+| — | **SEC-009** | Continuous Security Validation (≠ Sentry, ≠ Fase 8). Design complete; **implementation in progress** (activo: SEC-009.0 CI foundation). Detalle: [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/SEC-009-continuous-security-validation-design.md`](docs/SEC-009-continuous-security-validation-design.md) | En progreso |
 
 ---
 
 ## Bloqueadores
 
-_Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-004 cerrados (F5-004 = reserva asistida por enlace). Follow-ups post-sprint implementados. Backup automático (R2) + backup local de contingencia operativos. Tutorial operativo en `docs/backup-local-contingency.md`. Tutorial migraciones CLI: `docs/TUTORIAL-SUPABASE-MIGRACIONES.md`. Restore drill trimestral pendiente. Sin sprint activo._
+_Ninguno. Sprint activo: SEC-009.0 (CI Security Foundation). F4/F5 cerrados. Backup + tutoriales operativos. Restore drill trimestral pendiente._
 
 ---
 
@@ -92,7 +101,8 @@ _Ninguno. F4-001…F4-004 CLOSED. F5-001…F5-004 cerrados (F5-004 = reserva asi
 
 - **Background Worker nativo** — cuando el plan de hosting lo permita (sin HTTP)
 - **UX continua** — responsive, accesibilidad, skeletons (ROADMAP Fase 7)
-- **Escalabilidad** — caché, índices, costos; Prometheus (ROADMAP Fase 8)
+- **Escalabilidad** — load/stress/capacity, caché, índices, costos (ROADMAP Fase 8; ≠ SEC-009)
+- **Hexagonal / Ports & Adapters** — evaluación oportunista en features nuevas complejas (ROADMAP; sin rewrite global)
 - **Sentry frontend / Performance / Replay** — fuera de WKR-006.2
 - **Email occupancy_alerts** — requiere Resend comercial
 - **UI prefs `superadmin_digest`** — v1 es seed + gate de envío
