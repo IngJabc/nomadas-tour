@@ -69,7 +69,7 @@ jobs:
         id: supa-start
         run: |
           echo "START_TIME=$(date +%s)" >> "$GITHUB_OUTPUT"
-          supabase start --print-credentials 2>&1 | tee /tmp/supa-start-output.txt
+          supabase start 2>&1 | tee /tmp/supa-start-output.txt
           echo "END_TIME=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       - name: Report Supabase startup
@@ -100,7 +100,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Verify schema
         run: |
-          supabase db execute --db-url "postgresql://postgres:postgres@localhost:54322/postgres" <<'SQL'
+          supabase db query --local <<'SQL'
           SELECT
             (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public') AS table_count,
             (SELECT count(*) FROM information_schema.routines WHERE routine_schema = 'private') AS private_routine_count;
