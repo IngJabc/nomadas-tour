@@ -90,11 +90,11 @@ ALTER TABLE reservations RENAME COLUMN passenger_name TO customer_name;
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS agency_id UUID REFERENCES agencies(id);
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS seat_code TEXT;
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS phone TEXT;
-ALTER TABLE reservations DROP COLUMN IF EXISTS seat_id;
-
 -- Populate seat_code from seats table where possible
 UPDATE reservations r SET seat_code = s.seat_code
 FROM seats s WHERE r.seat_id = s.id;
+
+ALTER TABLE reservations DROP COLUMN IF EXISTS seat_id;
 
 ALTER TABLE reservations ALTER COLUMN seat_code SET NOT NULL;
 
@@ -189,7 +189,7 @@ CREATE POLICY "invitations_superadmin_all" ON agency_invitations FOR ALL
   USING (auth.jwt() ->> 'role' = 'superadmin');
 
 -- 11. REALTIME
-ALTER PUBLICATION supabase_realtime ADD TABLE seats;
+-- seats already added by migration 001
 ALTER PUBLICATION supabase_realtime ADD TABLE reservations;
 
 -- 12. Create superadmin user function
