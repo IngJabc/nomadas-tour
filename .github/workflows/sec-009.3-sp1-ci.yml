@@ -63,13 +63,48 @@ jobs:
         run: supabase init
 
       # -----------------------------------------------------------------------
-      # 4. Supabase start
+      # 4. Docker diagnostics + Supabase start (with retry)
       # -----------------------------------------------------------------------
-      - name: Supabase start
+      - name: Docker diagnostics
+        run: |
+          echo "=== docker version ==="
+          docker version
+          echo ""
+          echo "=== docker info ==="
+          docker info
+          echo ""
+          echo "=== docker network ls ==="
+          docker network ls
+          echo ""
+          echo "=== docker ps -a ==="
+          docker ps -a
+          echo ""
+          echo "=== df -h ==="
+          df -h
+
+      - name: Supabase start (with retry)
         id: supa-start
         run: |
+          set -o pipefail
           echo "START_TIME=$(date +%s)" >> "$GITHUB_OUTPUT"
-          supabase start 2>&1 | tee /tmp/supa-start-output.txt
+          for attempt in 1 2 3; do
+            echo "=== Attempt $attempt/3 ==="
+            if supabase start --debug 2>&1 | tee /tmp/supa-start-output.txt; then
+              echo "supabase start succeeded on attempt $attempt"
+              break
+            fi
+            echo "supabase start failed on attempt $attempt"
+            if [ "$attempt" -lt 3 ]; then
+              echo "--- Docker state after failure ---"
+              docker ps -a
+              docker network ls
+              echo "Waiting 20s before retry..."
+              sleep 20
+            else
+              echo "All 3 attempts failed"
+              exit 1
+            fi
+          done
           echo "END_TIME=$(date +%s)" >> "$GITHUB_OUTPUT"
 
       - name: Report Supabase startup
@@ -77,7 +112,9 @@ jobs:
           START=${{ steps.supa-start.outputs.START_TIME }}
           END=${{ steps.supa-start.outputs.END_TIME }}
           echo "Supabase start duration: $(( END - START ))s"
-          cat /tmp/supa-start-output.txt
+          echo ""
+          echo "=== supabase start output (last 80 lines) ==="
+          tail -80 /tmp/supa-start-output.txt
 
       # -----------------------------------------------------------------------
       # 5. Database reset (applies all 71 migrations)
