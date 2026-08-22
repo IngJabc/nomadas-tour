@@ -1,0 +1,127 @@
+# =============================================================================
+# SEC-009.3-SP1 — Supabase Local CI Feasibility (TEMPORARY SPIKE)
+# =============================================================================
+# Purpose: Validate whether ubuntu-latest can run Supabase Local + Docker +
+#          71 migrations + authenticated RLS context for tenant isolation testing.
+#
+# This workflow is TEMPORARY. It will be deleted after the spike completes.
+# It is NOT a Required Status Check. It does NOT modify ci.yml.
+#
+# Trigger: workflow_dispatch (manual only)
+# =============================================================================
+
+name: sec-009.3-sp1-ci
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  SUPABASE_CLI_VERSION: "2.115.0"
+
+jobs:
+  spike:
+    name: spike
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 0. Checkout
+      # -----------------------------------------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 1. Docker verification
+      # -----------------------------------------------------------------------
+      - name: Docker version
+        run: docker --version
+
+      - name: Docker info
+        run: docker info --format '{{.ServerVersion}}'
+
+      # -----------------------------------------------------------------------
+      # 2. Supabase CLI install (pinned version)
+      # -----------------------------------------------------------------------
+      - name: Install Supabase CLI v${{ env.SUPABASE_CLI_VERSION }}
+        run: |
+          curl -fsSL \
+            "https://github.com/supabase/cli/releases/download/v${{ env.SUPABASE_CLI_VERSION }}/supabase_linux_amd64.tar.gz" \
+            | tar -xz
+          sudo mv supabase /usr/local/bin/supabase
+          supabase --version
+
+      # -----------------------------------------------------------------------
+      # 3. Supabase init (creates config.toml if absent)
+      # -----------------------------------------------------------------------
+      - name: Supabase init
+        run: supabase init
+
+      # -----------------------------------------------------------------------
+      # 4. Supabase start
+      # -----------------------------------------------------------------------
+      - name: Supabase start
+        id: supa-start
+        run: |
+          echo "START_TIME=$(date +%s)" >> "$GITHUB_OUTPUT"
+          supabase start --print-credentials 2>&1 | tee /tmp/supa-start-output.txt
+          echo "END_TIME=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Report Supabase startup
+        run: |
+          START=${{ steps.supa-start.outputs.START_TIME }}
+          END=${{ steps.supa-start.outputs.END_TIME }}
+          echo "Supabase start duration: $(( END - START ))s"
+          cat /tmp/supa-start-output.txt
+
+      # -----------------------------------------------------------------------
+      # 5. Database reset (applies all 71 migrations)
+      # -----------------------------------------------------------------------
+      - name: Supabase db reset
+        id: supa-reset
+        run: |
+          echo "RESET_START=$(date +%s)" >> "$GITHUB_OUTPUT"
+          supabase db reset 2>&1
+          echo "RESET_END=$(date +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Report migration reset
+        run: |
+          START=${{ steps.supa-reset.outputs.RESET_START }}
+          END=${{ steps.supa-reset.outputs.RESET_END }}
+          echo "DB reset duration: $(( END - START ))s"
+
+      # -----------------------------------------------------------------------
+      # 6. Schema verification
+      # -----------------------------------------------------------------------
+      - name: Verify schema
+        run: |
+          supabase db execute --db-url "postgresql://postgres:postgres@localhost:54322/postgres" <<'SQL'
+          SELECT
+            (SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public') AS table_count,
+            (SELECT count(*) FROM information_schema.routines WHERE routine_schema = 'private') AS private_routine_count;
+          SQL
+
+      # -----------------------------------------------------------------------
+      # 7. Auth context + RLS validation (Node.js with pg)
+      # -----------------------------------------------------------------------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pg driver
+        run: npm install pg@8
+
+      - name: Run RLS validation
+        run: node spike/rls-validation.mjs
+
+      # -----------------------------------------------------------------------
+      # 8. Cleanup (always runs)
+      # -----------------------------------------------------------------------
+      - name: Supabase stop
+        if: always()
+        run: supabase stop
