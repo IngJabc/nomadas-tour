@@ -6,8 +6,8 @@
 -- ============================================================
 
 -- A1. REMOVE FROM REALTIME
-ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS seats;
-ALTER PUBLICATION supabase_realtime DROP TABLE IF EXISTS reservations;
+ALTER PUBLICATION supabase_realtime DROP TABLE seats;
+ALTER PUBLICATION supabase_realtime DROP TABLE reservations;
 
 -- A2. DROP RLS POLICIES
 DROP POLICY IF EXISTS "agencies_public_read" ON agencies;

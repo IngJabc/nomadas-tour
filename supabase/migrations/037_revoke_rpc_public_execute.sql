@@ -59,9 +59,17 @@ GRANT EXECUTE ON FUNCTION public.create_agency_reservation(
 ) TO service_role;
 
 -- create_superadmin es un placeholder vacío (006_multi_tenant_schema.sql).
--- Revocar ejecución pública y eliminar la función.
-REVOKE EXECUTE ON FUNCTION public.create_superadmin(TEXT, TEXT, TEXT) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.create_superadmin(TEXT, TEXT, TEXT) FROM anon;
-REVOKE EXECUTE ON FUNCTION public.create_superadmin(TEXT, TEXT, TEXT) FROM authenticated;
-
-DROP FUNCTION IF EXISTS public.create_superadmin(TEXT, TEXT, TEXT);
+-- Revocar ejecución pública y eliminar la función (si existe).
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE p.proname = 'create_superadmin' AND n.nspname = 'public'
+  ) THEN
+    REVOKE EXECUTE ON FUNCTION public.create_superadmin(TEXT, TEXT, TEXT) FROM PUBLIC;
+    REVOKE EXECUTE ON FUNCTION public.create_superadmin(TEXT, TEXT, TEXT) FROM anon;
+    REVOKE EXECUTE ON FUNCTION public.create_superadmin(TEXT, TEXT, TEXT) FROM authenticated;
+    DROP FUNCTION public.create_superadmin(TEXT, TEXT, TEXT);
+  END IF;
+END $$;

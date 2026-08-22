@@ -5,21 +5,14 @@
  * Live DB behavior lives in supabase/tests/f5_001_verification.sql.
  */
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertHistoricalMigrationsImmutable, listMigrations } from './migration-immutability';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
 function read(rel: string): string {
   return fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
-}
-
-function listMigrations(): string[] {
-  return fs
-    .readdirSync(path.join(REPO_ROOT, 'supabase/migrations'))
-    .filter((name) => name.endsWith('.sql'))
-    .sort();
 }
 
 const migration065 = read('supabase/migrations/065_audit_log.sql');
@@ -38,24 +31,7 @@ describe('F5-001 — migration isolation', () => {
   });
 
   it('has no tracked modifications in migrations 001–064', () => {
-    const status = execFileSync(
-      'git',
-      [
-        'status',
-        '--porcelain',
-        '--untracked-files=no',
-        '--',
-        'supabase/migrations',
-      ],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    );
-    const dirtyHistorical = status
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .filter((line) => !line.includes('065_audit_log.sql'))
-      .filter((line) => !line.includes('066_create_agency_reservation_departed.sql'));
-    expect(dirtyHistorical).toEqual([]);
+    assertHistoricalMigrationsImmutable(64);
   });
 
   it('defines audit_log append-only + audit_append + nine actions', () => {

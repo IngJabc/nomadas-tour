@@ -691,3 +691,8 @@ Antes de comenzar cualquier tarea:
 Durante la tarea: 5. Usar solo las variables y valores definidos aquí 6. Si algo no está definido aquí, usar el criterio más cercano que sí esté 7. Si hay ambigüedad real, hacer UNA sola pregunta antes de continuar
 
 Al terminar: 8. Correr el servidor y revisar la consola de errores 9. Si hay errores, corregirlos sin preguntar 10. Verificar contra el checklist de la tarea (ver [`TASKS.md`](TASKS.md); visión de producto en [`docs/ROADMAP.md`](docs/ROADMAP.md)) 11. Ejecutar `npm run build` en la raíz; si hubo cambios en `backend/`, ejecutar también `npm run build` ahí 12. Solo reportar "listo" cuando el servidor y los builds terminen sin errores 13. Si hubo cambios de env vars, incluir un bloque **Render** en el cierre (nombre, servicio, valor soak, cuándo poner `true` / encender). Un default `false` en código no sustituye este aviso.
+
+🔴 Auditoría crítica / seguridad / arquitectura	Nemotron 3 Ultra Free
+🟣 Problema complejo / investigación / diseño difícil	Big Pickle
+🟢 Implementación de código / refactor / debugging	MiMo-V2.5 Free
+🔵 Cambios sencillos / documentación / tareas mecánicas	Nemotron 3.5 Lightning Free

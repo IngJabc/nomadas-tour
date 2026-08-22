@@ -579,6 +579,14 @@ Ese fue el origen del desfase histórico schema vs migration history.
 3. Nunca aplicar migrations normales desde SQL Editor.
 4. Toda nueva migration debe tener **versión única**.
 5. Una migration ya aplicada en un entorno compartido **no se edita**; se crea otra migration.
+   - **Excepción documentada:** una migration histórica puede modificarse SOLO cuando:
+     1. el fresh replay es imposible sin el cambio;
+     2. la remediación es técnicamente necesaria;
+     3. el hash SHA-256 exacto del contenido aprobado queda registrado;
+     4. el test de inmutabilidad verifica el hash aprobado;
+     5. la excepción está documentada en el audit/diseño relevante.
+   - Las remediaciones aprobadas se registran en `tests/boarding/migration-immutability.ts`.
+   - Esta excepción NO se convierte en regla genérica.
 6. `db push --dry-run` es **obligatorio** antes de Producción.
 7. Staging y Producción deben recibir la **misma cadena** de migrations.
 8. Grants y RLS deben verificarse **por separado**.

@@ -5,21 +5,14 @@
  * behavioral harness, and reminder worker wiring. No live DB.
  */
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertHistoricalMigrationsImmutable, listMigrations } from './migration-immutability';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
 function read(rel: string): string {
   return fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
-}
-
-function listMigrations(): string[] {
-  return fs
-    .readdirSync(path.join(REPO_ROOT, 'supabase/migrations'))
-    .filter((name) => name.endsWith('.sql'))
-    .sort();
 }
 
 const migration059 = read(
@@ -46,26 +39,7 @@ describe('WKR-008 — migration isolation', () => {
   });
 
   it('has no tracked modifications in migrations 001–058', () => {
-    const status = execFileSync(
-      'git',
-      [
-        'status',
-        '--porcelain',
-        '--untracked-files=no',
-        '--',
-        'supabase/migrations',
-      ],
-      { cwd: REPO_ROOT, encoding: 'utf8' },
-    );
-    const historicalChanges = status
-      .split(/\r?\n/)
-      .filter((line) => {
-        const match = line.match(/supabase\/migrations\/(\d{3})_/);
-        if (!match) return false;
-        return Number(match[1]) <= 58;
-      });
-
-    expect(historicalChanges).toEqual([]);
+    assertHistoricalMigrationsImmutable(58);
   });
 });
 
