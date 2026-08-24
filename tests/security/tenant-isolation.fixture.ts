@@ -267,7 +267,6 @@ async function safeAuthQuery(
 export async function createFixture(): Promise<Fixture> {
   const client = new pg.Client({
     connectionString: TENANT_DB_URL,
-    ssl: { rejectUnauthorized: false },
   });
   await client.connect();
 
