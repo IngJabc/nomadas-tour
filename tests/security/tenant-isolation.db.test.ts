@@ -139,13 +139,13 @@ describe('SEC-009.3 — Tenant Isolation DB/RLS', () => {
       expect(r.rows[0]?.cnt).toBeGreaterThanOrEqual(1);
     });
 
-    it('audit_log: sees own (count=1)', async () => {
+    it('audit_log: sees own (count=2: seed + reservation trigger)', async () => {
       if (!f) return;
       const r = await f.authQuery(
         IDS.USER_A,
         'SELECT count(*)::int AS cnt FROM public.audit_log',
       );
-      expect(r.rows[0]?.cnt).toBe(1);
+      expect(r.rows[0]?.cnt).toBe(2);
     });
 
     it('users: sees same-agency users (count=1)', async () => {
