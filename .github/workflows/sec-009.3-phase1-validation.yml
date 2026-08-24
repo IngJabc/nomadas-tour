@@ -1,0 +1,61 @@
+name: SEC-009.3 Phase 1 — DB/RLS Validation
+
+on:
+  push:
+    branches: [features/sec-009.3-tenant-isolation-db]
+  workflow_dispatch:
+
+jobs:
+  tenant-isolation-phase1:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      TEST_MODE: ci
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── 2. Node 22 ────────────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # ── 3. Supabase CLI 2.115.0 ───────────────────────────────────
+      - name: Install Supabase CLI
+        run: |
+          cd /tmp
+          curl -fsSL \
+            "https://github.com/supabase/cli/releases/download/v2.115.0/supabase_linux_amd64.tar.gz" \
+            | tar -xz
+          sudo mv /tmp/supabase /usr/local/bin/supabase
+          supabase --version
+
+      # ── 4. Supabase init + start ──────────────────────────────────
+      - name: Supabase init
+        run: npx supabase init
+
+      - name: Supabase start
+        run: npx supabase start
+
+      # ── 5. DB reset (applies migrations + seed) ───────────────────
+      - name: Database reset
+        run: npx supabase db reset
+
+      # ── 6. Install dependencies ───────────────────────────────────
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci --prefix backend
+
+      # ── 7. Run Phase 1 tenant isolation tests ─────────────────────
+      - name: Run tenant DB/RLS tests
+        run: npm run test:tenant:db
+
+      # ── 8. Cleanup (always) ──────────────────────────────────────
+      - name: Stop Supabase
+        if: always()
+        run: npx supabase stop
