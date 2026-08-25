@@ -40,6 +40,20 @@ jobs:
       - name: Supabase start
         run: npx supabase start
 
+      # -----------------------------------------------------------------------
+      # 5. Extract Supabase Local environment variables
+      # -----------------------------------------------------------------------
+      - name: Extract Supabase env vars
+        run: |
+          KEY=$(supabase status -o env 2>/dev/null | grep 'SUPABASE_SERVICE_ROLE_KEY=' | cut -d'=' -f2-)
+          if [ -n "$KEY" ]; then
+            echo "SUPABASE_SERVICE_ROLE_KEY=$KEY" >> $GITHUB_ENV
+            echo "✅ Extracted SUPABASE_SERVICE_ROLE_KEY from supabase status"
+          else
+            echo "⚠️ SUPABASE_SERVICE_ROLE_KEY not found in supabase status output"
+            echo "   The fixture will throw a clear error if the key is needed"
+          fi
+
       # ── 5. DB reset (applies migrations + seed) ───────────────────
       - name: Database reset
         run: npx supabase db reset

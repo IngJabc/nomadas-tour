@@ -6,10 +6,16 @@
  * Provides deterministic test data and auth helpers for DB/RLS tenant
  * isolation tests against Supabase Local. Uses parameterized set_config()
  * for JWT claims — no SQL string interpolation.
+ *
+ * Phase 3 additions: Supabase auth helpers for real JWT tokens and
+ * Express server lifecycle for full HTTP integration tests.
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import pg from 'pg';
+import { createClient } from '@supabase/supabase-js';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -52,12 +58,45 @@ const TENANT_DB_URL =
 
 const TEST_MODE = process.env.TEST_MODE || 'local';
 
+/* ------------------------------------------------------------------ */
+/*  Supabase Local defaults (from supabase CLI config.toml)            */
+/* ------------------------------------------------------------------ */
+
+const SUPABASE_LOCAL_URL =
+  process.env.SUPABASE_URL || 'http://localhost:54321';
+
+const SUPABASE_LOCAL_SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+/* ------------------------------------------------------------------ */
+/*  Availability checks                                                */
+/* ------------------------------------------------------------------ */
+
 export function isDbAvailable(): boolean {
   return Boolean(TENANT_DB_URL) && !TENANT_DB_URL.includes('[YOUR-PASSWORD]');
 }
 
 export function shouldFailIfNoDb(): boolean {
   return TEST_MODE === 'ci';
+}
+
+export function isSupabaseLocalAvailable(): boolean {
+  return SUPABASE_LOCAL_URL.startsWith('http://localhost');
+}
+
+/**
+ * Probe whether Supabase Local (GoTrue on :54321) is actually reachable.
+ * Returns true if the health endpoint responds within 3s.
+ */
+export async function isSupabaseLocalReachable(): Promise<boolean> {
+  try {
+    const res = await fetch(`${SUPABASE_LOCAL_URL}/health/v1/authorized`, {
+      signal: AbortSignal.timeout(3_000),
+    });
+    return res.ok || res.status === 401 || res.status === 403;
+  } catch {
+    return false;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -77,6 +116,19 @@ export interface Fixture {
     params?: unknown[],
   ) => Promise<{ rows: pg.RowList; denied?: boolean }>;
   cleanup: () => Promise<void>;
+  createReservationLink: (
+    actorUserId: string,
+    agencyId: string,
+    tripId: string,
+    seatIds: string[],
+  ) => Promise<{ linkId: string; tokenHash: string }>;
+  createTempReservation: (
+    actorUserId: string,
+    agencyId: string,
+    tripId: string,
+    seatId: string,
+  ) => Promise<string>;
+  getLinkIds: () => Promise<{ linkA: string; linkB: string }>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -251,7 +303,87 @@ async function safeAuthQuery(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Public API                                                          */
+/*  Test Data Helpers (service_role caller)                             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Create a reservation link for testing.
+ * Uses service_role (base client) to call create_reservation_link RPC.
+ * Returns the created link_id and token_hash.
+ */
+async function createReservationLink(
+  client: pg.Client,
+  actorUserId: string,
+  agencyId: string,
+  tripId: string,
+  seatIds: string[],
+): Promise<{ linkId: string; tokenHash: string }> {
+  const tokenHash = `test-token-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  const result = await client.query(
+    `SELECT public.create_reservation_link($1, $2, $3, $4, $5)`,
+    [tripId, agencyId, actorUserId, tokenHash, seatIds],
+  );
+  const linkId = result.rows[0]?.create_reservation_link?.link_id ?? result.rows[0]?.link_id ?? result.rows[0]?.id;
+  if (!linkId) {
+    throw new Error('Failed to create reservation link: ' + JSON.stringify(result.rows));
+  }
+  return { linkId, tokenHash };
+}
+
+/**
+ * Create a temporary reservation for cancel_agency_reservation tests.
+ * Uses service_role (base client) to call create_agency_reservation RPC.
+ * Returns the reservation_id.
+ */
+async function createTempReservation(
+  client: pg.Client,
+  actorUserId: string,
+  agencyId: string,
+  tripId: string,
+  seatId: string,
+): Promise<string> {
+  const result = await client.query(
+    `SELECT public.create_agency_reservation($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      tripId,
+      agencyId,
+      actorUserId,
+      'Temp Booker',
+      'DOC-TEMP',
+      '555-TEMP',
+      [seatId],
+      ['Temp Passenger'],
+      ['DOC-PT'],
+      ['555-PT'],
+    ],
+  );
+  const resId = result.rows[0]?.create_agency_reservation?.reservation_id ?? result.rows[0]?.reservation_id ?? result.rows[0]?.id;
+  if (!resId) {
+    throw new Error('Failed to create temp reservation: ' + JSON.stringify(result.rows));
+  }
+  return resId;
+}
+
+/**
+ * Get the actual link IDs from the seeded data.
+ * Returns { linkA: string, linkB: string } where linkA belongs to AGENCY_A, linkB to AGENCY_B.
+ */
+async function getLinkIds(client: pg.Client): Promise<{ linkA: string; linkB: string }> {
+  const result = await client.query(
+    `SELECT id, agency_id FROM public.reservation_links WHERE id IN ($1, $2)`,
+    [IDS.LINK_A, IDS.LINK_B],
+  );
+  let linkA = IDS.LINK_A;
+  let linkB = IDS.LINK_B;
+  for (const row of result.rows) {
+    if (row.agency_id === IDS.AGENCY_A) linkA = row.id;
+    else if (row.agency_id === IDS.AGENCY_B) linkB = row.id;
+  }
+  return { linkA, linkB };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Public API — DB/RLS Fixture                                         */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -263,6 +395,9 @@ async function safeAuthQuery(
  *   - authQuery(userId, sql): parameterized authenticated query
  *   - safeAuthQuery(userId, sql): catches permission denied
  *   - cleanup(): idempotent teardown of test data
+ *   - createReservationLink(actorUserId, agencyId, tripId, seatIds): create link via RPC
+ *   - createTempReservation(actorUserId, agencyId, tripId, seatId): create temp reservation
+ *   - getLinkIds(): get actual link IDs by agency ownership
  */
 export async function createFixture(): Promise<Fixture> {
   const client = new pg.Client({
@@ -281,5 +416,202 @@ export async function createFixture(): Promise<Fixture> {
     safeAuthQuery: (userId: string, sql: string, params?: unknown[]) =>
       safeAuthQuery(client, userId, sql, params),
     cleanup: () => cleanupData(client),
+    createReservationLink: (actorUserId: string, agencyId: string, tripId: string, seatIds: string[]) =>
+      createReservationLink(client, actorUserId, agencyId, tripId, seatIds),
+    createTempReservation: (actorUserId: string, agencyId: string, tripId: string, seatId: string) =>
+      createTempReservation(client, actorUserId, agencyId, tripId, seatId),
+    getLinkIds: () => getLinkIds(client),
   };
+}
+
+/* ================================================================== */
+/*  Phase 3 — API Authorization Helpers                                */
+/* ================================================================== */
+
+/* ------------------------------------------------------------------ */
+/*  Supabase auth clients (lazy — only created when key is available)  */
+/* ------------------------------------------------------------------ */
+
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
+let _supabaseAuth: ReturnType<typeof createClient> | null = null;
+
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    if (!SUPABASE_LOCAL_SERVICE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available');
+    }
+    _supabaseAdmin = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return _supabaseAdmin;
+}
+
+function getSupabaseAuth() {
+  if (!_supabaseAuth) {
+    if (!SUPABASE_LOCAL_SERVICE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available');
+    }
+    _supabaseAuth = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return _supabaseAuth;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Auth user management                                               */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Set a password for an auth user created by the seed.
+ * Uses the Supabase admin API to update the user's encrypted_password.
+ */
+export async function setAuthPassword(
+  userId: string,
+  password: string,
+): Promise<void> {
+  const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
+    password,
+  });
+  if (error) {
+    throw new Error(`Failed to set password for ${userId}: ${error.message}`);
+  }
+}
+
+/**
+ * Sign in as a user and return the access token (JWT).
+ * The returned token is valid for the Supabase auth.getUser() validation
+ * used by the backend's auth middleware.
+ */
+export async function signInAndGetToken(
+  email: string,
+  password: string,
+): Promise<string> {
+  const { data, error } = await getSupabaseAuth().auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error || !data.session) {
+    throw new Error(`Failed to sign in as ${email}: ${error?.message}`);
+  }
+  return data.session.access_token;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Express server lifecycle                                           */
+/* ------------------------------------------------------------------ */
+
+let serverInstance: Server | null = null;
+let serverBaseUrl: string = '';
+
+/**
+ * Start the Express backend on a random port.
+ * Returns the base URL (e.g. http://127.0.0.1:12345).
+ *
+ * Sets the required env vars before importing the app module.
+ * Must be called once in beforeAll.
+ */
+export async function startBackendServer(): Promise<string> {
+  // Set env vars required by the backend (must be before app import).
+  process.env.SUPABASE_URL = SUPABASE_LOCAL_URL;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = SUPABASE_LOCAL_SERVICE_KEY;
+  process.env.JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';
+  process.env.NODE_ENV = 'test';
+  process.env.CORS_ORIGIN = 'http://localhost:3000';
+  process.env.RESEND_API_KEY = 'test-resend';
+  process.env.EMAIL_FROM = 'test@example.com';
+  process.env.FRONTEND_URL = 'http://localhost:3000';
+
+  // Dynamic import — env vars must already be set.
+  const { default: app } = await import(
+    '../../backend/src/app.js'
+  );
+
+  serverInstance = await new Promise<Server>((resolve, reject) => {
+    const s = app.listen(0, '127.0.0.1', () => resolve(s));
+    s.once('error', reject);
+  });
+
+  const { port } = serverInstance.address() as AddressInfo;
+  serverBaseUrl = `http://127.0.0.1:${port}`;
+  return serverBaseUrl;
+}
+
+/**
+ * Stop the Express backend. Must be called in afterAll.
+ */
+export async function stopBackendServer(): Promise<void> {
+  if (!serverInstance) return;
+  const closing = serverInstance;
+  serverInstance = null;
+  serverBaseUrl = '';
+  await new Promise<void>((resolve, reject) => {
+    closing.close((err) => (err ? reject(err) : resolve()));
+  });
+}
+
+/**
+ * Get the base URL of the running backend server.
+ * Throws if server hasn't been started.
+ */
+export function getBaseUrl(): string {
+  if (!serverBaseUrl) {
+    throw new Error('Backend server not started. Call startBackendServer() first.');
+  }
+  return serverBaseUrl;
+}
+
+/* ------------------------------------------------------------------ */
+/*  API test fixture                                                    */
+/* ------------------------------------------------------------------ */
+
+export interface ApiFixture {
+  tokenA: string;
+  tokenB: string;
+  baseUrl: string;
+}
+
+/**
+ * Create the API test fixture with real JWT tokens.
+ *
+ * Sets passwords for the seeded auth users, signs in to get real
+ * Supabase JWT tokens, and starts the Express backend server.
+ *
+ * Must be called inside a Vitest beforeAll with a 60s timeout.
+ */
+export async function createApiFixture(): Promise<ApiFixture> {
+  if (!SUPABASE_LOCAL_SERVICE_KEY) {
+    if (shouldFailIfNoDb()) {
+      throw new Error(
+        'SEC-009.3 CI: SUPABASE_SERVICE_ROLE_KEY is not available. ' +
+        'Ensure Supabase Local is running and the key is set.',
+      );
+    }
+    throw new Error('skip');
+  }
+
+  // Set passwords for seeded auth users
+  const PASSWORD_A = 'TestPassword-A-123!';
+  const PASSWORD_B = 'TestPassword-B-123!';
+
+  await setAuthPassword(IDS.USER_A, PASSWORD_A);
+  await setAuthPassword(IDS.USER_B, PASSWORD_B);
+
+  // Sign in and get real JWT tokens
+  const tokenA = await signInAndGetToken('user-a@tenant-test.local', PASSWORD_A);
+  const tokenB = await signInAndGetToken('user-b@tenant-test.local', PASSWORD_B);
+
+  // Start backend server
+  const baseUrl = await startBackendServer();
+
+  return { tokenA, tokenB, baseUrl };
+}
+
+/**
+ * Tear down the API test fixture.
+ * Stops the backend server.
+ */
+export async function destroyApiFixture(): Promise<void> {
+  await stopBackendServer();
 }
