@@ -231,14 +231,14 @@ describe('SEC-009.3 — RPC Authorization', () => {
   /* ================================================================== */
 
   describe('Phase 2B — actor/agency tampering', () => {
-    it('create_agency_reservation: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
+    it('create_agency_reservation: USER_A + AGENCY_B → ERR_AGENCY_NOT_ASSIGNED', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'create_agency_reservation', [
         IDS.TRIP_A, IDS.AGENCY_B, IDS.USER_A, 'Test', 'DOC', '555',
         [IDS.SEAT_A1], ['P'], ['D'], ['555'],
       ]);
       expect(r.error).toBeDefined();
-      expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
+      expect(r.error).toContain('ERR_AGENCY_NOT_ASSIGNED');
     });
 
     it('cancel_agency_reservation: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
@@ -268,58 +268,58 @@ describe('SEC-009.3 — RPC Authorization', () => {
       expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
     });
 
-    it('create_reservation_link: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
+    it('create_reservation_link: USER_A + AGENCY_B → ERR_AGENCY_NOT_ASSIGNED', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'create_reservation_link', [
         IDS.TRIP_A, IDS.AGENCY_B, IDS.USER_A, 'hash', [IDS.SEAT_A1],
       ]);
       expect(r.error).toBeDefined();
-      expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
+      expect(r.error).toContain('ERR_AGENCY_NOT_ASSIGNED');
     });
 
-    it('confirm_reservation_from_link: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
+    it('confirm_reservation_from_link: USER_A + AGENCY_B → ERR_LINK_NOT_FOUND', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'confirm_reservation_from_link', [
         IDS.LINK_A, IDS.AGENCY_B, IDS.USER_A,
       ]);
       expect(r.error).toBeDefined();
-      expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
+      expect(r.error).toContain('ERR_LINK_NOT_FOUND');
     });
 
-    it('regenerate_reservation_link: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
+    it('regenerate_reservation_link: USER_A + AGENCY_B → ERR_LINK_NOT_FOUND', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'regenerate_reservation_link', [
         IDS.LINK_A, IDS.AGENCY_B, IDS.USER_A, 'new-hash',
       ]);
       expect(r.error).toBeDefined();
-      expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
+      expect(r.error).toContain('ERR_LINK_NOT_FOUND');
     });
 
-    it('cancel_reservation_link: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
+    it('cancel_reservation_link: USER_A + AGENCY_B → ERR_LINK_NOT_FOUND', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'cancel_reservation_link', [
         IDS.LINK_A, IDS.AGENCY_B,
       ]);
       expect(r.error).toBeDefined();
-      expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
+      expect(r.error).toContain('ERR_LINK_NOT_FOUND');
     });
 
-    it('invalidate_reservation_link: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
+    it('invalidate_reservation_link: USER_A + AGENCY_B → ERR_LINK_NOT_FOUND', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'invalidate_reservation_link', [
         IDS.LINK_A, IDS.AGENCY_B,
       ]);
       expect(r.error).toBeDefined();
-      expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
+      expect(r.error).toContain('ERR_LINK_NOT_FOUND');
     });
 
-    it('patch_reservation_link_data: USER_A + AGENCY_B → ERR_ACTOR_AGENCY_MISMATCH', async () => {
+    it('patch_reservation_link_data: USER_A + AGENCY_B → ERR_LINK_NOT_FOUND', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'patch_reservation_link_data', [
         IDS.LINK_A, IDS.AGENCY_B, { passengers: [] },
       ]);
       expect(r.error).toBeDefined();
-      expect(r.error).toContain('ERR_ACTOR_AGENCY_MISMATCH');
+      expect(r.error).toContain('ERR_LINK_NOT_FOUND');
     });
 
     it('boarding_toggle: USER_A + AGENCY_B → actor/agencia mismatch', async () => {
@@ -335,9 +335,10 @@ describe('SEC-009.3 — RPC Authorization', () => {
   describe('Phase 2B — positive authorization (A → A)', () => {
     it('create_agency_reservation: USER_A + AGENCY_A + assigned trip → success', async () => {
       if (!f) return;
+      const seat = await f.createDedicatedSeat(IDS.TRIP_A);
       const r = await callRpcAsServiceRole(f, 'create_agency_reservation', [
         IDS.TRIP_A, IDS.AGENCY_A, IDS.USER_A, 'Booker TI', 'DOC-TI', '555-9999',
-        [IDS.SEAT_A1], ['Passenger TI'], ['DOC-PTI'], ['555-9998'],
+        [seat.seatId], ['Passenger TI'], ['DOC-PTI'], ['555-9998'],
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
@@ -346,14 +347,22 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('create_reservation_link: USER_A + AGENCY_A + assigned trip + locked seat → success', async () => {
       if (!f) return;
-      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [IDS.SEAT_A1]);
+      const seat = await f.createDedicatedSeat(IDS.TRIP_A);
+      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [seat.seatId]);
       expect(linkId).toBeDefined();
       expect(typeof linkId).toBe('string');
     });
 
     it('confirm_reservation_from_link: USER_A + AGENCY_A + own link → success', async () => {
       if (!f) return;
-      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [IDS.SEAT_A1]);
+      const seat = await f.createDedicatedSeat(IDS.TRIP_A);
+      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [seat.seatId]);
+      await f.patchLinkData(linkId, IDS.AGENCY_A, {
+        booker_name: 'Test Booker',
+        booker_document: 'DOC-BOOKER',
+        booker_phone: '555-BOOK',
+        passengers: [{ seat_code: seat.seatCode, name: 'Test Pax', document: 'DOC-PAX' }],
+      });
       const r = await callRpcAsServiceRole(f, 'confirm_reservation_from_link', [
         linkId, IDS.AGENCY_A, IDS.USER_A,
       ]);
@@ -364,7 +373,8 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('regenerate_reservation_link: USER_A + AGENCY_A + own link → success', async () => {
       if (!f) return;
-      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [IDS.SEAT_A1]);
+      const seat = await f.createDedicatedSeat(IDS.TRIP_A);
+      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [seat.seatId]);
       const r = await callRpcAsServiceRole(f, 'regenerate_reservation_link', [
         linkId, IDS.AGENCY_A, IDS.USER_A, 'new-token-hash',
       ]);
@@ -375,7 +385,8 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('cancel_reservation_link: USER_A + AGENCY_A + own link → success', async () => {
       if (!f) return;
-      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [IDS.SEAT_A1]);
+      const seat = await f.createDedicatedSeat(IDS.TRIP_A);
+      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [seat.seatId]);
       const r = await callRpcAsServiceRole(f, 'cancel_reservation_link', [
         linkId, IDS.AGENCY_A,
       ]);
@@ -386,7 +397,8 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('invalidate_reservation_link: USER_A + AGENCY_A + own link → success', async () => {
       if (!f) return;
-      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [IDS.SEAT_A1]);
+      const seat = await f.createDedicatedSeat(IDS.TRIP_A);
+      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [seat.seatId]);
       const r = await callRpcAsServiceRole(f, 'invalidate_reservation_link', [
         linkId, IDS.AGENCY_A,
       ]);
@@ -397,9 +409,10 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('patch_reservation_link_data: USER_A + AGENCY_A + own link → success', async () => {
       if (!f) return;
-      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [IDS.SEAT_A1]);
+      const seat = await f.createDedicatedSeat(IDS.TRIP_A);
+      const { linkId } = await f.createReservationLink(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, [seat.seatId]);
       const r = await callRpcAsServiceRole(f, 'patch_reservation_link_data', [
-        linkId, IDS.AGENCY_A, { passengers: [{ seat_code: 'A1', name: 'Test Pax', document: 'DOC-TEST' }] },
+        linkId, IDS.AGENCY_A, { passengers: [{ seat_code: seat.seatCode, name: 'Test Pax', document: 'DOC-TEST' }] },
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
@@ -428,8 +441,7 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('cancel_agency_reservation: USER_A + AGENCY_A + own reservation → success', async () => {
       if (!f) return;
-      // Create a dedicated temp reservation for this test to avoid order dependency
-      const tempResId = await f.createTempReservation(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A, IDS.SEAT_A1);
+      const tempResId = await f.createTempReservation(IDS.USER_A, IDS.AGENCY_A, IDS.TRIP_A);
       const r = await callRpcAsServiceRole(f, 'cancel_agency_reservation', [
         tempResId, IDS.USER_A, IDS.AGENCY_A, {},
       ]);
@@ -440,9 +452,11 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('boarding_toggle: USER_A + OPERATOR_A + assigned trip + passenger → success', async () => {
       if (!f) return;
-      // TRIP_A is assigned to AGENCY_A, PAS_A belongs to AGENCY_A's reservation
+      const { tripId } = await f.createPastTrip(IDS.AGENCY_A);
+      const seat = await f.createDedicatedSeat(tripId);
+      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_A, IDS.USER_A, seat.seatId);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        IDS.PAS_A, true, IDS.USER_A, IDS.AGENCY_A,
+        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
@@ -516,8 +530,11 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('boarding_toggle: USER_A + OPERATOR_A on unassigned trip → denied', async () => {
       if (!f) return;
+      const { tripId } = await f.createPastTrip(IDS.AGENCY_B);
+      const seat = await f.createDedicatedSeat(tripId);
+      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_B, IDS.USER_B, seat.seatId);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        IDS.PAS_B, true, IDS.USER_A, IDS.AGENCY_A,
+        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeDefined();
       expect(r.error).toContain('Tu agencia no está asignada a este viaje');
@@ -527,8 +544,11 @@ describe('SEC-009.3 — RPC Authorization', () => {
   describe('Phase 2B — boarding_toggle authorization matrix', () => {
     it('boarding_toggle: USER_A + OPERATOR_A + assigned trip → success', async () => {
       if (!f) return;
+      const { tripId } = await f.createPastTrip(IDS.AGENCY_A);
+      const seat = await f.createDedicatedSeat(tripId);
+      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_A, IDS.USER_A, seat.seatId);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        IDS.PAS_A, true, IDS.USER_A, IDS.AGENCY_A,
+        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
@@ -537,8 +557,11 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('boarding_toggle: USER_A + OPERATOR_A + unassigned trip → denied', async () => {
       if (!f) return;
+      const { tripId } = await f.createPastTrip(IDS.AGENCY_B);
+      const seat = await f.createDedicatedSeat(tripId);
+      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_B, IDS.USER_B, seat.seatId);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        IDS.PAS_B, true, IDS.USER_A, IDS.AGENCY_A,
+        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeDefined();
       expect(r.error).toContain('Tu agencia no está asignada a este viaje');
@@ -546,8 +569,11 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('boarding_toggle: USER_A + OPERATOR_B + assigned trip → actor/operator mismatch', async () => {
       if (!f) return;
+      const { tripId } = await f.createPastTrip(IDS.AGENCY_A);
+      const seat = await f.createDedicatedSeat(tripId);
+      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_A, IDS.USER_A, seat.seatId);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        IDS.PAS_A, true, IDS.USER_A, IDS.AGENCY_B,
+        passengerId, true, IDS.USER_A, IDS.AGENCY_B,
       ]);
       expect(r.error).toBeDefined();
       expect(r.error).toContain('El actor no pertenece a la agencia operadora');
