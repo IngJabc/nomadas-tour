@@ -126,9 +126,26 @@ export interface Fixture {
     actorUserId: string,
     agencyId: string,
     tripId: string,
-    seatId: string,
   ) => Promise<string>;
   getLinkIds: () => Promise<{ linkA: string; linkB: string }>;
+  createDedicatedSeat: (
+    tripId: string,
+    lockForUserId?: string,
+  ) => Promise<{ seatId: string; seatCode: string }>;
+  createPastTrip: (
+    agencyId: string,
+  ) => Promise<{ tripId: string }>;
+  createReservationWithPassenger: (
+    tripId: string,
+    agencyId: string,
+    actorUserId: string,
+    seatId: string,
+  ) => Promise<{ reservationId: string; passengerId: string }>;
+  patchLinkData: (
+    linkId: string,
+    agencyId: string,
+    linkData: Record<string, unknown>,
+  ) => Promise<void>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -142,6 +159,16 @@ const ALL_TRIP_IDS = [IDS.TRIP_A, IDS.TRIP_B];
 async function cleanupData(client: pg.Client): Promise<void> {
   await client.query('SET session_replication_role = replica');
   try {
+    const tripAgResult = await client.query(
+      `SELECT DISTINCT trip_id FROM public.trip_agencies WHERE agency_id = ANY($1::uuid[])`,
+      [ALL_AGENCY_IDS],
+    );
+    const allTripIds = [...new Set([...ALL_TRIP_IDS, ...tripAgResult.rows.map((r: { trip_id: string }) => r.trip_id)])];
+
+    await client.query(
+      'DELETE FROM public.reservation_link_seats WHERE link_id IN (SELECT id FROM public.reservation_links WHERE agency_id = ANY($1::uuid[]))',
+      [ALL_AGENCY_IDS],
+    );
     await client.query(
       'DELETE FROM public.reservation_passengers WHERE reservation_id IN (SELECT id FROM public.reservations WHERE agency_id = ANY($1::uuid[]))',
       [ALL_AGENCY_IDS],
@@ -156,11 +183,11 @@ async function cleanupData(client: pg.Client): Promise<void> {
     );
     await client.query(
       'DELETE FROM public.boarding_logs WHERE trip_id = ANY($1::uuid[])',
-      [ALL_TRIP_IDS],
+      [allTripIds],
     );
     await client.query(
       'DELETE FROM public.seats WHERE trip_id = ANY($1::uuid[])',
-      [ALL_TRIP_IDS],
+      [allTripIds],
     );
     await client.query(
       'DELETE FROM public.trip_agencies WHERE agency_id = ANY($1::uuid[])',
@@ -168,7 +195,7 @@ async function cleanupData(client: pg.Client): Promise<void> {
     );
     await client.query(
       'DELETE FROM public.trips WHERE id = ANY($1::uuid[])',
-      [ALL_TRIP_IDS],
+      [allTripIds],
     );
     await client.query(
       'DELETE FROM public.routes WHERE id = $1',
@@ -318,12 +345,20 @@ async function createReservationLink(
   tripId: string,
   seatIds: string[],
 ): Promise<{ linkId: string; tokenHash: string }> {
+  for (const seatId of seatIds) {
+    await client.query(
+      `UPDATE public.seats SET status = 'locked', locked_by = $2, locked_at = NOW(), lock_expires_at = NOW() + INTERVAL '600 seconds' WHERE id = $1 AND trip_id = $3`,
+      [seatId, actorUserId, tripId],
+    );
+  }
+
   const tokenHash = `test-token-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const result = await client.query(
     `SELECT public.create_reservation_link($1, $2, $3, $4, $5)`,
     [tripId, agencyId, actorUserId, tokenHash, seatIds],
   );
-  const linkId = result.rows[0]?.create_reservation_link?.link_id ?? result.rows[0]?.link_id ?? result.rows[0]?.id;
+  const data = result.rows[0]?.create_reservation_link;
+  const linkId = data?.link_id ?? data?.id;
   if (!linkId) {
     throw new Error('Failed to create reservation link: ' + JSON.stringify(result.rows));
   }
@@ -340,8 +375,14 @@ async function createTempReservation(
   actorUserId: string,
   agencyId: string,
   tripId: string,
-  seatId: string,
 ): Promise<string> {
+  const seatCode = `TRES-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const ins = await client.query(
+    `INSERT INTO public.seats (trip_id, seat_code, status) VALUES ($1, $2, 'available') RETURNING id`,
+    [tripId, seatCode],
+  );
+  const seatId = ins.rows[0].id;
+
   const result = await client.query(
     `SELECT public.create_agency_reservation($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
@@ -383,6 +424,90 @@ async function getLinkIds(client: pg.Client): Promise<{ linkA: string; linkB: st
 }
 
 /* ------------------------------------------------------------------ */
+/*  Dedicated resource helpers (test isolation)                         */
+/* ------------------------------------------------------------------ */
+
+async function createDedicatedSeat(
+  client: pg.Client,
+  tripId: string,
+  lockForUserId?: string,
+): Promise<{ seatId: string; seatCode: string }> {
+  const seatCode = `SEC-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const ins = await client.query(
+    `INSERT INTO public.seats (trip_id, seat_code, status) VALUES ($1, $2, 'available') RETURNING id, seat_code`,
+    [tripId, seatCode],
+  );
+  const seatId = ins.rows[0].id;
+  const code = ins.rows[0].seat_code;
+  if (lockForUserId) {
+    await client.query(
+      `UPDATE public.seats SET status = 'locked', locked_by = $2, locked_at = NOW(), lock_expires_at = NOW() + INTERVAL '600 seconds' WHERE id = $1`,
+      [seatId, lockForUserId],
+    );
+  }
+  return { seatId, seatCode: code };
+}
+
+async function createPastTrip(
+  client: pg.Client,
+  agencyId: string,
+): Promise<{ tripId: string }> {
+  const res = await client.query(
+    `INSERT INTO public.trips (route_id, status, departure_time) VALUES ($1, 'active', NOW() - INTERVAL '1 hour') RETURNING id`,
+    [IDS.ROUTE_1],
+  );
+  const tripId = res.rows[0].id;
+  await client.query(
+    `INSERT INTO public.trip_agencies (trip_id, agency_id) VALUES ($1, $2)`,
+    [tripId, agencyId],
+  );
+  return { tripId };
+}
+
+async function createReservationWithPassenger(
+  client: pg.Client,
+  tripId: string,
+  agencyId: string,
+  actorUserId: string,
+  seatId: string,
+): Promise<{ reservationId: string; passengerId: string }> {
+  const result = await client.query(
+    `SELECT public.create_agency_reservation($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      tripId,
+      agencyId,
+      actorUserId,
+      'Test Booker',
+      'DOC-BOOKER',
+      '555-BOOK',
+      [seatId],
+      ['Test Pax'],
+      ['DOC-PAX'],
+      ['555-PAX'],
+    ],
+  );
+  const data = result.rows[0]?.create_agency_reservation;
+  const reservationId = data?.reservation_id;
+  const pax = await client.query(
+    `SELECT id FROM public.reservation_passengers WHERE reservation_id = $1 LIMIT 1`,
+    [reservationId],
+  );
+  return { reservationId, passengerId: pax.rows[0]?.id };
+}
+
+async function patchLinkData(
+  client: pg.Client,
+  linkId: string,
+  agencyId: string,
+  linkData: Record<string, unknown>,
+): Promise<void> {
+  await client.query(
+    `SELECT public.patch_reservation_link_data($1, $2, $3)`,
+    [linkId, agencyId, JSON.stringify(linkData)],
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Public API — DB/RLS Fixture                                         */
 /* ------------------------------------------------------------------ */
 
@@ -418,9 +543,17 @@ export async function createFixture(): Promise<Fixture> {
     cleanup: () => cleanupData(client),
     createReservationLink: (actorUserId: string, agencyId: string, tripId: string, seatIds: string[]) =>
       createReservationLink(client, actorUserId, agencyId, tripId, seatIds),
-    createTempReservation: (actorUserId: string, agencyId: string, tripId: string, seatId: string) =>
-      createTempReservation(client, actorUserId, agencyId, tripId, seatId),
+    createTempReservation: (actorUserId: string, agencyId: string, tripId: string) =>
+      createTempReservation(client, actorUserId, agencyId, tripId),
     getLinkIds: () => getLinkIds(client),
+    createDedicatedSeat: (tripId: string, lockForUserId?: string) =>
+      createDedicatedSeat(client, tripId, lockForUserId),
+    createPastTrip: (agencyId: string) =>
+      createPastTrip(client, agencyId),
+    createReservationWithPassenger: (tripId: string, agencyId: string, actorUserId: string, seatId: string) =>
+      createReservationWithPassenger(client, tripId, agencyId, actorUserId, seatId),
+    patchLinkData: (linkId: string, agencyId: string, linkData: Record<string, unknown>) =>
+      patchLinkData(client, linkId, agencyId, linkData),
   };
 }
 
