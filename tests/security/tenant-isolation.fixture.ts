@@ -67,12 +67,6 @@ const SUPABASE_LOCAL_URL =
 
 const SUPABASE_LOCAL_SERVICE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!SUPABASE_LOCAL_SERVICE_KEY) {
-  throw new Error(
-    'SEC-009.3: SUPABASE_SERVICE_ROLE_KEY environment variable is not set. ' +
-    'Start Supabase Local and export the service role key, or set it in the workflow.',
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Availability checks                                                */
@@ -435,18 +429,35 @@ export async function createFixture(): Promise<Fixture> {
 /* ================================================================== */
 
 /* ------------------------------------------------------------------ */
-/*  Supabase auth clients                                              */
+/*  Supabase auth clients (lazy — only created when key is available)  */
 /* ------------------------------------------------------------------ */
 
-/** Admin client for managing auth users (set passwords, etc.). */
-const supabaseAdmin = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
+let _supabaseAuth: ReturnType<typeof createClient> | null = null;
 
-/** Unauthenticated client for signInWithPassword(). */
-const supabaseAuth = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+function getSupabaseAdmin() {
+  if (!_supabaseAdmin) {
+    if (!SUPABASE_LOCAL_SERVICE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available');
+    }
+    _supabaseAdmin = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return _supabaseAdmin;
+}
+
+function getSupabaseAuth() {
+  if (!_supabaseAuth) {
+    if (!SUPABASE_LOCAL_SERVICE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available');
+    }
+    _supabaseAuth = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+  }
+  return _supabaseAuth;
+}
 
 /* ------------------------------------------------------------------ */
 /*  Auth user management                                               */
@@ -460,7 +471,7 @@ export async function setAuthPassword(
   userId: string,
   password: string,
 ): Promise<void> {
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+  const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
     password,
   });
   if (error) {
@@ -477,7 +488,7 @@ export async function signInAndGetToken(
   email: string,
   password: string,
 ): Promise<string> {
-  const { data, error } = await supabaseAuth.auth.signInWithPassword({
+  const { data, error } = await getSupabaseAuth().auth.signInWithPassword({
     email,
     password,
   });
@@ -570,6 +581,16 @@ export interface ApiFixture {
  * Must be called inside a Vitest beforeAll with a 60s timeout.
  */
 export async function createApiFixture(): Promise<ApiFixture> {
+  if (!SUPABASE_LOCAL_SERVICE_KEY) {
+    if (shouldFailIfNoDb()) {
+      throw new Error(
+        'SEC-009.3 CI: SUPABASE_SERVICE_ROLE_KEY is not available. ' +
+        'Ensure Supabase Local is running and the key is set.',
+      );
+    }
+    throw new Error('skip');
+  }
+
   // Set passwords for seeded auth users
   const PASSWORD_A = 'TestPassword-A-123!';
   const PASSWORD_B = 'TestPassword-B-123!';
