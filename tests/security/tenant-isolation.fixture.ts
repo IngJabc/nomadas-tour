@@ -818,6 +818,16 @@ export async function createApiFixture(): Promise<ApiFixture> {
     throw new Error('skip');
   }
 
+  // Prepare a clean seed state — Phase 2 cleanup may have removed auth.users.
+  const seedClient = new pg.Client({ connectionString: TENANT_DB_URL });
+  await seedClient.connect();
+  try {
+    await cleanupData(seedClient);
+    await seedData(seedClient);
+  } finally {
+    await seedClient.end();
+  }
+
   // Set passwords for seeded auth users
   const PASSWORD_A = 'TestPassword-A-123!';
   const PASSWORD_B = 'TestPassword-B-123!';
