@@ -81,7 +81,16 @@ export function shouldFailIfNoDb(): boolean {
 }
 
 export function isSupabaseLocalAvailable(): boolean {
-  return SUPABASE_LOCAL_URL.startsWith('http://localhost');
+  try {
+    const url = new URL(SUPABASE_LOCAL_URL);
+
+    return (
+      url.protocol === 'http:' &&
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
