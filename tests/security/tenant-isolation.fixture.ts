@@ -146,6 +146,10 @@ export interface Fixture {
     agencyId: string,
     linkData: Record<string, unknown>,
   ) => Promise<void>;
+  createBoardingScenario: (
+    agencyId: string,
+    actorUserId: string,
+  ) => Promise<{ tripId: string; seatId: string; reservationId: string; passengerId: string }>;
 }
 
 /* ------------------------------------------------------------------ */
@@ -507,6 +511,71 @@ async function patchLinkData(
   );
 }
 
+/**
+ * Create a complete boarding scenario:
+ *   1. Future trip (departure > NOW) so create_agency_reservation works
+ *   2. Assign agency
+ *   3. Create dedicated seat
+ *   4. Create reservation + passenger via create_agency_reservation
+ *   5. Flip trip to past (departure <= NOW) so boarding_toggle works
+ *
+ * Returns { tripId, seatId, reservationId, passengerId }.
+ */
+async function createBoardingScenario(
+  client: pg.Client,
+  agencyId: string,
+  actorUserId: string,
+): Promise<{ tripId: string; seatId: string; reservationId: string; passengerId: string }> {
+  const tripRes = await client.query(
+    `INSERT INTO public.trips (route_id, status, departure_time, capacity, vehicle_type) VALUES ($1, 'active', NOW() + INTERVAL '1 hour', 31, 'bus') RETURNING id`,
+    [IDS.ROUTE_1],
+  );
+  const tripId = tripRes.rows[0].id as string;
+
+  await client.query(
+    `INSERT INTO public.trip_agencies (trip_id, agency_id) VALUES ($1, $2)`,
+    [tripId, agencyId],
+  );
+
+  const seatCode = `BDG-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const seatRes = await client.query(
+    `INSERT INTO public.seats (trip_id, seat_code, status) VALUES ($1, $2, 'available') RETURNING id`,
+    [tripId, seatCode],
+  );
+  const seatId = seatRes.rows[0].id as string;
+
+  const resResult = await client.query(
+    `SELECT public.create_agency_reservation($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+    [
+      tripId,
+      agencyId,
+      actorUserId,
+      'Boarding Booker',
+      'DOC-BDG',
+      '555-BDG',
+      [seatId],
+      ['Boarding Pax'],
+      ['DOC-PAX-BDG'],
+      ['555-PAX-BDG'],
+    ],
+  );
+  const resData = resResult.rows[0]?.create_agency_reservation;
+  const reservationId = resData?.reservation_id as string;
+
+  const paxRes = await client.query(
+    `SELECT id FROM public.reservation_passengers WHERE reservation_id = $1 LIMIT 1`,
+    [reservationId],
+  );
+  const passengerId = paxRes.rows[0]?.id as string;
+
+  await client.query(
+    `UPDATE public.trips SET departure_time = NOW() - INTERVAL '1 hour' WHERE id = $1`,
+    [tripId],
+  );
+
+  return { tripId, seatId, reservationId, passengerId };
+}
+
 /* ------------------------------------------------------------------ */
 /*  Public API — DB/RLS Fixture                                         */
 /* ------------------------------------------------------------------ */
@@ -554,6 +623,8 @@ export async function createFixture(): Promise<Fixture> {
       createReservationWithPassenger(client, tripId, agencyId, actorUserId, seatId),
     patchLinkData: (linkId: string, agencyId: string, linkData: Record<string, unknown>) =>
       patchLinkData(client, linkId, agencyId, linkData),
+    createBoardingScenario: (agencyId: string, actorUserId: string) =>
+      createBoardingScenario(client, agencyId, actorUserId),
   };
 }
 
