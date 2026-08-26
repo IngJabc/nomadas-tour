@@ -453,7 +453,7 @@ async function createPastTrip(
   agencyId: string,
 ): Promise<{ tripId: string }> {
   const res = await client.query(
-    `INSERT INTO public.trips (route_id, status, departure_time) VALUES ($1, 'active', NOW() - INTERVAL '1 hour') RETURNING id`,
+    `INSERT INTO public.trips (route_id, status, departure_time, capacity, vehicle_type) VALUES ($1, 'active', NOW() - INTERVAL '1 hour', 31, 'bus') RETURNING id`,
     [IDS.ROUTE_1],
   );
   const tripId = res.rows[0].id;
