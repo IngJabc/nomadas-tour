@@ -90,11 +90,15 @@ export function isSupabaseLocalAvailable(): boolean {
  */
 export async function isSupabaseLocalReachable(): Promise<boolean> {
   try {
-    const res = await fetch(`${SUPABASE_LOCAL_URL}/health/v1/ready`, {
-      signal: AbortSignal.timeout(3_000),
+    const res = await fetch(SUPABASE_LOCAL_URL, {
+      signal: AbortSignal.timeout(5_000),
     });
-    return res.ok;
-  } catch {
+    return res.status < 500;
+  } catch (err) {
+    console.warn(
+      '[SEC-009.3] Supabase Local reachability check failed:',
+      err,
+    );
     return false;
   }
 }
