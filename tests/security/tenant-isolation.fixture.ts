@@ -90,10 +90,10 @@ export function isSupabaseLocalAvailable(): boolean {
  */
 export async function isSupabaseLocalReachable(): Promise<boolean> {
   try {
-    const res = await fetch(`${SUPABASE_LOCAL_URL}/health/v1/authorized`, {
+    const res = await fetch(`${SUPABASE_LOCAL_URL}/health/v1/ready`, {
       signal: AbortSignal.timeout(3_000),
     });
-    return res.ok || res.status === 401 || res.status === 403;
+    return res.ok;
   } catch {
     return false;
   }
