@@ -419,14 +419,16 @@ describe('SEC-009.3 — RPC Authorization', () => {
       expect(r.rows[0]).toBeDefined();
     });
 
-    it('update_agency_branding: USER_A + AGENCY_A → success (no-op)', async () => {
+    it('update_agency_branding: USER_A + AGENCY_A → success', async () => {
       if (!f) return;
       const r = await callRpcAsServiceRole(f, 'update_agency_branding', [
         IDS.AGENCY_A, IDS.USER_A, { primary_color: '#FF0000' }, {},
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
-      expect((r.rows[0] as { changed: boolean }).changed).toBe(true);
+      const data = r.rows[0] as Record<string, unknown>;
+      const branding = data?.update_agency_branding as Record<string, unknown>;
+      expect(branding?.changed).toBe(true);
     });
 
     it('update_agency_notification_preferences: USER_A + AGENCY_A → success', async () => {
@@ -436,7 +438,9 @@ describe('SEC-009.3 — RPC Authorization', () => {
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
-      expect((r.rows[0] as { changed: boolean }).changed).toBe(true);
+      const data = r.rows[0] as Record<string, unknown>;
+      const prefs = data?.update_agency_notification_preferences as Record<string, unknown>;
+      expect(prefs?.changed).toBe(true);
     });
 
     it('cancel_agency_reservation: USER_A + AGENCY_A + own reservation → success', async () => {
@@ -447,20 +451,23 @@ describe('SEC-009.3 — RPC Authorization', () => {
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
-      expect((r.rows[0] as { cancelled: boolean }).cancelled).toBe(true);
+      const data = r.rows[0] as Record<string, unknown>;
+      const cancel = data?.cancel_agency_reservation as Record<string, unknown>;
+      expect(cancel?.cancelled).toBe(true);
     });
 
-    it('boarding_toggle: USER_A + OPERATOR_A + assigned trip + passenger → success', async () => {
+    it('boarding_toggle: USER_A + OPERATOR_A + assigned trip → success', async () => {
       if (!f) return;
-      const { tripId } = await f.createPastTrip(IDS.AGENCY_A);
-      const seat = await f.createDedicatedSeat(tripId);
-      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_A, IDS.USER_A, seat.seatId);
+      const scenario = await f.createBoardingScenario(IDS.AGENCY_A, IDS.USER_A);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
+        scenario.passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
-      expect(r.rows[0]).toBeDefined();
+      const data = r.rows[0] as Record<string, unknown>;
+      const boarding = data?.boarding_toggle as Record<string, unknown>;
+      expect(boarding?.passenger_id).toBeDefined();
+      expect(boarding?.boarded).toBe(true);
     });
   });
 
@@ -530,11 +537,9 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('boarding_toggle: USER_A + OPERATOR_A on unassigned trip → denied', async () => {
       if (!f) return;
-      const { tripId } = await f.createPastTrip(IDS.AGENCY_B);
-      const seat = await f.createDedicatedSeat(tripId);
-      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_B, IDS.USER_B, seat.seatId);
+      const scenario = await f.createBoardingScenario(IDS.AGENCY_B, IDS.USER_B);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
+        scenario.passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeDefined();
       expect(r.error).toContain('Tu agencia no está asignada a este viaje');
@@ -544,24 +549,23 @@ describe('SEC-009.3 — RPC Authorization', () => {
   describe('Phase 2B — boarding_toggle authorization matrix', () => {
     it('boarding_toggle: USER_A + OPERATOR_A + assigned trip → success', async () => {
       if (!f) return;
-      const { tripId } = await f.createPastTrip(IDS.AGENCY_A);
-      const seat = await f.createDedicatedSeat(tripId);
-      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_A, IDS.USER_A, seat.seatId);
+      const scenario = await f.createBoardingScenario(IDS.AGENCY_A, IDS.USER_A);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
+        scenario.passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeUndefined();
       expect(r.rows.length).toBe(1);
-      expect(r.rows[0]).toBeDefined();
+      const data = r.rows[0] as Record<string, unknown>;
+      const boarding = data?.boarding_toggle as Record<string, unknown>;
+      expect(boarding?.passenger_id).toBeDefined();
+      expect(boarding?.boarded).toBe(true);
     });
 
     it('boarding_toggle: USER_A + OPERATOR_A + unassigned trip → denied', async () => {
       if (!f) return;
-      const { tripId } = await f.createPastTrip(IDS.AGENCY_B);
-      const seat = await f.createDedicatedSeat(tripId);
-      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_B, IDS.USER_B, seat.seatId);
+      const scenario = await f.createBoardingScenario(IDS.AGENCY_B, IDS.USER_B);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        passengerId, true, IDS.USER_A, IDS.AGENCY_A,
+        scenario.passengerId, true, IDS.USER_A, IDS.AGENCY_A,
       ]);
       expect(r.error).toBeDefined();
       expect(r.error).toContain('Tu agencia no está asignada a este viaje');
@@ -569,11 +573,9 @@ describe('SEC-009.3 — RPC Authorization', () => {
 
     it('boarding_toggle: USER_A + OPERATOR_B + assigned trip → actor/operator mismatch', async () => {
       if (!f) return;
-      const { tripId } = await f.createPastTrip(IDS.AGENCY_A);
-      const seat = await f.createDedicatedSeat(tripId);
-      const { passengerId } = await f.createReservationWithPassenger(tripId, IDS.AGENCY_A, IDS.USER_A, seat.seatId);
+      const scenario = await f.createBoardingScenario(IDS.AGENCY_A, IDS.USER_A);
       const r = await callRpcAsServiceRole(f, 'boarding_toggle', [
-        passengerId, true, IDS.USER_A, IDS.AGENCY_B,
+        scenario.passengerId, true, IDS.USER_A, IDS.AGENCY_B,
       ]);
       expect(r.error).toBeDefined();
       expect(r.error).toContain('El actor no pertenece a la agencia operadora');
