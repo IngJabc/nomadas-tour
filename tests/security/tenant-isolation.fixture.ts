@@ -822,11 +822,52 @@ export async function createApiFixture(): Promise<ApiFixture> {
   const seedClient = new pg.Client({ connectionString: TENANT_DB_URL });
   await seedClient.connect();
   try {
+    // DIAGNOSTIC: auth.users state before reseed
+    const beforeReseed = await seedClient.query(
+      `SELECT id, email FROM auth.users WHERE id IN ($1, $2) ORDER BY id`,
+      [IDS.USER_A, IDS.USER_B],
+    );
+    console.log('[SEC-009.3 DEBUG] auth.users BEFORE reseed:', {
+      count: beforeReseed.rows.length,
+      users: beforeReseed.rows.map((r: { id: string; email: string }) => ({ id: r.id, email: r.email })),
+    });
+
     await cleanupData(seedClient);
     await seedData(seedClient);
+
+    // DIAGNOSTIC: auth.users state after reseed
+    const afterReseed = await seedClient.query(
+      `SELECT id, email FROM auth.users WHERE id IN ($1, $2) ORDER BY id`,
+      [IDS.USER_A, IDS.USER_B],
+    );
+    console.log('[SEC-009.3 DEBUG] auth.users AFTER reseed:', {
+      count: afterReseed.rows.length,
+      users: afterReseed.rows.map((r: { id: string; email: string }) => ({ id: r.id, email: r.email })),
+    });
+
+    // DIAGNOSTIC: public.users state after reseed
+    const publicAfter = await seedClient.query(
+      `SELECT id, email, agency_id FROM public.users WHERE id IN ($1, $2) ORDER BY id`,
+      [IDS.USER_A, IDS.USER_B],
+    );
+    console.log('[SEC-009.3 DEBUG] public.users AFTER reseed:', {
+      count: publicAfter.rows.length,
+      users: publicAfter.rows.map((r: { id: string; email: string; agency_id: string }) => ({
+        id: r.id, email: r.email, agency_id: r.agency_id,
+      })),
+    });
   } finally {
     await seedClient.end();
   }
+
+  // DIAGNOSTIC: GoTrue/Admin API view of auth.users (compare with Postgres view)
+  const admin = getSupabaseAdmin();
+  const { data: userA, error: errA } = await admin.auth.admin.getUserById(IDS.USER_A);
+  console.log('[SEC-009.3 DEBUG] auth.users BEFORE setAuthPassword:', {
+    userAExists: !errA && !!userA,
+    userAEmail: userA?.user?.email,
+    error: errA?.message,
+  });
 
   // Set passwords for seeded auth users
   const PASSWORD_A = 'TestPassword-A-123!';
