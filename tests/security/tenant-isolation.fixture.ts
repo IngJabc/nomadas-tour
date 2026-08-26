@@ -90,14 +90,26 @@ export function isSupabaseLocalAvailable(): boolean {
  */
 export async function isSupabaseLocalReachable(): Promise<boolean> {
   try {
+    console.log(
+      '[SEC-009.3 DEBUG] Probing Supabase Local:',
+      SUPABASE_LOCAL_URL,
+    );
     const res = await fetch(SUPABASE_LOCAL_URL, {
       signal: AbortSignal.timeout(5_000),
     });
+    console.log(
+      '[SEC-009.3 DEBUG] Response:',
+      res.status,
+      res.statusText,
+    );
     return res.status < 500;
   } catch (err) {
-    console.warn(
-      '[SEC-009.3] Supabase Local reachability check failed:',
-      err,
+    console.error(
+      '[SEC-009.3 DEBUG] Supabase Local reachability error:',
+      err instanceof Error ? err.message : String(err),
+      err instanceof Error && err.cause
+        ? `(cause: ${err.cause})`
+        : '',
     );
     return false;
   }

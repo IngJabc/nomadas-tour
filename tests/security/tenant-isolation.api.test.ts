@@ -78,8 +78,25 @@ let canRun = false;
 
 beforeAll(async () => {
   const dbOk = isDbAvailable();
-  const supabaseOk = isSupabaseLocalAvailable() && (await isSupabaseLocalReachable());
-  canRun = dbOk && supabaseOk;
+  const localConfigured = isSupabaseLocalAvailable();
+  const localReachable = localConfigured
+    ? await isSupabaseLocalReachable()
+    : false;
+
+  console.log('[SEC-009.3 DEBUG]', {
+    dbOk,
+    localConfigured,
+    localReachable,
+    supabaseUrl:
+      process.env.SUPABASE_URL || 'http://localhost:54321',
+    dbUrlPresent: Boolean(
+      process.env.TENANT_DB_URL || process.env.DATABASE_URL,
+    ),
+    testMode: process.env.TEST_MODE || 'local',
+    serviceKeyPresent: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+  });
+
+  canRun = dbOk && localConfigured && localReachable;
   if (!canRun) {
     if (shouldFailIfNoDb()) {
       throw new Error(
