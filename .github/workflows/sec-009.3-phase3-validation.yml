@@ -121,20 +121,43 @@ jobs:
       # 5. Extract Supabase Local environment variables
       # -----------------------------------------------------------------------
       - name: Extract Supabase env vars
-        env:
-          # If the key is already set (e.g., from a previous step), use it
-          SUPABASE_SERVICE_ROLE_KEY: ''
         run: |
-          # Try to get the service role key from supabase status
-          KEY=$(supabase status -o env 2>/dev/null | grep 'SUPABASE_SERVICE_ROLE_KEY=' | cut -d'=' -f2-)
-          if [ -n "$KEY" ]; then
-            echo "SUPABASE_SERVICE_ROLE_KEY=$KEY" >> $GITHUB_ENV
-            echo "✅ Extracted SUPABASE_SERVICE_ROLE_KEY from supabase status"
-          else
-            echo "⚠️ SUPABASE_SERVICE_ROLE_KEY not found in supabase status output"
-            echo "   The fixture will throw a clear error if the key is needed"
-            # Don't set it - the fixture will throw an error with guidance
+          set -euo pipefail
+
+          echo "=== Supabase status env names ==="
+
+          OUTPUT=$(supabase status -o env \
+            --override-name api.url=SUPABASE_URL \
+            --override-name auth.service_role_key=SUPABASE_SERVICE_ROLE_KEY)
+
+          echo "$OUTPUT" | sed -E 's/=.*$/=<redacted>/'
+
+          KEY=$(printf '%s\n' "$OUTPUT" |
+            sed -n 's/^SUPABASE_SERVICE_ROLE_KEY=//p' |
+            tr -d '"')
+
+          URL=$(printf '%s\n' "$OUTPUT" |
+            sed -n 's/^SUPABASE_URL=//p' |
+            tr -d '"')
+
+          echo "KEY_PRESENT=$([ -n "$KEY" ] && echo yes || echo no)"
+          echo "URL=$URL"
+
+          if [ -z "$KEY" ]; then
+            echo "::error::SUPABASE_SERVICE_ROLE_KEY missing after override-name"
+            exit 1
           fi
+
+          if [ -z "$URL" ]; then
+            echo "::error::SUPABASE_URL missing after override-name"
+            exit 1
+          fi
+
+          echo "SUPABASE_SERVICE_ROLE_KEY=$KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_URL=$URL" >> "$GITHUB_ENV"
+
+          echo "✅ SUPABASE_SERVICE_ROLE_KEY=<present>"
+          echo "✅ SUPABASE_URL=$URL"
 
       # -----------------------------------------------------------------------
       # 5. Database reset (applies all 72 migrations + seed.sql)
