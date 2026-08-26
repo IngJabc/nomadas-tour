@@ -45,28 +45,6 @@ INSERT INTO auth.users (
   );
 
 -- =============================================================================
--- 2b. Auth identities (required for email/password sign-in via GoTrue)
---     provider_id = user UUID as text for email provider.
--- =============================================================================
-INSERT INTO auth.identities (
-  id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at
-) VALUES
-  (
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","email":"user-a@tenant-test.local","email_verified":true}'::jsonb,
-    'email', NOW(), NOW(), NOW()
-  ),
-  (
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","email":"user-b@tenant-test.local","email_verified":true}'::jsonb,
-    'email', NOW(), NOW(), NOW()
-  );
-
--- =============================================================================
 -- 3. Public users (FK → auth.users, FK → agencies)
 -- =============================================================================
 INSERT INTO public.users (id, email, password_hash, role, agency_id) VALUES
