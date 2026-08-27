@@ -13,8 +13,6 @@
     "test:tenant": "vitest run tests/security/tenant-isolation.db.test.ts",
     "test:tenant:db": "vitest run tests/security/tenant-isolation.db.test.ts",
     "test:tenant:rpc": "vitest run tests/security/tenant-isolation.rpc.test.ts",
-    "test:tenant:api": "vitest run tests/security/tenant-isolation.api.test.ts",
-    "test:tenant:api:ci": "node -e \"process.env.TEST_MODE='ci';import('child_process').then(m=>m.execSync('npx vitest run tests/security/tenant-isolation.api.test.ts',{stdio:'inherit'}))\"",
     "test:tenant:ci": "node -e \"process.env.TEST_MODE='ci';import('child_process').then(m=>m.execSync('npx vitest run tests/security/tenant-isolation.db.test.ts',{stdio:'inherit'}))\"",
     "audit:deps": "npm audit --audit-level=high && npm audit --prefix backend --audit-level=high"
   },

@@ -10,39 +10,11 @@ INSERT INTO public.agencies (id, name, subdomain, status) VALUES
   ('22222222-2222-2222-2222-222222222222', 'Agency B (TI Test)', 'test-tenant-b', 'active');
 
 -- =============================================================================
--- 2. Auth users (GoTrue-compatible: instance_id, token columns, raw_app_meta_data)
---    Token columns MUST be '' (not NULL) — GoTrue's Go driver crashes on NULL-to-string.
---    instance_id = zero UUID for single-tenant local Supabase.
+-- 2. Auth users (required for public.users FK)
 -- =============================================================================
-INSERT INTO auth.users (
-  instance_id, id, aud, role, email, encrypted_password,
-  email_confirmed_at, confirmation_token, recovery_token,
-  email_change_token_new, email_change,
-  raw_app_meta_data, raw_user_meta_data,
-  created_at, updated_at
-) VALUES
-  (
-    '00000000-0000-0000-0000-000000000000',
-    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    'authenticated', 'authenticated',
-    'user-a@tenant-test.local',
-    '',
-    NOW(), '', '', '', '',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{}'::jsonb,
-    NOW(), NOW()
-  ),
-  (
-    '00000000-0000-0000-0000-000000000000',
-    'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    'authenticated', 'authenticated',
-    'user-b@tenant-test.local',
-    '',
-    NOW(), '', '', '', '',
-    '{"provider":"email","providers":["email"]}'::jsonb,
-    '{}'::jsonb,
-    NOW(), NOW()
-  );
+INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, aud, role) VALUES
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'user-a@tenant-test.local', '', NOW(), 'authenticated', 'authenticated'),
+  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'user-b@tenant-test.local', '', NOW(), 'authenticated', 'authenticated');
 
 -- =============================================================================
 -- 3. Public users (FK → auth.users, FK → agencies)

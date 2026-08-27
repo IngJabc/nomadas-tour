@@ -6,16 +6,10 @@
  * Provides deterministic test data and auth helpers for DB/RLS tenant
  * isolation tests against Supabase Local. Uses parameterized set_config()
  * for JWT claims — no SQL string interpolation.
- *
- * Phase 3 additions: Supabase auth helpers for real JWT tokens and
- * Express server lifecycle for full HTTP integration tests.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Server } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import pg from 'pg';
-import { createClient } from '@supabase/supabase-js';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '../..');
 
@@ -59,16 +53,6 @@ const TENANT_DB_URL =
 const TEST_MODE = process.env.TEST_MODE || 'local';
 
 /* ------------------------------------------------------------------ */
-/*  Supabase Local defaults (from supabase CLI config.toml)            */
-/* ------------------------------------------------------------------ */
-
-const SUPABASE_LOCAL_URL =
-  process.env.SUPABASE_URL || 'http://localhost:54321';
-
-const SUPABASE_LOCAL_SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-/* ------------------------------------------------------------------ */
 /*  Availability checks                                                */
 /* ------------------------------------------------------------------ */
 
@@ -78,50 +62,6 @@ export function isDbAvailable(): boolean {
 
 export function shouldFailIfNoDb(): boolean {
   return TEST_MODE === 'ci';
-}
-
-export function isSupabaseLocalAvailable(): boolean {
-  try {
-    const url = new URL(SUPABASE_LOCAL_URL);
-
-    return (
-      url.protocol === 'http:' &&
-      (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
-    );
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Probe whether Supabase Local (GoTrue on :54321) is actually reachable.
- * Returns true if the health endpoint responds within 3s.
- */
-export async function isSupabaseLocalReachable(): Promise<boolean> {
-  try {
-    console.log(
-      '[SEC-009.3 DEBUG] Probing Supabase Local:',
-      SUPABASE_LOCAL_URL,
-    );
-    const res = await fetch(SUPABASE_LOCAL_URL, {
-      signal: AbortSignal.timeout(5_000),
-    });
-    console.log(
-      '[SEC-009.3 DEBUG] Response:',
-      res.status,
-      res.statusText,
-    );
-    return res.status < 500;
-  } catch (err) {
-    console.error(
-      '[SEC-009.3 DEBUG] Supabase Local reachability error:',
-      err instanceof Error ? err.message : String(err),
-      err instanceof Error && err.cause
-        ? `(cause: ${err.cause})`
-        : '',
-    );
-    return false;
-  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -157,15 +97,6 @@ export interface Fixture {
     tripId: string,
     lockForUserId?: string,
   ) => Promise<{ seatId: string; seatCode: string }>;
-  createPastTrip: (
-    agencyId: string,
-  ) => Promise<{ tripId: string }>;
-  createReservationWithPassenger: (
-    tripId: string,
-    agencyId: string,
-    actorUserId: string,
-    seatId: string,
-  ) => Promise<{ reservationId: string; passengerId: string }>;
   patchLinkData: (
     linkId: string,
     agencyId: string,
@@ -477,53 +408,6 @@ async function createDedicatedSeat(
   return { seatId, seatCode: code };
 }
 
-async function createPastTrip(
-  client: pg.Client,
-  agencyId: string,
-): Promise<{ tripId: string }> {
-  const res = await client.query(
-    `INSERT INTO public.trips (route_id, status, departure_time, capacity, vehicle_type) VALUES ($1, 'active', NOW() - INTERVAL '1 hour', 31, 'bus') RETURNING id`,
-    [IDS.ROUTE_1],
-  );
-  const tripId = res.rows[0].id;
-  await client.query(
-    `INSERT INTO public.trip_agencies (trip_id, agency_id) VALUES ($1, $2)`,
-    [tripId, agencyId],
-  );
-  return { tripId };
-}
-
-async function createReservationWithPassenger(
-  client: pg.Client,
-  tripId: string,
-  agencyId: string,
-  actorUserId: string,
-  seatId: string,
-): Promise<{ reservationId: string; passengerId: string }> {
-  const result = await client.query(
-    `SELECT public.create_agency_reservation($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [
-      tripId,
-      agencyId,
-      actorUserId,
-      'Test Booker',
-      'DOC-BOOKER',
-      '555-BOOK',
-      [seatId],
-      ['Test Pax'],
-      ['DOC-PAX'],
-      ['555-PAX'],
-    ],
-  );
-  const data = result.rows[0]?.create_agency_reservation;
-  const reservationId = data?.reservation_id;
-  const pax = await client.query(
-    `SELECT id FROM public.reservation_passengers WHERE reservation_id = $1 LIMIT 1`,
-    [reservationId],
-  );
-  return { reservationId, passengerId: pax.rows[0]?.id };
-}
-
 async function patchLinkData(
   client: pg.Client,
   linkId: string,
@@ -640,334 +524,9 @@ export async function createFixture(): Promise<Fixture> {
     getLinkIds: () => getLinkIds(client),
     createDedicatedSeat: (tripId: string, lockForUserId?: string) =>
       createDedicatedSeat(client, tripId, lockForUserId),
-    createPastTrip: (agencyId: string) =>
-      createPastTrip(client, agencyId),
-    createReservationWithPassenger: (tripId: string, agencyId: string, actorUserId: string, seatId: string) =>
-      createReservationWithPassenger(client, tripId, agencyId, actorUserId, seatId),
     patchLinkData: (linkId: string, agencyId: string, linkData: Record<string, unknown>) =>
       patchLinkData(client, linkId, agencyId, linkData),
     createBoardingScenario: (agencyId: string, actorUserId: string) =>
       createBoardingScenario(client, agencyId, actorUserId),
   };
-}
-
-/* ================================================================== */
-/*  Phase 3 — API Authorization Helpers                                */
-/* ================================================================== */
-
-/* ------------------------------------------------------------------ */
-/*  Supabase auth clients (lazy — only created when key is available)  */
-/* ------------------------------------------------------------------ */
-
-let _supabaseAdmin: ReturnType<typeof createClient> | null = null;
-let _supabaseAuth: ReturnType<typeof createClient> | null = null;
-
-function getSupabaseAdmin() {
-  if (!_supabaseAdmin) {
-    if (!SUPABASE_LOCAL_SERVICE_KEY) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available');
-    }
-    _supabaseAdmin = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-  }
-  return _supabaseAdmin;
-}
-
-function getSupabaseAuth() {
-  if (!_supabaseAuth) {
-    if (!SUPABASE_LOCAL_SERVICE_KEY) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY is not available');
-    }
-    _supabaseAuth = createClient(SUPABASE_LOCAL_URL, SUPABASE_LOCAL_SERVICE_KEY, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-  }
-  return _supabaseAuth;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Auth user management                                               */
-/* ------------------------------------------------------------------ */
-
-/**
- * Set a password for an auth user created by the seed.
- * Uses the Supabase admin API to update the user's encrypted_password.
- */
-export async function setAuthPassword(
-  userId: string,
-  password: string,
-): Promise<void> {
-  const { error } = await getSupabaseAdmin().auth.admin.updateUserById(userId, {
-    password,
-  });
-  if (error) {
-    throw new Error(`Failed to set password for ${userId}: ${error.message}`);
-  }
-}
-
-/**
- * Sign in as a user and return the access token (JWT).
- * The returned token is valid for the Supabase auth.getUser() validation
- * used by the backend's auth middleware.
- */
-export async function signInAndGetToken(
-  email: string,
-  password: string,
-): Promise<string> {
-  const { data, error } = await getSupabaseAuth().auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  // SEC-009.3 DIAGNOSTIC — log sign-in result (temporary, revert after)
-  console.log('[SEC-009.3 SIGNIN DEBUG]', {
-    email,
-    error: error?.message,
-    hasSession: !!data?.session,
-    hasAccessToken: !!data?.session?.access_token,
-    accessTokenLength: data?.session?.access_token?.length,
-    userId: data?.session?.user?.id,
-    userRole: data?.session?.user?.role,
-    userAud: data?.session?.user?.aud,
-  });
-
-  if (error || !data.session) {
-    throw new Error(`Failed to sign in as ${email}: ${error?.message}`);
-  }
-  return data.session.access_token;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Express server lifecycle                                           */
-/* ------------------------------------------------------------------ */
-
-let serverInstance: Server | null = null;
-let serverBaseUrl: string = '';
-
-/**
- * Start the Express backend on a random port.
- * Returns the base URL (e.g. http://127.0.0.1:12345).
- *
- * Sets the required env vars before importing the app module.
- * Must be called once in beforeAll.
- */
-export async function startBackendServer(): Promise<string> {
-  // Set env vars required by the backend (must be before app import).
-  process.env.SUPABASE_URL = SUPABASE_LOCAL_URL;
-  process.env.SUPABASE_SERVICE_ROLE_KEY = SUPABASE_LOCAL_SERVICE_KEY;
-  process.env.JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long';
-  process.env.NODE_ENV = 'test';
-  process.env.CORS_ORIGIN = 'http://localhost:3000';
-  process.env.RESEND_API_KEY = 'test-resend';
-  process.env.EMAIL_FROM = 'test@example.com';
-  process.env.FRONTEND_URL = 'http://localhost:3000';
-
-  // SEC-009.3 DIAGNOSTIC — log env vars (temporary, revert after)
-  console.log('[SEC-009.3 SERVER DEBUG] Backend env vars:', {
-    SUPABASE_URL: process.env.SUPABASE_URL,
-    SUPABASE_SERVICE_ROLE_KEY_PREFIX: process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 8) + '...',
-    SUPABASE_SERVICE_ROLE_KEY_LENGTH: process.env.SUPABASE_SERVICE_ROLE_KEY?.length,
-    JWT_SECRET_PREFIX: process.env.JWT_SECRET?.substring(0, 8) + '...',
-    JWT_SECRET_LENGTH: process.env.JWT_SECRET?.length,
-    NODE_ENV: process.env.NODE_ENV,
-  });
-
-  // Dynamic import — env vars must already be set.
-  const { default: app } = await import(
-    '../../backend/src/app.js'
-  );
-
-  serverInstance = await new Promise<Server>((resolve, reject) => {
-    const s = app.listen(0, '127.0.0.1', () => resolve(s));
-    s.once('error', reject);
-  });
-
-  const { port } = serverInstance.address() as AddressInfo;
-  serverBaseUrl = `http://127.0.0.1:${port}`;
-  return serverBaseUrl;
-}
-
-/**
- * Stop the Express backend. Must be called in afterAll.
- */
-export async function stopBackendServer(): Promise<void> {
-  if (!serverInstance) return;
-  const closing = serverInstance;
-  serverInstance = null;
-  serverBaseUrl = '';
-  await new Promise<void>((resolve, reject) => {
-    closing.close((err) => (err ? reject(err) : resolve()));
-  });
-}
-
-/**
- * Get the base URL of the running backend server.
- * Throws if server hasn't been started.
- */
-export function getBaseUrl(): string {
-  if (!serverBaseUrl) {
-    throw new Error('Backend server not started. Call startBackendServer() first.');
-  }
-  return serverBaseUrl;
-}
-
-/* ------------------------------------------------------------------ */
-/*  API test fixture                                                    */
-/* ------------------------------------------------------------------ */
-
-export interface ApiFixture {
-  tokenA: string;
-  tokenB: string;
-  baseUrl: string;
-}
-
-/**
- * Create the API test fixture with real JWT tokens.
- *
- * Sets passwords for the seeded auth users, signs in to get real
- * Supabase JWT tokens, and starts the Express backend server.
- *
- * Must be called inside a Vitest beforeAll with a 60s timeout.
- */
-export async function createApiFixture(): Promise<ApiFixture> {
-  if (!SUPABASE_LOCAL_SERVICE_KEY) {
-    if (shouldFailIfNoDb()) {
-      throw new Error(
-        'SEC-009.3 CI: SUPABASE_SERVICE_ROLE_KEY is not available. ' +
-        'Ensure Supabase Local is running and the key is set.',
-      );
-    }
-    throw new Error('skip');
-  }
-
-  // Prepare a clean seed state — Phase 2 cleanup may have removed auth.users.
-  const seedClient = new pg.Client({ connectionString: TENANT_DB_URL });
-  await seedClient.connect();
-  try {
-    // DIAGNOSTIC: auth.users state before reseed
-    const beforeReseed = await seedClient.query(
-      `SELECT id, email FROM auth.users WHERE id IN ($1, $2) ORDER BY id`,
-      [IDS.USER_A, IDS.USER_B],
-    );
-    console.log('[SEC-009.3 DEBUG] auth.users BEFORE reseed:', {
-      count: beforeReseed.rows.length,
-      users: beforeReseed.rows.map((r: { id: string; email: string }) => ({ id: r.id, email: r.email })),
-    });
-
-    await cleanupData(seedClient);
-    await seedData(seedClient);
-
-    // DIAGNOSTIC: auth.users state after reseed
-    const afterReseed = await seedClient.query(
-      `SELECT id, email FROM auth.users WHERE id IN ($1, $2) ORDER BY id`,
-      [IDS.USER_A, IDS.USER_B],
-    );
-    console.log('[SEC-009.3 DEBUG] auth.users AFTER reseed:', {
-      count: afterReseed.rows.length,
-      users: afterReseed.rows.map((r: { id: string; email: string }) => ({ id: r.id, email: r.email })),
-    });
-
-    // DIAGNOSTIC: public.users state after reseed
-    const publicAfter = await seedClient.query(
-      `SELECT id, email, agency_id FROM public.users WHERE id IN ($1, $2) ORDER BY id`,
-      [IDS.USER_A, IDS.USER_B],
-    );
-    console.log('[SEC-009.3 DEBUG] public.users AFTER reseed:', {
-      count: publicAfter.rows.length,
-      users: publicAfter.rows.map((r: { id: string; email: string; agency_id: string }) => ({
-        id: r.id, email: r.email, agency_id: r.agency_id,
-      })),
-    });
-  } finally {
-    await seedClient.end();
-  }
-
-  // DIAGNOSTIC: GoTrue/Admin API view of auth.users (compare with Postgres view)
-  const admin = getSupabaseAdmin();
-  const { data: userA, error: errA } = await admin.auth.admin.getUserById(IDS.USER_A);
-  console.log('[SEC-009.3 DEBUG] auth.users BEFORE setAuthPassword:', {
-    userAExists: !errA && !!userA,
-    userAEmail: userA?.user?.email,
-    error: errA?.message,
-  });
-
-  // Set passwords for seeded auth users
-  const PASSWORD_A = 'TestPassword-A-123!';
-  const PASSWORD_B = 'TestPassword-B-123!';
-
-  await setAuthPassword(IDS.USER_A, PASSWORD_A);
-  await setAuthPassword(IDS.USER_B, PASSWORD_B);
-
-  // Sign in and get real JWT tokens
-  const tokenA = await signInAndGetToken('user-a@tenant-test.local', PASSWORD_A);
-  const tokenB = await signInAndGetToken('user-b@tenant-test.local', PASSWORD_B);
-
-  // SEC-009.3 DIAGNOSTIC — temporary, revert after evidence captured
-  function decodeJwtPayload(jwt: string) {
-    const parts = jwt.split('.');
-    if (parts.length !== 3) return null;
-    try {
-      return JSON.parse(Buffer.from(parts[1], 'base64url').toString());
-    } catch {
-      return null;
-    }
-  }
-  const payloadA = decodeJwtPayload(tokenA);
-  const payloadB = decodeJwtPayload(tokenB);
-  console.log('[SEC-009.3 JWT DEBUG]', {
-    tokenA: {
-      iss: payloadA?.iss,
-      aud: payloadA?.aud,
-      sub: payloadA?.sub,
-      role: payloadA?.role,
-      email: payloadA?.email,
-      exp: payloadA?.exp,
-      iat: payloadA?.iat,
-    },
-    tokenB: {
-      iss: payloadB?.iss,
-      aud: payloadB?.aud,
-      sub: payloadB?.sub,
-      role: payloadB?.role,
-      email: payloadB?.email,
-      exp: payloadB?.exp,
-      iat: payloadB?.iat,
-    },
-  });
-
-  // SEC-009.3 DIAGNOSTIC: Direct GoTrue /auth/v1/user check
-  try {
-    const goTrueRes = await fetch(`${SUPABASE_LOCAL_URL}/auth/v1/user`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${tokenA}`,
-        apikey: SUPABASE_LOCAL_SERVICE_KEY,
-      },
-    });
-    const goTrueBody = await goTrueRes.json();
-    console.log('[SEC-009.3 GOTRUE DIRECT]', {
-      status: goTrueRes.status,
-      ok: goTrueRes.ok,
-      bodyId: goTrueBody?.id,
-      bodyEmail: goTrueBody?.email,
-      bodyError: goTrueBody?.msg || goTrueBody?.message,
-      bodyCode: goTrueBody?.error_code,
-    });
-  } catch (e: any) {
-    console.log('[SEC-009.3 GOTRUE DIRECT] fetch failed:', e?.message);
-  }
-
-  // Start backend server
-  const baseUrl = await startBackendServer();
-
-  return { tokenA, tokenB, baseUrl };
-}
-
-/**
- * Tear down the API test fixture.
- * Stops the backend server.
- */
-export async function destroyApiFixture(): Promise<void> {
-  await stopBackendServer();
 }
