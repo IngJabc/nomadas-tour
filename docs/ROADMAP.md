@@ -88,7 +88,7 @@ FASE 3 — Workers
 
 FASE Seguridad continua
   SEC-001 … SEC-008                        ✅ (hardening cerrado)
-  SEC-009  Continuous security validation  → abierto (009.0 ✅ COMPLETED; 009.1 ✅ COMPLETED; 009.2 ✅ IMPLEMENTED / COMPLETED)
+  SEC-009  Continuous security validation  → abierto (009.0 ✅; 009.1 ✅; 009.2 ✅; 009.3 Phase 3 DESCARTADA — Phase 1 DB/RLS y Phase 2 RPC son los controles validados)
 
 FASE 4 — Automatizaciones (producto)
   F4-001  Agency Daily Digest            ✅

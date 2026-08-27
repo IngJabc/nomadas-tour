@@ -1,7 +1,7 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** **SEC-009** abierto. **SEC-009.0** COMPLETED. **SEC-009.1** COMPLETED. **SEC-009.2** IMPLEMENTED / COMPLETED (Required Status Check `dependency-scan` configurado / activo).
+> **Estado:** **SEC-009** abierto. **SEC-009.0** COMPLETED. **SEC-009.1** COMPLETED. **SEC-009.2** IMPLEMENTED / COMPLETED (Required Status Check `dependency-scan` configurado / activo). **SEC-009.3 Phase 3** CANCELADA (Phase 1 DB/RLS y Phase 2 RPC son los controles de seguridad validados).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
