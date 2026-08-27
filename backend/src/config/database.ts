@@ -5,6 +5,13 @@ const ADMIN_OPTIONS = {
   auth: { autoRefreshToken: false, persistSession: false },
 };
 
+// SEC-009.3 DIAGNOSTIC — log Supabase client config (temporary, revert after)
+console.log('[SEC-009.3 CLIENT DEBUG] Creating Supabase clients:', {
+  url: env.SUPABASE_URL,
+  keyPrefix: env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 8) + '...',
+  keyLength: env.SUPABASE_SERVICE_ROLE_KEY?.length,
+});
+
 export const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, ADMIN_OPTIONS);
 
 // Second client with the same key — NEVER used for auth.getUser(), so its auth

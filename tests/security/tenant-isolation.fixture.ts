@@ -719,6 +719,19 @@ export async function signInAndGetToken(
     email,
     password,
   });
+
+  // SEC-009.3 DIAGNOSTIC — log sign-in result (temporary, revert after)
+  console.log('[SEC-009.3 SIGNIN DEBUG]', {
+    email,
+    error: error?.message,
+    hasSession: !!data?.session,
+    hasAccessToken: !!data?.session?.access_token,
+    accessTokenLength: data?.session?.access_token?.length,
+    userId: data?.session?.user?.id,
+    userRole: data?.session?.user?.role,
+    userAud: data?.session?.user?.aud,
+  });
+
   if (error || !data.session) {
     throw new Error(`Failed to sign in as ${email}: ${error?.message}`);
   }
@@ -749,6 +762,16 @@ export async function startBackendServer(): Promise<string> {
   process.env.RESEND_API_KEY = 'test-resend';
   process.env.EMAIL_FROM = 'test@example.com';
   process.env.FRONTEND_URL = 'http://localhost:3000';
+
+  // SEC-009.3 DIAGNOSTIC — log env vars (temporary, revert after)
+  console.log('[SEC-009.3 SERVER DEBUG] Backend env vars:', {
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY_PREFIX: process.env.SUPABASE_SERVICE_ROLE_KEY?.substring(0, 8) + '...',
+    SUPABASE_SERVICE_ROLE_KEY_LENGTH: process.env.SUPABASE_SERVICE_ROLE_KEY?.length,
+    JWT_SECRET_PREFIX: process.env.JWT_SECRET?.substring(0, 8) + '...',
+    JWT_SECRET_LENGTH: process.env.JWT_SECRET?.length,
+    NODE_ENV: process.env.NODE_ENV,
+  });
 
   // Dynamic import — env vars must already be set.
   const { default: app } = await import(
@@ -879,6 +902,61 @@ export async function createApiFixture(): Promise<ApiFixture> {
   // Sign in and get real JWT tokens
   const tokenA = await signInAndGetToken('user-a@tenant-test.local', PASSWORD_A);
   const tokenB = await signInAndGetToken('user-b@tenant-test.local', PASSWORD_B);
+
+  // SEC-009.3 DIAGNOSTIC — temporary, revert after evidence captured
+  function decodeJwtPayload(jwt: string) {
+    const parts = jwt.split('.');
+    if (parts.length !== 3) return null;
+    try {
+      return JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    } catch {
+      return null;
+    }
+  }
+  const payloadA = decodeJwtPayload(tokenA);
+  const payloadB = decodeJwtPayload(tokenB);
+  console.log('[SEC-009.3 JWT DEBUG]', {
+    tokenA: {
+      iss: payloadA?.iss,
+      aud: payloadA?.aud,
+      sub: payloadA?.sub,
+      role: payloadA?.role,
+      email: payloadA?.email,
+      exp: payloadA?.exp,
+      iat: payloadA?.iat,
+    },
+    tokenB: {
+      iss: payloadB?.iss,
+      aud: payloadB?.aud,
+      sub: payloadB?.sub,
+      role: payloadB?.role,
+      email: payloadB?.email,
+      exp: payloadB?.exp,
+      iat: payloadB?.iat,
+    },
+  });
+
+  // SEC-009.3 DIAGNOSTIC: Direct GoTrue /auth/v1/user check
+  try {
+    const goTrueRes = await fetch(`${SUPABASE_LOCAL_URL}/auth/v1/user`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${tokenA}`,
+        apikey: SUPABASE_LOCAL_SERVICE_KEY,
+      },
+    });
+    const goTrueBody = await goTrueRes.json();
+    console.log('[SEC-009.3 GOTRUE DIRECT]', {
+      status: goTrueRes.status,
+      ok: goTrueRes.ok,
+      bodyId: goTrueBody?.id,
+      bodyEmail: goTrueBody?.email,
+      bodyError: goTrueBody?.msg || goTrueBody?.message,
+      bodyCode: goTrueBody?.error_code,
+    });
+  } catch (e: any) {
+    console.log('[SEC-009.3 GOTRUE DIRECT] fetch failed:', e?.message);
+  }
 
   // Start backend server
   const baseUrl = await startBackendServer();
