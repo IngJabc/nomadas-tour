@@ -62,3 +62,116 @@ describe('Express app — trust proxy / rate-limit', () => {
     expect(body.error?.code).toBe('VALIDATION_ERROR');
   });
 });
+
+// ── Health endpoint /healthz ───────────────────────────────────────────────
+describe('Health endpoint /healthz', () => {
+  let server: Server | null = null;
+
+  afterEach(async () => {
+    if (!server) return;
+    const closing = server;
+    server = null;
+    await new Promise<void>((resolve, reject) => {
+      closing.close((err) => (err ? reject(err) : resolve()));
+    });
+  });
+
+  async function startServer(): Promise<number> {
+    server = await new Promise<Server>((resolve, reject) => {
+      const s = app.listen(0, '127.0.0.1', () => resolve(s));
+      s.once('error', reject);
+    });
+    return (server.address() as AddressInfo).port;
+  }
+
+  // ── GET /healthz ───────────────────────────────────────────────────────
+
+  it('GET /healthz returns 200 with expected JSON shape', async () => {
+    const port = await startServer();
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.status).toBe('ok');
+    expect(body.service).toBe('nomadas-api');
+    expect(typeof body.version).toBe('string');
+    expect(body.version).not.toBe('');
+    expect(Number.isInteger(body.uptime_seconds)).toBe(true);
+    expect(body.uptime_seconds).toBeGreaterThanOrEqual(0);
+    expect(Number.isInteger(body.pid)).toBe(true);
+    expect(body.pid).toBeGreaterThan(0);
+  });
+
+  it('GET /healthz returns correct Content-Type and Content-Length', async () => {
+    const port = await startServer();
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+
+    expect(res.headers.get('content-type')).toBe(
+      'application/json; charset=utf-8',
+    );
+    const contentLength = res.headers.get('content-length');
+    expect(contentLength).not.toBeNull();
+    const bodyText = await res.text();
+    expect(Number(contentLength)).toBe(Buffer.byteLength(bodyText));
+  });
+
+  it('GET /healthz returns Cache-Control no-store', async () => {
+    const port = await startServer();
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`);
+
+    expect(res.headers.get('cache-control')).toBe(
+      'no-store, no-cache, must-revalidate',
+    );
+  });
+
+  // ── HEAD /healthz ──────────────────────────────────────────────────────
+
+  it('HEAD /healthz returns 200 with empty body', async () => {
+    const port = await startServer();
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`, {
+      method: 'HEAD',
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('');
+  });
+
+  it('HEAD /healthz returns same Content-Length as GET', async () => {
+    const port = await startServer();
+    const [getRes, headRes] = await Promise.all([
+      fetch(`http://127.0.0.1:${port}/healthz`),
+      fetch(`http://127.0.0.1:${port}/healthz`, { method: 'HEAD' }),
+    ]);
+
+    expect(headRes.headers.get('content-length')).toBe(
+      getRes.headers.get('content-length'),
+    );
+    expect(headRes.headers.get('content-type')).toBe(
+      getRes.headers.get('content-type'),
+    );
+  });
+
+  // ── Rate-limit independence ────────────────────────────────────────────
+
+  it('multiple rapid GET requests to /healthz do not 429', async () => {
+    const port = await startServer();
+    const requests = Array.from({ length: 50 }, () =>
+      fetch(`http://127.0.0.1:${port}/healthz`),
+    );
+    const responses = await Promise.all(requests);
+    for (const r of responses) {
+      expect(r.status).toBe(200);
+    }
+  });
+
+  // ── Liveness independence (no auth) ───────────────────────────────────
+
+  it('GET /healthz does not require authentication', async () => {
+    const port = await startServer();
+    const res = await fetch(`http://127.0.0.1:${port}/healthz`, {
+      headers: { Authorization: 'Bearer invalid-token' },
+    });
+
+    expect(res.status).toBe(200);
+  });
+});

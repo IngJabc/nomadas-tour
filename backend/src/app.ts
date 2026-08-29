@@ -26,7 +26,47 @@ app.use(cors({
 // Body parsing
 app.use(express.json());
 
-// Health check
+// ── Health check (liveness-only) ─────────────────────────────────────────────
+// Convención unificada con Worker: GET+HEAD /healthz
+// No DB, no Supabase, no auth, no logs, no Sentry, no side effects.
+//
+// NOTE: placed before all routes so current rate-limiting (per-route in
+// auth/index.ts, public/reservation-links.ts) does not touch this endpoint.
+// If a *global* rate limiter is added later, it MUST include:
+//   skip: (req) => req.path === '/healthz'
+// so UptimeRobot HEAD requests every 5 min are never blocked.
+
+function buildHealthPayload(): string {
+  return JSON.stringify({
+    status: 'ok',
+    service: 'nomadas-api',
+    version: process.env.npm_package_version ?? 'unknown',
+    uptime_seconds: Math.floor(process.uptime()),
+    pid: process.pid,
+  });
+}
+
+app.get('/healthz', (_req, res) => {
+  const body = buildHealthPayload();
+  res.set({
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': String(Buffer.byteLength(body)),
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+  });
+  res.status(200).send(body);
+});
+
+app.head('/healthz', (_req, res) => {
+  const body = buildHealthPayload();
+  res.set({
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': String(Buffer.byteLength(body)),
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+  });
+  res.status(200).end();
+});
+
+// Legacy endpoint kept for backward compatibility.
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
