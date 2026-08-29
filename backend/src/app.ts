@@ -35,6 +35,10 @@ app.use(express.json());
 // If a *global* rate limiter is added later, it MUST include:
 //   skip: (req) => req.path === '/healthz'
 // so UptimeRobot HEAD requests every 5 min are never blocked.
+//
+// SENTRY PROTECTION: if a Sentry request handler is added later as a global
+// middleware, it MUST be placed AFTER /healthz or include a skip rule to
+// prevent UptimeRobot health checks from generating Sentry transactions/events.
 
 function buildHealthPayload(): string {
   return JSON.stringify({

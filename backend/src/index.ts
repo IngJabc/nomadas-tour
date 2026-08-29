@@ -31,6 +31,14 @@ process.on('unhandledRejection', (reason) => {
   });
 });
 
+// Graceful shutdown — flush Sentry before exit (parity with Worker)
+async function gracefulShutdown() {
+  await flushSentry(2000);
+  process.exit(0);
+}
+process.on('SIGTERM', () => { void gracefulShutdown(); });
+process.on('SIGINT', () => { void gracefulShutdown(); });
+
 // Auto-expiration for locked seats (every 60s)
 setInterval(async () => {
   try {
