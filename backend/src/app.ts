@@ -81,6 +81,16 @@ app.use('/api/admin', superadminRoutes);       // superadmin only
 app.use('/api/agency', agencyRoutes);           // agency role
 app.use('/api/public/reservation-links', publicReservationLinkRoutes);
 
+// TEMPORARY: Sentry production verification endpoint. Remove after validation.
+// Enables a controlled unhandled Error to validate the full Sentry pipeline:
+//   HTTP → Express → errorHandler → captureException → Sentry
+// Activated ONLY when SENTRY_TEST_ENABLED=true; otherwise returns 404.
+if (process.env.SENTRY_TEST_ENABLED === 'true') {
+  app.get('/api/internal/sentry-test', (_req, _res, next) => {
+    next(new Error('SENTRY_API_TEST'));
+  });
+}
+
 // Error handler (must be last)
 app.use(errorHandler);
 
