@@ -21,7 +21,7 @@ const migration063 = read(
 const harness = read('supabase/tests/f4_003_verification.sql');
 
 describe('F4-003 — migration isolation', () => {
-  it('keeps 063 contiguous after 060→061→062; tip is 072 (F5-004)', () => {
+  it('keeps 063 contiguous after 060→061→062; tip is 073', () => {
     const migrations = listMigrations();
     const i060 = migrations.indexOf('060_purge_completed_outbox_events.sql');
     const i061 = migrations.indexOf('061_schedule_agency_digests.sql');
@@ -30,7 +30,7 @@ describe('F4-003 — migration isolation', () => {
     const i064 = migrations.indexOf('064_occupancy_urgency_alerts.sql');
     const i065 = migrations.indexOf('065_audit_log.sql');
     const i066 = migrations.indexOf('066_create_agency_reservation_departed.sql');
-    const i072 = migrations.indexOf('072_reservation_link_agency_branding.sql');
+    const i073 = migrations.indexOf('073_agency_settings_auto_create.sql');
 
     expect(i061).toBe(i060 + 1);
     expect(i062).toBe(i061 + 1);
@@ -38,7 +38,7 @@ describe('F4-003 — migration isolation', () => {
     expect(i064).toBe(i063 + 1);
     expect(i065).toBe(i064 + 1);
     expect(i066).toBe(i065 + 1);
-    expect(i072).toBe(migrations.length - 1);
+    expect(i073).toBe(migrations.length - 1);
   });
 
   it('has no tracked modifications in migrations 001–062', () => {

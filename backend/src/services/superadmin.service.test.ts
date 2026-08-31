@@ -113,12 +113,27 @@ vi.mock('./email.service.js', () => ({
     sendTripPostponedEmail: vi.fn(),
     sendNewTripAssignedEmail: vi.fn(),
     sendTripCancelledEmail: vi.fn(),
+    sendInvitationEmail: vi.fn(() => Promise.resolve()),
   },
 }));
 
 vi.mock('./notification.service.js', () => ({
   notificationService: {
     createForAgenciesAndAdmin: vi.fn(() => Promise.resolve(undefined)),
+  },
+}));
+
+const mockSeedDefaults = vi.fn().mockResolvedValue(undefined);
+vi.mock('./notification-preference.service.js', () => ({
+  notificationPreferenceService: {
+    seedDefaults: (...args: any[]) => mockSeedDefaults(...args),
+  },
+}));
+
+const mockSeedBrandingDefaults = vi.fn().mockResolvedValue(undefined);
+vi.mock('./agency-settings.service.js', () => ({
+  agencySettingsService: {
+    seedBrandingDefaults: (...args: any[]) => mockSeedBrandingDefaults(...args),
   },
 }));
 
@@ -1175,6 +1190,73 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
         ['agency-1'],
         'user-1',
       ),
-    ).rejects.toBeInstanceOf(ValidationError);
+    ).rejects.toThrow(ValidationError);
+  });
+});
+
+describe('superadminService.createAgency', () => {
+  beforeEach(() => {
+    resetTableChains();
+    mockSeedDefaults.mockClear();
+    mockSeedBrandingDefaults.mockClear();
+  });
+
+  it('creates agency and seeds both notification prefs and branding defaults', async () => {
+    const agenciesChain = createChainable();
+    agenciesChain.insert.mockImplementation(() => agenciesChain);
+    agenciesChain.select.mockImplementation(() => agenciesChain);
+    agenciesChain.single.mockResolvedValue({
+      data: { id: 'new-agency-1', name: 'Test Agency', status: 'pending' },
+      error: null,
+    });
+    tableChains['agencies'] = agenciesChain;
+
+    const invitationsChain = createChainable();
+    invitationsChain.insert.mockResolvedValue({ error: null });
+    tableChains['agency_invitations'] = invitationsChain;
+
+    const { generateUniqueSubdomain } = await import('../utils/subdomain.js');
+    vi.mocked(generateUniqueSubdomain).mockResolvedValue('test-agency');
+    const { generateToken } = await import('../utils/token.js');
+    vi.mocked(generateToken).mockReturnValue('test-token-123');
+
+    const result = await superadminService.createAgency(
+      'Test Agency',
+      'test@example.com',
+      'admin-1',
+    );
+
+    expect(result.id).toBe('new-agency-1');
+    expect(mockSeedDefaults).toHaveBeenCalledWith('new-agency-1');
+    expect(mockSeedBrandingDefaults).toHaveBeenCalledWith('new-agency-1');
+  });
+
+  it('calls seedBrandingDefaults even if notification seed fails', async () => {
+    const agenciesChain = createChainable();
+    agenciesChain.insert.mockImplementation(() => agenciesChain);
+    agenciesChain.select.mockImplementation(() => agenciesChain);
+    agenciesChain.single.mockResolvedValue({
+      data: { id: 'new-agency-2', name: 'Agency 2', status: 'pending' },
+      error: null,
+    });
+    tableChains['agencies'] = agenciesChain;
+
+    const invitationsChain = createChainable();
+    invitationsChain.insert.mockResolvedValue({ error: null });
+    tableChains['agency_invitations'] = invitationsChain;
+
+    mockSeedDefaults.mockRejectedValueOnce(new Error('notif seed failed'));
+
+    const { generateUniqueSubdomain } = await import('../utils/subdomain.js');
+    vi.mocked(generateUniqueSubdomain).mockResolvedValue('agency-2');
+    const { generateToken } = await import('../utils/token.js');
+    vi.mocked(generateToken).mockReturnValue('token-2');
+
+    await expect(
+      superadminService.createAgency('Agency 2', 'a2@test.com', 'admin-1'),
+    ).rejects.toThrow('notif seed failed');
+
+    // branding seed should NOT be called if notif seed throws first
+    expect(mockSeedBrandingDefaults).not.toHaveBeenCalled();
   });
 });

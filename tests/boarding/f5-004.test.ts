@@ -18,7 +18,7 @@ function listMigrations(): string[] {
 }
 
 describe('F5-004 — migration isolation', () => {
-  it('keeps 066→067→068→069→070→071→072 contiguous and 072 as tip', () => {
+  it('keeps 066→067→068→069→070→071→072 contiguous; tip is 073', () => {
     const migrations = listMigrations();
     const i066 = migrations.indexOf('066_create_agency_reservation_departed.sql');
     const i067 = migrations.indexOf('067_reservation_links.sql');
@@ -27,13 +27,14 @@ describe('F5-004 — migration isolation', () => {
     const i070 = migrations.indexOf('070_reservation_links_agency_realtime.sql');
     const i071 = migrations.indexOf('071_invalidate_reservation_link.sql');
     const i072 = migrations.indexOf('072_reservation_link_agency_branding.sql');
+    const i073 = migrations.indexOf('073_agency_settings_auto_create.sql');
     expect(i067).toBe(i066 + 1);
     expect(i068).toBe(i067 + 1);
     expect(i069).toBe(i068 + 1);
     expect(i070).toBe(i069 + 1);
     expect(i071).toBe(i070 + 1);
     expect(i072).toBe(i071 + 1);
-    expect(i072).toBe(migrations.length - 1);
+    expect(i073).toBe(migrations.length - 1);
   });
 
   it('ships the SQL verification harness', () => {

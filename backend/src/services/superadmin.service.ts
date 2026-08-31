@@ -13,6 +13,7 @@ import { emailService } from "./email.service.js";
 import { notificationService } from "./notification.service.js";
 import { notificationDeliveryPolicy } from "./notification-delivery.policy.js";
 import { notificationPreferenceService } from "./notification-preference.service.js";
+import { agencySettingsService } from "./agency-settings.service.js";
 import {
   getTripOperationalContext,
   validateTripEditable,
@@ -174,6 +175,7 @@ export class SuperadminService {
     if (inviteError) throw new ValidationError(inviteError.message);
 
     await notificationPreferenceService.seedDefaults(agency.id);
+    await agencySettingsService.seedBrandingDefaults(agency.id);
 
     emailService.sendInvitationEmail(email, name, token).catch((err) => {
       console.error(

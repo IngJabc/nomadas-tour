@@ -13,6 +13,13 @@ export interface AgencyBrandingSettings {
 
 export type AgencyBrandingPatch = Partial<AgencyBrandingSettings>;
 
+const DEFAULT_BRANDING: AgencyBrandingSettings = {
+  logo_url: null,
+  primary_color: '#000024',
+  secondary_color: '#0080FF',
+  accent_color: '#00D4FF',
+};
+
 export class AgencySettingsService {
   async getBranding(
     agencyId: string,
@@ -26,7 +33,7 @@ export class AgencySettingsService {
       .single();
 
     if (error || !data) {
-      throw new NotFoundError('Configuración de marca no encontrada');
+      return DEFAULT_BRANDING;
     }
 
     return data as AgencyBrandingSettings;
@@ -71,6 +78,21 @@ export class AgencySettingsService {
       secondary_color: data.secondary_color,
       accent_color: data.accent_color,
     };
+  }
+  async seedBrandingDefaults(agencyId: string): Promise<void> {
+    const { error } = await supabaseAdmin
+      .from('agency_settings')
+      .upsert(
+        {
+          agency_id: agencyId,
+          primary_color: DEFAULT_BRANDING.primary_color,
+          secondary_color: DEFAULT_BRANDING.secondary_color,
+          accent_color: DEFAULT_BRANDING.accent_color,
+        },
+        { onConflict: 'agency_id', ignoreDuplicates: true },
+      );
+
+    if (error) throw new ValidationError(error.message);
   }
 }
 
