@@ -1,7 +1,7 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** **SEC-009** abierto. **SEC-009.0** COMPLETED. **SEC-009.1** COMPLETED. **SEC-009.2** IMPLEMENTED / COMPLETED (Required Status Check `dependency-scan` configurado / activo). **SEC-009.3 Phase 3** CANCELADA (Phase 1 DB/RLS y Phase 2 RPC son los controles de seguridad validados).
+> **Estado:** **Fase A (Production & SaaS Readiness)** en progreso — SEO, Legal, Analytics, SEC-010…014, OBS-001. **SEC-009** permanece abierto (009.0/.1/.2 COMPLETED; 009.3 CANCELADA).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
@@ -28,6 +28,45 @@
   - Validación: tests 399 / security 19 / backend 567; tsc y build root+backend PASS; `npm run audit:deps` PASS.
   - Design: [`docs/SEC-009.2-dependency-scanning-implementation-design.md`](docs/SEC-009.2-dependency-scanning-implementation-design.md)
   - Required Status Check `dependency-scan` en el Ruleset de `main`: **configurado / activo** (bloquea merge si falla).
+
+---
+
+## Activo — Fase A (Production & SaaS Readiness)
+
+**Objetivo:** Cerrar gaps de seguridad, SEO técnico, legal y observabilidad básica para lanzamiento comercial. Detalle de cada ticket (temas, estado, archivos) en [`docs/ROADMAP.md`](docs/ROADMAP.md) → Fase A.
+
+### A.1 — SEO Técnico & Landing Pública
+- [ ] **SEO-001** — Landing page pública `/` (hoy redirige a `/login`) — value prop, CTA, branding, metadata, OG, responsive, contacto, legal links.
+- [ ] **SEO-002** — Página 404 propia (`not-found.tsx`) — branded, CTA a `/login`, search params preservation.
+- [ ] **SEO-003** — Meta tags por página (title, description, OG) — login, auth pages, public reservation link, dashboards. Hoy solo metadata global.
+- [ ] **SEO-004** — `robots.ts` / `robots.txt` — disallow `/admin/`, `/agency/`, `/api/`, `/reservations/link/`; sitemap reference.
+- [ ] **SEO-005** — `sitemap.ts` / `sitemap.xml` — URLs públicas.
+- [ ] **SEO-006** — Favicon completo (ico multi-size, apple-touch-icon, manifest.json) — parcial.
+- [ ] **SEO-007** — OG image dinámica para reservation links — planificado.
+- [ ] **SEO-008** — Image optimization (`next/image` para assets estáticos) — planificado.
+
+### A.2 — Legal & Trust
+- [ ] **LEGAL-001** — Privacy Policy (`/privacy`).
+- [ ] **LEGAL-002** — Terms & Conditions (`/terms`).
+- [ ] **LEGAL-003** — Cookie Policy (`/cookies`) — solo cookies esenciales Supabase; sin banner si solo esenciales.
+- [ ] **LEGAL-004** — Contact page (`/contact`) — form + honeypot + rate limit + email; footer global con links legales.
+- [ ] **LEGAL-005** — Email sender identity (DMARC/SPF/DKIM) — verificar.
+
+### A.3 — Analytics
+- [ ] **ANALYTICS-001** — Decisión de producto: herramienta analytics (Vercel Analytics vs Plausible). **No implementar hasta decidir.**
+- [ ] **ANALYTICS-002** — Implementación técnica — **bloqueada** por ANALYTICS-001.
+
+### A.4 — Seguridad Crítica
+- [ ] **SEC-010** — Rate limiting global + per-tenant en `/api/agency/*`, `/api/admin/*` (hoy solo auth y public links).
+- [ ] **SEC-011** — CSP header configurado.
+- [ ] **SEC-012** — Verificar `.env` no commiteado (`.gitignore` + secretos en Render/Vercel) — verificar.
+- [ ] **SEC-013** — Verificar `trust proxy` contra Render — verificar.
+- [ ] **SEC-014** — Password reset progressive lockout — evaluar.
+
+### A.5 — Observabilidad Básica
+- [ ] **OBS-001** — Readiness health check (`/readyz`) — DB connectivity; complementa `/healthz`.
+- [x] **OBS-002** — Uptime monitoring — Sentry Uptime **configurado** (experimental).
+- [x] **OBS-003** — Sentry API + Worker operativo — **COMPLETED** (WKR-006.2; graceful shutdown `flushSentry(2000)` en API y Worker).
 
 ---
 
@@ -95,8 +134,13 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 | Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                                                              | Estado      |
 | ----- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| —     | **Fase A**                    | SEO (SEO-001…008), Legal (LEGAL-001…005), Analytics (ANALYTICS-001/002), SEC-010…014, OBS-001. Ver [`docs/ROADMAP.md`](docs/ROADMAP.md)                                                                                                                                                                                                                                            | En progreso |
+| —     | **Fase B (Professional UX)**  | UX-001…011 (accesibilidad, mobile, estados de error, focus, contraste)                                                                                                                                                                                                                                                                                                            | Planificada |
+| —     | **Fase C (Reliability & Perf)**| REL-001…006 (readiness, timeouts, paginación, métricas)                                                                                                                                                                                                                                                                                                                           | Planificada |
+| —     | **Fase D (Scale)**            | SCALE-001…005 (worker separado, Redis, load test, querys, realtime) — futura bajo evidencia                                                                                                                                                                                                                                                                                       | Diferida   |
+| —     | **Fase E (Adv Observability)**| OBS-004…007 (Sentry frontend, SLOs, correlation ID, dashboard ops) — futura                                                                                                                                                                                                                                                                                                       | Diferida   |
 | —     | **F5 resto**                  | Invitaciones/usuarios en audit; correlation ID; retención/purge; quitar gate UI temporal                                                                                                                                                                                                                                                                                          | Futura      |
-| —     | Futuro / Fase 6               | Métricas históricas y reporting                                                                                                                                                                                                                                                                                                                                                   | Futura      |
+| —     | Futuro / Fase 6               | Métricas históricas y reporting (REP-001…004)                                                                                                                                                                                                                                                                                                                                      | Futura      |
 | —     | Infraestructura / Operaciones | Restore drill trimestral (manual)                                                                                                                                                                                                                                                                                                                                                 | Futura      |
 | —     | Follow-up                     | Migración timers `LockCleanup` / `completeExpiredTrips`                                                                                                                                                                                                                                                                                                                           | Futura      |
 | —     | Follow-up                     | Retention `boarding_attempts`                                                                                                                                                                                                                                                                                                                                                     | Futura      |
@@ -107,17 +151,17 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 ## Bloqueadores
 
-_Ninguno. Sprint: SEC-009 abierto. 009.0 COMPLETED. 009.1 COMPLETED (`secret-scan` Required Status Check activo). 009.2 IMPLEMENTED / COMPLETED (`dependency-scan` en CI; Required Status Check activo). F4/F5 cerrados. Backup + tutoriales operativos. Restore drill trimestral pendiente._
+_Ninguno. Sprint: **Fase A** en progreso. SEC-009 abierto (009.0/.1/.2 COMPLETED). F4/F5 cerrados. Backup + tutoriales operativos. Restore drill trimestral pendiente._
 
 ---
 
 ## Ideas futuras
 
 - **Background Worker nativo** — cuando el plan de hosting lo permita (sin HTTP)
-- **UX continua** — responsive, accesibilidad, skeletons (ROADMAP Fase 7)
-- **Escalabilidad** — load/stress/capacity, caché, índices, costos (ROADMAP Fase 8; ≠ SEC-009)
+- **UX continua** — responsive, accesibilidad, skeletons (ROADMAP Fase B)
+- **Escalabilidad** — load/stress/capacity, caché, índices, costos (ROADMAP Fase D; ≠ SEC-009)
 - **Hexagonal / Ports & Adapters** — evaluación oportunista en features nuevas complejas (ROADMAP; sin rewrite global)
-- **Sentry frontend / Performance / Replay** — fuera de WKR-006.2
+- **Sentry frontend / Performance / Replay** — fuera de WKR-006.2 (ROADMAP OBS-004)
 - **Email occupancy_alerts** — requiere Resend comercial
 - **UI prefs `superadmin_digest`** — v1 es seed + gate de envío
 - **Dashboard superadmin de alertas activas** — v1 usa in-app existente
