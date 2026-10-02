@@ -8,6 +8,42 @@
 
 ---
 
+## Activo — MKT-001 (schema del marketplace, escritura de migraciones)
+
+> Estas migraciones son de `nomadas-tour-marketplace` pero se guardan **aquí**
+> para mantener una sola historia de migraciones sobre la BD compartida.
+> Diseño y reglas: `../nomadas-tour-marketplace/docs/`.
+
+- [x] **MKT-001** — Escritura de migraciones 074–079 — **2026-09-30**
+  - `074_add_customer_role.sql` — `customer` en `users.role_check`, resuelto
+    por catálogo porque `011_create_all.sql` no nombró el constraint.
+    Sin esto, `POST /api/auth/register` del marketplace falla.
+  - `075_reservations_marketplace.sql` — `reservations.customer_id`,
+    `source` (backfill `internal`), `payment_status` (derivado),
+    estados `locked`/`reserved` agregados sin quitar los de tour, y policy
+    `reservations_customer_read`.
+  - `076_payments.sql` — `trips.seat_price`, `reservation_passengers.unit_price`,
+    `payments`, `payment_allocations`, helper `reservation_passenger_balance()`.
+  - `077_platform_config_commissions_refunds.sql` — `platform_config`
+    (fee 30), `commissions`, `reservation_refunds`,
+    `agencies.first_marketplace_trip_completed_at`.
+  - `078_trips_installments.sql` — `trips.installment_allowed`,
+    `trips.installment_amount_cents`.
+  - `079_cancel_reservation_passenger.sql` — RPC `cancel_reservation_passenger`
+    (idempotente, libera solo su seat, crea refund `required`) y ampliación
+    de `audit_log` para `actor_role='customer'` + acción
+    `reservation.passenger_cancelled`. CHECKs ampliados, ningún valor quitado.
+  - **NO APLICADAS a la BD.** Validación realizada: UTF-8 sin BOM, sin bytes
+    no-ASCII, paréntesis y bloques `$$` balanceados. Falta dry-run
+    `BEGIN; … ROLLBACK;` contra la BD y aplicación en orden estricto.
+  - Hallazgo relevante: **el schema no tenía ninguna columna de precio**
+    (001–073), por lo que la fórmula de saldo del marketplace no era
+    calculable. Resuelto en 076 con precio de viaje + snapshot por pasajero.
+  - UTF-8 sin BOM y solo ASCII en comentarios (los SQL 001–073 tienen mojibake
+    al leerlos en consolas Windows; no se replicó ese defecto).
+
+---
+
 ## Activo — SEC-009 (Continuous Security Validation)
 
 - [x] **SEC-009.0** — CI Security Foundation — **COMPLETED**

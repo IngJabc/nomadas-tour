@@ -18,7 +18,7 @@ function listMigrations(): string[] {
 }
 
 describe('F5-004 — migration isolation', () => {
-  it('keeps 066→067→068→069→070→071→072 contiguous; tip is 073', () => {
+  it('keeps 066→079 contiguous; tip is 079', () => {
     const migrations = listMigrations();
     const i066 = migrations.indexOf('066_create_agency_reservation_departed.sql');
     const i067 = migrations.indexOf('067_reservation_links.sql');
@@ -28,13 +28,26 @@ describe('F5-004 — migration isolation', () => {
     const i071 = migrations.indexOf('071_invalidate_reservation_link.sql');
     const i072 = migrations.indexOf('072_reservation_link_agency_branding.sql');
     const i073 = migrations.indexOf('073_agency_settings_auto_create.sql');
+    const i074 = migrations.indexOf('074_add_customer_role.sql');
+    const i075 = migrations.indexOf('075_reservations_marketplace.sql');
+    const i076 = migrations.indexOf('076_payments.sql');
+    const i077 = migrations.indexOf('077_platform_config_commissions_refunds.sql');
+    const i078 = migrations.indexOf('078_trips_installments.sql');
+    const i079 = migrations.indexOf('079_cancel_reservation_passenger.sql');
     expect(i067).toBe(i066 + 1);
     expect(i068).toBe(i067 + 1);
     expect(i069).toBe(i068 + 1);
     expect(i070).toBe(i069 + 1);
     expect(i071).toBe(i070 + 1);
     expect(i072).toBe(i071 + 1);
-    expect(i073).toBe(migrations.length - 1);
+    expect(i073).toBe(i072 + 1);
+    expect(i074).toBe(i073 + 1);
+    expect(i075).toBe(i074 + 1);
+    expect(i076).toBe(i075 + 1);
+    expect(i077).toBe(i076 + 1);
+    expect(i078).toBe(i077 + 1);
+    expect(i079).toBe(i078 + 1);
+    expect(i079).toBe(migrations.length - 1);
   });
 
   it('ships the SQL verification harness', () => {
