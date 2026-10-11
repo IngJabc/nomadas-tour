@@ -29,6 +29,9 @@ const createTripSchema = z.object({
   vehicle_type: z.enum(["bus", "kia"]),
   agency_ids: z.array(z.string().uuid()).min(1),
   postpone: z.boolean().optional(),
+  // TRIP-PRICE-001: centavos COP, entero no negativo. Omitido = no
+  // enviar (create sin publicar / update preserva el valor actual).
+  seat_price: z.number().int().min(0).max(2_147_483_647).optional(),
 });
 
 const addTripAgenciesSchema = z.object({
@@ -164,6 +167,7 @@ export class SuperadminController {
         data.agency_ids,
         data.postpone ?? false,
         req.ctx!.userId,
+        data.seat_price,
       );
       res.json(result);
     } catch (error) {
@@ -183,7 +187,8 @@ export class SuperadminController {
         data.departure_time,
         data.vehicle_type,
         data.agency_ids,
-        req.ctx!.userId
+        req.ctx!.userId,
+        data.seat_price,
       );
       res.status(201).json(trip);
     } catch (error) {

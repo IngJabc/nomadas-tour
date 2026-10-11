@@ -1,8 +1,9 @@
 'use client';
 
-import { MapPin, Calendar, Bus, Building2 } from 'lucide-react';
+import { MapPin, Calendar, Bus, Building2, DollarSign } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { formatInTimezone } from '@/lib/timezone';
+import { formatSeatPriceCents, parseSeatPricePesosInput } from '@/lib/price';
 import type { TripBuilderState } from '@/hooks/useTripBuilderReducer';
 import type { Route } from '@/types';
 
@@ -10,6 +11,7 @@ interface ReviewStepProps {
   state: TripBuilderState;
   routes: Route[];
   agencies: { id: string; name: string }[];
+  mode: 'create' | 'edit';
 }
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -43,7 +45,7 @@ function InfoRow({
   );
 }
 
-export function ReviewStep({ state, routes, agencies }: ReviewStepProps) {
+export function ReviewStep({ state, routes, agencies, mode }: ReviewStepProps) {
   const route = routes.find((r) => r.id === state.route_id);
   const selectedAgencies = agencies.filter((a) =>
     state.agency_ids.includes(a.id),
@@ -52,6 +54,15 @@ export function ReviewStep({ state, routes, agencies }: ReviewStepProps) {
   const dt = state.departure_time
     ? formatInTimezone(state.departure_time)
     : '';
+
+  const parsedPrice = parseSeatPricePesosInput(state.seat_price_input);
+  const seatPriceLabel = parsedPrice.invalid
+    ? 'Precio no válido'
+    : parsedPrice.cents !== null
+      ? formatSeatPriceCents(parsedPrice.cents)
+      : mode === 'edit'
+        ? 'Se conserva el precio actual'
+        : 'Sin precio';
 
   return (
     <div className="space-y-4 max-w-lg">
@@ -85,6 +96,14 @@ export function ReviewStep({ state, routes, agencies }: ReviewStepProps) {
                 ? VEHICLE_LABELS[state.vehicle_type]
                 : 'No seleccionado'
             }
+          />
+
+          <div className="w-full h-px bg-[rgba(0,0,0,0.06)]" />
+
+          <InfoRow
+            icon={<DollarSign className="w-4 h-4" />}
+            label="Precio por puesto"
+            value={seatPriceLabel}
           />
 
           <div className="w-full h-px bg-[rgba(0,0,0,0.06)]" />

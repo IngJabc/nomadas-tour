@@ -21,7 +21,7 @@ const migration063 = read(
 const harness = read('supabase/tests/f4_003_verification.sql');
 
 describe('F4-003 — migration isolation', () => {
-  it('keeps 063 contiguous after 060→061→062; tip is 079', () => {
+  it('keeps 063 contiguous after 060→061→062', () => {
     const migrations = listMigrations();
     const i060 = migrations.indexOf('060_purge_completed_outbox_events.sql');
     const i061 = migrations.indexOf('061_schedule_agency_digests.sql');
@@ -30,7 +30,6 @@ describe('F4-003 — migration isolation', () => {
     const i064 = migrations.indexOf('064_occupancy_urgency_alerts.sql');
     const i065 = migrations.indexOf('065_audit_log.sql');
     const i066 = migrations.indexOf('066_create_agency_reservation_departed.sql');
-    const i079 = migrations.indexOf('079_cancel_reservation_passenger.sql');
 
     expect(i061).toBe(i060 + 1);
     expect(i062).toBe(i061 + 1);
@@ -38,7 +37,10 @@ describe('F4-003 — migration isolation', () => {
     expect(i064).toBe(i063 + 1);
     expect(i065).toBe(i064 + 1);
     expect(i066).toBe(i065 + 1);
-    expect(i079).toBe(migrations.length - 1);
+    // El tip del repo cambia con cada migración nueva: se valida que sea un
+    // archivo numerado válido (mismo patrón que f4-001/f4-002) sin fijar un
+    // número concreto que quedaría obsoleto.
+    expect(migrations[migrations.length - 1]).toMatch(/^\d{3}_/);
   });
 
   it('has no tracked modifications in migrations 001–062', () => {

@@ -250,6 +250,8 @@ export const adminApi = {
     departure_time: string;
     vehicle_type: 'bus' | 'kia';
     agency_ids: string[];
+    /** Centavos COP (trips.seat_price). Omitir = no publicar precio. */
+    seat_price?: number;
   }) => request<any>('/admin/trips', { method: 'POST', body: JSON.stringify(data) }),
   updateTrip: (id: string, data: {
     route_id: string;
@@ -257,6 +259,8 @@ export const adminApi = {
     vehicle_type: 'bus' | 'kia';
     agency_ids: string[];
     postpone?: boolean;
+    /** Centavos COP. Omitir = preservar el precio actual del viaje. */
+    seat_price?: number;
   }) => request<{
     trip: Record<string, unknown>;
     action: 'POSTPONED' | 'UPDATED';

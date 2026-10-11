@@ -51,6 +51,29 @@ function assertDepartureTimeInFuture(departureTime: string): void {
   }
 }
 
+/** Maximo positivo de INTEGER (columna trips.seat_price, centavos COP). */
+const SEAT_PRICE_MAX_CENTS = 2_147_483_647;
+
+/**
+ * TRIP-PRICE-001 — valida el precio por asiento en CENTAVOS COP.
+ * `null`/`undefined` = no enviado (preservar en update, no publicar en create).
+ * El valor nunca se multiplica aqui: la conversion pesos->centavos es
+ * responsabilidad de la capa de presentacion.
+ */
+function assertValidSeatPrice(seatPrice: number | null | undefined): void {
+  if (seatPrice === null || seatPrice === undefined) return;
+  if (!Number.isInteger(seatPrice)) {
+    throw new ValidationError(
+      "El precio por asiento debe ser un número entero en centavos.",
+    );
+  }
+  if (seatPrice < 0 || seatPrice > SEAT_PRICE_MAX_CENTS) {
+    throw new ValidationError(
+      "El precio por asiento debe estar entre 0 y el máximo permitido.",
+    );
+  }
+}
+
 /** Map 057 trip RPC ERR_* codes to existing service error types. */
 function mapTripRpcError(error: { message?: string }): never {
   const raw = error?.message ?? "Unknown trip RPC error";
@@ -78,6 +101,7 @@ function mapTripRpcError(error: { message?: string }): never {
     case "ERR_TRIP_STATUS_INVALID":
     case "ERR_TRIP_ACTIVE":
     case "ERR_INVALID_STATUS":
+    case "ERR_INVALID_SEAT_PRICE":
       throw new ValidationError(detail);
     default:
       throw new ValidationError(raw);
@@ -417,11 +441,14 @@ export class SuperadminService {
     departureTime: string,
     vehicleType: "bus" | "kia",
     agencyIds: string[],
-    createdBy: string
+    createdBy: string,
+    seatPrice?: number | null
   ) {
     if (agencyIds.length === 0) {
       throw new ValidationError("At least one agency is required");
     }
+
+    assertValidSeatPrice(seatPrice);
 
     const config = this.VEHICLE_CONFIG[vehicleType];
     const capacity = config.capacity;
@@ -450,6 +477,7 @@ export class SuperadminService {
         p_vehicle_type: vehicleType,
         p_agency_ids: agencyIds,
         p_created_by: createdBy,
+        p_seat_price: seatPrice ?? null,
       });
       if (error) throw mapTripRpcError(error);
       if (!trip) throw new ValidationError("create_trip returned no data");
@@ -464,6 +492,7 @@ export class SuperadminService {
         capacity,
         vehicle_type: vehicleType,
         created_by: createdBy,
+        seat_price: seatPrice ?? null,
       })
       .select()
       .single();
@@ -1064,10 +1093,13 @@ export class SuperadminService {
     agencyIds: string[],
     postpone: boolean = false,
     actorUserId?: string,
+    seatPrice?: number | null,
   ) {
     if (agencyIds.length === 0) {
       throw new ValidationError("At least one agency is required");
     }
+
+    assertValidSeatPrice(seatPrice);
 
     const config = this.VEHICLE_CONFIG[vehicleType];
     const capacity = config.capacity;
@@ -1115,6 +1147,7 @@ export class SuperadminService {
           p_agency_ids: agencyIds,
           p_postpone: postpone,
           p_actor_user_id: actorUserId ?? null,
+          p_seat_price: seatPrice ?? null,
         }
       );
       if (error) throw mapTripRpcError(error);
@@ -1146,6 +1179,11 @@ export class SuperadminService {
       vehicle_type: vehicleType,
       updated_by: actorUserId ?? null,
     };
+    // TRIP-PRICE-001: solo se incluye la columna cuando se envio un
+    // precio; omitirlo preserva el valor actual (no hay borrado).
+    if (seatPrice !== null && seatPrice !== undefined) {
+      updateFields.seat_price = seatPrice;
+    }
     if (isRealPostpone) {
       updateFields.postponed_from = ctx.trip.departure_time;
     }

@@ -9,6 +9,11 @@ import {
   DEPARTURE_MUST_BE_FUTURE_MESSAGE,
   isDepartureTimeInFuture,
 } from '@/lib/timezone';
+import {
+  SEAT_PRICE_INVALID_MESSAGE,
+  SEAT_PRICE_REQUIRED_MESSAGE,
+  parseSeatPricePesosInput,
+} from '@/lib/price';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { AdminTripCardSkeleton } from '@/components/admin/skeleton/AdminTripCardSkeleton';
@@ -85,10 +90,22 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
       return;
     }
 
+    if (state.currentStep === 2) {
+      const parsedPrice = parseSeatPricePesosInput(state.seat_price_input);
+      if (parsedPrice.invalid) {
+        setNavError(SEAT_PRICE_INVALID_MESSAGE);
+        return;
+      }
+      if (mode === 'create' && parsedPrice.cents === null) {
+        setNavError(SEAT_PRICE_REQUIRED_MESSAGE);
+        return;
+      }
+    }
+
     setNavError(null);
     setSubmitError(null);
     dispatch({ type: 'NEXT_STEP' });
-  }, [canProceed, dispatch, state.currentStep, state.departure_time]);
+  }, [canProceed, dispatch, mode, state.currentStep, state.departure_time, state.seat_price_input]);
 
   const handlePrevious = useCallback(() => {
     setNavError(null);
@@ -97,6 +114,16 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
   }, [dispatch]);
 
   const handleSubmit = useCallback(async () => {
+    const parsedPrice = parseSeatPricePesosInput(state.seat_price_input);
+    if (parsedPrice.invalid) {
+      setSubmitError(SEAT_PRICE_INVALID_MESSAGE);
+      return;
+    }
+    if (mode === 'create' && parsedPrice.cents === null) {
+      setSubmitError(SEAT_PRICE_REQUIRED_MESSAGE);
+      return;
+    }
+
     setSubmitLoading(true);
     setSubmitError(null);
     setSubmitFeedback(null);
@@ -106,6 +133,8 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
       departure_time: state.departure_time,
       vehicle_type: state.vehicle_type as 'bus' | 'kia',
       agency_ids: state.agency_ids,
+      // Centavos COP. Omitir = create sin precio / update preserva el actual.
+      ...(parsedPrice.cents !== null ? { seat_price: parsedPrice.cents } : {}),
     };
 
     try {
@@ -193,6 +222,10 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
                   <VehicleStep
                     selectedType={state.vehicle_type as 'bus' | 'kia' | ''}
                     onSelect={(v) => dispatch({ type: 'SET_VEHICLE', payload: v })}
+                    seatPriceInput={state.seat_price_input}
+                    onSeatPriceInputChange={(v) =>
+                      dispatch({ type: 'SET_SEAT_PRICE_INPUT', payload: v })
+                    }
                   />
                 )}
                 {state.currentStep === 3 && (
@@ -203,7 +236,12 @@ export function BuilderLayout({ mode, tripId, initialData, onSuccess }: BuilderL
                   />
                 )}
                 {state.currentStep === 4 && (
-                  <ReviewStep state={state} routes={routes} agencies={agencies} />
+                  <ReviewStep
+                    state={state}
+                    routes={routes}
+                    agencies={agencies}
+                    mode={mode}
+                  />
                 )}
               </div>
             </motion.div>

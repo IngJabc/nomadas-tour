@@ -7,6 +7,7 @@ import { AdminSkeletonItem, AdminSkeletonShell } from '@/components/admin/skelet
 import { AdminTripCardSkeleton } from '@/components/admin/skeleton/AdminTripCardSkeleton';
 import { adminApi } from '@/lib/api';
 import { fromUTCToLocal } from '@/lib/timezone';
+import { seatPriceCentsToInput } from '@/lib/price';
 import type { TripBuilderState } from '@/hooks/useTripBuilderReducer';
 
 export default function EditTripPage() {
@@ -30,6 +31,7 @@ export default function EditTripPage() {
             : '',
           vehicle_type: trip.vehicle_type ?? 'bus',
           agency_ids: (trip.trip_agencies || []).map((a: any) => a.agency_id),
+          seat_price_input: seatPriceCentsToInput(trip.seat_price),
         });
       } catch {
         setError('No se pudo cargar el viaje');
