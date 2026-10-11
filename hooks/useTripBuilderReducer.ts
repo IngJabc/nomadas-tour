@@ -7,6 +7,8 @@ export interface TripBuilderState {
   departure_time: string;
   vehicle_type: 'bus' | 'kia' | '';
   agency_ids: string[];
+  /** Precio por puesto en pesos COP enteros (texto del input). */
+  seat_price_input: string;
   currentStep: number;
 }
 
@@ -15,6 +17,7 @@ export type TripBuilderAction =
   | { type: 'SET_DEPARTURE_TIME'; payload: string }
   | { type: 'SET_VEHICLE'; payload: 'bus' | 'kia' }
   | { type: 'SET_AGENCIES'; payload: string[] }
+  | { type: 'SET_SEAT_PRICE_INPUT'; payload: string }
   | { type: 'NEXT_STEP' }
   | { type: 'PREVIOUS_STEP' }
   | { type: 'SET_STEP'; payload: number }
@@ -39,6 +42,7 @@ const initialState: TripBuilderState = {
   departure_time: '',
   vehicle_type: '',
   agency_ids: [],
+  seat_price_input: '',
   currentStep: 0,
 };
 
@@ -55,6 +59,8 @@ function tripBuilderReducer(
       return { ...state, vehicle_type: action.payload };
     case 'SET_AGENCIES':
       return { ...state, agency_ids: action.payload };
+    case 'SET_SEAT_PRICE_INPUT':
+      return { ...state, seat_price_input: action.payload };
     case 'NEXT_STEP':
       return { ...state, currentStep: Math.min(state.currentStep + 1, TOTAL_STEPS - 1) };
     case 'PREVIOUS_STEP':

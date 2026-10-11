@@ -955,6 +955,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
       p_vehicle_type: 'bus',
       p_agency_ids: ['agency-1', 'agency-2'],
       p_created_by: 'user-1',
+      p_seat_price: null,
     });
     expect(tableChains['trips'].insert).not.toHaveBeenCalled();
     expect(tableChains['seats'].insert).not.toHaveBeenCalled();
@@ -994,6 +995,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
       p_agency_ids: ['agency-1', 'agency-2'],
       p_postpone: true,
       p_actor_user_id: null,
+      p_seat_price: null,
     });
     expect(result.action).toBe(TripUpdateAction.POSTPONED);
     expect(result.trip.id).toBe('trip-1');
@@ -1030,6 +1032,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
       p_agency_ids: ['agency-1', 'agency-2'],
       p_postpone: false,
       p_actor_user_id: null,
+      p_seat_price: null,
     });
     expect(result.action).toBe(TripUpdateAction.UPDATED);
     expect(emailService.sendTripPostponedEmail).not.toHaveBeenCalled();
@@ -1258,5 +1261,278 @@ describe('superadminService.createAgency', () => {
 
     // branding seed should NOT be called if notif seed throws first
     expect(mockSeedBrandingDefaults).not.toHaveBeenCalled();
+  });
+});
+
+// ── TRIP-PRICE-001 — trips.seat_price (centavos COP) ─────────────
+
+describe('TRIP-PRICE-001 — createTrip seat_price', () => {
+  beforeEach(() => {
+    resetTableChains();
+    mockFrom.mockClear();
+  });
+
+  it('persists a valid seat_price on the legacy insert path', async () => {
+    setupCreateTripHappyPath();
+
+    const result = await superadminService.createTrip(
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      'user-1',
+      250_000,
+    );
+
+    expect(result.id).toBe('trip-new');
+    expect(tableChains['trips'].insert).toHaveBeenCalledWith(
+      expect.objectContaining({ seat_price: 250_000 }),
+    );
+  });
+
+  it('sends seat_price=null on the legacy insert path when omitted (no silent zero)', async () => {
+    setupCreateTripHappyPath();
+
+    await superadminService.createTrip(
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      'user-1',
+    );
+
+    expect(tableChains['trips'].insert).toHaveBeenCalledWith(
+      expect.objectContaining({ seat_price: null }),
+    );
+  });
+
+  it('sends p_seat_price to the create_trip RPC when provided (outbox path)', async () => {
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = true;
+    setupCreateTripHappyPath();
+    mockRpc.mockResolvedValue({
+      data: { id: 'trip-rpc', seat_price: 250_000 },
+      error: null,
+    });
+
+    await superadminService.createTrip(
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      'user-1',
+      250_000,
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'create_trip',
+      expect.objectContaining({ p_seat_price: 250_000 }),
+    );
+  });
+
+  it('accepts seat_price 0 without converting it to null', async () => {
+    setupCreateTripHappyPath();
+
+    await superadminService.createTrip(
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      'user-1',
+      0,
+    );
+
+    expect(tableChains['trips'].insert).toHaveBeenCalledWith(
+      expect.objectContaining({ seat_price: 0 }),
+    );
+  });
+
+  it('rejects a negative seat_price before touching the database', async () => {
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+        -1,
+      ),
+    ).rejects.toThrow(ValidationError);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('rejects a fractional seat_price', async () => {
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+        12.5,
+      ),
+    ).rejects.toThrow(ValidationError);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('rejects a seat_price above the INTEGER column range', async () => {
+    await expect(
+      superadminService.createTrip(
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        'user-1',
+        2_147_483_648,
+      ),
+    ).rejects.toThrow(ValidationError);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+describe('TRIP-PRICE-001 — updateTrip seat_price', () => {
+  beforeEach(() => {
+    resetTableChains();
+    mockFrom.mockClear();
+  });
+
+  it('updates seat_price on the legacy path when provided', async () => {
+    setupHappyPath();
+
+    await superadminService.updateTrip(
+      'trip-1',
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      false,
+      undefined,
+      300_000,
+    );
+
+    expect(tableChains['trips'].update).toHaveBeenCalledWith(
+      expect.objectContaining({ seat_price: 300_000 }),
+    );
+  });
+
+  it('preserves the current price when seat_price is omitted (column not touched)', async () => {
+    setupHappyPath();
+
+    await superadminService.updateTrip(
+      'trip-1',
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+    );
+
+    const updatePayload = tableChains['trips'].update.mock.calls[0][0];
+    expect(updatePayload).not.toHaveProperty('seat_price');
+  });
+
+  it('preserves the current price when seat_price is explicitly null', async () => {
+    setupHappyPath();
+
+    await superadminService.updateTrip(
+      'trip-1',
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      false,
+      undefined,
+      null,
+    );
+
+    const updatePayload = tableChains['trips'].update.mock.calls[0][0];
+    expect(updatePayload).not.toHaveProperty('seat_price');
+  });
+
+  it('sends p_seat_price to the update_trip RPC when provided (outbox path)', async () => {
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = true;
+    setupHappyPath();
+    mockRpc.mockResolvedValue({
+      data: {
+        trip_id: 'trip-1',
+        action: 'updated',
+        event_type: 'trip.updated',
+        changed_fields: ['seat_price'],
+      },
+      error: null,
+    });
+
+    await superadminService.updateTrip(
+      'trip-1',
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+      false,
+      undefined,
+      300_000,
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_trip',
+      expect.objectContaining({ p_seat_price: 300_000 }),
+    );
+  });
+
+  it('sends p_seat_price=null to the update_trip RPC when omitted (SQL preserves)', async () => {
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = true;
+    setupHappyPath();
+    mockRpc.mockResolvedValue({
+      data: {
+        trip_id: 'trip-1',
+        action: 'updated',
+        event_type: 'trip.updated',
+        changed_fields: [],
+      },
+      error: null,
+    });
+
+    await superadminService.updateTrip(
+      'trip-1',
+      'route-1',
+      FUTURE_DATE,
+      'bus',
+      ['agency-1'],
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith(
+      'update_trip',
+      expect.objectContaining({ p_seat_price: null }),
+    );
+  });
+
+  it('rejects a negative seat_price before touching the database', async () => {
+    await expect(
+      superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        false,
+        undefined,
+        -100,
+      ),
+    ).rejects.toThrow(ValidationError);
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('rejects a fractional seat_price', async () => {
+    await expect(
+      superadminService.updateTrip(
+        'trip-1',
+        'route-1',
+        FUTURE_DATE,
+        'bus',
+        ['agency-1'],
+        false,
+        undefined,
+        99.9,
+      ),
+    ).rejects.toThrow(ValidationError);
+    expect(mockFrom).not.toHaveBeenCalled();
   });
 });

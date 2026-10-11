@@ -18,7 +18,7 @@ function listMigrations(): string[] {
 }
 
 describe('F5-004 — migration isolation', () => {
-  it('keeps 066→079 contiguous; tip is 079', () => {
+  it('keeps 066→079 contiguous', () => {
     const migrations = listMigrations();
     const i066 = migrations.indexOf('066_create_agency_reservation_departed.sql');
     const i067 = migrations.indexOf('067_reservation_links.sql');
@@ -47,7 +47,10 @@ describe('F5-004 — migration isolation', () => {
     expect(i077).toBe(i076 + 1);
     expect(i078).toBe(i077 + 1);
     expect(i079).toBe(i078 + 1);
-    expect(i079).toBe(migrations.length - 1);
+    // El tip del repo cambia con cada migración nueva: se valida que sea un
+    // archivo numerado válido (mismo patrón que f4-001/f4-002) sin fijar un
+    // número concreto que quedaría obsoleto.
+    expect(migrations[migrations.length - 1]).toMatch(/^\d{3}_/);
   });
 
   it('ships the SQL verification harness', () => {
