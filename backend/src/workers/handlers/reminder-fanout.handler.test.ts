@@ -37,7 +37,15 @@ vi.mock('../../config/env.js', () => ({
 }));
 
 vi.mock('../../config/database.js', () => ({
-  supabaseAdmin: { from: vi.fn() },
+  supabaseAdmin: {
+    from: vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(async () => ({ count: 3, error: null })),
+        })),
+      })),
+    })),
+  },
 }));
 
 vi.mock('../../services/notification-delivery.policy.js', () => ({
@@ -298,10 +306,13 @@ describe('WKR-008 — ReminderFanout', () => {
       expect.objectContaining({
         type: 'trip_reminder',
         title: 'Recordatorio de viaje',
-        body: expect.stringContaining('dos días'),
+        body: expect.stringContaining('(3 asientos ocupados)'),
         agency_id: AGENCY_A,
         source_event_id: EVENT_ID,
-        metadata: expect.objectContaining({ window: 't48' }),
+        metadata: expect.objectContaining({
+          window: 't48',
+          active_passenger_count: 3,
+        }),
       }),
     ]);
   });

@@ -25,6 +25,9 @@ export interface WorkerRuntimeConfig {
   occupancyAlertPollMs: number;
   occupancyAlertBatch: number;
   occupancyUrgencyViaWorker: boolean;
+  marketplaceT1CancelViaWorker: boolean;
+  marketplaceT1CancelPollMs: number;
+  marketplaceT1CancelBatch: number;
   heartbeatMs: number;
   staleProcessingMs: number;
   staleRecoveryLimit: number;
@@ -57,6 +60,9 @@ export function getWorkerRuntimeConfig(): WorkerRuntimeConfig {
     occupancyAlertPollMs: env.OCCUPANCY_ALERT_POLL_MS,
     occupancyAlertBatch: env.OCCUPANCY_ALERT_BATCH,
     occupancyUrgencyViaWorker: env.OCCUPANCY_URGENCY_VIA_WORKER,
+    marketplaceT1CancelViaWorker: env.MARKETPLACE_T1_CANCEL_VIA_WORKER,
+    marketplaceT1CancelPollMs: env.MARKETPLACE_T1_CANCEL_POLL_MS,
+    marketplaceT1CancelBatch: env.MARKETPLACE_T1_CANCEL_BATCH,
     heartbeatMs: env.OUTBOX_HEARTBEAT_MS,
     staleProcessingMs: env.OUTBOX_STALE_PROCESSING_MS,
     staleRecoveryLimit: env.OUTBOX_STALE_RECOVERY_LIMIT,

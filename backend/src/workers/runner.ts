@@ -36,6 +36,10 @@ import {
   startOccupancyAlertScheduler,
 } from './occupancy-alert-scheduler.js';
 import {
+  createDefaultMarketplaceT1SchedulerDeps,
+  startMarketplaceT1Scheduler,
+} from './marketplace-t1-scheduler.js';
+import {
   DEFAULT_WORKER_NAME,
   createHeartbeatController,
   createRecoveryScheduler,
@@ -186,6 +190,9 @@ async function main() {
     occupancy_alert_poll_ms: config.occupancyAlertPollMs,
     occupancy_alert_batch: config.occupancyAlertBatch,
     occupancy_urgency_via_worker: config.occupancyUrgencyViaWorker,
+    marketplace_t1_cancel_via_worker: config.marketplaceT1CancelViaWorker,
+    marketplace_t1_cancel_poll_ms: config.marketplaceT1CancelPollMs,
+    marketplace_t1_cancel_batch: config.marketplaceT1CancelBatch,
     poll_ms: config.pollMs,
     batch_size: config.batchSize,
     settle_ms: config.settleMs,
@@ -229,6 +236,12 @@ async function main() {
     createDefaultOccupancyAlertSchedulerDeps(logger),
   );
 
+  // MKT-008 — marketplace T-1 cancellation scheduler runs in parallel; errors never kill the relay.
+  const marketplaceT1Scheduler = startMarketplaceT1Scheduler(
+    controller.signal,
+    createDefaultMarketplaceT1SchedulerDeps(logger),
+  );
+
   try {
     await runOutboxRelayLoop(
       {
@@ -270,6 +283,7 @@ async function main() {
       digestScheduler.done,
       superadminDigestScheduler.done,
       occupancyAlertScheduler.done,
+      marketplaceT1Scheduler.done,
     ]);
 
     logger.info('worker_stopped', {

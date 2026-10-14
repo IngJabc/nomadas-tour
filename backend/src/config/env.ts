@@ -111,6 +111,18 @@ const envSchema = z.object({
   OCCUPANCY_URGENCY_VIA_WORKER: z
     .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
     .default(false),
+  /**
+   * MKT-008 — When true, marketplace T-1 scheduler calls
+   * schedule_marketplace_t1_cancellations every poll interval.
+   * Default false until soak.
+   */
+  MARKETPLACE_T1_CANCEL_VIA_WORKER: z
+    .preprocess((v) => v === true || v === "true" || v === "1", z.boolean())
+    .default(false),
+  /** MKT-008 — T-1 scheduler poll interval (default 15 min). */
+  MARKETPLACE_T1_CANCEL_POLL_MS: z.coerce.number().default(900_000),
+  /** MKT-008 — max passengers scanned per schedule_marketplace_t1_cancellations call. */
+  MARKETPLACE_T1_CANCEL_BATCH: z.coerce.number().default(50),
   OUTBOX_POLL_MS: z.coerce.number().default(2000),
   OUTBOX_BATCH_SIZE: z.coerce.number().default(10),
   OUTBOX_MAX_ATTEMPTS: z.coerce.number().default(10),
