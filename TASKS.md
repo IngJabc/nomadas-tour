@@ -8,11 +8,13 @@
 
 ---
 
-## Activo — MKT-001 (schema del marketplace, escritura de migraciones)
+## Marketplace (schema + pagos) — COMPLETADO (ver detalle en `../nomadas-tour-marketplace/TASKS.md`)
 
-> Estas migraciones son de `nomadas-tour-marketplace` pero se guardan **aquí**
-> para mantener una sola historia de migraciones sobre la BD compartida.
+> Estas migraciones y features son de `nomadas-tour-marketplace` pero viven
+> **aquí** (migraciones) para mantener una sola historia sobre la BD compartida.
 > Diseño y reglas: `../nomadas-tour-marketplace/docs/`.
+> Repo marketplace: Fases 0–2 completadas (auth, catálogo, wizard, checkout
+> MKT-007, panel de revisión de pagos de agencia). Siguiente: MKT-008 (T-1).
 
 - [x] **MKT-001** — Escritura de migraciones 074–079 — **2026-09-30**
   - `074_add_customer_role.sql` — `customer` en `users.role_check`, resuelto
@@ -33,14 +35,24 @@
     (idempotente, libera solo su seat, crea refund `required`) y ampliación
     de `audit_log` para `actor_role='customer'` + acción
     `reservation.passenger_cancelled`. CHECKs ampliados, ningún valor quitado.
-  - **NO APLICADAS a la BD.** Validación realizada: UTF-8 sin BOM, sin bytes
-    no-ASCII, paréntesis y bloques `$$` balanceados. Falta dry-run
-    `BEGIN; … ROLLBACK;` contra la BD y aplicación en orden estricto.
+  - **APLICADAS a la BD** (074–080 verificadas en vivo 2026-10-06; 085–087
+    aplicadas posteriormente). Validación inicial: UTF-8 sin BOM, sin bytes
+    no-ASCII, paréntesis y bloques `$$` balanceados.
   - Hallazgo relevante: **el schema no tenía ninguna columna de precio**
     (001–073), por lo que la fórmula de saldo del marketplace no era
     calculable. Resuelto en 076 con precio de viaje + snapshot por pasajero.
   - UTF-8 sin BOM y solo ASCII en comentarios (los SQL 001–073 tienen mojibake
     al leerlos en consolas Windows; no se replicó ese defecto).
+
+- [x] **MKT-005/006/007** — Pagos marketplace + checkout con revisión — **2026-10-13**
+  - Migraciones 082–087 (locks/estados, RPCs de pago, `checkout_attempts` en 087).
+  - **Repo tour**: panel de agencia `/agency/payments` (listado "Compras",
+    detalle por intento, verificar/rechazar/ver comprobante);
+    `checkout-attempt.service.ts` y `payment.service.ts`.
+  - **Repo marketplace**: wizard de reserva + checkout (`checkout_attempts`),
+    endpoints legacy → `410 Gone`.
+  - Verificación/rechazo **por `attempt_id`** (nunca por `reservation_id`).
+  - Detalle exhaustivo: `../nomadas-tour-marketplace/TASKS.md` → Fase 2.
 
 ---
 
