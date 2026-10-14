@@ -583,6 +583,12 @@ async function buildRowsForEvent(
         const departureFormatted = deps.formatDeparture(
           parsed.data.departure_time,
         );
+        // MKT-008: contar pasajeros activos del viaje (JOIN reservations por trip_id)
+        const { count: activePax } = await supabaseAdmin
+          .from('reservation_passengers')
+          .select('id, reservations!inner(trip_id)', { count: 'exact', head: true })
+          .eq('reservations.trip_id', parsed.data.trip_id)
+          .eq('status', 'active');
         const headline =
           parsed.data.window === 't48'
             ? 'Tu viaje sale en dos días'
@@ -592,7 +598,7 @@ async function buildRowsForEvent(
           rows: buildAgencyAndOptionalAdminRows({
             type: 'trip_reminder',
             title: 'Recordatorio de viaje',
-            body: `${headline}: ${notificationDestinationLabel(destination, '?')} el ${departureFormatted}`,
+            body: `${headline}: ${notificationDestinationLabel(destination, '?')} el ${departureFormatted} (${activePax ?? 0} asientos ocupados)`,
             entityType: 'trip',
             entityId: parsed.data.trip_id,
             agencyIds: parsed.data.agency_ids,
@@ -605,6 +611,7 @@ async function buildRowsForEvent(
               destination,
               departure_time: parsed.data.departure_time,
               window: parsed.data.window,
+              active_passenger_count: activePax ?? 0,
             },
           }),
         };
