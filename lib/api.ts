@@ -11,6 +11,20 @@ import type {
   PublicReservationLinkBody,
   RegenerateReservationLinkResult,
 } from '@/lib/reservation-links';
+import type {
+  AgencyPaymentDetail,
+  AgencyPaymentListQuery,
+  ListAgencyPaymentsResult,
+  PaymentProofSignedUrlResult,
+  RejectPaymentResult,
+  VerifyPaymentResult,
+  AgencyCheckoutAttemptListQuery,
+  AgencyCheckoutAttemptDetail,
+  ListAgencyCheckoutAttemptsResult,
+  CheckoutAttemptProofSignedUrlResult,
+  VerifyCheckoutAttemptResult,
+  RejectCheckoutAttemptResult,
+} from '@/lib/payments';
 
 export interface NotificationPreferenceCategory {
   key: string;
@@ -421,6 +435,57 @@ export const agencyApi = {
       method: 'PATCH',
       body: JSON.stringify({ link_data }),
     }),
+
+  // — Fase 2 · Administración de pagos (marketplace) —
+  listPayments: (params?: AgencyPaymentListQuery) =>
+    request<ListAgencyPaymentsResult>('/agency/payments', {
+      params: {
+        status: params?.status,
+        page: params?.page !== undefined ? String(params.page) : undefined,
+        limit: params?.limit !== undefined ? String(params.limit) : undefined,
+      },
+    }),
+  getPayment: (paymentId: string) =>
+    request<AgencyPaymentDetail>(`/agency/payments/${paymentId}`),
+  getPaymentProof: (paymentId: string) =>
+    request<PaymentProofSignedUrlResult>(`/agency/payments/${paymentId}/proof`),
+  verifyPayment: (paymentId: string) =>
+    request<VerifyPaymentResult>(`/agency/payments/${paymentId}/verify`, {
+      method: 'POST',
+    }),
+  rejectPayment: (paymentId: string, reason: string) =>
+    request<RejectPaymentResult>(`/agency/payments/${paymentId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  // — MKT-007 · Checkout attempts (compras en revisión) —
+  listCheckoutAttempts: (params?: AgencyCheckoutAttemptListQuery) =>
+    request<ListAgencyCheckoutAttemptsResult>('/agency/checkout-attempts', {
+      params: {
+        status: params?.status || undefined,
+        trip_id: params?.trip_id,
+        q: params?.q,
+        page: params?.page !== undefined ? String(params.page) : undefined,
+        limit: params?.limit !== undefined ? String(params.limit) : undefined,
+      },
+    }),
+  getCheckoutAttempt: (attemptId: string) =>
+    request<AgencyCheckoutAttemptDetail>(`/agency/checkout-attempts/${attemptId}`),
+  getCheckoutAttemptProof: (attemptId: string) =>
+    request<CheckoutAttemptProofSignedUrlResult>(
+      `/agency/checkout-attempts/${attemptId}/proof`,
+    ),
+  verifyCheckoutAttempt: (attemptId: string) =>
+    request<VerifyCheckoutAttemptResult>(
+      `/agency/checkout-attempts/${attemptId}/verify`,
+      { method: 'POST' },
+    ),
+  rejectCheckoutAttempt: (attemptId: string, reason: string) =>
+    request<RejectCheckoutAttemptResult>(
+      `/agency/checkout-attempts/${attemptId}/reject`,
+      { method: 'POST', body: JSON.stringify({ reason }) },
+    ),
 };
 
 export const publicReservationLinkApi = {

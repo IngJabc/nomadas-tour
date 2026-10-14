@@ -8,6 +8,8 @@ import { notificationPreferenceController } from '../../controllers/notification
 import { agencySettingsController } from '../../controllers/agency-settings.controller.js';
 import { auditController } from '../../controllers/audit.controller.js';
 import { reservationLinkController } from '../../controllers/reservation-link.controller.js';
+import paymentRoutes from './payments.js';
+import checkoutAttemptRoutes from './checkout-attempts.js';
 
 const router = Router();
 
@@ -89,5 +91,12 @@ router.post('/settings/logo', (req, res, next) =>
 router.get('/audit', (req, res, next) =>
   auditController.getAgencyAudit(req, res, next),
 );
+
+// Marketplace payment review (MKT-006 — read/compose only; mutations via RPC 085)
+router.use('/payments', paymentRoutes);
+
+// Checkout review (MKT-007 — the reservation + verified payment are born
+// in verify_checkout_attempt / reject_checkout_attempt, RPC 087)
+router.use('/checkout-attempts', checkoutAttemptRoutes);
 
 export default router;
