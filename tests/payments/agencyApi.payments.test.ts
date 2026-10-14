@@ -2,6 +2,13 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
 import { agencyApi } from '@/lib/api';
 
+/**
+ * Misma fuente de verdad que usa lib/api.ts para construir la base URL.
+ * El host real depende de NEXT_PUBLIC_API_URL (p. ej. localhost o
+ * 127.0.0.1 en CI); el test no debe acoplarse a un host concreto.
+ */
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+
 function jsonResponse(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -33,7 +40,7 @@ describe('agencyApi — Fase 2 pagos', () => {
 
     expect(result).toEqual(payload);
     const [url] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:3001/api/agency/payments?status=pending&page=2&limit=20');
+    expect(url).toBe(`${API_BASE}/agency/payments?status=pending&page=2&limit=20`);
   });
 
   it('listPayments omite page/limit undefined y status vacío', async () => {
@@ -42,7 +49,7 @@ describe('agencyApi — Fase 2 pagos', () => {
     await agencyApi.listPayments();
 
     const [url] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:3001/api/agency/payments');
+    expect(url).toBe(`${API_BASE}/agency/payments`);
   });
 
   it('getPayment llama GET /agency/payments/:id', async () => {
@@ -51,7 +58,7 @@ describe('agencyApi — Fase 2 pagos', () => {
     await agencyApi.getPayment('p1');
 
     const [url] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:3001/api/agency/payments/p1');
+    expect(url).toBe(`${API_BASE}/agency/payments/p1`);
   });
 
   it('getPaymentProof llama GET /agency/payments/:id/proof', async () => {
@@ -62,7 +69,7 @@ describe('agencyApi — Fase 2 pagos', () => {
     await agencyApi.getPaymentProof('p1');
 
     const [url] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:3001/api/agency/payments/p1/proof');
+    expect(url).toBe(`${API_BASE}/agency/payments/p1/proof`);
   });
 
   it('verifyPayment hace POST sin body', async () => {
@@ -71,7 +78,7 @@ describe('agencyApi — Fase 2 pagos', () => {
     await agencyApi.verifyPayment('p1');
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:3001/api/agency/payments/p1/verify');
+    expect(url).toBe(`${API_BASE}/agency/payments/p1/verify`);
     expect(init.method).toBe('POST');
     expect(init.body).toBeUndefined();
   });
@@ -82,7 +89,7 @@ describe('agencyApi — Fase 2 pagos', () => {
     await agencyApi.rejectPayment('p1', 'Comprobante inválido');
 
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('http://localhost:3001/api/agency/payments/p1/reject');
+    expect(url).toBe(`${API_BASE}/agency/payments/p1/reject`);
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body)).toEqual({ reason: 'Comprobante inválido' });
   });
