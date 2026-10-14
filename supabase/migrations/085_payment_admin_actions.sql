@@ -408,6 +408,7 @@ DECLARE
   v_outcome TEXT;
   v_audit_payment_id UUID;
   v_audit_reservation_id UUID;
+  v_rec RECORD;
 BEGIN
   -- ── 1) Entrada + normalizacion del motivo ──────────────────
   IF p_payment_id IS NULL OR p_actor_user_id IS NULL THEN
@@ -516,7 +517,7 @@ BEGIN
     IF v_reservation.status = 'reserved' THEN
 
       -- 7a) Pasajeros activos con FOR UPDATE (orden por seat_id).
-      FOR rec IN
+      FOR v_rec IN
         SELECT rp.id, rp.seat_id
         FROM public.reservation_passengers rp
         WHERE rp.reservation_id = v_payment.reservation_id
@@ -525,7 +526,7 @@ BEGIN
         FOR UPDATE
       LOOP
         v_active_count := v_active_count + 1;
-        v_seat_ids := v_seat_ids || rec.seat_id;
+        v_seat_ids := v_seat_ids || v_rec.seat_id;
       END LOOP;
 
       -- 7b) Cancelar los pasajeros activos (rowcount verificado).

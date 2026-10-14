@@ -215,6 +215,70 @@ export function AgencyReservationCardSkeleton() {
   );
 }
 
+export function PaymentCardSkeleton() {
+  return (
+    <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)] animate-pulse">
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="space-y-1.5 flex-1">
+          <div className="h-5 bg-slate-200 rounded w-2/5" />
+          <div className="h-3 bg-slate-200 rounded w-1/3" />
+        </div>
+        <div className="h-5 bg-slate-200 rounded-full w-20 shrink-0" />
+      </div>
+      <div className="space-y-2 mb-4">
+        <div className="h-3 bg-slate-200 rounded w-3/5" />
+        <div className="h-3 bg-slate-200 rounded w-2/5" />
+      </div>
+      <div className="pt-4 border-t border-[rgba(0,0,0,0.06)] flex items-center justify-between">
+        <div className="h-5 bg-slate-200 rounded w-20" />
+        <div className="h-4 bg-slate-200 rounded w-24" />
+      </div>
+    </div>
+  );
+}
+
+export function PaymentDetailSkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <Skeleton className="h-5 w-40 mb-5" />
+          <div className="space-y-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                <div className="space-y-1.5 flex-1">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-4 w-32" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+          <Skeleton className="h-5 w-32 mb-5" />
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex justify-between">
+                <Skeleton className="h-3 w-28" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] p-6 shadow-[0_1px_3px_rgba(0,0,0,0.06)]">
+        <Skeleton className="h-5 w-36 mb-3" />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-10 bg-slate-200 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TableSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="bg-[var(--color-brand-surface)] rounded-2xl border border-[rgba(0,0,0,0.06)] overflow-hidden">

@@ -37,6 +37,7 @@ import { ReservationDetailSkeleton } from "@/components/ui/Skeleton";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ReservationTicket } from "@/components/reservations/ReservationTicket";
 import { ReservationTicketActions } from "@/components/reservations/ReservationTicketActions";
+import { ReservationPaymentsLink } from "@/components/agency/reservations/ReservationPaymentsLink";
 import { useCapture } from "@/hooks/useCapture";
 import { withReposition } from "@/lib/capture-reposition";
 import { pageFade, staggerContainer, staggerItem } from "@/lib/motion/variants";
@@ -434,6 +435,9 @@ export default function ReservationDetailPage() {
                   onDownload={handleDownload}
                   onShare={handleShare}
                 />
+                {reservation.id && (
+                  <ReservationPaymentsLink reservationId={reservation.id} />
+                )}
                 {reservation.status === "confirmed" && reservation.trips?.status !== "cancelled" && reservation.trips?.status !== "completed" && (
                   <Button
                     variant="destructive"
