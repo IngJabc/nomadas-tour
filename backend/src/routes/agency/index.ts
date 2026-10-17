@@ -6,6 +6,7 @@ import { reservationController } from '../../controllers/reservation.controller.
 import { notificationController } from '../../controllers/notification.controller.js';
 import { notificationPreferenceController } from '../../controllers/notification-preference.controller.js';
 import { agencySettingsController } from '../../controllers/agency-settings.controller.js';
+import { agencyPaymentMethodController } from '../../controllers/agency-payment-method.controller.js';
 import { auditController } from '../../controllers/audit.controller.js';
 import { reservationLinkController } from '../../controllers/reservation-link.controller.js';
 import paymentRoutes from './payments.js';
@@ -85,6 +86,23 @@ router.patch('/settings/branding', (req, res, next) =>
 );
 router.post('/settings/logo', (req, res, next) =>
   agencySettingsController.uploadLogo(req, res, next),
+);
+
+// Marketplace payment methods (MKT-007.4 — canales de pago de la agencia)
+router.get('/settings/payment-methods', (req, res, next) =>
+  agencyPaymentMethodController.list(req, res, next),
+);
+router.post('/settings/payment-methods', (req, res, next) =>
+  agencyPaymentMethodController.create(req, res, next),
+);
+router.patch('/settings/payment-methods/:id', (req, res, next) =>
+  agencyPaymentMethodController.update(req, res, next),
+);
+router.post('/settings/payment-methods/:id/primary', (req, res, next) =>
+  agencyPaymentMethodController.setPrimary(req, res, next),
+);
+router.delete('/settings/payment-methods/:id', (req, res, next) =>
+  agencyPaymentMethodController.remove(req, res, next),
 );
 
 // Audit trail (F5-002 — read-only)

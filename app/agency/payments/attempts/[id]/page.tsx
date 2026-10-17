@@ -22,6 +22,7 @@ import {
   Building2,
   Clock,
   ExternalLink,
+  Landmark,
 } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -39,6 +40,8 @@ import { CheckoutAttemptRejectModal } from '@/components/agency/payments/Checkou
 import {
   CHECKOUT_ATTEMPT_STATUS_LABELS,
   checkoutAttemptStatusBadgeVariant,
+  describeChannelSummary,
+  parseAgencyPaymentMethodSnapshot,
   type AgencyCheckoutAttemptDetail,
 } from '@/lib/payments';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
@@ -176,6 +179,12 @@ export default function CheckoutAttemptDetailPage() {
   const { attempt, trip, passengers } = detail;
   const canReview = attempt.status === 'pending_review';
   const hasReservationLink = isUuid(attempt.reservation_id);
+  // MKT-007.4: el snapshot es JSONB crudo; se valida en runtime antes de
+  // usarlo. Un snapshot presente pero malformado NO se muestra como si
+  // fuera válido ni se sustituye por el canal actual de la agencia.
+  const rawSnapshot: unknown = attempt.payment_method_snapshot;
+  const snapshot = parseAgencyPaymentMethodSnapshot(rawSnapshot);
+  const snapshotRecorded = rawSnapshot !== null && rawSnapshot !== undefined;
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -262,56 +271,90 @@ export default function CheckoutAttemptDetailPage() {
           </motion.div>
         )}
 
-        {/* Resumen + conciliación */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <motion.div variants={staggerItem}>
-            <Card>
-              <SectionTitle>Resumen de la compra</SectionTitle>
-              <div className="mt-4 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
-                    <ShoppingCart className="w-4 h-4 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
-                  </div>
-                  <div>
-                    <p className="font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
-                      Monto
-                    </p>
-                    <p className="font-[family-name:var(--font-heading)] font-extrabold text-xl text-[var(--color-brand-navy)]">
-                      {formatSeatPriceCents(attempt.amount_cents)}
-                    </p>
-                  </div>
+        {/* Resumen */}
+        <motion.div variants={staggerItem}>
+          <Card>
+            <SectionTitle>Resumen de la compra</SectionTitle>
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
+                  <ShoppingCart className="w-4 h-4 text-[var(--color-brand-cyan)]" strokeWidth={1.75} />
                 </div>
-                <InfoRow
-                  icon={<Calendar className="w-4 h-4" strokeWidth={1.75} />}
-                  label="Creada"
-                  value={formatDateTimeShort(attempt.created_at)}
-                />
-                {attempt.proof_submitted_at && (
-                  <InfoRow
-                    icon={<FileImage className="w-4 h-4" strokeWidth={1.75} />}
-                    label="Comprobante enviado"
-                    value={formatDateTimeShort(attempt.proof_submitted_at)}
-                  />
-                )}
-                {attempt.verified_at && (
-                  <InfoRow
-                    icon={<CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />}
-                    label="Verificada"
-                    value={formatDateTimeShort(attempt.verified_at)}
-                  />
-                )}
-                <InfoRow
-                  icon={<User className="w-4 h-4" strokeWidth={1.75} />}
-                  label="Reservador"
-                  value={detail.passengers[0]?.name ?? '—'}
-                  strong
-                />
+                <div>
+                  <p className="font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+                    Monto
+                  </p>
+                  <p className="font-[family-name:var(--font-heading)] font-extrabold text-xl text-[var(--color-brand-navy)]">
+                    {formatSeatPriceCents(attempt.amount_cents)}
+                  </p>
+                </div>
               </div>
-            </Card>
-          </motion.div>
+              <InfoRow
+                icon={<User className="w-4 h-4" strokeWidth={1.75} />}
+                label="Reservador"
+                value={detail.passengers[0]?.name ?? '—'}
+                strong
+              />
+              <InfoRow
+                icon={<Calendar className="w-4 h-4" strokeWidth={1.75} />}
+                label="Creada"
+                value={formatDateTimeShort(attempt.created_at)}
+              />
+              {attempt.proof_submitted_at && (
+                <InfoRow
+                  icon={<FileImage className="w-4 h-4" strokeWidth={1.75} />}
+                  label="Comprobante enviado"
+                  value={formatDateTimeShort(attempt.proof_submitted_at)}
+                />
+              )}
+              {attempt.verified_at && (
+                <InfoRow
+                  icon={<CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />}
+                  label="Verificada"
+                  value={formatDateTimeShort(attempt.verified_at)}
+                />
+              )}
+              {canReview && (
+                <InfoRow
+                  icon={<Clock className="w-4 h-4" strokeWidth={1.75} />}
+                  label="Ventana de revisión vence"
+                  value={formatDateTimeShort(attempt.expires_at)}
+                />
+              )}
+            </div>
+          </Card>
+        </motion.div>
+
+        {/* Viaje + conciliación */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {trip && (
+            <motion.div variants={staggerItem}>
+              <Card className="h-full">
+                <SectionTitle>Viaje</SectionTitle>
+                <div className="mt-4 space-y-4">
+                  <InfoRow
+                    icon={<MapPin className="w-4 h-4" strokeWidth={1.75} />}
+                    label="Ruta"
+                    value={`${trip.origin} → ${trip.destination}`}
+                    strong
+                  />
+                  <InfoRow
+                    icon={<Calendar className="w-4 h-4" strokeWidth={1.75} />}
+                    label="Salida"
+                    value={formatDateTimeShort(trip.departure_time)}
+                  />
+                  <InfoRow
+                    icon={<Bus className="w-4 h-4" strokeWidth={1.75} />}
+                    label="Vehículo"
+                    value={VEHICLE_LABELS[trip.vehicle_type] ?? trip.vehicle_type}
+                  />
+                </div>
+              </Card>
+            </motion.div>
+          )}
 
           <motion.div variants={staggerItem}>
-            <Card>
+            <Card className="h-full">
               <SectionTitle>Conciliación del pago</SectionTitle>
               <div className="mt-4 space-y-4">
                 <InfoRow
@@ -335,47 +378,25 @@ export default function CheckoutAttemptDetailPage() {
                   }
                 />
                 <InfoRow
-                  icon={<Users className="w-4 h-4" strokeWidth={1.75} />}
-                  label="Pasajeros"
-                  value={String(attempt.passenger_count)}
+                  icon={<Landmark className="w-4 h-4" strokeWidth={1.75} />}
+                  label="Método de pago elegido"
+                  value={
+                    snapshot
+                      ? snapshot.label
+                      : snapshotRecorded
+                        ? 'No disponible'
+                        : 'Sin método seleccionado'
+                  }
+                  strong
                 />
-                <InfoRow
-                  icon={<FileImage className="w-4 h-4" strokeWidth={1.75} />}
-                  label="Comprobantes enviados"
-                  value={`${attempt.proof_count} de 3`}
-                />
-                {canReview && (
+                {snapshot && (
                   <InfoRow
-                    icon={<Clock className="w-4 h-4" strokeWidth={1.75} />}
-                    label="Ventana de revisión vence"
-                    value={formatDateTimeShort(attempt.expires_at)}
+                    icon={<Building2 className="w-4 h-4" strokeWidth={1.75} />}
+                    label="Datos de pago"
+                    value={describeChannelSummary(snapshot)}
                   />
                 )}
               </div>
-
-              {trip && (
-                <div className="mt-6 pt-4 border-t border-[rgba(0,0,0,0.06)]">
-                  <SectionTitle>Viaje</SectionTitle>
-                  <div className="mt-4 space-y-3">
-                    <InfoRow
-                      icon={<MapPin className="w-4 h-4" strokeWidth={1.75} />}
-                      label="Ruta"
-                      value={`${trip.origin} → ${trip.destination}`}
-                      strong
-                    />
-                    <InfoRow
-                      icon={<Calendar className="w-4 h-4" strokeWidth={1.75} />}
-                      label="Salida"
-                      value={formatDateTimeShort(trip.departure_time)}
-                    />
-                    <InfoRow
-                      icon={<Bus className="w-4 h-4" strokeWidth={1.75} />}
-                      label="Vehículo"
-                      value={VEHICLE_LABELS[trip.vehicle_type] ?? trip.vehicle_type}
-                    />
-                  </div>
-                </div>
-              )}
             </Card>
           </motion.div>
         </div>

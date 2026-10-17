@@ -51,33 +51,37 @@ export function Modal({
   const previouslyFocused = useRef<HTMLElement | null>(null);
   const [portalNode, setPortalNode] = useState<HTMLElement | null>(null);
 
+  // onClose en un ref: handleKeyDown queda estable y el effect de foco solo
+  // reacciona a `open`. Sin esto, cada re-render del padre recrea la función
+  // onClose → handleKeyDown → el effect se limpia y reclama el foco,
+  // robándoselo al usuario mientras escribe en los campos del formulario.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     setPortalNode(document.body);
   }, []);
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onCloseRef.current();
+      return;
+    }
+    if (e.key === "Tab") {
+      const focusableEls = getFocusable(dialogRef.current);
+      if (focusableEls.length === 0) return;
+      const first = focusableEls[0];
+      const last = focusableEls[focusableEls.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
-        onClose();
-        return;
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
-      if (e.key === "Tab") {
-        const focusableEls = getFocusable(dialogRef.current);
-        if (focusableEls.length === 0) return;
-        const first = focusableEls[0];
-        const last = focusableEls[focusableEls.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    },
-    [onClose]
-  );
+    }
+  }, []);
 
   useEffect(() => {
     if (!open) return;

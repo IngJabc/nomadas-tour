@@ -439,6 +439,95 @@ describe('CheckoutAttemptDetailPage (detalle de compra)', () => {
     expect(screen.getByText('Luis Pérez')).toBeTruthy();
   });
 
+  // ─── MKT-007.4 · Snapshot del canal elegido ──────────────────────────────
+
+  describe('snapshot del canal de pago (MKT-007.4)', () => {
+    const VALID_SNAPSHOT = {
+      method: 'pago_movil',
+      label: 'Pago Móvil Banesco',
+      data: {
+        bank_code: '0134',
+        bank_name: 'Banesco',
+        phone: '04121234567',
+        document_type: 'V',
+        document_number: '12345678',
+        holder_name: 'Agencia Central',
+      },
+      snapshot_version: 1,
+      selected_at: '2026-10-01T12:00:00Z',
+    };
+
+    function detailWithSnapshot(payment_method_snapshot: unknown) {
+      return {
+        ...ATTEMPT_DETAIL,
+        attempt: { ...ATTEMPT_DETAIL.attempt, payment_method_snapshot },
+      };
+    }
+
+    it('muestra el snapshot válido congelado al momento de elegir', async () => {
+      mockGetCheckoutAttempt.mockResolvedValue(detailWithSnapshot(VALID_SNAPSHOT));
+
+      render(<CheckoutAttemptDetailPage />);
+
+      expect(await screen.findByText('Pago Móvil Banesco')).toBeTruthy();
+      expect(
+        screen.getByText('Banesco (0134) · Tel. 04121234567 · Venezolano 12345678'),
+      ).toBeTruthy();
+    });
+
+    it('muestra «Sin método seleccionado» cuando el snapshot es null', async () => {
+      mockGetCheckoutAttempt.mockResolvedValue(detailWithSnapshot(null));
+
+      render(<CheckoutAttemptDetailPage />);
+
+      expect(await screen.findByText('Sin método seleccionado')).toBeTruthy();
+      expect(screen.queryByText('Datos de pago')).toBeNull();
+    });
+
+    it('muestra «No disponible» ante un objeto incompleto sin inventar datos', async () => {
+      mockGetCheckoutAttempt.mockResolvedValue(
+        detailWithSnapshot({ method: 'pago_movil' }),
+      );
+
+      render(<CheckoutAttemptDetailPage />);
+
+      expect(await screen.findByText('No disponible')).toBeTruthy();
+      expect(screen.queryByText('Sin método seleccionado')).toBeNull();
+      expect(screen.queryByText('Datos de pago (al momento de elegir)')).toBeNull();
+      expect(screen.queryByText(/undefined/)).toBeNull();
+    });
+
+    it('muestra «No disponible» ante data malformada (no-objeto)', async () => {
+      mockGetCheckoutAttempt.mockResolvedValue(
+        detailWithSnapshot({
+          method: 'pago_movil',
+          label: 'Canal',
+          data: 'corrupto',
+        }),
+      );
+
+      render(<CheckoutAttemptDetailPage />);
+
+      expect(await screen.findByText('No disponible')).toBeTruthy();
+      expect(screen.queryByText(/undefined/)).toBeNull();
+    });
+
+    it('ignora campos no-string del data en vez de renderizar undefined', async () => {
+      mockGetCheckoutAttempt.mockResolvedValue(
+        detailWithSnapshot({
+          method: 'pago_movil',
+          label: 'Canal Raro',
+          data: { phone: 12345, bank_name: { nested: true } },
+        }),
+      );
+
+      render(<CheckoutAttemptDetailPage />);
+
+      expect(await screen.findByText('Canal Raro')).toBeTruthy();
+      expect(screen.queryByText(/undefined/)).toBeNull();
+    });
+  });
+
   it('abre el modal de verificación y llama verifyCheckoutAttempt', async () => {
     mockGetCheckoutAttempt.mockResolvedValue(ATTEMPT_DETAIL);
     mockVerifyCheckoutAttempt.mockResolvedValue({

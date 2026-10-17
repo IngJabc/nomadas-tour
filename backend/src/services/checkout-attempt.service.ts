@@ -36,6 +36,7 @@ const DETAIL_SELECT = `
   payment_datetime, proof_path, proof_submitted_at, review_started_at,
   rejection_reason, rejection_count, history, expires_at, created_at,
   closed_at, verified_at, verified_by,
+  payment_method_id, payment_method_snapshot,
   trips (
     id, departure_time, vehicle_type, seat_price,
     routes ( origin, destination )
@@ -108,6 +109,8 @@ interface CheckoutAttemptDetailRow {
   closed_at: string | null;
   verified_at: string | null;
   verified_by: string | null;
+  payment_method_id: string | null;
+  payment_method_snapshot: Record<string, unknown> | null;
   trips: unknown;
 }
 
@@ -186,6 +189,8 @@ export interface CheckoutAttemptDetail {
     verified_at: string | null;
     verified_by: string | null;
     has_proof: boolean;
+    payment_method_id: string | null;
+    payment_method_snapshot: Record<string, unknown> | null;
   };
   trip: {
     id: string;
@@ -513,6 +518,8 @@ export class CheckoutAttemptService {
         verified_at: row.verified_at,
         verified_by: row.verified_by,
         has_proof: Boolean(row.proof_path),
+        payment_method_id: row.payment_method_id ?? null,
+        payment_method_snapshot: row.payment_method_snapshot ?? null,
       },
       trip: trip
         ? {
