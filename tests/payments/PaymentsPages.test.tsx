@@ -1,5 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import toast from 'react-hot-toast';
 
 const {
   mockListPayments,
@@ -47,6 +48,19 @@ vi.mock('react-hot-toast', () => ({
     success: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+vi.mock('@/hooks/useAuthUser', () => ({
+  useAuthUser: () => ({
+    user: {
+      id: 'user-1',
+      email: 'agencia@example.com',
+      role: 'agency',
+      agency_id: 'agency-1',
+      agency_name: 'Agencia Central',
+    },
+    loading: false,
+  }),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -650,5 +664,156 @@ describe('CheckoutAttemptDetailPage (detalle de compra)', () => {
     expect(
       await screen.findByText('Esta compra no existe o no pertenece a tu agencia.'),
     ).toBeTruthy();
+  });
+});
+
+// ─── MKT-007.1 — notificación WhatsApp tras rechazo ──────────────────────────
+
+describe('CheckoutAttemptDetailPage — MKT-007.1 notificación WhatsApp', () => {
+  const REJECT_SUCCESS = {
+    attempt_id: 'attempt-1',
+    status: 'rejected',
+    already_rejected: false,
+    final: false,
+    proof_count: 1,
+    remaining_submissions: 1,
+    rejection_reason: 'Comprobante ilegible',
+    freed_seats: 2,
+    audit_id: null,
+  };
+
+  let openSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+  });
+
+  afterEach(() => {
+    openSpy.mockRestore();
+  });
+
+  async function rejectFromPage(
+    detail: unknown = ATTEMPT_DETAIL,
+  ) {
+    mockGetCheckoutAttempt.mockResolvedValue(detail);
+    render(<CheckoutAttemptDetailPage />);
+    fireEvent.click(await screen.findByText('Rechazar compra'));
+    const textarea = await screen.findByLabelText('Motivo del rechazo');
+    fireEvent.change(textarea, { target: { value: 'Comprobante ilegible' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
+    await waitFor(() => {
+      expect(mockRejectCheckoutAttempt).toHaveBeenCalledWith(
+        'attempt-1',
+        'Comprobante ilegible',
+      );
+    });
+  }
+
+  it('tras rechazo exitoso con teléfono ofrece notificar por WhatsApp', async () => {
+    mockRejectCheckoutAttempt.mockResolvedValue(REJECT_SUCCESS);
+    await rejectFromPage();
+
+    expect(
+      await screen.findByText('¿Desea notificar al reservante por WhatsApp?'),
+    ).toBeTruthy();
+    expect(screen.getByText('Sí, contactar por WhatsApp')).toBeTruthy();
+    expect(screen.getByText('No, continuar')).toBeTruthy();
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(mockRejectCheckoutAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('al confirmar abre wa.me con el mensaje completo', async () => {
+    mockRejectCheckoutAttempt.mockResolvedValue(REJECT_SUCCESS);
+    await rejectFromPage();
+    fireEvent.click(await screen.findByText('Sí, contactar por WhatsApp'));
+
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledTimes(1);
+    });
+    const [url, target, features] = openSpy.mock.calls[0];
+    expect(target).toBe('_blank');
+    expect(String(features)).toContain('noopener');
+    expect(String(url).startsWith('https://wa.me/584141234567?text=')).toBeTruthy();
+    const message = decodeURIComponent(String(url).split('?text=')[1]);
+    expect(message).toContain('Hola Ana Pérez:');
+    expect(message).toContain('los asientos A1, A2');
+    expect(message).toContain('Caracas → Maracaibo');
+    expect(message).toContain('Agencia Central');
+    expect(message).toContain('Motivo: Comprobante ilegible');
+    expect(message).not.toContain('undefined');
+    expect(message).not.toContain('null');
+  });
+
+  it('al cancelar no abre WhatsApp ni repite el rechazo', async () => {
+    mockRejectCheckoutAttempt.mockResolvedValue(REJECT_SUCCESS);
+    await rejectFromPage();
+    fireEvent.click(await screen.findByText('No, continuar'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('¿Desea notificar al reservante por WhatsApp?')).toBeNull();
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(mockRejectCheckoutAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('sin teléfono muestra toast exacto y no ofrece el modal', async () => {
+    await rejectFromPage({
+      ...ATTEMPT_DETAIL,
+      passengers: [{ ...ATTEMPT_DETAIL.passengers[0], phone: null }],
+    });
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('No hay teléfono del reservante');
+    });
+    expect(screen.queryByText('¿Desea notificar al reservante por WhatsApp?')).toBeNull();
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it('con teléfono no normalizable no genera enlace roto', async () => {
+    await rejectFromPage({
+      ...ATTEMPT_DETAIL,
+      passengers: [{ ...ATTEMPT_DETAIL.passengers[0], phone: 'abc' }],
+    });
+
+    fireEvent.click(await screen.findByText('Sí, contactar por WhatsApp'));
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(
+      'No se pudo abrir WhatsApp con este número',
+    );
+    await waitFor(() => {
+      expect(screen.queryByText('¿Desea notificar al reservante por WhatsApp?')).toBeNull();
+    });
+  });
+
+  it('si el rechazo falla no se ofrece notificación', async () => {
+    mockGetCheckoutAttempt.mockResolvedValue(ATTEMPT_DETAIL);
+    mockRejectCheckoutAttempt.mockRejectedValue(new Error('boom'));
+
+    render(<CheckoutAttemptDetailPage />);
+    fireEvent.click(await screen.findByText('Rechazar compra'));
+    fireEvent.change(await screen.findByLabelText('Motivo del rechazo'), {
+      target: { value: 'Comprobante ilegible' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
+
+    await waitFor(() => {
+      expect(mockRejectCheckoutAttempt).toHaveBeenCalled();
+    });
+    expect(screen.queryByText('¿Desea notificar al reservante por WhatsApp?')).toBeNull();
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it('con already_rejected también ofrece notificar', async () => {
+    mockRejectCheckoutAttempt.mockResolvedValue({
+      ...REJECT_SUCCESS,
+      already_rejected: true,
+    });
+    await rejectFromPage();
+
+    expect(
+      await screen.findByText('¿Desea notificar al reservante por WhatsApp?'),
+    ).toBeTruthy();
+    expect(mockRejectCheckoutAttempt).toHaveBeenCalledTimes(1);
   });
 });

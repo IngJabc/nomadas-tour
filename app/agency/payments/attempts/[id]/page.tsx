@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   AlertTriangle,
@@ -30,10 +31,13 @@ import { Card } from '@/components/ui/Card';
 import { SectionTitle } from '@/components/ui/SectionTitle';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PaymentDetailSkeleton } from '@/components/ui/Skeleton';
 import { formatDateTimeShort } from '@/lib/timezone';
 import { formatSeatPriceCents } from '@/lib/price';
 import { isUuid } from '@/lib/utils';
+import { useAuthUser } from '@/hooks/useAuthUser';
+import { whatsappHref, buildCheckoutRejectWhatsAppMessage } from '@/lib/whatsapp';
 import { CheckoutAttemptProofViewerModal } from '@/components/agency/payments/CheckoutAttemptProofViewerModal';
 import { CheckoutAttemptVerifyModal } from '@/components/agency/payments/CheckoutAttemptVerifyModal';
 import { CheckoutAttemptRejectModal } from '@/components/agency/payments/CheckoutAttemptRejectModal';
@@ -43,6 +47,7 @@ import {
   describeChannelSummary,
   parseAgencyPaymentMethodSnapshot,
   type AgencyCheckoutAttemptDetail,
+  type RejectCheckoutAttemptResult,
 } from '@/lib/payments';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 
@@ -89,12 +94,15 @@ export default function CheckoutAttemptDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
+  const { user } = useAuthUser();
   const [detail, setDetail] = useState<AgencyCheckoutAttemptDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [proofOpen, setProofOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
+  const [notifyWhatsappOpen, setNotifyWhatsappOpen] = useState(false);
+  const [notifyWhatsappReason, setNotifyWhatsappReason] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doFetch = useCallback(async () => {
@@ -135,6 +143,44 @@ export default function CheckoutAttemptDetailPage() {
     }, 400);
     setVerifyOpen(false);
     setRejectOpen(false);
+  };
+
+  const handleRejectSuccess = (result: RejectCheckoutAttemptResult) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      doFetch();
+    }, 400);
+    setRejectOpen(false);
+
+    const bookerPhone = (detail?.passengers[0]?.phone ?? '').trim() || null;
+    if (!bookerPhone) {
+      toast.error('No hay teléfono del reservante');
+      return;
+    }
+    setNotifyWhatsappReason(result.rejection_reason);
+    setNotifyWhatsappOpen(true);
+  };
+
+  const handleNotifyWhatsappConfirm = () => {
+    const booker = detail?.passengers[0] ?? null;
+    const phone = (booker?.phone ?? '').trim() || null;
+    const href = whatsappHref(phone);
+    setNotifyWhatsappOpen(false);
+    if (!href) {
+      toast.error('No se pudo abrir WhatsApp con este número');
+      return;
+    }
+    const tripData = detail?.trip ?? null;
+    const message = buildCheckoutRejectWhatsAppMessage({
+      bookerName: booker?.name ?? null,
+      seatCodes: (detail?.passengers ?? []).map((p) => p.seat_code).filter((code): code is string => Boolean(code)),
+      origin: tripData?.origin ?? null,
+      destination: tripData?.destination ?? null,
+      departureLabel: tripData ? formatDateTimeShort(tripData.departure_time) : null,
+      agencyName: user?.agency_name ?? null,
+      reason: notifyWhatsappReason,
+    });
+    window.open(`${href}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {
@@ -455,7 +501,17 @@ export default function CheckoutAttemptDetailPage() {
         open={rejectOpen}
         attemptId={attempt.id}
         onClose={() => setRejectOpen(false)}
-        onSuccess={handleActionSuccess}
+        onSuccess={handleRejectSuccess}
+      />
+      <ConfirmModal
+        open={notifyWhatsappOpen}
+        variant="confirm"
+        title="¿Desea notificar al reservante por WhatsApp?"
+        message="Se abrirá WhatsApp con un mensaje preparado para que lo revises y envíes."
+        confirmLabel="Sí, contactar por WhatsApp"
+        cancelLabel="No, continuar"
+        onConfirm={handleNotifyWhatsappConfirm}
+        onCancel={() => setNotifyWhatsappOpen(false)}
       />
     </main>
   );
