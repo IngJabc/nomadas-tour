@@ -246,6 +246,14 @@ export interface AgencyCheckoutAttemptDetail {
     verified_at: string | null;
     verified_by: string | null;
     has_proof: boolean;
+    /** MKT-007.4: canal elegido por el cliente (snapshot inmutable). */
+    payment_method_id: string | null;
+    /**
+     * MKT-007.4: snapshot del canal elegido. JSONB crudo del backend: la
+     * forma no está garantizada en runtime. Validar SIEMPRE con
+     * parseAgencyPaymentMethodSnapshot antes de usarlo.
+     */
+    payment_method_snapshot: unknown;
   };
   trip: {
     id: string;
@@ -327,4 +335,193 @@ export function checkoutAttemptStatusBadgeVariant(
     default:
       return 'inactive';
   }
+}
+
+// ─── MKT-007.4 · Canales de pago de la agencia ───────────────────────────────
+
+/** Copia inmutable del canal elegida al momento de la selección. */
+export interface AgencyPaymentMethodSnapshot {
+  method: string;
+  label: string;
+  data: Record<string, unknown>;
+  is_primary?: boolean;
+  snapshot_version?: number;
+  selected_at?: string;
+}
+
+export interface AgencyPaymentMethod {
+  id: string;
+  agency_id: string;
+  method: string;
+  label: string;
+  data: Record<string, unknown>;
+  is_active: boolean;
+  is_primary: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface CreateAgencyPaymentMethodInput {
+  method: 'pago_movil';
+  label: string;
+  data: AgencyPagoMovilData;
+  is_primary?: boolean;
+  sort_order?: number;
+}
+
+export interface UpdateAgencyPaymentMethodInput {
+  label?: string;
+  data?: AgencyPagoMovilData;
+  is_active?: boolean;
+}
+
+/** Datos válidos del canal pago_movil (espejo del schema Zod del backend). */
+export interface AgencyPagoMovilData {
+  bank_code: string;
+  bank_name: string;
+  phone: string;
+  document_type: 'V' | 'E' | 'J' | 'G';
+  document_number: string;
+  holder_name: string;
+  account_type?: 'checking' | 'savings';
+  account_number?: string;
+}
+
+/** Error HTTP 409 devuelto cuando la agencia tiene compras activas. */
+export const AGENCY_HAS_ACTIVE_CHECKOUTS_CODE = 'AGENCY_HAS_ACTIVE_CHECKOUTS';
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  pago_movil: 'Pago móvil',
+};
+
+export const DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  V: 'Venezolano',
+  E: 'Extranjero',
+  J: 'Jurídico',
+  G: 'Gubernamental',
+};
+
+export const ACCOUNT_TYPE_LABELS: Record<string, string> = {
+  checking: 'Corriente',
+  savings: 'Ahorro',
+};
+
+/**
+ * MKT-007.4: valida en runtime la estructura de un snapshot de canal
+ * proveniente del JSONB del backend. Devuelve `null` cuando el valor no es
+ * un snapshot utilizable (no-objeto, method/label ausentes o no-string, o
+ * data que no es un objeto). Nunca inventa datos: un snapshot inválido no
+ * se muestra como si fuera válido.
+ */
+export function parseAgencyPaymentMethodSnapshot(
+  value: unknown,
+): AgencyPaymentMethodSnapshot | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.method !== 'string' || raw.method.trim() === '') return null;
+  if (typeof raw.label !== 'string' || raw.label.trim() === '') return null;
+  if (
+    typeof raw.data !== 'object' ||
+    raw.data === null ||
+    Array.isArray(raw.data)
+  ) {
+    return null;
+  }
+  return {
+    method: raw.method,
+    label: raw.label,
+    data: raw.data as Record<string, unknown>,
+    is_primary: typeof raw.is_primary === 'boolean' ? raw.is_primary : undefined,
+    snapshot_version:
+      typeof raw.snapshot_version === 'number' ? raw.snapshot_version : undefined,
+    selected_at: typeof raw.selected_at === 'string' ? raw.selected_at : undefined,
+  };
+}
+
+function snapshotString(
+  data: Record<string, unknown>,
+  key: string,
+): string | undefined {
+  const value = data[key];
+  return typeof value === 'string' && value.trim() !== ''
+    ? value.trim()
+    : undefined;
+}
+
+/**
+ * MKT-007.4: describe el snapshot del canal para mostrarlo al agente.
+ * Usa SOLO campos de texto presentes en `data`; los valores no-string se
+ * ignoran en lugar de renderizarse como "undefined".
+ */
+export function describePaymentMethodSnapshot(
+  snapshot: AgencyPaymentMethodSnapshot,
+): string {
+  const data =
+    typeof snapshot.data === 'object' &&
+    snapshot.data !== null &&
+    !Array.isArray(snapshot.data)
+      ? snapshot.data
+      : {};
+  const parts: string[] = [];
+  const methodLabel = PAYMENT_METHOD_LABELS[snapshot.method] ?? snapshot.method;
+  parts.push(methodLabel);
+
+  const bankName = snapshotString(data, 'bank_name');
+  const bankCode = snapshotString(data, 'bank_code');
+  if (bankName) {
+    parts.push(bankCode ? `${bankName} (${bankCode})` : bankName);
+  }
+  const phone = snapshotString(data, 'phone');
+  if (phone) parts.push(`Tel. ${phone}`);
+  const holder = snapshotString(data, 'holder_name');
+  if (holder) {
+    const docTypeRaw = snapshotString(data, 'document_type');
+    const docNumber = snapshotString(data, 'document_number');
+    const docType = docTypeRaw
+      ? (DOCUMENT_TYPE_LABELS[docTypeRaw] ?? docTypeRaw)
+      : '';
+    const doc = docType && docNumber ? `${docType} ${docNumber}` : '';
+    parts.push(doc ? `${holder} · ${doc}` : holder);
+  }
+  return parts.join(' · ');
+}
+
+/**
+ * Resumen conciso del canal para la tarjeta de detalle: solo banco,
+ * teléfono y documento del titular. Omite nombre del titular y datos
+ * de cuenta para no saturar la vista de revisión.
+ */
+export function describeChannelSummary(
+  snapshot: AgencyPaymentMethodSnapshot,
+): string {
+  const data =
+    typeof snapshot.data === 'object' &&
+    snapshot.data !== null &&
+    !Array.isArray(snapshot.data)
+      ? snapshot.data
+      : {};
+  const parts: string[] = [];
+
+  const bankName = snapshotString(data, 'bank_name');
+  const bankCode = snapshotString(data, 'bank_code');
+  if (bankName) {
+    parts.push(bankCode ? `${bankName} (${bankCode})` : bankName);
+  }
+
+  const phone = snapshotString(data, 'phone');
+  if (phone) parts.push(`Tel. ${phone}`);
+
+  const docTypeRaw = snapshotString(data, 'document_type');
+  const docNumber = snapshotString(data, 'document_number');
+  const docType = docTypeRaw
+    ? (DOCUMENT_TYPE_LABELS[docTypeRaw] ?? docTypeRaw)
+    : '';
+  const doc = docType && docNumber ? `${docType} ${docNumber}` : '';
+  if (doc) parts.push(doc);
+
+  return parts.join(' · ');
 }

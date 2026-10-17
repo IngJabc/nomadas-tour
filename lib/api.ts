@@ -24,6 +24,9 @@ import type {
   CheckoutAttemptProofSignedUrlResult,
   VerifyCheckoutAttemptResult,
   RejectCheckoutAttemptResult,
+  AgencyPaymentMethod,
+  CreateAgencyPaymentMethodInput,
+  UpdateAgencyPaymentMethodInput,
 } from '@/lib/payments';
 
 export interface NotificationPreferenceCategory {
@@ -485,6 +488,33 @@ export const agencyApi = {
     request<RejectCheckoutAttemptResult>(
       `/agency/checkout-attempts/${attemptId}/reject`,
       { method: 'POST', body: JSON.stringify({ reason }) },
+    ),
+
+  // — MKT-007.4 · Canales de pago de la agencia —
+  listPaymentMethods: () =>
+    request<{ methods: AgencyPaymentMethod[] }>('/agency/settings/payment-methods'),
+  createPaymentMethod: (data: CreateAgencyPaymentMethodInput) =>
+    request<{ payment_method: AgencyPaymentMethod }>(
+      '/agency/settings/payment-methods',
+      { method: 'POST', body: JSON.stringify(data) },
+    ),
+  updatePaymentMethod: (
+    id: string,
+    patch: UpdateAgencyPaymentMethodInput,
+  ) =>
+    request<{ payment_method: AgencyPaymentMethod }>(
+      `/agency/settings/payment-methods/${id}`,
+      { method: 'PATCH', body: JSON.stringify(patch) },
+    ),
+  setPaymentMethodPrimary: (id: string) =>
+    request<{ payment_method: AgencyPaymentMethod }>(
+      `/agency/settings/payment-methods/${id}/primary`,
+      { method: 'POST' },
+    ),
+  deletePaymentMethod: (id: string) =>
+    request<{ payment_method: AgencyPaymentMethod; already_deleted: boolean }>(
+      `/agency/settings/payment-methods/${id}`,
+      { method: 'DELETE' },
     ),
 };
 
