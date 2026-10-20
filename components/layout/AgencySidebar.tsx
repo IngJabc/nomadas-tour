@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { LayoutDashboard, ClipboardList, QrCode, Bus, Bell, Palette, History, CreditCard, Landmark, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, QrCode, Bus, Bell, Palette, History, CreditCard, Landmark, Phone, type LucideIcon } from 'lucide-react';
 import { PlatformLogoMark } from '@/components/brand/PlatformLogoMark';
 import { useAgencyBranding } from '@/components/branding/AgencyBrandingProvider';
 import { useAuthUser } from '@/hooks/useAuthUser';
@@ -15,6 +15,7 @@ const BASE_NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/agency/payments', label: 'Pagos', icon: CreditCard },
   { href: '/agency/scan', label: 'Escáner QR', icon: QrCode },
   { href: '/agency/settings/payment-methods', label: 'Métodos de pago', icon: Landmark },
+  { href: '/agency/settings/contacts', label: 'Contactos', icon: Phone },
   { href: '/agency/settings/branding', label: 'Branding', icon: Palette },
   { href: '/agency/settings/notifications', label: 'Notificaciones', icon: Bell },
 ];

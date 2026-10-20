@@ -95,12 +95,12 @@ export function AgencyCheckoutAttemptCard({
                 Comprobante
               </span>
             )}
-            {isPending && (
+            {/* {isPending && (
               <span className="inline-flex items-center gap-1 font-[family-name:var(--font-body)] text-[12px] text-[#92400e]">
                 <Clock className="w-3.5 h-3.5" strokeWidth={1.75} />
                 {formatDateTimeShort(attempt.expires_at)}
               </span>
-            )}
+            )} */}
             {attempt.status === 'rejected' && attempt.rejection_reason && (
               <span
                 className="inline-flex items-center gap-1 font-[family-name:var(--font-body)] text-[12px] text-[#ef4444] truncate max-w-[180px]"
