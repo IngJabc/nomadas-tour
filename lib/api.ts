@@ -28,6 +28,11 @@ import type {
   CreateAgencyPaymentMethodInput,
   UpdateAgencyPaymentMethodInput,
 } from '@/lib/payments';
+import type {
+  AgencyContact,
+  CreateAgencyContactInput,
+  UpdateAgencyContactInput,
+} from '@/lib/contacts';
 
 export interface NotificationPreferenceCategory {
   key: string;
@@ -514,6 +519,25 @@ export const agencyApi = {
   deletePaymentMethod: (id: string) =>
     request<{ payment_method: AgencyPaymentMethod; already_deleted: boolean }>(
       `/agency/settings/payment-methods/${id}`,
+      { method: 'DELETE' },
+    ),
+
+  // — MKT-008 · Contactos de la agencia —
+  listContacts: () =>
+    request<{ contacts: AgencyContact[] }>('/agency/settings/contacts'),
+  createContact: (data: CreateAgencyContactInput) =>
+    request<{ contact: AgencyContact }>('/agency/settings/contacts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  updateContact: (id: string, patch: UpdateAgencyContactInput) =>
+    request<{ contact: AgencyContact }>(`/agency/settings/contacts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+  deleteContact: (id: string) =>
+    request<{ contact: AgencyContact; already_deleted: boolean }>(
+      `/agency/settings/contacts/${id}`,
       { method: 'DELETE' },
     ),
 };

@@ -7,6 +7,7 @@ import { notificationController } from '../../controllers/notification.controlle
 import { notificationPreferenceController } from '../../controllers/notification-preference.controller.js';
 import { agencySettingsController } from '../../controllers/agency-settings.controller.js';
 import { agencyPaymentMethodController } from '../../controllers/agency-payment-method.controller.js';
+import { agencyContactController } from '../../controllers/agency-contact.controller.js';
 import { auditController } from '../../controllers/audit.controller.js';
 import { reservationLinkController } from '../../controllers/reservation-link.controller.js';
 import paymentRoutes from './payments.js';
@@ -103,6 +104,20 @@ router.post('/settings/payment-methods/:id/primary', (req, res, next) =>
 );
 router.delete('/settings/payment-methods/:id', (req, res, next) =>
   agencyPaymentMethodController.remove(req, res, next),
+);
+
+// Agency contacts (MKT-008 — numeros de contacto de la agencia)
+router.get('/settings/contacts', (req, res, next) =>
+  agencyContactController.list(req, res, next),
+);
+router.post('/settings/contacts', (req, res, next) =>
+  agencyContactController.create(req, res, next),
+);
+router.patch('/settings/contacts/:id', (req, res, next) =>
+  agencyContactController.update(req, res, next),
+);
+router.delete('/settings/contacts/:id', (req, res, next) =>
+  agencyContactController.remove(req, res, next),
 );
 
 // Audit trail (F5-002 — read-only)
