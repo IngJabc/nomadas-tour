@@ -14,7 +14,8 @@
 > **aquí** (migraciones) para mantener una sola historia sobre la BD compartida.
 > Diseño y reglas: `../nomadas-tour-marketplace/docs/`.
 > Repo marketplace: Fases 0–2 completadas (auth, catálogo, wizard, checkout
-> MKT-007, panel de revisión de pagos de agencia). Siguiente: MKT-008 (T-1).
+> MKT-007, panel de revisión de pagos de agencia) + **RT-01/RT-02
+> (historial de compras) y RT-03 (boleto QR)**. Siguiente: MKT-008 (T-1).
 
 - [x] **MKT-001** — Escritura de migraciones 074–079 — **2026-09-30**
   - `074_add_customer_role.sql` — `customer` en `users.role_check`, resuelto
@@ -53,6 +54,19 @@
     endpoints legacy → `410 Gone`.
   - Verificación/rechazo **por `attempt_id`** (nunca por `reservation_id`).
   - Detalle exhaustivo: `../nomadas-tour-marketplace/TASKS.md` → Fase 2.
+
+- [x] **RT-01/02/03** — Historial de compras + boleto QR (repo marketplace) — **2026-10-20**
+  - **Repo tour: cero cambios de código.** El escáner, las RPC de abordaje
+    y la protección de duplicados quedan intactos.
+  - El marketplace consume `reservations.qr_code`/`ticket_code` emitidos
+    por la migración 087 **sin regenerar** el QR: un solo QR por reserva,
+    valor idéntico al de `ReservationTicket` de tour (componente
+    `react-qr-code`).
+  - Nuevos endpoints del marketplace (solo lectura, cliente autenticado):
+    `GET /api/public/checkout/attempts` (historial) y
+    `GET /api/public/checkout/attempts/:attemptId/ticket` (boleto).
+  - Detalle exhaustivo: `../nomadas-tour-marketplace/TASKS.md` →
+    sección "RT-01…RT-03".
 
 ---
 
