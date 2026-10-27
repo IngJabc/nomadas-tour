@@ -40,13 +40,31 @@ process.on('SIGTERM', () => { void gracefulShutdown(); });
 process.on('SIGINT', () => { void gracefulShutdown(); });
 
 // Auto-expiration for locked seats (every 60s)
+// MKT-010: ANTES de liberar locks vencidos se cierran los intentos de
+// checkout vencidos vía `cleanup_expired_checkout_attempts` (RPC 087):
+// esa RPC libera, en la misma transacción, SOLO los locks que le
+// pertenecen a cada intento. El release directo de abajo excluye los
+// asientos con `checkout_attempt_id` para no destruir una compra en
+// curso si el cleanup falló. El TTL interno de Tour (600 s) no cambia.
 setInterval(async () => {
   try {
+    const { error: cleanupError } = await supabaseAdmin.rpc(
+      'cleanup_expired_checkout_attempts',
+    );
+    if (cleanupError) {
+      console.error('[CheckoutCleanup] Error:', cleanupError.message);
+      captureException(new Error(cleanupError.message), {
+        tags: { service: 'api', area: 'checkout_cleanup' },
+        fingerprint: fingerprintHttpError(500, 'CHECKOUT_CLEANUP'),
+      });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('seats')
       .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('status', 'locked')
       .lt('lock_expires_at', new Date().toISOString())
+      .is('checkout_attempt_id', null)
       .select();
     if (error) {
       console.error('[LockCleanup] Error:', error.message);

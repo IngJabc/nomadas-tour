@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -24,6 +24,7 @@ import {
   Clock,
   ExternalLink,
   Landmark,
+  WifiOff,
 } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -49,6 +50,11 @@ import {
   type AgencyCheckoutAttemptDetail,
   type RejectCheckoutAttemptResult,
 } from '@/lib/payments';
+import { subscribeToAgencyCheckoutAttempts } from '@/lib/realtime/subscriptions';
+import {
+  useRealtimeRefresh,
+  type RealtimeSubscribeFn,
+} from '@/hooks/useRealtimeRefresh';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -103,14 +109,19 @@ export default function CheckoutAttemptDetailPage() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [notifyWhatsappOpen, setNotifyWhatsappOpen] = useState(false);
   const [notifyWhatsappReason, setNotifyWhatsappReason] = useState<string | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Última secuencia de carga: descarta respuestas viejas (RT-06). */
+  const fetchSeqRef = useRef(0);
 
   const doFetch = useCallback(async () => {
+    const seq = ++fetchSeqRef.current;
     try {
       setFetchError(null);
       const data = await agencyApi.getCheckoutAttempt(id);
+      if (seq !== fetchSeqRef.current) return;
       setDetail(data);
     } catch (error) {
+      if (seq !== fetchSeqRef.current) return;
       const notFound =
         typeof error === 'object' &&
         error !== null &&
@@ -122,7 +133,7 @@ export default function CheckoutAttemptDetailPage() {
           : 'No se pudo cargar la compra. Intenta de nuevo.',
       );
     } finally {
-      setLoading(false);
+      if (seq === fetchSeqRef.current) setLoading(false);
     }
   }, [id]);
 
@@ -130,26 +141,33 @@ export default function CheckoutAttemptDetailPage() {
     doFetch();
   }, [doFetch]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  // RT-06: todo el DTO del detalle (estado, comprobante, historial,
+  // pasajeros y reserva vinculada) se deriva de la fila del intento,
+  // así que un único canal por `id` cubre envíos, verificación,
+  // rechazos y expiración. El filtro es rendimiento; RLS manda (094).
+  const realtimeSubscriptions = useMemo<RealtimeSubscribeFn[]>(
+    () => [
+      (onChange, onStatus) =>
+        subscribeToAgencyCheckoutAttempts(onChange, { attemptId: id, onStatus }),
+    ],
+    [id],
+  );
+
+  const { degraded, refreshNow } = useRealtimeRefresh({
+    subscriptions: realtimeSubscriptions,
+    refresh: doFetch,
+  });
 
   const handleActionSuccess = () => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      doFetch();
-    }, 400);
+    // La RPC ya confirmó el estado: refresco inmediato; el evento
+    // Realtime de la misma transacción lo pliega el hook (min-gap).
+    refreshNow();
     setVerifyOpen(false);
     setRejectOpen(false);
   };
 
   const handleRejectSuccess = (result: RejectCheckoutAttemptResult) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      doFetch();
-    }, 400);
+    refreshNow();
     setRejectOpen(false);
 
     const bookerPhone = (detail?.passengers[0]?.phone ?? '').trim() || null;
@@ -259,6 +277,26 @@ export default function CheckoutAttemptDetailPage() {
           }
         />
       </motion.div>
+
+      {/* RT-06: Realtime caído → no aparentar que el detalle está actual. */}
+      {degraded && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 p-4 rounded-xl bg-[#fffbeb] border border-[#fde68a]"
+        >
+          <div className="flex items-center gap-2.5">
+            <WifiOff className="w-4 h-4 text-[#92400e] shrink-0" strokeWidth={1.75} />
+            <p className="font-[family-name:var(--font-body)] text-sm text-[#92400e]">
+              Sin actualizaciones en vivo. Los datos pueden estar desactualizados.
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={refreshNow}>
+            Actualizar
+          </Button>
+        </motion.div>
+      )}
 
       <motion.div
         variants={staggerContainer}

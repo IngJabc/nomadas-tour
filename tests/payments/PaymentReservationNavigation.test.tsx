@@ -31,6 +31,11 @@ vi.mock('@/lib/realtime/subscriptions', () => ({
   subscribeToReservationPassengers: () => () => {},
   subscribeToBoardingLogs: () => () => {},
   subscribeToTrips: () => () => {},
+  // RT-06: exports que usa el detalle de pago.
+  subscribeToAgencyPayments: () => () => {},
+  subscribeToAgencyPaymentReservation: () => () => {},
+  subscribeToAgencyPaymentPassengers: () => () => {},
+  subscribeToAgencyCheckoutAttempts: () => () => {},
 }));
 
 vi.mock('react-hot-toast', () => ({

@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertTriangle, CreditCard, ShoppingCart, X } from 'lucide-react';
+import { AlertTriangle, CreditCard, ShoppingCart, WifiOff, X } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -20,6 +20,15 @@ import {
   type AgencyCheckoutAttemptListItem,
   type AgencyCheckoutAttemptStatusFilter,
 } from '@/lib/payments';
+import { useAuthUser } from '@/hooks/useAuthUser';
+import {
+  subscribeToAgencyCheckoutAttempts,
+  subscribeToAgencyPayments,
+} from '@/lib/realtime/subscriptions';
+import {
+  useRealtimeRefresh,
+  type RealtimeSubscribeFn,
+} from '@/hooks/useRealtimeRefresh';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 
 const PAGE_LIMIT = 20;
@@ -58,7 +67,14 @@ export default function AgencyPaymentsPage() {
   const [attemptFilter, setAttemptFilter] =
     useState<AgencyCheckoutAttemptStatusFilter>('');
 
+  const { user, loading: authLoading } = useAuthUser();
+  const agencyId = user?.agency_id ?? '';
+
+  /** Última secuencia de carga: descarta respuestas viejas (RT-06). */
+  const fetchSeqRef = useRef(0);
+
   const doFetch = useCallback(async () => {
+    const seq = ++fetchSeqRef.current;
     try {
       setFetchError(null);
       if (viewMode === 'attempts') {
@@ -67,6 +83,7 @@ export default function AgencyPaymentsPage() {
           page,
           limit: PAGE_LIMIT,
         });
+        if (seq !== fetchSeqRef.current) return;
         setAttempts(data.attempts);
         setTotal(data.total);
       } else {
@@ -75,23 +92,52 @@ export default function AgencyPaymentsPage() {
           page,
           limit: PAGE_LIMIT,
         });
+        if (seq !== fetchSeqRef.current) return;
         setPayments(data.payments);
         setTotal(data.total);
       }
     } catch {
+      if (seq !== fetchSeqRef.current) return;
       setFetchError(
         viewMode === 'attempts'
           ? 'No se pudieron cargar las compras. Intenta de nuevo.'
           : 'No se pudieron cargar los pagos. Intenta de nuevo.',
       );
     } finally {
-      setLoading(false);
+      if (seq === fetchSeqRef.current) setLoading(false);
     }
   }, [viewMode, statusFilter, attemptFilter, page]);
 
   useEffect(() => {
     doFetch();
   }, [doFetch]);
+
+  // RT-06: las dos tablas que alimentan las tarjetas del listado
+  // (estado de compra y estado de pago) filtradas por la agencia.
+  // El filtro es rendimiento: la autorización es RLS (policy 094).
+  const realtimeSubscriptions = useMemo<RealtimeSubscribeFn[]>(
+    () => [
+      (onChange, onStatus) =>
+        subscribeToAgencyCheckoutAttempts(
+          onChange,
+          agencyId ? { agencyId, onStatus } : { onStatus },
+        ),
+      (onChange, onStatus) =>
+        subscribeToAgencyPayments(
+          onChange,
+          agencyId ? { agencyId, onStatus } : { onStatus },
+        ),
+    ],
+    [agencyId],
+  );
+
+  // Mantiene filtros, página y vista actuales: cualquier evento re-consulta
+  // lo que el usuario está viendo, sin interpretar el payload del canal.
+  const { degraded, refreshNow } = useRealtimeRefresh({
+    subscriptions: realtimeSubscriptions,
+    refresh: doFetch,
+    enabled: !authLoading && Boolean(agencyId),
+  });
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
 
@@ -182,6 +228,26 @@ export default function AgencyPaymentsPage() {
           </div>
           <Button variant="secondary" size="sm" onClick={doFetch}>
             Reintentar
+          </Button>
+        </motion.div>
+      )}
+
+      {/* RT-06: Realtime caído → no aparentar que los datos están actuales. */}
+      {degraded && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 p-4 rounded-xl bg-[#fffbeb] border border-[#fde68a]"
+        >
+          <div className="flex items-center gap-2.5">
+            <WifiOff className="w-4 h-4 text-[#92400e] shrink-0" strokeWidth={1.75} />
+            <p className="font-[family-name:var(--font-body)] text-sm text-[#92400e]">
+              Sin actualizaciones en vivo. Los datos pueden estar desactualizados.
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={refreshNow}>
+            Actualizar
           </Button>
         </motion.div>
       )}

@@ -13,11 +13,22 @@ serve(async (_req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
+    // MKT-010: primero se cierran los intentos de checkout vencidos
+    // (RPC 087) — esa RPC libera, en la misma transacción, SOLO los
+    // locks de cada intento. Después se liberan los locks vencidos
+    // huérfanos, excluyendo los asientos con `checkout_attempt_id`
+    // para no destruir compras en curso si el cleanup falló.
+    const { error: cleanupError } = await supabase.rpc(
+      'cleanup_expired_checkout_attempts',
+    );
+    if (cleanupError) throw cleanupError;
+
     const { data, error } = await supabase
       .from('seats')
       .update({ status: 'available', locked_by: null, locked_at: null, lock_expires_at: null })
       .eq('status', 'locked')
-      .lt('lock_expires_at', new Date().toISOString());
+      .lt('lock_expires_at', new Date().toISOString())
+      .is('checkout_attempt_id', null);
 
     if (error) throw error;
 

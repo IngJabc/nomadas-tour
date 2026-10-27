@@ -392,3 +392,173 @@ export function subscribeToReservationLink(
     supabase.removeChannel(channel);
   };
 }
+
+// ============================================================
+// RT-06 — Realtime de pagos/compras del módulo de agencia
+// (/agency/payments: listado, detalle de pago y detalle de compra).
+// ============================================================
+
+/**
+ * RT-06: notificación SIN payload. El backend es la autoridad del estado
+ * derivado (estado de compra/pago, verified_at, rechazos): ante CUALQUIER
+ * evento el caller re-consulta la API correspondiente en lugar de
+ * interpretar la fila cruda del canal.
+ */
+export type AgencyPaymentsChangeCallback = () => void;
+
+/**
+ * RT-06: estado de conexión de un canal. `true` = SUBSCRIBED;
+ * `false` = CHANNEL_ERROR / TIMED_OUT / CLOSED. La vista degrada y ofrece
+ * actualización manual cuando algún canal reporta `false`.
+ */
+export type RealtimeConnectionCallback = (connected: boolean) => void;
+
+/**
+ * Crea un canal `postgres_changes` de solo-notificación sobre una tabla
+ * del módulo de pagos de agencia.
+ *
+ * El `filter` (agency_id / id) es SOLO rendimiento: la autorización real
+ * es RLS (policy 094 `*_agency_read`, espejo de `authorize('agency')` del
+ * backend). Sin policy, el evento simplemente no se entrega aunque el
+ * filtro del cliente casara; con policy ajena, RLS lo descarta.
+ */
+function subscribeToAgencyPaymentsTable(
+  table: string,
+  filter: string | null,
+  onChange: AgencyPaymentsChangeCallback,
+  onStatus?: RealtimeConnectionCallback,
+): CleanupFn {
+  const supabase = createClient();
+  const channelName = `rt06:${table}:${filter ?? '*'}`;
+
+  const channel = supabase
+    .channel(channelName)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table,
+        ...(filter ? { filter } : {}),
+      },
+      () => onChange(),
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        onStatus?.(true);
+        return;
+      }
+      console.warn(`[Realtime] RT-06 ${channelName} not SUBSCRIBED — status:`, status);
+      onStatus?.(false);
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+/**
+ * RT-06: compras (checkout_attempts) de la agencia autenticada.
+ *
+ * - `attemptId`: detalle de una compra (`id=eq.<attempt>`).
+ * - `agencyId` (sin attemptId): listado de la agencia
+ *   (`agency_id=eq.<agency>`).
+ * - Sin opciones: cualquier fila visible para la sesión (RLS 094 manda).
+ *
+ * Sin payload a propósito: el caller re-consulta
+ * `agencyApi.listCheckoutAttempts` / `getCheckoutAttempt`.
+ */
+export function subscribeToAgencyCheckoutAttempts(
+  onChange: AgencyPaymentsChangeCallback,
+  options?: {
+    agencyId?: string;
+    attemptId?: string;
+    onStatus?: RealtimeConnectionCallback;
+  },
+): CleanupFn {
+  const filter = options?.attemptId
+    ? `id=eq.${options.attemptId}`
+    : options?.agencyId
+      ? `agency_id=eq.${options.agencyId}`
+      : null;
+  return subscribeToAgencyPaymentsTable(
+    'checkout_attempts',
+    filter,
+    onChange,
+    options?.onStatus,
+  );
+}
+
+/**
+ * RT-06: pagos (payments) de la agencia autenticada.
+ *
+ * - `paymentId`: detalle de un pago (`id=eq.<payment>`).
+ * - `agencyId` (sin paymentId): listado de la agencia
+ *   (`agency_id=eq.<agency>`).
+ * - Sin opciones: cualquier fila visible para la sesión (RLS 094 manda).
+ *
+ * `payment_allocations` NO se suscribe: un UPDATE de `payments` dispara la
+ * re-consulta del caller, que recarga allocations y pasajeros con el resto
+ * del DTO.
+ */
+export function subscribeToAgencyPayments(
+  onChange: AgencyPaymentsChangeCallback,
+  options?: {
+    agencyId?: string;
+    paymentId?: string;
+    onStatus?: RealtimeConnectionCallback;
+  },
+): CleanupFn {
+  const filter = options?.paymentId
+    ? `id=eq.${options.paymentId}`
+    : options?.agencyId
+      ? `agency_id=eq.${options.agencyId}`
+      : null;
+  return subscribeToAgencyPaymentsTable(
+    'payments',
+    filter,
+    onChange,
+    options?.onStatus,
+  );
+}
+
+/**
+ * RT-06 (detalle de pago): la reserva vinculada. Cambios de estado o de
+ * `payment_status` que no tocan `payments` (p. ej. cancelación T-1 del
+ * worker) deben refrescar el detalle aunque no exista evento de pago.
+ * `reservation_id` está disponible una vez cargó el primer detalle; ya
+ * estaba publicada (006/012) con policy `reservations_agency_read` (039).
+ */
+export function subscribeToAgencyPaymentReservation(
+  reservationId: string,
+  onChange: AgencyPaymentsChangeCallback,
+  onStatus?: RealtimeConnectionCallback,
+): CleanupFn {
+  if (!reservationId) return () => {};
+  return subscribeToAgencyPaymentsTable(
+    'reservations',
+    `id=eq.${reservationId}`,
+    onChange,
+    onStatus,
+  );
+}
+
+/**
+ * RT-06 (detalle de pago): pasajeros de la reserva vinculada (badges de
+ * estado y totales del DTO). Misma cadena que la reserva: publicada desde
+ * 006/012 con policy `rp_agency_read` (039); RLS limita la entrega a los
+ * pasajeros de reservas propias de la agencia.
+ */
+export function subscribeToAgencyPaymentPassengers(
+  reservationId: string,
+  onChange: AgencyPaymentsChangeCallback,
+  onStatus?: RealtimeConnectionCallback,
+): CleanupFn {
+  if (!reservationId) return () => {};
+  return subscribeToAgencyPaymentsTable(
+    'reservation_passengers',
+    `reservation_id=eq.${reservationId}`,
+    onChange,
+    onStatus,
+  );
+}
