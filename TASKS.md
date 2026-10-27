@@ -70,6 +70,51 @@
 
 ---
 
+## Realtime de pagos de agencia — COMPLETADO
+
+- [x] **RT-06** — Realtime en `/agency/payments` (listado + detalle) — **2026-10-22**
+  - **Migración** `supabase/migrations/094_agency_payments_realtime.sql`
+    (+ `supabase/rollbacks/094_agency_payments_realtime_rollback.sql`):
+    policies `checkout_attempts_agency_read` y `payments_agency_read`
+    (espejo de `authorize('agency')` del backend: role `agency` +
+    `private.auth_app_agency_id()`), `GRANT SELECT` de `checkout_attempts`
+    a `authenticated` y publicación de `checkout_attempts` + `payments`
+    con la misma guarda de catálogo que 093 (PG17, reejecutable; no
+    duplica miembros si 093 ya corrió). El rollback retira solo las dos
+    policies: publicación y GRANT son compartidos con 093/RT-04A.
+    **Archivos locales: NO se aplicó nada a la BD remota.**
+  - **Frontend** (`lib/realtime/subscriptions.ts`): helpers
+    `subscribeToAgencyCheckoutAttempts`, `subscribeToAgencyPayments`,
+    `subscribeToAgencyPaymentReservation`, `subscribeToAgencyPaymentPassengers`
+    — solo-notificación (el backend es la autoridad; nunca se interpreta el
+    payload) con estado de conexión por canal. El filtro `agency_id`/`id`
+    es rendimiento: la autorización real es RLS.
+  - **Hook** `hooks/useRealtimeRefresh.ts`: debounce 500 ms, min-gap
+    700 ms (pliega el evento de la propia acción tras un refresco
+    inmediato), `degraded` + `refreshNow`, limpieza de timer/canales al
+    desmontar. Guard de secuencia (`fetchSeqRef`) en el `doFetch` de cada
+    página para descartar respuestas viejas.
+  - **Cableado** en las 3 vistas: listado (`checkout_attempts` +
+    `payments` por agencia), detalle de pago (`payments` por id + la
+    reserva y sus pasajeros cuando `reservation_id` es UUID, cubre T-1) y
+    detalle de compra (`checkout_attempts` por id). Banner discreto ámbar
+    "Sin actualizaciones en vivo…" con botón **Actualizar**; los timers de
+    400 ms post-verificar/rechazar se reemplazan por refresco inmediato;
+    **sin polling**. RPCs, TTLs (900/600), abordaje, locks y QR intactos.
+  - **Pruebas** nuevas: `tests/payments/PaymentsRealtime.test.tsx`
+    (8: suscripción, debounce, ráfaga única, cleanup, banner+Actualizar,
+    seq guard, refresco de ambos detalles) y
+    `tests/payments/realtime-agency-contract.test.ts` (18: 094, rollback,
+    093 intacto, helpers, hook, páginas). Mocks de realtime añadidos a
+    `PaymentsPages.test.tsx` y `PaymentReservationNavigation.test.tsx`.
+  - **Verificación:** `npm test` → 652 passed / 4 skipped (70 archivos);
+    `npx tsc --noEmit` OK; `npm run build` (next build) OK;
+    `git diff --check` OK. Limitación: la entrega Realtime en vivo
+    requiere aplicar 094 (+093) en staging y probarlo con sesión de
+    agencia — fuera del alcance por no operar contra la BD remota.
+
+---
+
 ## Activo — SEC-009 (Continuous Security Validation)
 
 - [x] **SEC-009.0** — CI Security Foundation — **COMPLETED**

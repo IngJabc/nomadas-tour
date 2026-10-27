@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -20,6 +20,7 @@ import {
   XCircle,
   ReceiptText,
   ExternalLink,
+  WifiOff,
 } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -39,6 +40,15 @@ import {
   paymentStatusBadgeVariant,
   type AgencyPaymentDetail,
 } from '@/lib/payments';
+import {
+  subscribeToAgencyPaymentPassengers,
+  subscribeToAgencyPaymentReservation,
+  subscribeToAgencyPayments,
+} from '@/lib/realtime/subscriptions';
+import {
+  useRealtimeRefresh,
+  type RealtimeSubscribeFn,
+} from '@/hooks/useRealtimeRefresh';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -117,14 +127,19 @@ export default function PaymentDetailPage() {
   const [proofOpen, setProofOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Última secuencia de carga: descarta respuestas viejas (RT-06). */
+  const fetchSeqRef = useRef(0);
 
   const doFetch = useCallback(async () => {
+    const seq = ++fetchSeqRef.current;
     try {
       setFetchError(null);
       const data = await agencyApi.getPayment(id);
+      if (seq !== fetchSeqRef.current) return;
       setDetail(data);
     } catch (error) {
+      if (seq !== fetchSeqRef.current) return;
       const notFound =
         typeof error === 'object' &&
         error !== null &&
@@ -136,7 +151,7 @@ export default function PaymentDetailPage() {
           : 'No se pudo cargar el pago. Intenta de nuevo.',
       );
     } finally {
-      setLoading(false);
+      if (seq === fetchSeqRef.current) setLoading(false);
     }
   }, [id]);
 
@@ -144,18 +159,37 @@ export default function PaymentDetailPage() {
     doFetch();
   }, [doFetch]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  // RT-06: el pago (estado/verificación/rechazo) más la reserva y sus
+  // pasajeros, que alimentan el bloque de reserva, los badges y los
+  // totales del DTO. Reserva/pasajeros solo cuando el detalle ya cargó
+  // (reservation_id es UUID); sus eventos cubren cancelaciones que no
+  // tocan `payments` (p. ej. T-1).
+  const reservationId = detail?.reservation.id ?? '';
+  const realtimeSubscriptions = useMemo<RealtimeSubscribeFn[]>(() => {
+    const list: RealtimeSubscribeFn[] = [
+      (onChange, onStatus) =>
+        subscribeToAgencyPayments(onChange, { paymentId: id, onStatus }),
+    ];
+    if (isUuid(reservationId)) {
+      list.push(
+        (onChange, onStatus) =>
+          subscribeToAgencyPaymentReservation(reservationId, onChange, onStatus),
+        (onChange, onStatus) =>
+          subscribeToAgencyPaymentPassengers(reservationId, onChange, onStatus),
+      );
+    }
+    return list;
+  }, [id, reservationId]);
+
+  const { degraded, refreshNow } = useRealtimeRefresh({
+    subscriptions: realtimeSubscriptions,
+    refresh: doFetch,
+  });
 
   const handleActionSuccess = () => {
-    // Pequeño delay para que la RPC confirme el estado antes de releer.
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      doFetch();
-    }, 400);
+    // La RPC ya confirmó el estado: refresco inmediato; si además llega el
+    // evento Realtime de la misma transacción, el hook lo pliega (min-gap).
+    refreshNow();
     setVerifyOpen(false);
     setRejectOpen(false);
   };
@@ -230,6 +264,26 @@ export default function PaymentDetailPage() {
           }
         />
       </motion.div>
+
+      {/* RT-06: Realtime caído → no aparentar que el detalle está actual. */}
+      {degraded && (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6 p-4 rounded-xl bg-[#fffbeb] border border-[#fde68a]"
+        >
+          <div className="flex items-center gap-2.5">
+            <WifiOff className="w-4 h-4 text-[#92400e] shrink-0" strokeWidth={1.75} />
+            <p className="font-[family-name:var(--font-body)] text-sm text-[#92400e]">
+              Sin actualizaciones en vivo. Los datos pueden estar desactualizados.
+            </p>
+          </div>
+          <Button variant="secondary" size="sm" onClick={refreshNow}>
+            Actualizar
+          </Button>
+        </motion.div>
+      )}
 
       <motion.div
         variants={staggerContainer}

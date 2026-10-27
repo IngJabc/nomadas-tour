@@ -14,19 +14,35 @@ const {
   mockVerifyCheckoutAttempt,
   mockRejectCheckoutAttempt,
   mockUseParamsId,
-} = vi.hoisted(() => ({
-  mockListPayments: vi.fn(),
-  mockGetPayment: vi.fn(),
-  mockGetPaymentProof: vi.fn(),
-  mockVerifyPayment: vi.fn(),
-  mockRejectPayment: vi.fn(),
-  mockListCheckoutAttempts: vi.fn(),
-  mockGetCheckoutAttempt: vi.fn(),
-  mockGetCheckoutAttemptProof: vi.fn(),
-  mockVerifyCheckoutAttempt: vi.fn(),
-  mockRejectCheckoutAttempt: vi.fn(),
-  mockUseParamsId: vi.fn(() => 'pay-1'),
-}));
+  rt,
+} = vi.hoisted(() => {
+  type RtCall = {
+    table: string;
+    onChange: () => void;
+    options: Record<string, unknown> | undefined;
+    removed: boolean;
+  };
+  const rt: { calls: RtCall[]; reset: () => void } = {
+    calls: [],
+    reset: () => {
+      rt.calls = [];
+    },
+  };
+  return {
+    mockListPayments: vi.fn(),
+    mockGetPayment: vi.fn(),
+    mockGetPaymentProof: vi.fn(),
+    mockVerifyPayment: vi.fn(),
+    mockRejectPayment: vi.fn(),
+    mockListCheckoutAttempts: vi.fn(),
+    mockGetCheckoutAttempt: vi.fn(),
+    mockGetCheckoutAttemptProof: vi.fn(),
+    mockVerifyCheckoutAttempt: vi.fn(),
+    mockRejectCheckoutAttempt: vi.fn(),
+    mockUseParamsId: vi.fn(() => 'pay-1'),
+    rt,
+  };
+});
 
 vi.mock('@/lib/api', () => ({
   agencyApi: {
@@ -49,6 +65,26 @@ vi.mock('react-hot-toast', () => ({
     error: vi.fn(),
   },
 }));
+
+// RT-06: los canales Realtime se registran en `rt` para poder disparar
+// eventos/estado de conexión desde los tests sin tocar supabase-js.
+vi.mock('@/lib/realtime/subscriptions', () => {
+  const track =
+    (table: string) =>
+    (onChange: () => void, options?: Record<string, unknown>) => {
+      const call = { table, onChange, options, removed: false };
+      rt.calls.push(call);
+      return () => {
+        call.removed = true;
+      };
+    };
+  return {
+    subscribeToAgencyCheckoutAttempts: track('checkout_attempts'),
+    subscribeToAgencyPayments: track('payments'),
+    subscribeToAgencyPaymentReservation: track('reservations'),
+    subscribeToAgencyPaymentPassengers: track('reservation_passengers'),
+  };
+});
 
 vi.mock('@/hooks/useAuthUser', () => ({
   useAuthUser: () => ({
@@ -254,6 +290,7 @@ const ATTEMPT_DETAIL = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rt.reset();
 });
 
 describe('AgencyPaymentsPage (listado de compras)', () => {
