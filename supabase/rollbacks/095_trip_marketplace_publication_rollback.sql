@@ -1,0 +1,39 @@
+-- ============================================================
+-- 095_trip_marketplace_publication_rollback.sql
+-- Rollback de la migracion 095 (TRIP-PUB-001 - publicacion de
+-- viajes en el Marketplace).
+-- Ejecutar SOLO si la migracion 095 causa problemas en staging/prod.
+--
+-- Restaura el estado previo:
+--   - Se elimina EXCLUSIVAMENTE la columna public.trips.is_published
+--     con DROP COLUMN IF EXISTS: operacion segura e idempotente,
+--     reejecutable sin error si la columna ya no existe.
+--
+-- IMPORTANTE - perdida de configuracion (informativo, NO contiene DML):
+--   Ejecutar este rollback ELIMINA LA CONFIGURACION INDIVIDUAL DE
+--   PUBLICACION DE TODOS LOS VIAJES. Cada viaje oculto del Marketplace
+--   (is_published = false) pierde esa marca al borrarse la columna, y
+--   si en el futuro se vuelve a aplicar 095, TODOS los viajes nacen
+--   publicados por el DEFAULT true: los ocultos reaparecerian en el
+--   catalogo. Antes del rollback, exportar o anotar los viajes que
+--   deben seguir ocultos (consulta informativa, ejecutar a mano):
+--     SELECT id, is_published FROM public.trips WHERE is_published = false;
+--
+-- IMPORTANTE - el rollback NO toca:
+--   - trips.status ni ninguna otra columna de trips: el estado
+--     operativo de cada viaje queda intacto.
+--   - reservas, pasajeros, pagos, allocations, asientos, bloqueos,
+--     tickets QR ni abordaje.
+--
+-- Efecto en la app (deploy coordinado):
+--   El backend del Marketplace referencia is_published en el catalogo,
+--   el detalle, los seat locks y create_checkout_attempt. Con la
+--   columna eliminada y ese backend desplegado, esos endpoints fallan
+--   (error de columna en PostgREST). Revertir PRIMERO el deploy del
+--   backend o desplegar backend y rollback juntos; nunca dejar el
+--   backend consultando una columna inexistente.
+-- ============================================================
+
+-- Unica sentencia del rollback: elimina la columna de publicacion.
+-- Sin DML; no escribe ni modifica ninguna fila ni otra columna.
+ALTER TABLE public.trips DROP COLUMN IF EXISTS is_published;
