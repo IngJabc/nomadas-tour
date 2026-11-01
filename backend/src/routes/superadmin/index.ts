@@ -68,6 +68,9 @@ router.patch("/trips/:id/archive", (req, res, next) =>
 router.patch("/trips/:id/status", (req, res, next) =>
   superadminController.updateTripStatus(req, res, next)
 );
+router.patch("/trips/:id/publication", (req, res, next) =>
+  superadminController.updateTripPublication(req, res, next)
+);
 
 // Reservations
 router.get("/reservations/tree", (req, res, next) =>

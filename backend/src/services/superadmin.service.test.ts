@@ -916,6 +916,89 @@ describe('superadminService.archiveTrip', () => {
   });
 });
 
+describe('superadminService.setTripPublication (TRIP-PUB-001)', () => {
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('publishes a hidden active trip (is_published false → true)', async () => {
+    const tripsChain = createChainable({
+      id: 'trip-1',
+      status: 'active',
+      is_published: false,
+    });
+    tableChains['trips'] = tripsChain;
+
+    const result = await superadminService.setTripPublication('trip-1', true);
+
+    expect(result).toEqual({ id: 'trip-1', is_published: true });
+    expect(tripsChain.update).toHaveBeenCalledWith({ is_published: true });
+  });
+
+  it('hides a published active trip (is_published true → false)', async () => {
+    const tripsChain = createChainable({
+      id: 'trip-1',
+      status: 'active',
+      is_published: true,
+    });
+    tableChains['trips'] = tripsChain;
+
+    const result = await superadminService.setTripPublication('trip-1', false);
+
+    expect(result).toEqual({ id: 'trip-1', is_published: false });
+    expect(tripsChain.update).toHaveBeenCalledWith({ is_published: false });
+  });
+
+  it('is idempotent: skips the write when already in the target state', async () => {
+    const tripsChain = createChainable({
+      id: 'trip-1',
+      status: 'active',
+      is_published: true,
+    });
+    tableChains['trips'] = tripsChain;
+
+    const result = await superadminService.setTripPublication('trip-1', true);
+
+    expect(result).toEqual({ id: 'trip-1', is_published: true });
+    expect(tripsChain.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects changing publication on a non-active trip', async () => {
+    tableChains['trips'] = createChainable({
+      id: 'trip-1',
+      status: 'completed',
+      is_published: true,
+    });
+
+    await expect(
+      superadminService.setTripPublication('trip-1', false),
+    ).rejects.toThrow('Solo se puede cambiar la visibilidad de un viaje activo.');
+  });
+
+  it('throws NotFoundError for an unknown trip', async () => {
+    tableChains['trips'] = createChainable(null, { message: 'not found' });
+
+    await expect(
+      superadminService.setTripPublication('nope', true),
+    ).rejects.toThrow('Trip not found');
+  });
+
+  it('never touches trips.status when toggling publication', async () => {
+    const tripsChain = createChainable({
+      id: 'trip-1',
+      status: 'active',
+      is_published: true,
+    });
+    tableChains['trips'] = tripsChain;
+
+    await superadminService.setTripPublication('trip-1', false);
+
+    const updatePayload = tripsChain.update.mock.calls[0][0];
+    expect(updatePayload).toEqual({ is_published: false });
+    expect(updatePayload).not.toHaveProperty('status');
+  });
+});
+
 // ── WKR-007 C2 — TRIP_EFFECTS_VIA_OUTBOX RPC path ───────────────────
 
 describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {

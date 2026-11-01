@@ -301,6 +301,11 @@ export const adminApi = {
     }),
   updateTripStatus: (id: string, status: string) =>
     request<any>(`/admin/trips/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  updateTripPublication: (id: string, isPublished: boolean) =>
+    request<{ id: string; is_published: boolean }>(`/admin/trips/${id}/publication`, {
+      method: 'PATCH',
+      body: JSON.stringify({ is_published: isPublished }),
+    }),
   getPassengerTree: (params?: { status?: string; route_id?: string; trip_id?: string; agency_id?: string; date?: string; search?: string }) =>
     request<any>('/admin/reservations/tree', { params: params as any }),
   getReservation: (id: string) => request<any>(`/admin/reservations/${id}`),

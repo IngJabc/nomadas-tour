@@ -837,6 +837,7 @@ export class SuperadminService {
         vehicle: { type: trip.vehicle_type, capacity: trip.capacity },
         status: trip.status,
         postponed_from: trip.postponed_from,
+        is_published: trip.is_published === true,
         seats: seatsByTrip[trip.id] || [],
         occupancy: {
           total: stats.total,
@@ -1434,6 +1435,45 @@ export class SuperadminService {
         ? TripUpdateAction.POSTPONED
         : TripUpdateAction.UPDATED,
     };
+  }
+
+  // ---- Marketplace publication (show/hide, TRIP-PUB-001) ----
+  // Cambia trips.is_published. Es SOLO visibilidad en el Marketplace:
+  // NUNCA toca trips.status ni reservas, pasajeros, pagos, asientos ni
+  // QR/tickets. Reservas/pagos/abordaje existentes siguen funcionando.
+  async setTripPublication(
+    id: string,
+    isPublished: boolean
+  ): Promise<{ id: string; is_published: boolean }> {
+    const { data: trip, error: fetchError } = await supabaseAdmin
+      .from("trips")
+      .select("id, status, is_published")
+      .eq("id", id)
+      .single();
+
+    if (fetchError || !trip) throw new NotFoundError("Trip not found");
+
+    // La publicacion solo aplica a viajes operativos (active). Completados,
+    // cancelados o archivados no aparecen en el Marketplace de todos modos.
+    if ((trip as any).status !== "active") {
+      throw new ValidationError(
+        "Solo se puede cambiar la visibilidad de un viaje activo."
+      );
+    }
+
+    // Idempotente: si ya esta en el estado deseado, no escribe.
+    if ((trip as any).is_published === isPublished) {
+      return { id, is_published: isPublished };
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("trips")
+      .update({ is_published: isPublished })
+      .eq("id", id);
+
+    if (updateError) throw new ValidationError(updateError.message);
+
+    return { id, is_published: isPublished };
   }
 
   async archiveTrip(id: string): Promise<{ id: string; status: "archived" }> {

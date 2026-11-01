@@ -3,7 +3,7 @@
 import { ResponsiveActions, type ResponsiveActionItem } from '@/components/ui/ResponsiveActions';
 
 interface TripActionsProps {
-  trip: { id: string; status: string; departure_time: string };
+  trip: { id: string; status: string; departure_time: string; is_published?: boolean };
   onEdit: () => void;
   onAction: (tripId: string, action: string) => void;
   actionLoading: boolean;
@@ -60,6 +60,27 @@ export function TripActions({
         className:
           '!bg-[var(--color-brand-cyan)] hover:!bg-[var(--color-brand-blue)] !text-white',
         onClick: () => onAction(trip.id, 'add_agency'),
+      });
+    }
+    // Mostrar / ocultar en el Marketplace (visibilidad, no estado).
+    // is_published === false => oculto; cualquier otro valor => publicado.
+    if (trip.is_published === false) {
+      actions.push({
+        key: 'publish',
+        label: 'Mostrar en el marketplace',
+        variant: 'secondary',
+        className:
+          '!bg-[var(--color-brand-cyan)] hover:!bg-[var(--color-brand-blue)] !text-white',
+        onClick: () => onAction(trip.id, 'toggle_publish'),
+      });
+    } else {
+      actions.push({
+        key: 'unpublish',
+        label: 'Ocultar del marketplace',
+        variant: 'secondary',
+        className:
+          '!bg-[#e2e8f0] hover:!bg-[#cbd5e1] !text-[var(--color-brand-navy)]',
+        onClick: () => onAction(trip.id, 'toggle_publish'),
       });
     }
     if (canCancelPostpone) {
