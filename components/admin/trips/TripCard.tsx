@@ -4,6 +4,7 @@ import { forwardRef, useRef, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Bus, MapPin, Calendar } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { formatDateTime } from '@/lib/utils';
 import { TripStatusBadge } from './TripStatusBadge';
 import { TripOccupancy } from './TripOccupancy';
@@ -23,6 +24,7 @@ interface TripCardProps {
     vehicle: { type: 'bus' | 'kia'; capacity: number };
     status: string;
     postponed_from: string | null;
+    is_published?: boolean;
     occupancy: { total: number; available: number; reserved: number; locked: number; blocked: number; boarded: number };
     agencies: { id: string; name: string; reservation_count: number }[];
   };
@@ -91,6 +93,9 @@ export const TripCard = forwardRef<HTMLDivElement, TripCardProps>(function TripC
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <TripStatusBadge status={trip.status} postponed={!!trip.postponed_from} />
+            {trip.is_published === false && (
+              <Badge variant="inactive" size="sm">Oculto</Badge>
+            )}
           </div>
         </div>
 

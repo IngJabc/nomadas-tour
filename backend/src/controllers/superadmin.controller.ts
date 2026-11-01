@@ -273,6 +273,26 @@ export class SuperadminController {
     }
   }
 
+  // Marketplace publication (show/hide, TRIP-PUB-001)
+  async updateTripPublication(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = z
+        .object({ is_published: z.boolean() })
+        .parse(req.body);
+      const result = await superadminService.setTripPublication(
+        req.params.id as string,
+        data.is_published,
+      );
+      res.json(result);
+    } catch (error) {
+      next(
+        error instanceof z.ZodError
+          ? new ValidationError("Invalid input", (error as any).issues)
+          : error
+      );
+    }
+  }
+
   // Dashboard
   async getDashboard(req: Request, res: Response, next: NextFunction) {
     try {

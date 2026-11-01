@@ -234,11 +234,34 @@ export default function AdminTripsPage() {
       return;
     }
 
+    if (action === 'toggle_publish') {
+      const trip = trips.find((t: any) => t.id === tripId);
+      if (!trip || actionLoading === tripId) return;
+      // is_published === false => oculto (publicar); true/undefined => publicado (ocultar).
+      const next = trip.is_published === false;
+      setActionLoading(tripId);
+      adminApi
+        .updateTripPublication(tripId, next)
+        .then(() => {
+          setTrips((prev) =>
+            prev.map((t: any) => (t.id === tripId ? { ...t, is_published: next } : t)),
+          );
+          toast.success(
+            next ? 'Viaje visible en el Marketplace' : 'Viaje oculto del Marketplace',
+          );
+        })
+        .catch((err) =>
+          toast.error(getApiErrorMessage(err, 'No se pudo cambiar la visibilidad')),
+        )
+        .finally(() => setActionLoading(null));
+      return;
+    }
+
     if (action === 'complete' || action === 'cancel' || action === 'archive' || action === 'postpone') {
       setPostponeDate('');
       setActiveModal({ tripId, action, anchorRect });
     }
-  }, [router]);
+  }, [router, trips, actionLoading]);
 
   const addAgencyTrip = useMemo(
     () => (addAgencyTripId ? trips.find((t: any) => t.id === addAgencyTripId) : null),
