@@ -12,6 +12,7 @@ function createDefaultPreferences() {
     trip_reminders: { in_app_enabled: true, email_enabled: true },
     ops_digest: { in_app_enabled: true, email_enabled: true },
     occupancy_alerts: { in_app_enabled: true, email_enabled: true },
+    payment_notifications: { in_app_enabled: true, email_enabled: true },
   };
 }
 
@@ -61,6 +62,25 @@ describe('isDeliveryEnabled', () => {
       false,
     );
     expect(isDeliveryEnabled(prefs as any, 'occupancy_alert', 'email')).toBe(
+      true,
+    );
+  });
+
+  it('gates the three payment types by the payment_notifications category', () => {
+    const prefs = createDefaultPreferences();
+    prefs.payment_notifications.in_app_enabled = false;
+    prefs.payment_notifications.email_enabled = false;
+    for (const type of [
+      'payment_receipt_submitted',
+      'payment_verified',
+      'payment_rejected',
+    ]) {
+      expect(isDeliveryEnabled(prefs as any, type, 'in_app')).toBe(false);
+      expect(isDeliveryEnabled(prefs as any, type, 'email')).toBe(false);
+    }
+
+    const enabled = createDefaultPreferences();
+    expect(isDeliveryEnabled(enabled as any, 'payment_verified', 'email')).toBe(
       true,
     );
   });

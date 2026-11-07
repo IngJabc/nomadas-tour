@@ -79,7 +79,14 @@ export default function AgencyReservationsPage() {
   }, [reservations, doFetch]);
 
   const filtered = reservations.filter((r) => {
-    if (statusFilter && r.status !== statusFilter) return false;
+    if (statusFilter && r.status !== statusFilter) {
+      // El ciclo marketplace deja la reserva definitiva en 'reserved'
+      // (nunca pasa por 'confirmed'): el chip «Confirmadas» también la
+      // incluye, porque la tarjeta la muestra como "Confirmada".
+      if (!(statusFilter === 'confirmed' && r.status === 'reserved')) {
+        return false;
+      }
+    }
     if (search) {
       const q = search.toLowerCase();
       const passengers = r.reservation_passengers ?? [];

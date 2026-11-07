@@ -69,6 +69,10 @@ describe('createDefaultPreferences', () => {
       in_app_enabled: true,
       email_enabled: true,
     });
+    expect(prefs.payment_notifications).toEqual({
+      in_app_enabled: true,
+      email_enabled: true,
+    });
   });
 });
 
@@ -129,7 +133,7 @@ describe('notificationPreferenceService.getForAgencies', () => {
 });
 
 describe('notificationPreferenceService.seedDefaults', () => {
-  it('upserts all default categories including trip_reminders and ops_digest', async () => {
+  it('upserts all default categories including trip_reminders, ops_digest and payment_notifications', async () => {
     const chain = createChainable();
     chain.upsert = vi.fn(() => Promise.resolve({ error: null }));
     tableChains['agency_notification_preferences'] = chain;
@@ -162,11 +166,17 @@ describe('notificationPreferenceService.seedDefaults', () => {
           in_app_enabled: true,
           email_enabled: true,
         }),
+        expect.objectContaining({
+          agency_id: 'agency-new',
+          category: 'payment_notifications',
+          in_app_enabled: true,
+          email_enabled: true,
+        }),
       ]),
       { onConflict: 'agency_id,category', ignoreDuplicates: true },
     );
     const rows = (chain.upsert as ReturnType<typeof vi.fn>).mock.calls[0][0];
-    expect(rows).toHaveLength(7);
+    expect(rows).toHaveLength(8);
   });
 });
 
@@ -187,7 +197,7 @@ describe('notificationPreferenceService.updateForAgency', () => {
     ).rejects.toThrow('Unknown notification category');
   });
 
-  it('persists trip_reminders, ops_digest and occupancy_alerts through RPC', async () => {
+  it('persists trip_reminders, ops_digest, occupancy_alerts and payment_notifications through RPC', async () => {
     mockRpc.mockResolvedValue({ data: { changed: true }, error: null });
     const chain = createChainable();
     tableChains['agency_notification_preferences'] = chain;
@@ -199,6 +209,7 @@ describe('notificationPreferenceService.updateForAgency', () => {
         trip_reminders: false,
         ops_digest: false,
         occupancy_alerts: false,
+        payment_notifications: false,
       },
       { source: 'api' },
     );
@@ -212,6 +223,7 @@ describe('notificationPreferenceService.updateForAgency', () => {
           trip_reminders: false,
           ops_digest: false,
           occupancy_alerts: false,
+          payment_notifications: false,
         },
         p_metadata: { source: 'api' },
       },
@@ -233,7 +245,7 @@ describe('public preference mappers', () => {
     const prefs = createDefaultPreferences();
     const categories = toPublicCategories(prefs);
 
-    expect(categories).toHaveLength(7);
+    expect(categories).toHaveLength(8);
     expect(categories[0]).toEqual(
       expect.objectContaining({
         key: 'trip_assignments',
@@ -263,6 +275,14 @@ describe('public preference mappers', () => {
         key: 'occupancy_alerts',
         locked: false,
         label: 'Alertas de ocupación',
+      }),
+    );
+    expect(categories.find((c) => c.key === 'payment_notifications')).toEqual(
+      expect.objectContaining({
+        key: 'payment_notifications',
+        locked: false,
+        label: 'Pagos y comprobantes',
+        channels: { in_app: true, email: true },
       }),
     );
   });

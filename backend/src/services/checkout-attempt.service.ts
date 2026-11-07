@@ -7,6 +7,10 @@ import {
   UnprocessableError,
   ValidationError,
 } from '../errors/index.js';
+import {
+  notifyCustomerPaymentStatus,
+  type CustomerPaymentNotificationInput,
+} from './customer-payment-notification.service.js';
 
 export const PROOF_BUCKET = 'payment-proofs';
 export const PROOF_SIGNED_URL_TTL_SECONDS = 300;
@@ -232,6 +236,23 @@ export interface RejectCheckoutAttemptResult {
   rejection_reason: string;
   freed_seats: number;
   audit_id?: string;
+}
+
+/**
+ * PAY-NOTIFICATIONS Task 2 — envelope interno de una revisión de checkout.
+ *
+ * `result` es EXACTAMENTE el contrato del RPC (VerifyCheckoutAttemptResult /
+ * RejectCheckoutAttemptResult) y es lo ÚNICO que el controller serializa en
+ * la respuesta HTTP.
+ *
+ * `customerId` se resuelve server-side con el attempt id DESPUÉS de que la
+ * RPC tuvo éxito (nunca proviene del input del cliente) y está reservado
+ * para la emisión de notificaciones al cliente (Task 3). NO debe salir del
+ * backend: el controller lo descarta antes de responder.
+ */
+export interface CheckoutReviewOutcome<T> {
+  result: T;
+  customerId: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -599,10 +620,91 @@ export class CheckoutAttemptService {
     return { url: signed.signedUrl, expires_in_seconds: PROOF_SIGNED_URL_TTL_SECONDS };
   }
 
+  /**
+   * PAY-NOTIFICATIONS Task 2 — customer_id del intento, resuelto
+   * SERVER-SIDE DESPUÉS de que la RPC de verify/reject tuvo éxito.
+   *
+   * - La clave de lectura es SOLO el attempt id: nunca se acepta un
+   *   customer_id proveniente del input del cliente.
+   * - El ownership ya lo validó la RPC de la MISMA petición (SECURITY
+   *   DEFINER: actor role=agency + agency_id del intento); esta lectura
+   *   solo corre cuando esa validación pasó, así que no abre una vía de
+   *   lectura cruzada entre agencias.
+   * - Best-effort: si la fila desapareció o la lectura falla devuelve
+   *   null y NUNCA falla la operación (la aprobación/rechazo ya está
+   *   commitada en su propia transacción).
+   */
+  private async resolveAttemptCustomerId(
+    attemptId: string,
+  ): Promise<string | null> {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('checkout_attempts')
+        .select('customer_id')
+        .eq('id', attemptId)
+        .maybeSingle();
+
+      if (error) {
+        console.error(
+          JSON.stringify({
+            event: 'CHECKOUT_CUSTOMER_ID_LOOKUP_FAILED',
+            attemptId,
+            error: error.message,
+          }),
+        );
+        return null;
+      }
+
+      return (
+        (data as { customer_id?: string | null } | null)?.customer_id ?? null
+      );
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'CHECKOUT_CUSTOMER_ID_LOOKUP_FAILED',
+          attemptId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      return null;
+    }
+  }
+
+  /**
+   * PAY-NOTIFICATIONS Task 7 — emisión best-effort de la notificación
+   * de pago hacia el cliente (`customer_notifications` vía Task 6).
+   *
+   * - Corre SOLO DESPUÉS de que la RPC tuvo éxito y el customer_id se
+   *   resolvió server-side (envelope de la Task 2): nunca recibe datos
+   *   de identidad ni propiedad del request del cliente.
+   * - NUNCA lanza ni altera la respuesta: el servicio de la Task 6 ya
+   *   encapsula sus fallos, y este try/catch es la red de seguridad
+   *   para que una regresión en esa capa jamás rompa la aprobación o
+   *   el rechazo (la operación de pago ya quedó commitada en su RPC).
+   * - El resultado se descarta: no entra al envelope ni a la respuesta
+   *   HTTP (el controller solo serializa `result`).
+   */
+  private async emitCustomerPaymentStatus(
+    input: CustomerPaymentNotificationInput,
+  ): Promise<void> {
+    try {
+      await notifyCustomerPaymentStatus(input);
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: 'CHECKOUT_CUSTOMER_NOTIFICATION_FAILED',
+          type: input.type,
+          attemptId: input.attemptId,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    }
+  }
+
   async verify(input: {
     attemptId: string;
     actorUserId: string;
-  }): Promise<VerifyCheckoutAttemptResult> {
+  }): Promise<CheckoutReviewOutcome<VerifyCheckoutAttemptResult>> {
     const data = await callRpc('verify_checkout_attempt', {
       p_attempt_id: input.attemptId,
       p_actor_user_id: input.actorUserId,
@@ -616,14 +718,29 @@ export class CheckoutAttemptService {
       );
     }
 
-    return data as VerifyCheckoutAttemptResult;
+    const result = data as VerifyCheckoutAttemptResult;
+    const customerId = await this.resolveAttemptCustomerId(input.attemptId);
+
+    // PAY-NOTIFICATIONS Task 7 — notificación al cliente. Se emite en la
+    // rama normal Y en la idempotente (already_verified): la clave
+    // natural del servicio Task 6 evita la fila doble. El reservation_id
+    // sale del resultado REAL de la RPC (nace al verificar); si la RPC
+    // lo devolviera null, Task 6 falla seguro sin romper la operación.
+    await this.emitCustomerPaymentStatus({
+      type: 'payment_verified',
+      customerId,
+      attemptId: input.attemptId,
+      reservationId: result.reservation_id ?? null,
+    });
+
+    return { result, customerId };
   }
 
   async reject(input: {
     attemptId: string;
     actorUserId: string;
     reason: string;
-  }): Promise<RejectCheckoutAttemptResult> {
+  }): Promise<CheckoutReviewOutcome<RejectCheckoutAttemptResult>> {
     const data = await callRpc('reject_checkout_attempt', {
       p_attempt_id: input.attemptId,
       p_actor_user_id: input.actorUserId,
@@ -638,7 +755,20 @@ export class CheckoutAttemptService {
       );
     }
 
-    return data as RejectCheckoutAttemptResult;
+    const result = data as RejectCheckoutAttemptResult;
+    const customerId = await this.resolveAttemptCustomerId(input.attemptId);
+
+    // PAY-NOTIFICATIONS Task 7 — notificación al cliente. Se emite en la
+    // rama normal Y en la idempotente (already_rejected): la clave
+    // natural del servicio Task 6 evita la fila doble. El rechazo NO
+    // tiene reserva (087), por eso solo viajan customerId + attemptId.
+    await this.emitCustomerPaymentStatus({
+      type: 'payment_rejected',
+      customerId,
+      attemptId: input.attemptId,
+    });
+
+    return { result, customerId };
   }
 }
 
