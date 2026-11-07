@@ -14,7 +14,10 @@ export type NotificationType =
   | 'reservation_created'
   | 'reservation_cancelled'
   | 'passenger_cancelled'
-  | 'reservation_link_passenger_data';
+  | 'reservation_link_passenger_data'
+  | 'payment_receipt_submitted'
+  | 'payment_verified'
+  | 'payment_rejected';
 
 export type EntityType = 'trip' | 'reservation' | 'passenger' | 'reservation_link';
 export type RecipientRole = 'agency' | 'superadmin';

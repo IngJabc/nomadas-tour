@@ -6,6 +6,7 @@ export const NOTIFICATION_CATEGORIES = [
   'trip_reminders',
   'ops_digest',
   'occupancy_alerts',
+  'payment_notifications',
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORIES)[number];
@@ -28,6 +29,9 @@ export const NOTIFICATION_TYPE_TO_CATEGORY = {
   reservation_cancelled: null,
   passenger_cancelled: null,
   reservation_link_passenger_data: null,
+  payment_receipt_submitted: 'payment_notifications',
+  payment_verified: 'payment_notifications',
+  payment_rejected: 'payment_notifications',
 } as const satisfies Record<string, NotificationCategory | null>;
 
 export function getCategoryForNotificationType(
@@ -87,6 +91,13 @@ export const CATEGORY_METADATA: {
     label: 'Alertas de ocupación',
     description:
       'Avisos in-app cuando un viaje está casi lleno o con pocas reservas.',
+    locked: false,
+  },
+  {
+    key: 'payment_notifications',
+    label: 'Pagos y comprobantes',
+    description:
+      'Cuando un cliente envía un comprobante y cuando la agencia lo aprueba o lo rechaza.',
     locked: false,
   },
 ];

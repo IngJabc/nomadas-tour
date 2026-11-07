@@ -51,6 +51,10 @@ export interface NotificationPreferencesResponse {
     trip_schedule_changes: boolean;
     trip_status_updates: boolean;
     trip_cancellations: boolean;
+    trip_reminders: boolean;
+    ops_digest: boolean;
+    occupancy_alerts: boolean;
+    payment_notifications: boolean;
   };
   categories: NotificationPreferenceCategory[];
 }

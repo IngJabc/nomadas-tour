@@ -31,6 +31,7 @@ const PREF_CATEGORY_LABELS: Record<string, string> = {
   trip_reminders: 'Recordatorios',
   ops_digest: 'Resumen diario',
   occupancy_alerts: 'Alertas de ocupación',
+  payment_notifications: 'Pagos y comprobantes',
 };
 
 const VEHICLE_LABELS: Record<string, string> = {

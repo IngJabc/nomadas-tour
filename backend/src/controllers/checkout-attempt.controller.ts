@@ -109,7 +109,9 @@ export class CheckoutAttemptController {
         req.params,
       );
 
-      const result = await checkoutAttemptService.verify({
+      // PAY-NOTIFICATIONS Task 2: `customerId` es interno (se resuelve
+      // server-side para notificar al cliente) y NUNCA se serializa aquí.
+      const { result } = await checkoutAttemptService.verify({
         attemptId,
         actorUserId: req.ctx!.userId,
       });
@@ -128,7 +130,9 @@ export class CheckoutAttemptController {
       );
       const { reason } = parseOrThrow(rejectBodySchema, req.body);
 
-      const result = await checkoutAttemptService.reject({
+      // PAY-NOTIFICATIONS Task 2: `customerId` es interno (se resuelve
+      // server-side para notificar al cliente) y NUNCA se serializa aquí.
+      const { result } = await checkoutAttemptService.reject({
         attemptId,
         actorUserId: req.ctx!.userId,
         reason,
