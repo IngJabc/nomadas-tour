@@ -64,6 +64,10 @@ export interface AgencyBrandingSettings {
   primary_color: string;
   secondary_color: string;
   accent_color: string;
+  // Phase 7 — storefront público
+  cover_url: string | null;
+  description: string | null;
+  slogan: string | null;
 }
 
 export type AgencyBrandingPatch = Partial<AgencyBrandingSettings>;
@@ -322,6 +326,141 @@ export const adminApi = {
     }),
 };
 
+// ── Marketplace · panel superadmin (REP-001 destacados) ─────────────────────
+//
+// El directorio público de agencias y el PATCH de destacados/orden viven en
+// el backend del Marketplace (repo `nomadas-marketplace`), NO en la API de
+// Tour: `adminApi.updateAgency` (Tour) solo acepta name/status y jamás se
+// extiende para esto. Ambos backends comparten el MISMO proyecto Supabase,
+// así que el Bearer de la sesión Supabase es válido en los dos: el helper
+// replica el patrón de auth de `request()` apuntando a otra base URL.
+
+const MARKETPLACE_API_BASE =
+  process.env.NEXT_PUBLIC_MARKETPLACE_API_URL || 'http://localhost:3003/api';
+
+/** El endpoint público limita `limit` a 50 por petición. */
+const MARKETPLACE_PAGE_SIZE = 50;
+
+/** Tope de páginas al listar (50 × 20 = 1000 agencias activas). */
+const MARKETPLACE_MAX_PAGES = 20;
+
+/** Fila del directorio público con los campos que gestiona el superadmin. */
+export interface MarketplaceAgencyShowcase {
+  id: string;
+  name: string;
+  subdomain: string;
+  logo_url: string | null;
+  /** El backend ya devuelve las destacadas primero: el orden NO se reordena. */
+  is_featured: boolean;
+  featured_order: number;
+}
+
+export interface MarketplaceAgencyListResult {
+  agencies: MarketplaceAgencyShowcase[];
+  total: number;
+}
+
+/** PATCH /api/admin/agencies/:agencyId — al menos un campo requerido. */
+export interface MarketplaceAgencyShowcasePatch {
+  is_featured?: boolean;
+  featured_order?: number;
+}
+
+interface MarketplaceRequestOptions extends RequestInit {
+  params?: Record<string, string | number | undefined>;
+}
+
+async function marketplaceRequest<T>(
+  path: string,
+  options: MarketplaceRequestOptions = {},
+): Promise<T> {
+  const { params, ...fetchOptions } = options;
+
+  let url = `${MARKETPLACE_API_BASE}${path}`;
+  if (params) {
+    const searchParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, val]) => {
+      if (val !== undefined && val !== '') searchParams.set(key, String(val));
+    });
+    const qs = searchParams.toString();
+    if (qs) url += `?${qs}`;
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(fetchOptions.headers as Record<string, string>),
+  };
+
+  try {
+    const { createClient } = await import('./supabase/client');
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch {
+    // Ignorar si corre sin window (SSR).
+  }
+
+  const res = await fetch(url, { ...fetchOptions, headers });
+
+  if (res.status === 204) {
+    return undefined as T;
+  }
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    const errorObj = data?.error;
+    const code = errorObj?.code;
+    const message = errorObj?.message || 'API request failed';
+    throw new ApiError(message, code || 'UNKNOWN', res.status);
+  }
+
+  return data as T;
+}
+
+export const marketplaceAdminApi = {
+  /**
+   * Agencias activas del directorio (`GET /public/agencies`), paginando en
+   * páginas de 50 hasta cubrir `total`. El orden devuelto es el del backend
+   * (`is_featured DESC, featured_order ASC, name ASC`): NO se reordena aquí.
+   */
+  async listShowcaseAgencies(): Promise<MarketplaceAgencyListResult> {
+    const agencies: MarketplaceAgencyShowcase[] = [];
+    let offset = 0;
+    let total = 0;
+
+    for (let page = 0; page < MARKETPLACE_MAX_PAGES; page++) {
+      const result = await marketplaceRequest<MarketplaceAgencyListResult>(
+        '/public/agencies',
+        { params: { limit: MARKETPLACE_PAGE_SIZE, offset } },
+      );
+      agencies.push(...result.agencies);
+      total = result.total;
+      if (result.agencies.length === 0 || agencies.length >= total) break;
+      offset += MARKETPLACE_PAGE_SIZE;
+    }
+
+    return { agencies, total };
+  },
+
+  /**
+   * `PATCH /api/admin/agencies/:agencyId` (superadmin en el backend del
+   * Marketplace). Unfeature resetea `featured_order` a 0 en el servidor; un
+   * `featured_order > 0` sobre una agencia no destacada responde 400, así
+   * que el cliente solo lo envía junto a/agencias ya destacadas.
+   */
+  updateShowcase: (
+    agencyId: string,
+    data: MarketplaceAgencyShowcasePatch,
+  ) =>
+    marketplaceRequest<{ agency: MarketplaceAgencyShowcase }>(
+      `/admin/agencies/${encodeURIComponent(agencyId)}`,
+      { method: 'PATCH', body: JSON.stringify(data) },
+    ),
+};
+
 // Agency
 export const agencyApi = {
   getBranding: () =>
@@ -336,6 +475,15 @@ export const agencyApi = {
     formData.append('logo', file);
     return requestForm<AgencyBrandingSettings>(
       '/agency/settings/logo',
+      formData,
+      { method: 'POST' },
+    );
+  },
+  uploadCover: (file: File) => {
+    const formData = new FormData();
+    formData.append('cover', file);
+    return requestForm<AgencyBrandingSettings>(
+      '/agency/settings/cover',
       formData,
       { method: 'POST' },
     );

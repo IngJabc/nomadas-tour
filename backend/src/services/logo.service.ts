@@ -4,16 +4,59 @@ import { AppError, ValidationError } from '../errors/index.js';
 
 export const AGENCY_ASSETS_BUCKET = 'agency-assets';
 export const MAX_LOGO_BYTES = 1024 * 1024;
+// El bucket (042) limita TODOS los archivos a 1MB: la portada usa el
+// mismo techo que el logo para no depender de un bucket nuevo.
+export const MAX_COVER_BYTES = MAX_LOGO_BYTES;
 
 type SupportedLogoExtension = 'png' | 'jpg' | 'webp';
 type SupportedLogoMime = 'image/png' | 'image/jpeg' | 'image/webp';
 
-interface UploadAgencyLogoInput {
+/** Phase 7: mismo bucket y misma validación, distinto objeto por agencia. */
+type AgencyAssetKind = 'logo' | 'cover';
+
+interface UploadAgencyAssetInput {
   agencyId: string;
   buffer: Buffer;
   originalName: string;
   mimeType: string;
 }
+
+interface AssetMessages {
+  unsupportedExtension: string;
+  empty: string;
+  tooLarge: string;
+  extensionMismatch: string;
+  invalidContent: string;
+  uploadFailed: string;
+  cleanupFailed: string;
+  publicUrlFailed: string;
+}
+
+/** Mensajes por activo: el logo conserva literalmente su copy histórico. */
+const MESSAGES: Record<AgencyAssetKind, AssetMessages> = {
+  logo: {
+    unsupportedExtension: 'El logo debe ser PNG, JPEG o WEBP',
+    empty: 'El archivo de logo está vacío',
+    tooLarge: 'El logo no puede superar 1MB',
+    extensionMismatch: 'La extensión y el tipo MIME del logo no coinciden',
+    invalidContent: 'El contenido del archivo de logo no es válido',
+    uploadFailed: 'No se pudo subir el logo',
+    cleanupFailed:
+      'El logo se subió, pero no se pudieron limpiar versiones anteriores',
+    publicUrlFailed: 'No se pudo obtener la URL pública del logo',
+  },
+  cover: {
+    unsupportedExtension: 'La portada debe ser PNG, JPEG o WEBP',
+    empty: 'El archivo de portada está vacío',
+    tooLarge: 'La portada no puede superar 1MB',
+    extensionMismatch: 'La extensión y el tipo MIME de la portada no coinciden',
+    invalidContent: 'El contenido del archivo de portada no es válido',
+    uploadFailed: 'No se pudo subir la portada',
+    cleanupFailed:
+      'La portada se subió, pero no se pudieron limpiar versiones anteriores',
+    publicUrlFailed: 'No se pudo obtener la URL pública de la portada',
+  },
+};
 
 const MIME_BY_EXTENSION: Record<SupportedLogoExtension, SupportedLogoMime> = {
   png: 'image/png',
@@ -21,13 +64,16 @@ const MIME_BY_EXTENSION: Record<SupportedLogoExtension, SupportedLogoMime> = {
   webp: 'image/webp',
 };
 
-function normalizeExtension(originalName: string): SupportedLogoExtension {
+function normalizeExtension(
+  originalName: string,
+  messages: AssetMessages,
+): SupportedLogoExtension {
   const extension = path.extname(originalName).slice(1).toLowerCase();
   if (extension === 'jpeg') return 'jpg';
   if (extension === 'png' || extension === 'jpg' || extension === 'webp') {
     return extension;
   }
-  throw new ValidationError('El logo debe ser PNG, JPEG o WEBP');
+  throw new ValidationError(messages.unsupportedExtension);
 }
 
 function hasPngSignature(buffer: Buffer): boolean {
@@ -65,37 +111,77 @@ function hasExpectedSignature(
   return hasWebpSignature(buffer);
 }
 
-export function validateLogoFile({
-  buffer,
-  originalName,
-  mimeType,
-}: Omit<UploadAgencyLogoInput, 'agencyId'>): {
+export function validateAgencyAssetFile(
+  input: Omit<UploadAgencyAssetInput, 'agencyId'>,
+  kind: AgencyAssetKind,
+): {
   extension: SupportedLogoExtension;
   mimeType: SupportedLogoMime;
 } {
+  const messages = MESSAGES[kind];
+  const { buffer, originalName, mimeType } = input;
   if (buffer.length === 0) {
-    throw new ValidationError('El archivo de logo está vacío');
+    throw new ValidationError(messages.empty);
   }
-  if (buffer.length > MAX_LOGO_BYTES) {
-    throw new ValidationError('El logo no puede superar 1MB');
+  if (buffer.length > (kind === 'cover' ? MAX_COVER_BYTES : MAX_LOGO_BYTES)) {
+    throw new ValidationError(messages.tooLarge);
   }
 
-  const extension = normalizeExtension(originalName);
+  const extension = normalizeExtension(originalName, messages);
   const expectedMime = MIME_BY_EXTENSION[extension];
   if (mimeType !== expectedMime) {
-    throw new ValidationError('La extensión y el tipo MIME del logo no coinciden');
+    throw new ValidationError(messages.extensionMismatch);
   }
   if (!hasExpectedSignature(buffer, extension)) {
-    throw new ValidationError('El contenido del archivo de logo no es válido');
+    throw new ValidationError(messages.invalidContent);
   }
 
   return { extension, mimeType: expectedMime };
 }
 
+/** Validación histórica del logo: firma pública estable para sus tests. */
+export function validateLogoFile(
+  input: Omit<UploadAgencyAssetInput, 'agencyId'>,
+): {
+  extension: SupportedLogoExtension;
+  mimeType: SupportedLogoMime;
+} {
+  return validateAgencyAssetFile(input, 'logo');
+}
+
 export class LogoService {
-  async uploadAgencyLogo(input: UploadAgencyLogoInput): Promise<string> {
-    const file = validateLogoFile(input);
-    const objectPath = `${input.agencyId}/logo.${file.extension}`;
+  async uploadAgencyLogo(input: UploadAgencyAssetInput): Promise<string> {
+    return this.uploadAgencyAsset(input, 'logo');
+  }
+
+  /** Phase 7: portada del storefront — mismo bucket, objeto `{agencyId}/cover.*`. */
+  async uploadAgencyCover(input: UploadAgencyAssetInput): Promise<string> {
+    return this.uploadAgencyAsset(input, 'cover');
+  }
+
+  /**
+   * Borra el objeto de portada de la agencia (mejor esfuerzo): se llama
+   * cuando la agencia ELIMINA la portada para no dejar huérfanos en el
+   * bucket. Nunca lanza: la URL ya quedó anulada en base de datos.
+   */
+  async removeAgencyCover(agencyId: string): Promise<void> {
+    const paths = (Object.keys(MIME_BY_EXTENSION) as SupportedLogoExtension[])
+      .map((extension) => `${agencyId}/cover.${extension}`);
+    try {
+      const bucket = supabaseAdmin.storage.from(AGENCY_ASSETS_BUCKET);
+      await bucket.remove(paths);
+    } catch {
+      // Mejor esfuerzo: un archivo huérfano no rompe la operación.
+    }
+  }
+
+  private async uploadAgencyAsset(
+    input: UploadAgencyAssetInput,
+    kind: AgencyAssetKind,
+  ): Promise<string> {
+    const messages = MESSAGES[kind];
+    const file = validateAgencyAssetFile(input, kind);
+    const objectPath = `${input.agencyId}/${kind}.${file.extension}`;
     const bucket = supabaseAdmin.storage.from(AGENCY_ASSETS_BUCKET);
 
     const { error: uploadError } = await bucket.upload(
@@ -107,16 +193,16 @@ export class LogoService {
       },
     );
     if (uploadError) {
-      throw new AppError('No se pudo subir el logo', 500, 'STORAGE_UPLOAD_ERROR');
+      throw new AppError(messages.uploadFailed, 500, 'STORAGE_UPLOAD_ERROR');
     }
 
     const obsoletePaths = (Object.keys(MIME_BY_EXTENSION) as SupportedLogoExtension[])
       .filter((extension) => extension !== file.extension)
-      .map((extension) => `${input.agencyId}/logo.${extension}`);
+      .map((extension) => `${input.agencyId}/${kind}.${extension}`);
     const { error: cleanupError } = await bucket.remove(obsoletePaths);
     if (cleanupError) {
       throw new AppError(
-        'El logo se subió, pero no se pudieron limpiar versiones anteriores',
+        messages.cleanupFailed,
         500,
         'STORAGE_CLEANUP_ERROR',
       );
@@ -125,7 +211,7 @@ export class LogoService {
     const { data } = bucket.getPublicUrl(objectPath);
     if (!data.publicUrl) {
       throw new AppError(
-        'No se pudo obtener la URL pública del logo',
+        messages.publicUrlFailed,
         500,
         'STORAGE_PUBLIC_URL_ERROR',
       );

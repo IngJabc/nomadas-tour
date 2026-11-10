@@ -1,14 +1,23 @@
 import { createAuthenticatedClient, supabaseAdmin } from '../config/database.js';
 import { NotFoundError, ValidationError } from '../errors/index.js';
 
+// Literales de una sola línea: el parser de tipos de supabase-js solo
+// infiere el row cuando el select es un literal (con `+` el tipo degrada
+// a string y el cast de `getBranding` deja de compilar).
 const BRANDING_COLUMNS =
-  'logo_url, primary_color, secondary_color, accent_color';
+  'logo_url, primary_color, secondary_color, accent_color, cover_url, description, slogan';
 
 export interface AgencyBrandingSettings {
   logo_url: string | null;
   primary_color: string;
   secondary_color: string;
   accent_color: string;
+  /** Phase 7: portada del storefront público (bucket agency-assets). */
+  cover_url: string | null;
+  /** Phase 7: descripción comercial pública; null = texto generado. */
+  description: string | null;
+  /** Phase 7: slogan opcional bajo el nombre; null = sin slogan. */
+  slogan: string | null;
 }
 
 export type AgencyBrandingPatch = Partial<AgencyBrandingSettings>;
@@ -18,6 +27,9 @@ const DEFAULT_BRANDING: AgencyBrandingSettings = {
   primary_color: '#000024',
   secondary_color: '#0080FF',
   accent_color: '#00D4FF',
+  cover_url: null,
+  description: null,
+  slogan: null,
 };
 
 export class AgencySettingsService {
@@ -77,6 +89,9 @@ export class AgencySettingsService {
       primary_color: data.primary_color,
       secondary_color: data.secondary_color,
       accent_color: data.accent_color,
+      cover_url: data.cover_url ?? null,
+      description: data.description ?? null,
+      slogan: data.slogan ?? null,
     };
   }
   async seedBrandingDefaults(agencyId: string): Promise<void> {

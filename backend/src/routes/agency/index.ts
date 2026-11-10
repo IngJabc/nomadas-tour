@@ -88,6 +88,9 @@ router.patch('/settings/branding', (req, res, next) =>
 router.post('/settings/logo', (req, res, next) =>
   agencySettingsController.uploadLogo(req, res, next),
 );
+router.post('/settings/cover', (req, res, next) =>
+  agencySettingsController.uploadCover(req, res, next),
+);
 
 // Marketplace payment methods (MKT-007.4 — canales de pago de la agencia)
 router.get('/settings/payment-methods', (req, res, next) =>
