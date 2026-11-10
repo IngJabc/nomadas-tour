@@ -34,6 +34,9 @@ const BRANDING = {
   primary_color: '#000024',
   secondary_color: '#0080FF',
   accent_color: '#00D4FF',
+  cover_url: null,
+  description: null,
+  slogan: null,
 };
 
 beforeEach(() => {
@@ -74,6 +77,9 @@ describe('AgencySettingsService', () => {
       primary_color: '#000024',
       secondary_color: '#0080FF',
       accent_color: '#00D4FF',
+      cover_url: null,
+      description: null,
+      slogan: null,
     });
   });
 

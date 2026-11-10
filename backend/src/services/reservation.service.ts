@@ -1129,7 +1129,7 @@ export class ReservationService {
       .from('trips')
       .select('*, routes(origin, destination), trip_agencies!inner(agency_id)')
       .eq('trip_agencies.agency_id', agencyId)
-      .in('status', ['active', 'cancelled'])
+      .in('status', ['active', 'completed', 'cancelled'])
       .order('departure_time');
 
     if (error) throw new ValidationError(error.message);

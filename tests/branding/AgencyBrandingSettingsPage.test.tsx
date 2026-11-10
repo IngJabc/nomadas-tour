@@ -5,6 +5,7 @@ const {
   mockGetBranding,
   mockUpdateBranding,
   mockUploadLogo,
+  mockUploadCover,
   mockRuntimeUpdate,
   mockRefreshBranding,
   mockUseAgencyBranding,
@@ -14,6 +15,7 @@ const {
   mockGetBranding: vi.fn(),
   mockUpdateBranding: vi.fn(),
   mockUploadLogo: vi.fn(),
+  mockUploadCover: vi.fn(),
   mockRuntimeUpdate: vi.fn(),
   mockRefreshBranding: vi.fn(),
   mockUseAgencyBranding: vi.fn(),
@@ -37,6 +39,7 @@ vi.mock('@/lib/api', () => ({
     getBranding: () => mockGetBranding(),
     updateBranding: (patch: unknown) => mockUpdateBranding(patch),
     uploadLogo: (file: File) => mockUploadLogo(file),
+    uploadCover: (file: File) => mockUploadCover(file),
   },
 }));
 
@@ -62,6 +65,9 @@ const STORED_BRANDING = {
   primary_color: '#112233',
   secondary_color: '#445566',
   accent_color: '#778899',
+  cover_url: null,
+  description: null,
+  slogan: null,
 };
 
 beforeEach(() => {
@@ -138,6 +144,8 @@ describe('AgencyBrandingSettingsPage', () => {
         primary_color: '#112233',
         secondary_color: '#445566',
         accent_color: '#ABCDEF',
+        description: null,
+        slogan: null,
       });
     });
     expect(mockToastSuccess).toHaveBeenCalledWith(
@@ -148,6 +156,9 @@ describe('AgencyBrandingSettingsPage', () => {
       primary_color: '#112233',
       secondary_color: '#445566',
       accent_color: '#ABCDEF',
+      cover_url: null,
+      description: null,
+      slogan: null,
     });
   });
 
@@ -208,6 +219,79 @@ describe('AgencyBrandingSettingsPage', () => {
       expect(mockUploadLogo).toHaveBeenCalledWith(file);
       expect(mockRuntimeUpdate).toHaveBeenCalledWith(uploadedBranding);
     });
+  });
+
+  it('saves the slogan and commercial description in the payload', async () => {
+    mockUpdateBranding.mockImplementation(async (patch) => ({
+      ...STORED_BRANDING,
+      ...patch,
+    }));
+
+    render(<AgencyBrandingSettingsPage />);
+
+    const sloganInput = await screen.findByLabelText('Slogan');
+    fireEvent.change(sloganInput, { target: { value: ' Viaja seguro ' } });
+    const descriptionInput = await screen.findByLabelText(
+      'Descripción comercial',
+    );
+    fireEvent.change(descriptionInput, {
+      target: { value: 'Tours privados en la costa.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }));
+
+    await waitFor(() => {
+      expect(mockUpdateBranding).toHaveBeenCalledWith({
+        primary_color: '#112233',
+        secondary_color: '#445566',
+        accent_color: '#778899',
+        description: 'Tours privados en la costa.',
+        slogan: 'Viaja seguro',
+      });
+    });
+    expect(mockToastSuccess).toHaveBeenCalledWith(
+      'Branding actualizado correctamente',
+    );
+  });
+
+  it('updates runtime branding after a successful cover upload', async () => {
+    const uploadedBranding = {
+      ...STORED_BRANDING,
+      cover_url:
+        'https://project.supabase.co/storage/v1/object/public/agency-assets/agency-1/cover.png?v=1',
+    };
+    mockUploadCover.mockResolvedValue(uploadedBranding);
+
+    render(<AgencyBrandingSettingsPage />);
+
+    const input = await screen.findByLabelText('Seleccionar portada');
+    const file = new File(['png'], 'cover.png', { type: 'image/png' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockUploadCover).toHaveBeenCalledWith(file);
+      expect(mockRuntimeUpdate).toHaveBeenCalledWith(uploadedBranding);
+      expect(
+        screen.getByAltText('Portada actual de la agencia'),
+      ).toHaveProperty(
+        'src',
+        'https://project.supabase.co/storage/v1/object/public/agency-assets/agency-1/cover.png?v=1',
+      );
+    });
+  });
+
+  it('does not upload an invalid cover type', async () => {
+    render(<AgencyBrandingSettingsPage />);
+
+    const input = await screen.findByLabelText('Seleccionar portada');
+    const file = new File(['gif'], 'cover.gif', { type: 'image/gif' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        'Selecciona una imagen PNG, JPEG o WEBP',
+      );
+    });
+    expect(mockUploadCover).not.toHaveBeenCalled();
   });
 
   it('uses provider refresh when retrying a branding load error', () => {

@@ -19,6 +19,9 @@ const FIELD_LABELS: Record<string, string> = {
   primary_color: 'Color primario',
   secondary_color: 'Color secundario',
   accent_color: 'Color de acento',
+  cover_url: 'Portada',
+  slogan: 'Slogan',
+  description: 'Descripción',
   in_app: 'In-app',
   email: 'Email',
 };
@@ -131,6 +134,15 @@ function formatScalar(
       return <span className="text-[var(--color-brand-muted)]">Sin logo</span>;
     }
     return <span className="text-[13px]">Logo actualizado</span>;
+  }
+
+  if (key === 'cover_url') {
+    if (value == null || value === '') {
+      return (
+        <span className="text-[var(--color-brand-muted)]">Sin portada</span>
+      );
+    }
+    return <span className="text-[13px]">Portada actualizada</span>;
   }
 
   if (typeof value === 'boolean') {

@@ -1,7 +1,7 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** **Fase A (Production & SaaS Readiness)** en progreso — SEO, Legal, Analytics, SEC-010…014, OBS-001. **SEC-009** permanece abierto (009.0/.1/.2 COMPLETED; 009.3 CANCELADA).
+> **Estado:** **Fase A (Production & SaaS Readiness)** en progreso — SEO, Legal, Analytics, SEC-010…014, OBS-001. **SEC-009** permanece abierto (009.0/.1/.2 COMPLETED; 009.3 CANCELADA). **Próxima iniciativa de producto:** auto-servicio de rutas y viajes por agencia (descubrimiento — DISC-AS-01…05).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
@@ -15,7 +15,9 @@
 > Diseño y reglas: `../nomadas-tour-marketplace/docs/`.
 > Repo marketplace: Fases 0–2 completadas (auth, catálogo, wizard, checkout
 > MKT-007, panel de revisión de pagos de agencia) + **RT-01/RT-02
-> (historial de compras) y RT-03 (boleto QR)**. Siguiente: MKT-008 (T-1).
+> (historial de compras) y RT-03 (boleto QR)**. Siguiente: MKT-008 (T-1) —
+> **integrado y desplegado**, validación funcional local pendiente (ver
+> `../nomadas-tour-marketplace/TASKS.md` → MKT-008 T-1).
 
 - [x] **MKT-001** — Escritura de migraciones 074–079 — **2026-09-30**
   - `074_add_customer_role.sql` — `customer` en `users.role_check`, resuelto
@@ -82,7 +84,9 @@
     con la misma guarda de catálogo que 093 (PG17, reejecutable; no
     duplica miembros si 093 ya corrió). El rollback retira solo las dos
     policies: publicación y GRANT son compartidos con 093/RT-04A.
-    **Archivos locales: NO se aplicó nada a la BD remota.**
+    **Migración APLICADA** (historial 074–101 aplicado, confirmado
+    2026-11-10; al momento de esta tarea los archivos eran locales sin
+    aplicar a la BD remota).
   - **Frontend** (`lib/realtime/subscriptions.ts`): helpers
     `subscribeToAgencyCheckoutAttempts`, `subscribeToAgencyPayments`,
     `subscribeToAgencyPaymentReservation`, `subscribeToAgencyPaymentPassengers`
@@ -109,9 +113,11 @@
     `PaymentsPages.test.tsx` y `PaymentReservationNavigation.test.tsx`.
   - **Verificación:** `npm test` → 652 passed / 4 skipped (70 archivos);
     `npx tsc --noEmit` OK; `npm run build` (next build) OK;
-    `git diff --check` OK. Limitación: la entrega Realtime en vivo
-    requiere aplicar 094 (+093) en staging y probarlo con sesión de
-    agencia — fuera del alcance por no operar contra la BD remota.
+    `git diff --check` OK. **094 (+093) aplicadas en la BD** (confirmado
+    2026-11-10). **Pendiente:** validar la entrega Realtime en vivo con
+    sesión de agencia en staging — no cubierto por esta tarea (no se operó
+    contra la BD remota); que la migración esté aplicada **no** implica
+    validación funcional.
 
 ---
 
@@ -237,10 +243,50 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 ---
 
+## Próxima iniciativa — Auto-servicio de rutas y viajes por agencia (DESCUBRIMIENTO, 2026-11-10)
+
+**Dirección:** la agencia pasa a **autogestionar sus rutas y viajes sobre
+sus propios datos** (hoy la alta y edición de rutas/viajes depende del
+superadmin). **No hay implementación todavía**: los siguientes son **ítems
+de descubrimiento** para cerrar alcance y convertirlos después en tickets de
+fase. No se inventan requisitos — cada ítem se resuelve con evidencia del
+dominio existente.
+
+**Reglas que no cambian:** RLS y aislamiento por `agency_id`, autorización
+de backend desde `public.users`, rol superadmin intacto; **reusar el dominio
+existente** (trips, rutas, vehículos, layouts, estados, triggers,
+`audit_log`); sin tablas ni conceptos nuevos salvo que el descubrimiento lo
+pruebe necesario. No duplica tickets del marketplace (checkout, pagos y
+reservas B2C viven en `nomadas-tour-marketplace`).
+
+- [ ] **DISC-AS-01** — Alcance de rutas: CRUD de rutas de la agencia vs
+  alta/edición por superadmin, y efecto sobre viajes ya publicados.
+- [ ] **DISC-AS-02** — Edición de viajes con reservas existentes: reglas
+  actuales (validaciones, ventanas cercanas a la salida, «Ya salió») y qué
+  acciones quedan permitidas o restringidas para la agencia.
+- [ ] **DISC-AS-03** — Permisos y aislamiento: qué acciones quedan
+  libremente de agencia y cuáles exigen superadmin (p. ej. publicación en
+  el marketplace); verificación RLS sin acceso cruzado entre agencias.
+- [ ] **DISC-AS-04** — Validación de datos y reuso de UI: ocupación,
+  layouts kia/bus, precios, horarios; qué formularios/componentes
+  existentes se reutilizan (evitar duplicar pantallas).
+- [ ] **DISC-AS-05** — Auditoría y ubicación: eventos `audit_log` nuevos
+  para cada acción de auto-servicio (reusar F5-001…F5-003) y dónde vive la
+  gestión en el panel de agencia existente.
+
+**Relación con las fases:** la **Fase A sigue en progreso** y conserva su
+prioridad crítica; esta iniciativa se planifica en paralelo **sin cerrar ni
+reordenar** Fases B–E, F5 resto ni SEC-009 (009.3 sigue cancelada). Detalle
+de la dirección en [`docs/ROADMAP.md`](docs/ROADMAP.md) → Próxima iniciativa
+de producto.
+
+---
+
 ## Después (producto / follow-ups)
 
 | Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                                                              | Estado      |
 | ----- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| —     | **Próxima iniciativa**        | Auto-servicio de rutas y viajes por agencia (descubrimiento: **DISC-AS-01…05**; ver sección arriba)                                                                                                                                                                                                                                                                              | Descubrimiento |
 | —     | **Fase A**                    | SEO (SEO-001…008), Legal (LEGAL-001…005), Analytics (ANALYTICS-001/002), SEC-010…014, OBS-001. Ver [`docs/ROADMAP.md`](docs/ROADMAP.md)                                                                                                                                                                                                                                            | En progreso |
 | —     | **Fase B (Professional UX)**  | UX-001…011 (accesibilidad, mobile, estados de error, focus, contraste)                                                                                                                                                                                                                                                                                                            | Planificada |
 | —     | **Fase C (Reliability & Perf)**| REL-001…006 (readiness, timeouts, paginación, métricas)                                                                                                                                                                                                                                                                                                                           | Planificada |

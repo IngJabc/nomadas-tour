@@ -8,6 +8,7 @@ import {
 import { agencySettingsService } from '../services/agency-settings.service.js';
 import {
   logoService,
+  MAX_COVER_BYTES,
   MAX_LOGO_BYTES,
 } from '../services/logo.service.js';
 import { auditRequestMetadata } from '../utils/audit-metadata.js';
@@ -22,6 +23,21 @@ export const updateAgencyBrandingSchema = z
     primary_color: hexColorSchema.optional(),
     secondary_color: hexColorSchema.optional(),
     accent_color: hexColorSchema.optional(),
+    // Phase 7 — storefront público: mismos límites que las constraints
+    // de la migración 103 (slogan 160 / description 2000).
+    cover_url: z.string().url('Cover URL must be valid').nullable().optional(),
+    description: z
+      .string()
+      .trim()
+      .max(2000, 'Description must be at most 2000 characters')
+      .nullable()
+      .optional(),
+    slogan: z
+      .string()
+      .trim()
+      .max(160, 'Slogan must be at most 160 characters')
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -39,7 +55,36 @@ interface ParsedLogoUpload {
   mimeType: string;
 }
 
-function parseLogoUpload(req: Request): Promise<ParsedLogoUpload> {
+/** Copy de parseo por activo: el logo conserva literalmente su histórico. */
+const PARSE_MESSAGES = {
+  logo: {
+    onlyFile: 'La solicitud debe contener únicamente el archivo logo',
+    noFields: 'No se permiten campos adicionales en la carga del logo',
+    onlyOneFile: 'Solo se permite un archivo de logo',
+    parseFailed: 'No se pudo procesar el archivo de logo',
+    tooLarge: 'El logo no puede superar 1MB',
+    missing: 'Selecciona un archivo de logo',
+    aborted: 'La carga del logo fue interrumpida',
+  },
+  cover: {
+    onlyFile: 'La solicitud debe contener únicamente el archivo portada',
+    noFields: 'No se permiten campos adicionales en la carga de la portada',
+    onlyOneFile: 'Solo se permite un archivo de portada',
+    parseFailed: 'No se pudo procesar el archivo de portada',
+    tooLarge: 'La portada no puede superar 1MB',
+    missing: 'Selecciona un archivo de portada',
+    aborted: 'La carga de la portada fue interrumpida',
+  },
+} as const;
+
+type AgencyAssetKind = keyof typeof PARSE_MESSAGES;
+
+function parseAgencyImageUpload(
+  req: Request,
+  kind: AgencyAssetKind,
+): Promise<ParsedLogoUpload> {
+  const messages = PARSE_MESSAGES[kind];
+  const maxBytes = kind === 'cover' ? MAX_COVER_BYTES : MAX_LOGO_BYTES;
   return new Promise((resolve, reject) => {
     let parser: ReturnType<typeof Busboy>;
     try {
@@ -48,7 +93,7 @@ function parseLogoUpload(req: Request): Promise<ParsedLogoUpload> {
         limits: {
           files: 1,
           fields: 0,
-          fileSize: MAX_LOGO_BYTES,
+          fileSize: maxBytes,
         },
       });
     } catch {
@@ -61,10 +106,8 @@ function parseLogoUpload(req: Request): Promise<ParsedLogoUpload> {
     const chunks: Buffer[] = [];
 
     parser.on('file', (fieldName, stream, info) => {
-      if (fieldName !== 'logo' || upload) {
-        parserError = new ValidationError(
-          'La solicitud debe contener únicamente el archivo logo',
-        );
+      if (fieldName !== kind || upload) {
+        parserError = new ValidationError(messages.onlyFile);
         stream.resume();
         return;
       }
@@ -78,25 +121,21 @@ function parseLogoUpload(req: Request): Promise<ParsedLogoUpload> {
         chunks.push(chunk);
       });
       stream.on('limit', () => {
-        parserError = new ValidationError('El logo no puede superar 1MB');
+        parserError = new ValidationError(messages.tooLarge);
       });
     });
 
     parser.on('field', () => {
-      parserError = new ValidationError(
-        'No se permiten campos adicionales en la carga del logo',
-      );
+      parserError = new ValidationError(messages.noFields);
     });
     parser.on('fieldsLimit', () => {
-      parserError = new ValidationError(
-        'No se permiten campos adicionales en la carga del logo',
-      );
+      parserError = new ValidationError(messages.noFields);
     });
     parser.on('filesLimit', () => {
-      parserError = new ValidationError('Solo se permite un archivo de logo');
+      parserError = new ValidationError(messages.onlyOneFile);
     });
     parser.on('error', () => {
-      reject(new ValidationError('No se pudo procesar el archivo de logo'));
+      reject(new ValidationError(messages.parseFailed));
     });
     parser.on('close', () => {
       if (parserError) {
@@ -104,7 +143,7 @@ function parseLogoUpload(req: Request): Promise<ParsedLogoUpload> {
         return;
       }
       if (!upload) {
-        reject(new ValidationError('Selecciona un archivo de logo'));
+        reject(new ValidationError(messages.missing));
         return;
       }
       resolve({
@@ -113,7 +152,7 @@ function parseLogoUpload(req: Request): Promise<ParsedLogoUpload> {
       });
     });
     req.on('aborted', () => {
-      reject(new ValidationError('La carga del logo fue interrumpida'));
+      reject(new ValidationError(messages.aborted));
     });
     req.pipe(parser);
   });
@@ -155,6 +194,14 @@ export class AgencySettingsController {
         patch,
         auditRequestMetadata(req),
       );
+
+      // Phase 7: al ELIMINAR la portada se borra su objeto del bucket
+      // (mejor esfuerzo, nunca lanza) para no dejar huérfanos. La URL ya
+      // quedó anulada en base de datos antes de este punto.
+      if (patch.cover_url === null) {
+        await logoService.removeAgencyCover(agencyId);
+      }
+
       res.json(branding);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -172,7 +219,7 @@ export class AgencySettingsController {
         throw new ValidationError('Agency context required');
       }
 
-      const file = await parseLogoUpload(req);
+      const file = await parseAgencyImageUpload(req, 'logo');
       const logoUrl = await logoService.uploadAgencyLogo({
         agencyId,
         ...file,
@@ -181,6 +228,32 @@ export class AgencySettingsController {
         agencyId,
         req.ctx!.userId,
         { logo_url: logoUrl },
+        auditRequestMetadata(req),
+      );
+
+      res.json(branding);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /** Phase 7: portada del storefront público (mismo patrón que el logo). */
+  async uploadCover(req: Request, res: Response, next: NextFunction) {
+    try {
+      const agencyId = req.ctx?.agencyId;
+      if (!agencyId) {
+        throw new ValidationError('Agency context required');
+      }
+
+      const file = await parseAgencyImageUpload(req, 'cover');
+      const coverUrl = await logoService.uploadAgencyCover({
+        agencyId,
+        ...file,
+      });
+      const branding = await agencySettingsService.updateBranding(
+        agencyId,
+        req.ctx!.userId,
+        { cover_url: coverUrl },
         auditRequestMetadata(req),
       );
 

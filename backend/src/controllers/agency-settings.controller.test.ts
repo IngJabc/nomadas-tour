@@ -6,6 +6,8 @@ import { ValidationError } from '../errors/index.js';
 const mockGetBranding = vi.fn();
 const mockUpdateBranding = vi.fn();
 const mockUploadAgencyLogo = vi.fn();
+const mockUploadAgencyCover = vi.fn();
+const mockRemoveAgencyCover = vi.fn();
 
 vi.mock('../services/agency-settings.service.js', () => ({
   agencySettingsService: {
@@ -16,8 +18,11 @@ vi.mock('../services/agency-settings.service.js', () => ({
 
 vi.mock('../services/logo.service.js', () => ({
   MAX_LOGO_BYTES: 1024 * 1024,
+  MAX_COVER_BYTES: 1024 * 1024,
   logoService: {
     uploadAgencyLogo: (...args: unknown[]) => mockUploadAgencyLogo(...args),
+    uploadAgencyCover: (...args: unknown[]) => mockUploadAgencyCover(...args),
+    removeAgencyCover: (...args: unknown[]) => mockRemoveAgencyCover(...args),
   },
 }));
 
@@ -28,6 +33,9 @@ const BRANDING = {
   primary_color: '#000024',
   secondary_color: '#0080FF',
   accent_color: '#00D4FF',
+  cover_url: null,
+  description: null,
+  slogan: null,
 };
 
 function createMockReqRes(body: Record<string, unknown> = {}) {
@@ -48,8 +56,10 @@ function createMockReqRes(body: Record<string, unknown> = {}) {
 
 function createMultipartReqRes({
   includeAgencyField = false,
+  fieldName = 'logo',
 }: {
   includeAgencyField?: boolean;
+  fieldName?: 'logo' | 'cover';
 } = {}) {
   const boundary = '----nomadas-test-boundary';
   const png = Buffer.from([
@@ -66,7 +76,7 @@ function createMultipartReqRes({
   }
   parts.push(
     Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="logo"; filename="logo.png"\r\nContent-Type: image/png\r\n\r\n`,
+      `--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${fieldName}.png"\r\nContent-Type: image/png\r\n\r\n`,
     ),
     png,
     Buffer.from(`\r\n--${boundary}--\r\n`),
@@ -175,6 +185,74 @@ describe('AgencySettingsController.updateBranding', () => {
     );
     expect(next).not.toHaveBeenCalled();
   });
+
+  it('trims and forwards the storefront presentation fields', async () => {
+    mockUpdateBranding.mockResolvedValue({
+      ...BRANDING,
+      description: 'Viajes seguros',
+      slogan: 'Viaja seguro',
+    });
+    const { req, res, next, json } = createMockReqRes({
+      description: '  Viajes seguros  ',
+      slogan: 'Viaja seguro',
+    });
+
+    await agencySettingsController.updateBranding(req, res, next);
+
+    expect(mockUpdateBranding).toHaveBeenCalledWith(
+      'agency-1',
+      'user-1',
+      { description: 'Viajes seguros', slogan: 'Viaja seguro' },
+      expect.objectContaining({ source: 'api' }),
+    );
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Viajes seguros' }),
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects storefront fields over the length limits', async () => {
+    const { req, res, next } = createMockReqRes({
+      slogan: 'x'.repeat(161),
+    });
+
+    await agencySettingsController.updateBranding(req, res, next);
+
+    expect(mockUpdateBranding).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+
+  it('removes stored cover objects after clearing cover_url', async () => {
+    mockUpdateBranding.mockResolvedValue({ ...BRANDING, cover_url: null });
+    const { req, res, next, json } = createMockReqRes({ cover_url: null });
+
+    await agencySettingsController.updateBranding(req, res, next);
+
+    expect(mockUpdateBranding).toHaveBeenCalledWith(
+      'agency-1',
+      'user-1',
+      { cover_url: null },
+      expect.objectContaining({ source: 'api' }),
+    );
+    expect(mockRemoveAgencyCover).toHaveBeenCalledWith('agency-1');
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ cover_url: null }),
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('does not touch storage when cover_url is not in the patch', async () => {
+    mockUpdateBranding.mockResolvedValue({
+      ...BRANDING,
+      accent_color: '#ABCDEF',
+    });
+    const { req, res, next } = createMockReqRes({ accent_color: '#ABCDEF' });
+
+    await agencySettingsController.updateBranding(req, res, next);
+
+    expect(mockRemoveAgencyCover).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
 });
 
 describe('AgencySettingsController.uploadLogo', () => {
@@ -213,6 +291,59 @@ describe('AgencySettingsController.uploadLogo', () => {
     await agencySettingsController.uploadLogo(req, res, next);
 
     expect(mockUploadAgencyLogo).not.toHaveBeenCalled();
+    expect(mockUpdateBranding).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+});
+
+describe('AgencySettingsController.uploadCover', () => {
+  it('uploads the cover for the authenticated agency and persists the URL', async () => {
+    const coverUrl =
+      'https://project.supabase.co/storage/v1/object/public/agency-assets/agency-1/cover.png?v=1';
+    mockUploadAgencyCover.mockResolvedValue(coverUrl);
+    mockUpdateBranding.mockResolvedValue({ ...BRANDING, cover_url: coverUrl });
+    const { req, res, next, json, png } = createMultipartReqRes({
+      fieldName: 'cover',
+    });
+
+    await agencySettingsController.uploadCover(req, res, next);
+
+    expect(mockUploadAgencyCover).toHaveBeenCalledWith({
+      agencyId: 'agency-1',
+      buffer: png,
+      originalName: 'cover.png',
+      mimeType: 'image/png',
+    });
+    expect(mockUpdateBranding).toHaveBeenCalledWith(
+      'agency-1',
+      'user-1',
+      { cover_url: coverUrl },
+      expect.objectContaining({ source: 'api' }),
+    );
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ cover_url: coverUrl }),
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('rejects a file posted under the wrong field name', async () => {
+    const { req, res, next } = createMultipartReqRes({ fieldName: 'logo' });
+
+    await agencySettingsController.uploadCover(req, res, next);
+
+    expect(mockUploadAgencyCover).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
+  });
+
+  it('never trusts an agency_id field from the browser', async () => {
+    const { req, res, next } = createMultipartReqRes({
+      fieldName: 'cover',
+      includeAgencyField: true,
+    });
+
+    await agencySettingsController.uploadCover(req, res, next);
+
+    expect(mockUploadAgencyCover).not.toHaveBeenCalled();
     expect(mockUpdateBranding).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledWith(expect.any(ValidationError));
   });

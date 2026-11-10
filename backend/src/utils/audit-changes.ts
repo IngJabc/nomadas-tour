@@ -21,6 +21,9 @@ const BRANDING_FIELDS = [
   'primary_color',
   'secondary_color',
   'accent_color',
+  'cover_url',
+  'description',
+  'slogan',
 ] as const;
 
 const RESERVATION_LINK_FIELDS = [

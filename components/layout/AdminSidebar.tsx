@@ -8,6 +8,7 @@ import {
   Route,
   Building2,
   History,
+  Star,
   type LucideIcon,
 } from "lucide-react";
 import { PlatformLogoMark } from "@/components/brand/PlatformLogoMark";
@@ -21,6 +22,7 @@ const BASE_NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/admin/bookings", label: "Pasajeros", icon: Users },
   { href: "/admin/routes", label: "Rutas", icon: Route },
   { href: "/admin/agencies", label: "Agencias", icon: Building2 },
+  { href: "/admin/featured-agencies", label: "Destacadas", icon: Star },
 ];
 
 const AUDIT_NAV_ITEM = {

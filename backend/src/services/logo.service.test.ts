@@ -21,6 +21,7 @@ vi.mock('../config/database.js', () => ({
 import {
   AGENCY_ASSETS_BUCKET,
   logoService,
+  validateAgencyAssetFile,
   validateLogoFile,
 } from './logo.service.js';
 
@@ -32,12 +33,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockUpload.mockResolvedValue({ error: null });
   mockRemove.mockResolvedValue({ error: null });
-  mockGetPublicUrl.mockReturnValue({
+  mockGetPublicUrl.mockImplementation((path: string) => ({
     data: {
-      publicUrl:
-        'https://project.supabase.co/storage/v1/object/public/agency-assets/agency-1/logo.png',
+      publicUrl: `https://project.supabase.co/storage/v1/object/public/agency-assets/${path}`,
     },
-  });
+  }));
   vi.spyOn(Date, 'now').mockReturnValue(1720000000000);
 });
 
@@ -101,5 +101,93 @@ describe('LogoService', () => {
         mimeType: 'image/png',
       }),
     ).toThrow('El contenido del archivo de logo no es válido');
+  });
+});
+
+describe('LogoService cover (Phase 7)', () => {
+  it('uploads the cover under the agency-scoped cover path and cleans old extensions', async () => {
+    const result = await logoService.uploadAgencyCover({
+      agencyId: 'agency-1',
+      buffer: PNG_BUFFER,
+      originalName: '../../agency-2/cover.png',
+      mimeType: 'image/png',
+    });
+
+    expect(mockStorageFrom).toHaveBeenCalledWith(AGENCY_ASSETS_BUCKET);
+    expect(mockUpload).toHaveBeenCalledWith(
+      'agency-1/cover.png',
+      PNG_BUFFER,
+      {
+        contentType: 'image/png',
+        upsert: true,
+      },
+    );
+    expect(mockRemove).toHaveBeenCalledWith([
+      'agency-1/cover.jpg',
+      'agency-1/cover.webp',
+    ]);
+    expect(result).toBe(
+      'https://project.supabase.co/storage/v1/object/public/agency-assets/agency-1/cover.png?v=1720000000000',
+    );
+  });
+
+  it('never overwrites another agency path (path always starts with the caller agencyId)', async () => {
+    await logoService.uploadAgencyCover({
+      agencyId: 'agency-1',
+      buffer: PNG_BUFFER,
+      originalName: 'cover.png',
+      mimeType: 'image/png',
+    });
+
+    const uploadedPath = mockUpload.mock.calls[0]?.[0] as string;
+    expect(uploadedPath.startsWith('agency-1/')).toBe(true);
+  });
+
+  it('rejects cover files over 1MB before accessing storage', () => {
+    const oversized = Buffer.concat([PNG_BUFFER, Buffer.alloc(1024 * 1024)]);
+
+    expect(() =>
+      validateAgencyAssetFile(
+        {
+          buffer: oversized,
+          originalName: 'cover.png',
+          mimeType: 'image/png',
+        },
+        'cover',
+      ),
+    ).toThrow('La portada no puede superar 1MB');
+    expect(mockUpload).not.toHaveBeenCalled();
+  });
+
+  it('rejects cover files whose MIME does not match their extension', () => {
+    expect(() =>
+      validateAgencyAssetFile(
+        {
+          buffer: PNG_BUFFER,
+          originalName: 'cover.png',
+          mimeType: 'image/jpeg',
+        },
+        'cover',
+      ),
+    ).toThrow('La extensión y el tipo MIME de la portada no coinciden');
+  });
+
+  it('removeAgencyCover deletes every cover extension of that agency only', async () => {
+    await logoService.removeAgencyCover('agency-1');
+
+    expect(mockStorageFrom).toHaveBeenCalledWith(AGENCY_ASSETS_BUCKET);
+    expect(mockRemove).toHaveBeenCalledWith([
+      'agency-1/cover.png',
+      'agency-1/cover.jpg',
+      'agency-1/cover.webp',
+    ]);
+  });
+
+  it('removeAgencyCover never throws when storage fails (best effort)', async () => {
+    mockRemove.mockRejectedValueOnce(new Error('storage down'));
+
+    await expect(
+      logoService.removeAgencyCover('agency-1'),
+    ).resolves.toBeUndefined();
   });
 });
