@@ -1153,6 +1153,21 @@ export class ReservationService {
       }
     }
 
+    // AS-TRIP-002: cuántas agencias tienen asignado cada viaje. La UI
+    // usa `agency_count === 1` para mostrar "Completar viaje" (solo
+    // viajes exclusivos de la agencia). Es un dato informativo: la
+    // autorización real la valida el backend en
+    // PATCH /agency/trips/:tripId/status (AS-TRIP-001).
+    const { data: allAssignments } = await supabaseAdmin
+      .from('trip_agencies')
+      .select('trip_id, agency_id')
+      .in('trip_id', tripIds);
+
+    const assignmentCount: Record<string, number> = {};
+    for (const row of allAssignments || []) {
+      assignmentCount[row.trip_id] = (assignmentCount[row.trip_id] ?? 0) + 1;
+    }
+
     return (trips || []).map((t: any) => {
       const seats = seatMap[t.id] || { total: 0, available: 0, reserved: 0 };
       return {
@@ -1164,6 +1179,9 @@ export class ReservationService {
         total_seats: seats.total,
         available_seats: seats.available,
         reserved_seats: seats.reserved,
+        // La lista solo contiene viajes asignados a esta agencia, así
+        // que count >= 1 siempre; 1 = exclusivo.
+        agency_count: assignmentCount[t.id] ?? 1,
       };
     });
   }

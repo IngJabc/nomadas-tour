@@ -245,7 +245,10 @@ export class SuperadminController {
 
   async archiveTrip(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await superadminService.archiveTrip(req.params.id as string);
+      const result = await superadminService.archiveTrip(
+        req.params.id as string,
+        req.ctx!,
+      );
       res.json(result);
     } catch (error) {
       next(error);
@@ -258,10 +261,12 @@ export class SuperadminController {
       const data = z
         .object({ status: z.enum(["completed", "cancelled"]) })
         .parse(req.body);
+      // El actor sale SIEMPRE de la sesión (req.ctx); cualquier
+      // actor_user_id enviado en el body/query/headers se ignora.
       const result = await superadminService.updateTripStatus(
         req.params.id as string,
         data.status,
-        req.ctx!.userId,
+        req.ctx!,
       );
       res.json(result);
     } catch (error) {

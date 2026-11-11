@@ -1,7 +1,7 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** **Fase A (Production & SaaS Readiness)** en progreso — SEO, Legal, Analytics, SEC-010…014, OBS-001. **SEC-009** permanece abierto (009.0/.1/.2 COMPLETED; 009.3 CANCELADA). **Próxima iniciativa de producto:** auto-servicio de rutas y viajes por agencia (descubrimiento — DISC-AS-01…05).
+> **Estado:** **Fase A (Production & SaaS Readiness)** en progreso — SEO, Legal, Analytics, SEC-010…014, OBS-001. **SEC-009** permanece abierto (009.0/.1/.2 COMPLETED; 009.3 CANCELADA). **Próxima iniciativa de producto:** auto-servicio de rutas y viajes por agencia — descubrimiento **DISC-AS-01…05 completado** e incrementos implementados: **AS-TRIP-001** (autorización de transiciones de estado de viaje) y **AS-TRIP-002** (UI "Completar viaje" en el panel de agencia).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
@@ -243,14 +243,16 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 ---
 
-## Próxima iniciativa — Auto-servicio de rutas y viajes por agencia (DESCUBRIMIENTO, 2026-11-10)
+## Próxima iniciativa — Auto-servicio de rutas y viajes por agencia (DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002, 2026-11-10)
 
 **Dirección:** la agencia pasa a **autogestionar sus rutas y viajes sobre
 sus propios datos** (hoy la alta y edición de rutas/viajes depende del
-superadmin). **No hay implementación todavía**: los siguientes son **ítems
-de descubrimiento** para cerrar alcance y convertirlos después en tickets de
-fase. No se inventan requisitos — cada ítem se resuelve con evidencia del
-dominio existente.
+superadmin). El **descubrimiento cerró** (DISC-AS-01…05) y los primeros
+incrementos de implementación (**AS-TRIP-001** autorización de estado,
+**AS-TRIP-002** UI "Completar viaje") ya están entregados; el resto
+sigue siendo **ítems de alcance** para convertirlos en tickets de fase. No
+se inventan requisitos — cada ítem se resuelve con evidencia del dominio
+existente.
 
 **Reglas que no cambian:** RLS y aislamiento por `agency_id`, autorización
 de backend desde `public.users`, rol superadmin intacto; **reusar el dominio
@@ -259,20 +261,160 @@ existente** (trips, rutas, vehículos, layouts, estados, triggers,
 pruebe necesario. No duplica tickets del marketplace (checkout, pagos y
 reservas B2C viven en `nomadas-tour-marketplace`).
 
-- [ ] **DISC-AS-01** — Alcance de rutas: CRUD de rutas de la agencia vs
+- [x] **DISC-AS-01** — Alcance de rutas: CRUD de rutas de la agencia vs
   alta/edición por superadmin, y efecto sobre viajes ya publicados.
-- [ ] **DISC-AS-02** — Edición de viajes con reservas existentes: reglas
+  - **Verificado:** Rutas son entidades globales sin `agency_id` en la tabla.
+    Migración 001 y 011 crean `routes(id, origin, destination, duration_minutes, created_at)`.
+    Migración 021 agrega `status TEXT NOT NULL DEFAULT 'active'` con CHECK
+    `status IN ('active', 'inactive')` e índice `idx_routes_status`.
+    RLS `routes_superadmin_all` solo permite superadmin modificar rutas.
+    **No hay endpoint ni mecanismo para que agencias toggleen estado global.**
+  - **Decisión establecida:** Routes remain global; agencies cannot toggle
+    global route status. Any agency route management requires a separate
+    `agency_routes` relationship (not yet implemented).
+
+- [x] **DISC-AS-02** — Edición de viajes con reservas existentes: reglas
   actuales (validaciones, ventanas cercanas a la salida, «Ya salió») y qué
   acciones quedan permitidas o restringidas para la agencia.
-- [ ] **DISC-AS-03** — Permisos y aislamiento: qué acciones quedan
+  - **Verificado:** Los statuses de trip en la BD CHECK son
+    `'active'`, `'cancelled'`, `'completed'` (migración 011) **y
+    `'archived'` (agregado por la migración 033)**. **No hay `'inactive'`**
+    en ninguna restricción de la BD. Agencies pueden ver sus trips
+    asignados vía `getAgencyTrips` (filtro por `agency_id` en
+    `trip_agencies`).
+    - Código en `reservation.service.ts` línea 1182:
+      `if (trip.status === 'archived')` lanza error 'Trip not found',
+      consistente con que `archived` **sí** está en la restricción CHECK.
+  - **Acción permitida (en el momento del descubrimiento):** Agencies can
+    view their assigned trips; no podían modificar status ni campos
+    fundamentales de un trip.
+  - **Decisión establecida:** `archived` es un estado **soportado** y de
+    **solo-superadmin** (visibilidad administrativa, conserva todo el
+    historial; no existe operación de des-archivar). `'inactive'` **nunca**
+    debe introducirse. El alcance de escritura de la agencia sobre sus
+    viajes se resolvió después en **AS-TRIP-001** (solo completar viajes
+    exclusivos).
+
+- [x] **DISC-AS-03** — Permisos y aislamiento: qué acciones quedan
   libremente de agencia y cuáles exigen superadmin (p. ej. publicación en
   el marketplace); verificación RLS sin acceso cruzado entre agencias.
-- [ ] **DISC-AS-04** — Validación de datos y reuso de UI: ocupación,
+  - **Verificado:** Autorización RPC + RLS en cada RPC afecta-agencia:
+    `cancel_agency_reservation` valida `p_agency_id` coincide con
+    `reservation.agency_id`; `boarding_toggle` valida vía
+    `p_operator_agency_id`; `lockSeat`/`unlockSeat` valida
+    `trip_agencies.agency_id`; `cancelPassenger` valida
+    `reservation.agency_id`. Policies SQL: `reservations_agency_read`/
+    `reservations_agency_insert` filtran por JWT `agency_id`. No hay acceso
+    cruzado entre agencias posible sin parámetro `agency_id`.
+  - **Discrepancia corregida:** Asumición anterior de que agencies pueden
+    cambiar status de trip a `'inactive'` fue **incorrecta** — `'inactive'` no
+    es status soportado en BD y el código valida `trip.status !== 'active'` para
+    bloquear modificaciones.
+  - **Decisión establecida:** El patrón RPC + RLS `agency_id` es el modelo
+    correcto. Cualquier nueva operación de agency route/trip debe validar
+    `agency_id` en el nivel RPC, nunca confiar en restricciones frontend-only.
+
+- [x] **DISC-AS-04** — Validación de datos y reuso de UI: ocupación,
   layouts kia/bus, precios, horarios; qué formularios/componentes
   existentes se reutilizan (evitar duplicar pantallas).
-- [ ] **DISC-AS-05** — Auditoría y ubicación: eventos `audit_log` nuevos
+  - **Verificado:** Panel agencia existente `/agency/settings/branding` con
+    `AgencySettingsForm` (esquema Zod: logo_url URL, colores hex, cover_url URL,
+    descripción máx. 2000, eslogan máx. 160). Navegación Admin sidebar.
+    Dashboard `/admin/bookings` con tablas de trips/reservas/boarding.
+    Componentes reutilizables: `ConfirmModal`, tablas, inputs DM Sans.
+  - **Decisión establecida:** UI de route/trip management debe extender patrones
+    existentes del panel agencia (validación de formularios, confirmaciones
+    modales, listas de tablas) en lugar de crear nueva librería de componentes.
+    Reutilizar tipografía DM Sans, paleta terracota/navy y patrón `ConfirmModal`.
+
+- [x] **DISC-AS-05** — Auditoría y ubicación: eventos `audit_log` nuevos
   para cada acción de auto-servicio (reusar F5-001…F5-003) y dónde vive la
   gestión en el panel de agencia existente.
+  - **Verificado:** `audit_append()` (migración 065) ya soporta grabación de
+    eventos agency: actor_user_id, category ('agency'), agency_id, entity type,
+    table name, entity_id, before/after JSONB, metadata. Ya usado para: cambios
+    status trip, cambios reservation, eventos boarding, updates branding,
+    preferences notification. UI auditoría en `/admin/audit` y `/agency/audit`
+    (puerta F5-001…F5-003, gate superadmin solo).
+  - **Decisión establecida:** Reutilizar existente `audit_append` para acciones
+    de route/trip (cambios status, assignments, edits). No se requieren nuevas
+    tablas o RPCs para auditoría básica de route/trip.
+
+- [x] **AS-TRIP-001** — Autorización de transiciones de estado de viaje y
+  salvaguardas de negocio (**IMPLEMENTADO, 2026-11-10**).
+  - **Migración nueva:** `supabase/migrations/104_trip_status_authorization.sql`
+    (**ya aplicada a Supabase**, según el contexto de AS-TRIP-002; este
+    ticket no ejecuta aplicaciones de migración). Re-crea
+    `set_trip_status(UUID, TEXT, UUID)` con:
+    - actor obligatorio; rol y `agency_id` resueltos en `public.users`
+      (el `service_role` del backend no puede evadir la autorización);
+    - `agency` solo completa y solo si `trip_agencies` tiene **exactamente
+      una** fila y es la suya (exclusividad leída en la misma transacción,
+      no declarada por el cliente);
+    - `agency` no cancela viajes completos ni archiva;
+    - guarda `ERR_TRIP_HAS_RESERVATIONS` al cancelar (reservas vivas =
+      `status <> 'cancelled'`), en la misma transacción que el `UPDATE`;
+    - release de asientos + `lock_expires_at` y evento outbox con
+      `dedup_key trip.<status>:<trip_id>` **sin cambios** (exactamente una
+      vez);
+    - `REVOKE/GRANT` re-emitidos: `EXECUTE` solo a `service_role`;
+    - trigger `reservations_trip_status_guard` (`BEFORE INSERT`, `FOR SHARE`
+      sobre el viaje) que cierra la carrera cancelar-reserva concurrente.
+  - **Backend:**
+    - `superadmin.service.updateTripStatus()` ya **no** hace `UPDATE`
+      directo sobre `trips.status`: siempre invoca el RPC, con
+      validación de ventanas de salida y autorización previas. Igual en
+      ambas configuraciones de `TRIP_EFFECTS_VIA_OUTBOX` (los efectos
+      legacy se emiten in-process solo cuando el flag está `false`).
+    - `archiveTrip(id, actor)` superadmin-only en el servicio.
+    - Controlador superadmin pasa `req.ctx` como actor (nunca body/query).
+    - **Nuevo** `PATCH /api/agency/trips/:tripId/status` acepta únicamente
+      `{ "status": "completed" }` (`controllers/agency-trip.controller.ts`).
+  - **Tests:** matriz completa en `superadmin.trip-status.test.ts` (21) +
+    `trip-status.controller.test.ts` (actor de sesión, body spoofed
+    ignorado) + actualizados `superadmin.service.test.ts` y
+    `reservation.service.cancel.test.ts` (cancel individual independiente).
+    Suite backend **84 archivos / 781 tests ✅**; suite raíz **75 archivos /
+    718 passed, 4 skipped ✅**; `tsc --noEmit`, `backend build` y
+    `next build` **exit 0**.
+  - **Pendiente (fuera de este ticket):** UI en panel de agencia para
+    completar viaje → **hecho en AS-TRIP-002**; sistema de reembolsos
+    (requisito previo para poder cancelar un viaje con reservas);
+    `agency_routes` sigue **proposal-only**.
+
+- [x] **AS-TRIP-002** — UI de agencia: completar un viaje exclusivo
+  (**IMPLEMENTADO, 2026-11-10**). Consume el endpoint de AS-TRIP-001; no
+  reimplementa autorización ni toca RPC/migración.
+  - **Acción "Completar viaje"** en la tarjeta del viaje
+    (`components/agency/AgencyTripCard.tsx`, footer junto a "Ver
+    pasajeros"). Visible **solo** cuando el viaje está `active`, **ya
+    salió** (ventana de salida del backend) y es **exclusivo** de la
+    agencia (`agency_count === 1`). No aparece en viajes compartidos, no
+    salidos, completados/cancelados ni sin datos de exclusividad. No se
+    agregan acciones de cancelar/archivar.
+  - **Visibilidad:** el listado `GET /api/agency/trips` ahora incluye
+    `agency_count` (lectura de `trip_agencies`, dato informativo — la
+    autorización sigue siendo del backend en el PATCH).
+  - **Flujo** (`app/agency/trips/AgencyTripsContent.tsx`): tarjeta →
+    `ConfirmModal` ("El viaje … se marcará como completado") →
+    `agencyApi.completeTrip()` (`PATCH /api/agency/trips/:tripId/status`
+    con `{ "status": "completed" }`) → toast de éxito + refresco de la
+    lista. Envío bloqueado mientras está en curso (botón + modal en
+    loading, guarda en el handler).
+  - **Errores:** 403 / 404 / 409 y errores de red traducidos a mensajes
+    accionables con `toast.error`; **nunca** toast de éxito si la
+    petición falla; el modal queda abierto para reintentar.
+  - **Tests:** `components/agency/__tests__/AgencyTripCard.complete.test.tsx`
+    (8: visibilidad por exclusividad/salida/estado + click + sin anidado
+    en `<Link>`), `tests/agency/AgencyTripsContent.complete.test.tsx`
+    (9: confirmación, éxito con refresco, cancelación sin llamada,
+    visibilidad en lista, 403/404/409 sin éxito, doble envío bloqueado,
+    error genérico) y `reservation.service.test.ts` (+`agency_count`).
+    Suite backend **84 archivos / 782 tests ✅**; suite raíz **77
+    archivos / 735 passed, 4 skipped ✅**; `tsc --noEmit` (raíz y
+    backend), `backend build` y `next build` **exit 0**.
+  - **Pendiente (fuera de este ticket):** alta/edición de rutas y viajes
+    por la agencia (UI de route/trip management), flujo de reembolsos.
 
 **Relación con las fases:** la **Fase A sigue en progreso** y conserva su
 prioridad crítica; esta iniciativa se planifica en paralelo **sin cerrar ni
@@ -280,13 +422,23 @@ reordenar** Fases B–E, F5 resto ni SEC-009 (009.3 sigue cancelada). Detalle
 de la dirección en [`docs/ROADMAP.md`](docs/ROADMAP.md) → Próxima iniciativa
 de producto.
 
+- **Hallazgos de validación DISC-AS-01 a 05:** corregidas suposiciones
+  previas (routes son globales sin agency_id; `'inactive'` no es status de
+  viaje en la BD; `'archived'` **sí** está en la CHECK desde la migración
+  033 — la "discrepancia abierta" quedó cerrada; agencies eran solo lectura
+  en trips hasta AS-TRIP-001/002). Requerimientos pendientes:
+  - diseño `agency_routes` table (**proposal-only, no implementar**),
+  - panel UI para alta/edición de rutas y viajes por la agencia
+    (la acción "Completar viaje" ya está entregada en AS-TRIP-002),
+  - flujo de reembolsos (bloquea cancelar viaje con reservas).
+
 ---
 
 ## Después (producto / follow-ups)
 
 | Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                                                              | Estado      |
 | ----- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| —     | **Próxima iniciativa**        | Auto-servicio de rutas y viajes por agencia (descubrimiento: **DISC-AS-01…05**; ver sección arriba)                                                                                                                                                                                                                                                                              | Descubrimiento |
+| —     | **Próxima iniciativa**        | Auto-servicio de rutas y viajes por agencia (descubrimiento **DISC-AS-01…05** completado; **AS-TRIP-001** autorización de estado de viaje + **AS-TRIP-002** UI "Completar viaje" IMPLEMENTADOS; resto: UI alta/edición rutas-viajes, `agency_routes` proposal-only, reembolsos)                                    | En curso (2 incrementos listos) |
 | —     | **Fase A**                    | SEO (SEO-001…008), Legal (LEGAL-001…005), Analytics (ANALYTICS-001/002), SEC-010…014, OBS-001. Ver [`docs/ROADMAP.md`](docs/ROADMAP.md)                                                                                                                                                                                                                                            | En progreso |
 | —     | **Fase B (Professional UX)**  | UX-001…011 (accesibilidad, mobile, estados de error, focus, contraste)                                                                                                                                                                                                                                                                                                            | Planificada |
 | —     | **Fase C (Reliability & Perf)**| REL-001…006 (readiness, timeouts, paginación, métricas)                                                                                                                                                                                                                                                                                                                           | Planificada |

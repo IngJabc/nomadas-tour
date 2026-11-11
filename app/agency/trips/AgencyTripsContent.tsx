@@ -14,8 +14,10 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { AgencyTripCard, type AgencyTrip } from '@/components/agency/AgencyTripCard';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { ApiError } from '@/lib/errors/api-error';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
-import { toBusinessDateString } from '@/lib/timezone';
+import { toBusinessDateString, formatDateLong } from '@/lib/timezone';
 import toast from 'react-hot-toast';
 
 const STATUS_OPTIONS = [
@@ -24,6 +26,27 @@ const STATUS_OPTIONS = [
   { value: 'completed', label: 'Completados' },
   { value: 'cancelled', label: 'Cancelados' },
 ] as const;
+
+/**
+ * AS-TRIP-002 — mensajes de error del PATCH de estado. El backend decide
+ * la autorización; aquí solo traducimos el resultado a un mensaje
+ * accionable. Nunca se muestra éxito si la petición falló.
+ */
+function completeTripErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 403) {
+      return 'No puedes completar este viaje: solo está disponible para viajes exclusivos de tu agencia y ya iniciados.';
+    }
+    if (error.status === 404) {
+      return 'El viaje ya no existe o no está disponible. Actualiza la lista.';
+    }
+    if (error.status === 409) {
+      return 'El viaje no se puede completar en este estado. Actualiza la lista e inténtalo de nuevo.';
+    }
+    if (error.message) return error.message;
+  }
+  return 'No se pudo completar el viaje. Intenta de nuevo.';
+}
 
 export default function AgencyTripsContent() {
   const [trips, setTrips] = useState<AgencyTrip[]>([]);
@@ -67,6 +90,31 @@ export default function AgencyTripsContent() {
   useEffect(() => {
     doFetch();
   }, [doFetch]);
+
+  // ─── AS-TRIP-002: completar viaje (confirmación → PATCH → refresh) ──
+  const [confirmTrip, setConfirmTrip] = useState<AgencyTrip | null>(null);
+  const [completingTripId, setCompletingTripId] = useState<string | null>(null);
+
+  const handleCompleteTrip = async () => {
+    // Anti doble envío: mientras haya una petición en curso no se repite.
+    if (!confirmTrip || completingTripId) return;
+    const tripId = confirmTrip.id;
+
+    setCompletingTripId(tripId);
+    try {
+      await agencyApi.completeTrip(tripId);
+      toast.success('Viaje completado correctamente');
+      setConfirmTrip(null);
+      // Refresca la lista para reflejar el nuevo estado del viaje.
+      await doFetch();
+    } catch (error) {
+      // El modal queda abierto para reintentar. Nunca hay toast de éxito
+      // cuando la petición falla (403 / 404 / 409 incluidos).
+      toast.error(completeTripErrorMessage(error));
+    } finally {
+      setCompletingTripId(null);
+    }
+  };
 
   // Client-side filtering
   const filteredTrips = useMemo(() => {
@@ -395,12 +443,33 @@ export default function AgencyTripsContent() {
           >
             {filteredTrips.map((trip) => (
               <motion.div key={trip.id} variants={staggerItem}>
-                <AgencyTripCard trip={trip} now={now} />
+                <AgencyTripCard
+                  trip={trip}
+                  now={now}
+                  onComplete={(t) => setConfirmTrip(t)}
+                  completing={completingTripId === trip.id}
+                />
               </motion.div>
             ))}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* AS-TRIP-002 — confirmación antes de marcar el viaje completado */}
+      <ConfirmModal
+        open={!!confirmTrip}
+        variant="confirm"
+        title="¿Completar viaje?"
+        message={`El viaje ${confirmTrip?.route?.destination ? `a ${confirmTrip.route.destination}` : ''} ${confirmTrip ? `del ${formatDateLong(confirmTrip.departure_time)}` : ''} se marcará como completado. Esta acción cambia el estado del viaje y no se puede deshacer desde aquí.`}
+        confirmLabel="Sí, completar"
+        cancelLabel="Volver"
+        loading={!!confirmTrip && completingTripId === confirmTrip.id}
+        onConfirm={handleCompleteTrip}
+        onCancel={() => {
+          if (completingTripId) return; // no cerrar mientras envía
+          setConfirmTrip(null);
+        }}
+      />
     </main>
   );
 }

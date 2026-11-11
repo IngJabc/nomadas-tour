@@ -10,6 +10,7 @@ import { agencyPaymentMethodController } from '../../controllers/agency-payment-
 import { agencyContactController } from '../../controllers/agency-contact.controller.js';
 import { auditController } from '../../controllers/audit.controller.js';
 import { reservationLinkController } from '../../controllers/reservation-link.controller.js';
+import { agencyTripController } from '../../controllers/agency-trip.controller.js';
 import paymentRoutes from './payments.js';
 import checkoutAttemptRoutes from './checkout-attempts.js';
 
@@ -21,6 +22,12 @@ router.get('/dashboard', (req, res, next) => reservationController.getAgencyDash
 router.get('/trips', (req, res, next) => reservationController.getAgencyTrips(req, res, next));
 router.get('/trips/:tripId', (req, res, next) => reservationController.getAgencyTripById(req, res, next));
 router.get('/trips/:tripId/passengers', (req, res, next) => reservationController.getAgencyTripPassengers(req, res, next));
+// Trip status: la agencia solo puede COMPLETAR viajes exclusivamente suyos
+// (nunca cancelar un viaje entero ni archivar). Ver
+// controllers/agency-trip.controller.ts + migración 104.
+router.patch('/trips/:tripId/status', (req, res, next) =>
+  agencyTripController.updateTripStatus(req, res, next),
+);
 router.get('/reservations', (req, res, next) => reservationController.getAgencyReservations(req, res, next));
 router.get('/reservations/links', (req, res, next) =>
   reservationLinkController.list(req, res, next),
