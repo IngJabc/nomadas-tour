@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check } from 'lucide-react';
 
-const STEPS = [
+const STEPS_ADMIN = [
   { label: 'Ruta', short: 'Ruta' },
   { label: 'Programación', short: 'Prog.' },
   { label: 'Vehículo', short: 'Veh.' },
@@ -11,11 +11,23 @@ const STEPS = [
   { label: 'Revisión', short: 'Rev.' },
 ];
 
+/** AS-TRIP-003.1 — el alta de la agencia no tiene paso de Agencias. */
+const STEPS_AGENCY = [
+  { label: 'Ruta', short: 'Ruta' },
+  { label: 'Programación', short: 'Prog.' },
+  { label: 'Vehículo', short: 'Veh.' },
+  { label: 'Revisión', short: 'Rev.' },
+];
+
 interface StepIndicatorProps {
   currentStep: number;
+  /** Por defecto 'admin' (superadmin, 5 pasos). 'agency' = 4 pasos. */
+  variant?: 'admin' | 'agency';
 }
 
-export function StepIndicator({ currentStep }: StepIndicatorProps) {
+export function StepIndicator({ currentStep, variant = 'admin' }: StepIndicatorProps) {
+  const STEPS = variant === 'agency' ? STEPS_AGENCY : STEPS_ADMIN;
+
   return (
     <nav aria-label="Progreso del formulario" className="w-full">
       <ol className="flex items-center justify-between">

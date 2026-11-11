@@ -124,7 +124,7 @@ FASE 6 — Reportes                        → FUTURA
 FASE 7 — UX (legacy, ver Fase B)         → INTEGRADA EN FASE B
 FASE 8 — Escalabilidad (ver Fase D)      → INTEGRADA EN FASE D
 
-PRÓXIMA INICIATIVA — Auto-servicio de rutas y viajes por agencia → DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002 IMPLEMENTADOS (2026-11-10)
+PRÓXIMA INICIATIVA — Auto-servicio de rutas y viajes por agencia → DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002/003 IMPLEMENTADOS (2026-11-10)
 `
 
 ---
@@ -151,7 +151,10 @@ opera su día a día sin administrar su propia oferta.
    solo-lectura a sus trips asignados; desde **AS-TRIP-001/002** pueden
    **completar** viajes asignados en exclusiva que ya salieron, desde la
    UI "Completar viaje" de su panel (nunca cancelar viajes completos ni
-   archivar).
+   archivar), y desde **AS-TRIP-003** pueden **crear** un viaje nuevo
+   asignado en exclusiva a su propia agencia eligiendo una ruta global
+   activa (`POST /api/agency/trips`, `agency_ids` rechazado por schema
+   strict).
 
 3. **Autorización RPC + RLS** - El patrón de autorización por RPC con validación
    de `agency_id` es el modelo correcto y ya está implementado en todos los RPCs
@@ -178,6 +181,11 @@ opera su día a día sin administrar su propia oferta.
 - **Preservar routes globales** - Rutas existentes continúan sin cambios.
   Evaluar tabla `agency_routes` para gestión agency-specific de routes.
   Mantener compatibilidad con trips y routes globales existentes.
+  **La creación/edición de rutas por la agencia NO está soportada** y
+  requiere una **decisión de producto aparte**; AS-TRIP-003 solo permite
+  **seleccionar** rutas globales existentes desde el catálogo
+  (`GET /api/agency/routes`) y explica al usuario que una ruta faltante
+  se solicita al superadmin (sin workaround de rutas de agencia).
 
 - **Definir permisos agency** - Evaluar qué acciones pueden realizar agencies
   sobre sus routes/trips designados vs. qué requiere superadmin. El patrón
@@ -192,6 +200,24 @@ opera su día a día sin administrar su propia oferta.
   separada e independiente. Cancelar un viaje **con reservas existentes
   queda bloqueado hasta que exista el flujo de reembolsos** (no se
   implementan reembolsos en este incremento).
+
+- **Alta de viaje por la agencia** — **Resuelto en AS-TRIP-003** y
+  afinado en **AS-TRIP-003.1**: la agencia crea un viaje nuevo con
+  `POST /api/agency/trips` desde un **modal abierto en `/agency/trips`**
+  (mismo builder que el superadmin, sin paso de Agencias), eligiendo una
+  **ruta global activa** del catálogo (`GET /api/agency/routes`, solo
+  lectura; corregido en AS-TRIP-003.1 para no referenciar la columna
+  `duration_minutes` que la migración 006 eliminó). La agencia sale
+  **siempre** de `req.ctx`; el schema es **strict** (rechaza
+  `agency_ids`, `agency_id`, `status`, etc.) y el viaje nace con
+  **exactamente una** fila en `trip_agencies`. Se reutiliza
+  `superadminService.createTrip` (RPC `create_trip` o rollback
+  compensatorio) con todas las validaciones existentes: ruta
+  existente/activa, salida futura, duplicado, capacidad y precio. **No se
+  crean rutas desde la agencia**; si la ruta no existe, el UI explica que
+  hay que solicitarla al superadmin. Éxito → cierra el modal + toast +
+  refresca la lista; error → modal abierto para reintentar. La **edición**
+  de viajes por la agencia sigue pendiente.
 
 - **Definir aislamiento cross-agency** - Confirmar que políticas RLS y validaciones
   RPC previenen acceso cruzado entre agencias en todas las operaciones.
@@ -208,30 +234,41 @@ opera su día a día sin administrar su propia oferta.
    `'inactive'` **no se introduce**.
 3. Definir RPCs agency para operaciones trip management — **parcialmente
    cerrado**: completar viaje agency implementado en AS-TRIP-001
-   (RPC `set_trip_status` con autorización); el resto (alta/edición de
-   rutas y viajes por la agencia) sigue pendiente.
+   (RPC `set_trip_status` con autorización) y alta de viaje en
+   AS-TRIP-003 (reutiliza `create_trip` con la agencia de la sesión); el
+   resto (alta/edición de rutas y **edición** de viajes por la agencia)
+   sigue pendiente.
 4. Panel UI: ubicación y componentes para route/trip management en panel
    agency — **parcial**: la acción **"Completar viaje"** ya está entregada
-   en **AS-TRIP-002** (lista de viajes + confirmación + errores 403/404/409);
-   alta/edición de rutas y viajes por la agencia sigue **pendiente**.
+   en **AS-TRIP-002** (lista de viajes + confirmación + errores 403/404/409)
+   y el alta **"Nuevo viaje"** está en **AS-TRIP-003 / AS-TRIP-003.1**
+   (**modal desde `/agency/trips`**, sin página propia); alta/edición de
+   **rutas** y **edición** de viajes por la agencia sigue **pendiente**.
 5. ~~Validación: discrepancy `'archived'` status BD vs código aplicación~~
    — **cerrada** (migración 033).
 
-**Trabajo restante explícito (post AS-TRIP-002):**
+**Trabajo restante explícito (post AS-TRIP-003):**
 
 - **Sistema de reembolsos**: prerequisite para permitir cancelar un viaje
   con reservas. Mientras no exista, `set_trip_status` responde
   `ERR_TRIP_HAS_RESERVATIONS` (409) y no cambia nada. La cancelación
   **individual** de reservas sigue siendo una operación separada que sí
   funciona.
-- Alta/edición de rutas y viajes por la agencia (sigue pendiente de
-  definición; `agency_routes` proposal-only).
+- **Edición de viajes por la agencia** (sigue pendiente de definición).
+- **Alta/edición de rutas por la agencia**: **no soportado** — las rutas
+  son globales sin `agency_id` y su CRUD es superadmin-only. Cualquier
+  ruta específica de agencia requiere una **decisión de producto aparte**
+  (tabla `agency_routes`, **proposal-only, no implementar**). El alta de
+  viajes **no** crea rutas: si la ruta necesaria no existe, la agencia
+  debe solicitarla al superadmin.
 
-**Estado:** **DESCUBRIMIENTO COMPLETO + 2 INCREMENTOS IMPLEMENTADOS**
+**Estado:** **DESCUBRIMIENTO COMPLETO + 3 INCREMENTOS IMPLEMENTADOS**
 (DISC-AS-01…05 completados; **AS-TRIP-001** — autorización de transiciones
 de estado de viaje — con migración `104_trip_status_authorization.sql`
 **ya aplicada a Supabase**; **AS-TRIP-002** — UI "Completar viaje" en el
-panel de agencia que consume ese endpoint). Detalle de los tickets en
+panel de agencia que consume ese endpoint; **AS-TRIP-003** — alta de viaje
+por la agencia con asignación exclusiva y catálogo global de rutas, **sin
+migración nueva**). Detalle de los tickets en
 [TASKS.md](../TASKS.md).
 
 **Relación con las fases existentes:** la **Fase A sigue en progreso** y

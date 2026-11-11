@@ -9,23 +9,34 @@ import { EmptyState } from '@/components/ui/EmptyState';
 const inputClass =
   "w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-white outline-none transition-all duration-200 focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)]";
 
+/**
+ * AS-TRIP-003: acepta el subconjunto de campos que realmente usa el
+ * selector (el catálogo de agencia no incluye `created_by` ni métricas),
+ * de modo que el admin puede seguir pasando `Route[]` completo.
+ */
 interface RouteStepProps {
-  routes: Route[];
+  routes: Array<Pick<Route, 'id' | 'origin' | 'destination' | 'status'>>;
   selectedRouteId: string;
   onSelect: (routeId: string) => void;
+  /**
+   * Texto del estado vacío. Por defecto el del superadmin ("crea una
+   * ruta"); la agencia no puede crear rutas, así que allí se explica que
+   * la ruta global hay que pedirla al superadmin.
+   */
+  emptyMessage?: string;
 }
 
-export function RouteStep({ routes, selectedRouteId, onSelect }: RouteStepProps) {
+export function RouteStep({
+  routes,
+  selectedRouteId,
+  onSelect,
+  emptyMessage = 'No hay rutas activas disponibles. Crea una ruta primero.',
+}: RouteStepProps) {
   const activeRoutes = routes.filter((r) => r.status === 'active');
   const selectedRoute = routes.find((r) => r.id === selectedRouteId);
 
   if (activeRoutes.length === 0) {
-    return (
-      <EmptyState
-        icon={<MapPin className="w-8 h-8" />}
-        message="No hay rutas activas disponibles. Crea una ruta primero."
-      />
-    );
+    return <EmptyState icon={<MapPin className="w-8 h-8" />} message={emptyMessage} />;
   }
 
   return (

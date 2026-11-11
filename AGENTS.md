@@ -337,7 +337,12 @@ pasajeros no autentican en la plataforma.
 ### Área agencia
 
 - `/agency` → Centro de operaciones de la agencia
-- `/agency/trips` → Viajes asignados
+- `/agency/trips` → Viajes asignados. La **alta de viaje es un MODAL**
+  abierto desde el CTA "Nuevo viaje" (mismo builder que el superadmin,
+  4 pasos sin Agencias: ruta global activa + salida + vehículo; la
+  agencia se asigna a sí misma en el backend, sin `agency_ids`; si la
+  ruta no existe se solicita al superadmin). **No existe página
+  `/agency/trips/new`**
 - `/agency/trips/[id]/passengers` → Pasajeros del viaje
 - `/agency/reservations` → Reservas propias
 - `/agency/reservations/new` → Wizard de nueva reserva

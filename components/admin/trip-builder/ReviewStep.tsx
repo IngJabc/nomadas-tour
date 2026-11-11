@@ -9,8 +9,14 @@ import type { Route } from '@/types';
 
 interface ReviewStepProps {
   state: TripBuilderState;
-  routes: Route[];
-  agencies: { id: string; name: string }[];
+  /** Subconjunto que consume la revisión (igual que en `RouteStep`). */
+  routes: Array<Pick<Route, 'id' | 'origin' | 'destination' | 'status'>>;
+  /**
+   * Omitido en el builder de agencia (AS-TRIP-003.1): sin selector de
+   * agencias no hay nada que resumir en esa fila. El superadmin siempre
+   * la pasa, así que su revisión no cambia.
+   */
+  agencies?: { id: string; name: string }[];
   mode: 'create' | 'edit';
 }
 
@@ -47,7 +53,7 @@ function InfoRow({
 
 export function ReviewStep({ state, routes, agencies, mode }: ReviewStepProps) {
   const route = routes.find((r) => r.id === state.route_id);
-  const selectedAgencies = agencies.filter((a) =>
+  const selectedAgencies = (agencies ?? []).filter((a) =>
     state.agency_ids.includes(a.id),
   );
 
@@ -106,17 +112,21 @@ export function ReviewStep({ state, routes, agencies, mode }: ReviewStepProps) {
             value={seatPriceLabel}
           />
 
-          <div className="w-full h-px bg-[rgba(0,0,0,0.06)]" />
+          {agencies && (
+            <>
+              <div className="w-full h-px bg-[rgba(0,0,0,0.06)]" />
 
-          <InfoRow
-            icon={<Building2 className="w-4 h-4" />}
-            label={`Agencias (${selectedAgencies.length})`}
-            value={
-              selectedAgencies.length > 0
-                ? selectedAgencies.map((a) => a.name).join(', ')
-                : 'No seleccionadas'
-            }
-          />
+              <InfoRow
+                icon={<Building2 className="w-4 h-4" />}
+                label={`Agencias (${selectedAgencies.length})`}
+                value={
+                  selectedAgencies.length > 0
+                    ? selectedAgencies.map((a) => a.name).join(', ')
+                    : 'No seleccionadas'
+                }
+              />
+            </>
+          )}
         </div>
       </Card>
     </div>

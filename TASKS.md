@@ -1,7 +1,7 @@
 # TASKS
 
 > Documento **operativo del sprint**. Una tarea activa a la vez; marcar `[x]` al completar.
-> **Estado:** **Fase A (Production & SaaS Readiness)** en progreso — SEO, Legal, Analytics, SEC-010…014, OBS-001. **SEC-009** permanece abierto (009.0/.1/.2 COMPLETED; 009.3 CANCELADA). **Próxima iniciativa de producto:** auto-servicio de rutas y viajes por agencia — descubrimiento **DISC-AS-01…05 completado** e incrementos implementados: **AS-TRIP-001** (autorización de transiciones de estado de viaje) y **AS-TRIP-002** (UI "Completar viaje" en el panel de agencia).
+> **Estado:** **Fase A (Production & SaaS Readiness)** en progreso — SEO, Legal, Analytics, SEC-010…014, OBS-001. **SEC-009** permanece abierto (009.0/.1/.2 COMPLETED; 009.3 CANCELADA). **Próxima iniciativa de producto:** auto-servicio de rutas y viajes por agencia — descubrimiento **DISC-AS-01…05 completado** e incrementos implementados: **AS-TRIP-001** (autorización de transiciones de estado de viaje), **AS-TRIP-002** (UI "Completar viaje" en el panel de agencia) y **AS-TRIP-003** (alta de viaje por la agencia sobre rutas globales).
 > **Visión de producto (mediano/largo plazo):** [`docs/ROADMAP.md`](docs/ROADMAP.md)
 > **Historial de sprints completados:** [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 > **Guía para mantener la documentación:** [`docs/documentation-guide.md`](docs/documentation-guide.md)
@@ -243,13 +243,15 @@ Detalle y evidencia de cutover: [`docs/TASKS-HISTORY.md`](docs/TASKS-HISTORY.md)
 
 ---
 
-## Próxima iniciativa — Auto-servicio de rutas y viajes por agencia (DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002, 2026-11-10)
+## Próxima iniciativa — Auto-servicio de rutas y viajes por agencia (DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002/003, 2026-11-10)
 
 **Dirección:** la agencia pasa a **autogestionar sus rutas y viajes sobre
-sus propios datos** (hoy la alta y edición de rutas/viajes depende del
-superadmin). El **descubrimiento cerró** (DISC-AS-01…05) y los primeros
+sus propios datos** (hoy la alta y edición de rutas depende del
+superadmin; la alta de viajes ya la puede hacer la agencia). El
+**descubrimiento cerró** (DISC-AS-01…05) y los primeros
 incrementos de implementación (**AS-TRIP-001** autorización de estado,
-**AS-TRIP-002** UI "Completar viaje") ya están entregados; el resto
+**AS-TRIP-002** UI "Completar viaje", **AS-TRIP-003** alta de viaje por la
+agencia) ya están entregados; el resto
 sigue siendo **ítems de alcance** para convertirlos en tickets de fase. No
 se inventan requisitos — cada ítem se resuelve con evidencia del dominio
 existente.
@@ -264,7 +266,11 @@ reservas B2C viven en `nomadas-tour-marketplace`).
 - [x] **DISC-AS-01** — Alcance de rutas: CRUD de rutas de la agencia vs
   alta/edición por superadmin, y efecto sobre viajes ya publicados.
   - **Verificado:** Rutas son entidades globales sin `agency_id` en la tabla.
-    Migración 001 y 011 crean `routes(id, origin, destination, duration_minutes, created_at)`.
+    Migración 001 crea `routes(id, origin, destination, duration_minutes, created_at)`;
+    la **006 elimina `duration_minutes`** (`DROP COLUMN IF EXISTS`) y agrega
+    `created_by`/`updated_at`; la 011 (create_all) define
+    `routes(id, origin, destination)`; por lo tanto **`duration_minutes` NO
+    existe en la BD actual** (ver AS-TRIP-003.1).
     Migración 021 agrega `status TEXT NOT NULL DEFAULT 'active'` con CHECK
     `status IN ('active', 'inactive')` e índice `idx_routes_status`.
     RLS `routes_superadmin_all` solo permite superadmin modificar rutas.
@@ -413,8 +419,135 @@ reservas B2C viven en `nomadas-tour-marketplace`).
     Suite backend **84 archivos / 782 tests ✅**; suite raíz **77
     archivos / 735 passed, 4 skipped ✅**; `tsc --noEmit` (raíz y
     backend), `backend build` y `next build` **exit 0**.
-  - **Pendiente (fuera de este ticket):** alta/edición de rutas y viajes
-    por la agencia (UI de route/trip management), flujo de reembolsos.
+  - **Pendiente (fuera de este ticket):** alta/edición de rutas por la
+    agencia (UI de route management), flujo de reembolsos.
+
+- [x] **AS-TRIP-003** — Alta de viaje por la agencia sobre rutas globales
+  (**IMPLEMENTADO, 2026-11-10**). Reutiliza el dominio de AS-TRIP-001/002;
+  **sin migración nueva** (se reutilizan `create_trip`, `trip_agencies` y
+  las validaciones existentes).
+  - **Endpoint nuevo:** `POST /api/agency/trips` (`auth + authorize('agency')
+    + tenant`) → `AgencyTripController.createTrip` →
+    `superadminService.createAgencyTrip(ctx, input)`.
+    - Schema Zod **strict**: solo `route_id`, `departure_time`,
+      `vehicle_type` (`bus|kia`) y `seat_price` opcional (centavos).
+      `agency_ids`, `agency_id`, `status`, `postpone`, `created_by`,
+      `actor_user_id` o cualquier campo extra → **400** (no se filtran en
+      silencio): imposible crear viajes compartidos o asignar otra agencia
+      desde el cliente.
+    - La agencia se deriva **solo** de `req.ctx`; el service re-verifica
+      rol `agency`, `agency_id` presente y que la agencia exista y esté
+      `active` (defensa en profundidad además del middleware `tenant`).
+    - Delega en `createTrip(..., [ctx.agencyId], ctx.userId, ...)`:
+      **exactamente una** fila en `trip_agencies`, atomicidad vía RPC
+      `create_trip` (outbox) o rollback compensatorio asientos+viaje
+      (legacy), y **todas** las validaciones existentes: ruta existente y
+      activa, salida en el futuro, duplicado ruta+salida, vehículo/
+      capacidad (bus=31, kia=10) y precio entero en centavos.
+  - **Catálogo de rutas:** `GET /api/agency/routes` →
+    `listRoutesCatalog()` (solo lectura, solo rutas `active`, sin métricas
+    ni escritura). **Las rutas siguen siendo globales y superadmin-only.**
+    El select solo usa columnas reales: `id, origin, destination, status`
+    (ver **AS-TRIP-003.1**).
+  - **Frontend:** alta desde **modal** en `/agency/trips` vía
+    `AgencyTripBuilderModal` → `BuilderLayout variant="agency"` reutilizando
+    `StepIndicator`, `RouteStep`, `ScheduleStep`, `VehicleStep` y
+    `ReviewStep` del builder del superadmin (**AS-TRIP-003.1**; el incremento
+    original usaba la página `/agency/trips/new`, hoy eliminada), más el CTA
+    **"Nuevo viaje"** en el header de `/agency/trips`.
+    - Sin rutas activas → EmptyState dentro del modal: *"…Las rutas son
+      globales: solicita al superadmin la creación de la ruta que
+      necesitas…"* **No se crea ninguna ruta específica de agencia.**
+    - Sin paso de Agencias ni `agency_ids`: la agencia sale **siempre** de
+      `req.ctx`.
+    - Validación en cliente idéntica al builder (salida futura, precio
+      requerido/entero); el backend vuelve a validar todo.
+    - Éxito → cierra el modal + toast + refresca la lista (sin
+      navegación). Error → mensaje **inline** con el modal **abierto** para
+      reintentar, nunca toast de éxito si falla.
+  - **Tests:** `backend/src/controllers/agency-trip.create.controller.test.ts`
+    + bloque `createAgencyTrip`/`listRoutesCatalog` en
+    `superadmin.service.test.ts` + `tests/agency/AgencyTripCreate.test.tsx`.
+    Cubren: creación exitosa, asignación exacta a la agencia autenticada,
+    rechazo de `agency_ids`/`agency_id` spoofed, rechazo de viajes
+    compartidos, ruta inexistente/inactiva, vehículo inválido, salida
+    pasada, duplicado, precio inválido, atomicidad (sin viaje ni asignación
+    parciales), agencia inexistente/inactiva, rol no-agencia, y que la
+    creación superadmin sigue intacta (suite completa).
+  - **Pendiente (fuera de este ticket):** edición de viajes por la agencia,
+    alta/edición de rutas (`agency_routes` proposal-only), flujo de
+    reembolsos (**prerequisito para cancelar un viaje con reservas**).
+  - **Verificación:** suite backend **85 archivos / 822 tests ✅**; suite
+    raíz **78 archivos / 746 passed, 4 skipped ✅**; `test:security`
+    **12 archivos / 133 tests ✅**; `npx tsc --noEmit` (raíz y backend),
+    `backend build` (tsc) y `next build` **exit 0**; `git diff --check`
+    **exit 0**. **Sin cambios de entorno** (ninguna env var nueva).
+
+- [x] **AS-TRIP-003.1** — Corrección del catálogo de rutas + alta de viaje
+  de la agencia en **modal** (**IMPLEMENTADO, 2026-11-11**). Sin migración
+  (el schema real no la requería) y sin cambios de entorno.
+  - **Corrección del error en producción** — `GET /api/agency/routes`
+    respondía `VALIDATION_ERROR: column routes.duration_minutes does not
+    exist`:
+    - **Causa:** `listRoutesCatalog()` seleccionaba `duration_minutes`.
+      La migración 001 la creó, la **006 la eliminó**
+      (`ALTER TABLE routes DROP COLUMN IF EXISTS duration_minutes`) y la
+      011 (create_all) solo define `routes(id, origin, destination)`; la
+      021 agrega `status`. La columna **no existe** en la BD actual.
+    - **Corrección:** select a columnas reales
+      `id, origin, destination, status`. **No se inventó columnas ni se
+      creó migración**: la duración nunca la consumió el frontend ni
+      `RouteStep` (solo `origin → destination`), así que no se necesita.
+    - **Contrato:** la respuesta es exactamente
+      `Pick<Route, 'id' | 'origin' | 'destination' | 'status'>[]`, que es
+      lo que esperan `agencyApi.listRoutes` y `RouteStep`; se quitó el
+      `duration_minutes` opcional del tipo en `lib/api.ts`.
+    - **Superadmin intacto:** su catálogo usa `listRoutes()`
+      (`select("*")` + métricas), otro service; sin cambios.
+  - **Investigación de navegación:** el único origen real de la navegación
+    a `/agency/trips/new` era el CTA `router.push('/agency/trips/new')`
+    del header de `/agency/trips` (sin middleware, redirects ni
+    navegación post-creación involucrados). Con la alta pasada a modal,
+    esa navegación desaparece: el CTA **abre el modal en la misma lista**,
+    el éxito cierra + toast + `doFetch()` y el error **no navega** (el
+    modal queda abierto).
+  - **UX modal (alineada a la del superadmin):** `AgencyTripBuilderModal`
+    envuelve el **mismo** `BuilderLayout` con `variant="agency"` (prop
+    opcional por defecto `'admin'` → el builder del superadmin no cambia):
+    mismos pasos, validaciones y componentes (`StepIndicator`, `RouteStep`,
+    `ScheduleStep`, `VehicleStep`, `ReviewStep`).
+    - 4 pasos (Ruta → Programación → Vehículo → Revisión): **sin paso de
+      Agencias, sin `agency_ids` ni configuración de viaje compartido**.
+    - Rutas: solo el catálogo **global activo** vía `GET /api/agency/routes`;
+      vacío → *"…solicita al superadmin…"*; fallo de carga → **Reintentar**
+      dentro del modal.
+    - Vehículos: los tipos soportados (`bus`=31 / `kia`=10); no existe
+      inventario de vehículos por agencia en el esquema — la capacidad y la
+      asignación del viaje a la agencia autenticada las valida el backend
+      (`createAgencyTrip` → `createTrip`, agencia siempre de `req.ctx`).
+    - Éxito → cierra el modal, toast `Viaje creado correctamente` y
+      refresca la lista; error → mensaje inline, modal **abierto** para
+      reintentar, nunca éxito falso ni navegación.
+  - **Eliminado:** `app/agency/trips/new/page.tsx` y todas sus
+    referencias (CTA, tipos y tests).
+  - **Tests nuevos/actualizados:**
+    `superadmin.service.test.ts` → select `id, origin, destination,
+    status` + **contrato contra las migraciones** (deriva las columnas de
+    `routes` desde `supabase/migrations/*.sql` y exige que el select solo
+    use columnas existentes y que `duration_minutes` ya no esté) +
+    chequeo de que ninguna fuente del backend la referencia en código;
+    `tests/agency/AgencyTripCreate.test.tsx` reescrita para el modal (12
+    tests): CTA sin navegar, catálogo por `/agency/routes` sin tocar
+    endpoints de admin, payload sin agencia, cierre + toast + refresh,
+    estado vacío, reintento de carga, revisión sin agencias, validaciones
+    (salida pasada, precio requerido/entero), error 409/red con modal
+    abierto y doble envío bloqueado.
+  - **Verificación:** suite raíz **78 archivos / 747 passed, 4 skipped ✅**;
+    suite backend **85 archivos / 824 tests ✅**; `test:security`
+    **12 archivos / 133 tests ✅**; `npx tsc --noEmit` raíz y backend
+    **exit 0**; `next build` **exit 0** (sin `/agency/trips/new`) y
+    `backend build` (tsc) **exit 0**; `git diff --check` **exit 0**.
+    **Sin migraciones, sin nuevas env vars, sin commit/push/deploy.**
 
 **Relación con las fases:** la **Fase A sigue en progreso** y conserva su
 prioridad crítica; esta iniciativa se planifica en paralelo **sin cerrar ni
@@ -428,8 +561,10 @@ de producto.
   033 — la "discrepancia abierta" quedó cerrada; agencies eran solo lectura
   en trips hasta AS-TRIP-001/002). Requerimientos pendientes:
   - diseño `agency_routes` table (**proposal-only, no implementar**),
-  - panel UI para alta/edición de rutas y viajes por la agencia
-    (la acción "Completar viaje" ya está entregada en AS-TRIP-002),
+  - panel UI para **alta/edición de rutas** por la agencia (la alta de
+    **viajes** ya está entregada en **AS-TRIP-003** y la acción
+    "Completar viaje" en **AS-TRIP-002**; la **edición** de viajes sigue
+    pendiente),
   - flujo de reembolsos (bloquea cancelar viaje con reservas).
 
 ---
@@ -438,7 +573,7 @@ de producto.
 
 | Orden | Ticket / Fase                 | Tema                                                                                                                                                                                                                                                                                                                                                                              | Estado      |
 | ----- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| —     | **Próxima iniciativa**        | Auto-servicio de rutas y viajes por agencia (descubrimiento **DISC-AS-01…05** completado; **AS-TRIP-001** autorización de estado de viaje + **AS-TRIP-002** UI "Completar viaje" IMPLEMENTADOS; resto: UI alta/edición rutas-viajes, `agency_routes` proposal-only, reembolsos)                                    | En curso (2 incrementos listos) |
+| —     | **Próxima iniciativa**        | Auto-servicio de rutas y viajes por agencia (descubrimiento **DISC-AS-01…05** completado; **AS-TRIP-001** autorización de estado de viaje, **AS-TRIP-002** UI "Completar viaje" y **AS-TRIP-003** alta de viaje por la agencia IMPLEMENTADOS; resto: alta/edición de rutas y edición de viajes, `agency_routes` proposal-only, reembolsos)                                    | En curso (3 incrementos listos) |
 | —     | **Fase A**                    | SEO (SEO-001…008), Legal (LEGAL-001…005), Analytics (ANALYTICS-001/002), SEC-010…014, OBS-001. Ver [`docs/ROADMAP.md`](docs/ROADMAP.md)                                                                                                                                                                                                                                            | En progreso |
 | —     | **Fase B (Professional UX)**  | UX-001…011 (accesibilidad, mobile, estados de error, focus, contraste)                                                                                                                                                                                                                                                                                                            | Planificada |
 | —     | **Fase C (Reliability & Perf)**| REL-001…006 (readiness, timeouts, paginación, métricas)                                                                                                                                                                                                                                                                                                                           | Planificada |

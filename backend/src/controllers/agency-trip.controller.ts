@@ -19,6 +19,27 @@ const updateTripStatusSchema = z.object({
   status: z.enum(["completed"]),
 });
 
+/**
+ * AS-TRIP-003 — alta de viaje por la agencia.
+ *
+ * Schema **strict**: cualquier campo que no esté listado aqui se rechaza
+ * con 400. En particular NO existen `agency_ids` / `agency_id` / `status`:
+ * la agencia no puede elegir a quién se asigna el viaje, crear viajes
+ * compartidos ni introducir estados no soportados. La asignación se
+ * deriva en el server desde `req.ctx`.
+ */
+export const createTripSchema = z
+  .object({
+    route_id: z.string().uuid(),
+    departure_time: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/),
+    vehicle_type: z.enum(["bus", "kia"]),
+    /** Centavos COP (trips.seat_price). Omitir = no publicar precio. */
+    seat_price: z.number().int().min(0).max(2_147_483_647).optional(),
+  })
+  .strict();
+
 export class AgencyTripController {
   async updateTripStatus(req: Request, res: Response, next: NextFunction) {
     try {
@@ -35,6 +56,39 @@ export class AgencyTripController {
           ? new ValidationError("Invalid input", (error as any).issues)
           : error
       );
+    }
+  }
+
+  /**
+   * AS-TRIP-003 — `POST /api/agency/trips`. Crea un viaje asignado en
+   * exclusiva a la agencia autenticada. El `agency_id` nunca se acepta
+   * del body: sale de `req.ctx`.
+   */
+  async createTrip(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = createTripSchema.parse(req.body);
+      const trip = await superadminService.createAgencyTrip(req.ctx!, data);
+      res.status(201).json(trip);
+    } catch (error) {
+      next(
+        error instanceof z.ZodError
+          ? new ValidationError("Invalid input", (error as any).issues)
+          : error
+      );
+    }
+  }
+
+  /**
+   * `GET /api/agency/routes` — catálogo global de rutas activas para el
+   * selector de viaje. Solo lectura: la agencia no puede crear, editar ni
+   * desactivar rutas (eso sigue siendo superadmin-only).
+   */
+  async listRoutes(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const routes = await superadminService.listRoutesCatalog();
+      res.json(routes);
+    } catch (error) {
+      next(error);
     }
   }
 }

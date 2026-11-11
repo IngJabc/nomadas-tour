@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bus, AlertTriangle, Search, X } from 'lucide-react';
+import { Bus, AlertTriangle, Search, X, Plus } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { agencyApi } from '@/lib/api';
 import { subscribeToTripSeats, subscribeToTripAgencies, subscribeToTrips } from '@/lib/realtime/subscriptions';
@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { AgencyTripCard, type AgencyTrip } from '@/components/agency/AgencyTripCard';
+import { AgencyTripBuilderModal } from '@/components/agency/AgencyTripBuilderModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { ApiError } from '@/lib/errors/api-error';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
@@ -89,6 +90,17 @@ export default function AgencyTripsContent() {
 
   useEffect(() => {
     doFetch();
+  }, [doFetch]);
+
+  // ─── AS-TRIP-003.1: alta de viaje en modal (sin salir de la lista) ──
+  const [builderOpen, setBuilderOpen] = useState(false);
+
+  const handleBuilderSuccess = useCallback(() => {
+    // Solo llega con el backend confirmando la creación: cierra, avisa y
+    // refresca la lista. Si la creación falla, el modal sigue abierto.
+    setBuilderOpen(false);
+    toast.success('Viaje creado correctamente');
+    void doFetch();
   }, [doFetch]);
 
   // ─── AS-TRIP-002: completar viaje (confirmación → PATCH → refresh) ──
@@ -316,7 +328,18 @@ export default function AgencyTripsContent() {
         animate="visible"
         transition={{ duration: 0.25 }}
       >
-        <PageHeader title="Mis viajes" />
+        <PageHeader
+          title="Mis viajes"
+          action={
+            <Button
+              onClick={() => setBuilderOpen(true)}
+              aria-label="Nuevo viaje"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo viaje
+            </Button>
+          }
+        />
       </motion.div>
 
       {fetchError && (
@@ -454,6 +477,15 @@ export default function AgencyTripsContent() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* AS-TRIP-003.1 — alta de viaje en modal (mismo builder que el
+          superadmin, adaptado a agencia: sin selector de agencias y con
+          la identidad derivada en el backend). */}
+      <AgencyTripBuilderModal
+        open={builderOpen}
+        onClose={() => setBuilderOpen(false)}
+        onSuccess={handleBuilderSuccess}
+      />
 
       {/* AS-TRIP-002 — confirmación antes de marcar el viaje completado */}
       <ConfirmModal

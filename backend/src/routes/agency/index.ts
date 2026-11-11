@@ -20,6 +20,16 @@ router.use(auth, authorize('agency'), tenant);
 
 router.get('/dashboard', (req, res, next) => reservationController.getAgencyDashboard(req, res, next));
 router.get('/trips', (req, res, next) => reservationController.getAgencyTrips(req, res, next));
+// Catálogo global de rutas (solo lectura): las rutas siguen siendo
+// globales y su creación/edición es superadmin-only.
+router.get('/routes', (req, res, next) =>
+  agencyTripController.listRoutes(req, res, next),
+);
+// Alta de viaje: la agencia sale de la sesión (req.ctx), nunca del body;
+// el viaje nace con una sola asignación en trip_agencies.
+router.post('/trips', (req, res, next) =>
+  agencyTripController.createTrip(req, res, next),
+);
 router.get('/trips/:tripId', (req, res, next) => reservationController.getAgencyTripById(req, res, next));
 router.get('/trips/:tripId/passengers', (req, res, next) => reservationController.getAgencyTripPassengers(req, res, next));
 // Trip status: la agencia solo puede COMPLETAR viajes exclusivamente suyos

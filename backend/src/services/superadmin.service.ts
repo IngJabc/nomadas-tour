@@ -7,6 +7,7 @@ import {
   NotFoundError,
   ValidationError,
   ForbiddenError,
+  AgencyInactiveError,
 } from "../errors/index.js";
 import { generateToken } from "../utils/token.js";
 import { toUTC } from "../utils/timezone.js";
@@ -292,6 +293,31 @@ export class SuperadminService {
       );
       return { ...route, tripCount, reservationCount };
     });
+  }
+
+  /**
+   * AS-TRIP-003 — catálogo de rutas para el selector del viaje de la
+   * agencia. Las rutas siguen siendo **globales** (sin `agency_id`): aquí
+   * solo se leen las activas, sin métricas ni escritura. La agencia no
+   * puede crear ni editar rutas; si la ruta que necesita no existe, hay
+   * que pedirla al superadmin.
+   *
+   * AS-TRIP-003.1 — el select solo puede usar columnas que existan hoy.
+   * `routes.duration_minutes` NO existe: la migración 001 la creó, la 006
+   * la eliminó (`DROP COLUMN IF EXISTS duration_minutes`) y la 011 (rebuilt
+   * final) solo define `id, origin, destination`; la 021 añade `status`.
+   * El frontend nunca necesitó la duración (ni el builder ni `RouteStep`),
+   * así que no se selecciona ni se recrea.
+   */
+  async listRoutesCatalog() {
+    const { data, error } = await supabaseAdmin
+      .from("routes")
+      .select("id, origin, destination, status")
+      .eq("status", "active")
+      .order("origin");
+
+    if (error) throw new ValidationError(error.message);
+    return data ?? [];
   }
 
   async createRoute(origin: string, destination: string) {
@@ -604,6 +630,62 @@ export class SuperadminService {
       });
 
     return trip;
+  }
+
+  /**
+   * AS-TRIP-003 — alta de un viaje desde el panel de agencia.
+   *
+   * REGLAS:
+   * - La agencia se deriva SIEMPRE de `req.ctx` (sesión + `public.users`);
+   *   el body, la query o los headers nunca pueden elegir otra agencia.
+   * - El viaje nace con **exactamente una** fila en `trip_agencies`: la de
+   *   la agencia autenticada. No existen viajes compartidos ni alta de
+   *   otras agencias por este camino (el controller además rechaza campos
+   *   extra con un schema `strict`).
+   * - Todas las validaciones de negocio (ruta existente/activa, salida en
+   *   el futuro, duplicado, vehículo/capacidad, precio) las aplica
+   *   `createTrip`, que también garantiza la atomicidad viaje + asientos +
+   *   asignación (RPC `create_trip` o rollback compensatorio).
+   * - La identidad de la agencia se verifica de nuevo aquí: defensa en
+   *   profundidad además del middleware `tenant`.
+   */
+  async createAgencyTrip(
+    ctx: RequestContext,
+    input: {
+      route_id: string;
+      departure_time: string;
+      vehicle_type: "bus" | "kia";
+      seat_price?: number | null;
+    }
+  ) {
+    if (ctx.role !== "agency" || !ctx.agencyId) {
+      throw new ForbiddenError("Solo las agencias pueden crear viajes");
+    }
+
+    // Capacidad/vehículo: la misma configuración estática que usa el
+    // superadmin (bus = 31, kia = 10). Un tipo desconocido nunca llega
+    // a tocar la base de datos.
+    if (!this.VEHICLE_CONFIG[input.vehicle_type]) {
+      throw new ValidationError("Tipo de vehículo no válido");
+    }
+
+    const { data: agency, error: agencyError } = await supabaseAdmin
+      .from("agencies")
+      .select("id, status")
+      .eq("id", ctx.agencyId)
+      .single();
+
+    if (agencyError || !agency) throw new NotFoundError("Agency not found");
+    if (agency.status !== "active") throw new AgencyInactiveError();
+
+    return this.createTrip(
+      input.route_id,
+      input.departure_time,
+      input.vehicle_type,
+      [ctx.agencyId],
+      ctx.userId,
+      input.seat_price ?? null
+    );
   }
 
   async listTrips(
