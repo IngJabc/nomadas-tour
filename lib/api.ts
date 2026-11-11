@@ -492,6 +492,17 @@ export const agencyApi = {
   listTrips: () => request<any[]>('/agency/trips'),
   getTrips: () => request<any[]>('/agency/trips'),
   getTrip: (tripId: string) => request<any>(`/agency/trips/${tripId}`),
+  /**
+   * AS-TRIP-002 — marca un viaje como completado.
+   * `PATCH /api/agency/trips/:tripId/status`. El backend valida el actor
+   * (sesión) y que el viaje sea exclusivo de la agencia; aquí solo se
+   * envía la intención.
+   */
+  completeTrip: (tripId: string) =>
+    request<{ id: string; status: string }>(
+      `/agency/trips/${encodeURIComponent(tripId)}/status`,
+      { method: 'PATCH', body: JSON.stringify({ status: 'completed' }) },
+    ),
   getTripPassengers: (tripId: string) =>
     request<AgencyTripPassengersResponse>(`/agency/trips/${tripId}/passengers`),
   listReservations: () => request<AgencyReservation[]>('/agency/reservations'),

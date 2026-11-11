@@ -306,3 +306,42 @@ describe('createAgencyReservation — ERR_TRIP_DEPARTED', () => {
     });
   });
 });
+
+// AS-TRIP-002 — el listado expone cuántas agencias tienen asignado el
+// viaje para que la UI decida mostrar "Completar viaje" (solo exclusivos).
+describe('getAgencyTrips — agency_count (AS-TRIP-002)', () => {
+  it('informa la cantidad de agencias por viaje', async () => {
+    queueFrom('trips', [
+      readSingle([
+        {
+          id: 'trip-1',
+          routes: { origin: 'Caracas', destination: 'Mérida' },
+          departure_time: '2026-11-09T08:00:00.000Z',
+          vehicle_type: 'bus',
+          status: 'active',
+        },
+        {
+          id: 'trip-2',
+          routes: { origin: 'Caracas', destination: 'Maracaibo' },
+          departure_time: '2026-11-09T09:00:00.000Z',
+          vehicle_type: 'kia',
+          status: 'active',
+        },
+      ]),
+    ]);
+    queueFrom('seats', [readSingle([])]);
+    queueFrom('trip_agencies', [
+      readSingle([
+        { trip_id: 'trip-1', agency_id: 'agency-1' },
+        { trip_id: 'trip-2', agency_id: 'agency-1' },
+        { trip_id: 'trip-2', agency_id: 'agency-2' },
+      ]),
+    ]);
+
+    const trips = await reservationService.getAgencyTrips(AGENCY_ID);
+
+    expect(trips).toHaveLength(2);
+    expect(trips[0]).toMatchObject({ id: 'trip-1', agency_count: 1 });
+    expect(trips[1]).toMatchObject({ id: 'trip-2', agency_count: 2 });
+  });
+});

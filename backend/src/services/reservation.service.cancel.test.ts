@@ -155,6 +155,13 @@ describe('reservationService.cancelAgencyReservation (F5-001)', () => {
       reservation_id: 'res-1',
       freed_seats: 2,
     });
+    // Camino independiente de la cancelación de un viaje entero:
+    // nunca toca set_trip_status ni el estado del viaje.
+    expect(mockRpc).not.toHaveBeenCalledWith(
+      'set_trip_status',
+      expect.anything(),
+    );
+    expect(mockRpc).toHaveBeenCalledTimes(1);
     expect(mockCreateForAgency).toHaveBeenCalled();
     const notif = mockCreateForAgency.mock.calls[0]?.[0] as {
       type: string;

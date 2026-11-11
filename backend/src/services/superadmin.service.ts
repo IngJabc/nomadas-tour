@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "../config/database.js";
 import { env } from "../config/env.js";
+import type { RequestContext } from "../types/index.js";
 import { generateUniqueSubdomain } from "../utils/subdomain.js";
 import {
   ConflictError,
@@ -40,6 +41,13 @@ export interface TripUpdateResult {
   trip: Record<string, unknown>;
   action: TripUpdateAction;
 }
+
+/**
+ * Actor autenticado de una transicion de estado de viaje (completar,
+ * cancelar, archivar). Se construye SIEMPRE desde `req.ctx`, que deriva
+ * de la sesion + `public.users`; nunca desde body/query/headers.
+ */
+export type TripStatusActor = RequestContext;
 
 const DEPARTURE_MUST_BE_FUTURE_MESSAGE =
   "La fecha y hora de salida debe ser posterior a la fecha y hora actual.";
@@ -92,6 +100,14 @@ function mapTripRpcError(error: { message?: string }): never {
     case "ERR_TRIP_NOT_DEPARTED":
     case "ERR_TRIP_DEPARTED":
       throw new ForbiddenError(detail);
+    case "ERR_ACTOR_REQUIRED":
+    case "ERR_ACTOR_NOT_FOUND":
+    case "ERR_FORBIDDEN_ROLE":
+    case "ERR_AGENCY_CANNOT_CANCEL":
+    case "ERR_TRIP_NOT_EXCLUSIVE":
+      throw new ForbiddenError(detail);
+    case "ERR_TRIP_HAS_RESERVATIONS":
+      throw new ConflictError(detail);
     case "ERR_TRIP_NOT_ACTIVE":
     case "ERR_NO_AGENCIES":
     case "ERR_INVALID_VEHICLE_TYPE":
@@ -1476,7 +1492,19 @@ export class SuperadminService {
     return { id, is_published: isPublished };
   }
 
-  async archiveTrip(id: string): Promise<{ id: string; status: "archived" }> {
+  async archiveTrip(
+    id: string,
+    actor: TripStatusActor,
+  ): Promise<{ id: string; status: "archived" }> {
+    // Archivar es superadmin-only: se valida en el route
+    // (authorize("superadmin")) y de nuevo aqui para que el servicio
+    // no dependa unicamente del middleware.
+    if (actor?.role !== "superadmin") {
+      throw new ForbiddenError(
+        "Solo un superadministrador puede archivar viajes",
+      );
+    }
+
     const { data: trip, error: fetchError } = await supabaseAdmin
       .from("trips")
       .select("id, status, route_id")
@@ -1571,8 +1599,17 @@ export class SuperadminService {
   async updateTripStatus(
     id: string,
     status: "completed" | "cancelled",
-    actorUserId?: string,
+    actor: TripStatusActor,
   ) {
+    // Actor: únicamente la sesión autenticada (req.ctx → public.users).
+    // Nunca se acepta un user id vindo del body, query o headers.
+    if (!actor?.userId) {
+      throw new ForbiddenError("Se requiere autenticación");
+    }
+    if (actor.role !== "superadmin" && actor.role !== "agency") {
+      throw new ForbiddenError("Permisos insuficientes");
+    }
+
     const { data: trip, error: fetchError } = await supabaseAdmin
       .from("trips")
       .select("departure_time, status, route_id")
@@ -1604,34 +1641,71 @@ export class SuperadminService {
       }
     }
 
-    if (env.TRIP_EFFECTS_VIA_OUTBOX) {
-      const { data, error } = await supabaseAdmin.rpc("set_trip_status", {
-        p_trip_id: id,
-        p_status: status,
-        p_actor_user_id: actorUserId ?? null,
-      });
-      if (error) throw mapTripRpcError(error);
-      return {
-        id: (data?.trip_id as string) ?? id,
-        status: (data?.status as "completed" | "cancelled") ?? status,
-      };
+    // ── Autorización por rol ──────────────────────────────────
+    if (actor.role === "agency") {
+      // Las agencias solo completan: nunca cancelan un viaje entero
+      // (la cancelación individual de reservas es otra operación).
+      if (status !== "completed") {
+        throw new ForbiddenError("Las agencias no pueden cancelar un viaje");
+      }
+
+      // Exclusividad: el viaje debe estar asignado exactamente a UNA
+      // agencia y esa agencia debe ser la del actor. Se lee de
+      // trip_agencies, nunca de una afirmación del cliente.
+      const { data: tripAgencies, error: taError } = await supabaseAdmin
+        .from("trip_agencies")
+        .select("agency_id")
+        .eq("trip_id", id);
+
+      if (taError) throw new ValidationError(taError.message);
+
+      const agencyIds = (tripAgencies ?? []).map((ta: any) => ta.agency_id);
+      if (agencyIds.length !== 1 || agencyIds[0] !== actor.agencyId) {
+        throw new ForbiddenError(
+          "El viaje no pertenece en exclusiva a tu agencia",
+        );
+      }
     }
 
-    const { error: updateError } = await supabaseAdmin
-      .from("trips")
-      .update({ status, updated_by: actorUserId ?? null })
-      .eq("id", id);
-
-    if (updateError) throw new ValidationError(updateError.message);
-
-    // Release all seats when trip is cancelled
+    // ── Guarda de cancelación: sin reservas vivas ─────────────
+    // Mientras no exista el sistema de reembolsos (MKT-006 6.2B) no
+    // se puede cancelar un viaje que tenga reservas. La verificación
+    // final y atómica la repite el RPC dentro de su transacción.
     if (status === "cancelled") {
-      await supabaseAdmin
-        .from("seats")
-        .update({ status: "available", locked_by: null, locked_at: null, lock_expires_at: null })
+      const { count, error: resError } = await supabaseAdmin
+        .from("reservations")
+        .select("id", { count: "exact", head: true })
         .eq("trip_id", id)
-        .in("status", ["locked", "reserved", "blocked"]);
+        .neq("status", "cancelled");
+
+      if (resError) throw new ValidationError(resError.message);
+      if ((count ?? 0) > 0) {
+        throw new ConflictError(
+          `No se puede cancelar un viaje con ${count} reserva(s) activa(s). El reembolso aún no está implementado`,
+        );
+      }
     }
+
+    // ── Único camino de transición: RPC transaccional ─────────
+    // No queda ningún UPDATE directo sobre trips.status: el RPC
+    // re-valida estado, ventana de salida, rol/exclusividad del actor
+    // y la guarda de reservas en la misma transacción (migración 104).
+    const { data, error } = await supabaseAdmin.rpc("set_trip_status", {
+      p_trip_id: id,
+      p_status: status,
+      p_actor_user_id: actor.userId,
+    });
+    if (error) throw mapTripRpcError(error);
+
+    const result = {
+      id: (data?.trip_id as string) ?? id,
+      status: (data?.status as "completed" | "cancelled") ?? status,
+    };
+
+    // Con el outbox activo el worker es el único emisor de emails y
+    // notificaciones (evita el doble envío). Con el outbox apagado el
+    // worker salta los eventos, así que se emiten aquí una sola vez.
+    if (env.TRIP_EFFECTS_VIA_OUTBOX) return result;
 
     // Send "trip cancelled" emails to active agencies
     if (status === "cancelled") {

@@ -169,6 +169,19 @@ import {
 const FUTURE_DATE = new Date(Date.now() + 86_400_000).toISOString();
 const PAST_DATE = new Date(Date.now() - 86_400_000).toISOString();
 
+// Actores autenticados (req.ctx). El servicio nunca acepta un actor
+// vindo del body: se construye desde la sesión.
+const SUPERADMIN_ACTOR = {
+  userId: 'user-1',
+  role: 'superadmin' as const,
+  agencyId: null,
+};
+const AGENCY_ACTOR = {
+  userId: 'user-2',
+  role: 'agency' as const,
+  agencyId: 'agency-1',
+};
+
 function makeTripRow(overrides: Record<string, any> = {}) {
   return {
     id: 'trip-1',
@@ -889,7 +902,7 @@ describe('superadminService.archiveTrip', () => {
     });
     tableChains['routes'] = routesChain;
 
-    const result = await superadminService.archiveTrip('trip-1');
+    const result = await superadminService.archiveTrip('trip-1', SUPERADMIN_ACTOR);
 
     expect(result).toEqual({ id: 'trip-1', status: 'archived' });
     expect(tripsChain.update).toHaveBeenCalledWith({ status: 'archived' });
@@ -900,7 +913,9 @@ describe('superadminService.archiveTrip', () => {
       { id: 'trip-1', status: 'active', route_id: 'route-1' },
     );
 
-    await expect(superadminService.archiveTrip('trip-1')).rejects.toThrow(
+    await expect(
+      superadminService.archiveTrip('trip-1', SUPERADMIN_ACTOR),
+    ).rejects.toThrow(
       'No se puede archivar un viaje activo',
     );
   });
@@ -910,9 +925,27 @@ describe('superadminService.archiveTrip', () => {
       { id: 'trip-1', status: 'archived', route_id: 'route-1' },
     );
 
-    await expect(superadminService.archiveTrip('trip-1')).rejects.toThrow(
+    await expect(
+      superadminService.archiveTrip('trip-1', SUPERADMIN_ACTOR),
+    ).rejects.toThrow(
       'El viaje ya está archivado',
     );
+  });
+
+  it('is superadmin-only: an agency actor is rejected before any write', async () => {
+    const tripsChain = createChainable({
+      id: 'trip-1',
+      status: 'cancelled',
+      route_id: 'route-1',
+    });
+    tableChains['trips'] = tripsChain;
+
+    await expect(
+      superadminService.archiveTrip('trip-1', AGENCY_ACTOR),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(tripsChain.update).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
   });
 });
 
@@ -1137,12 +1170,13 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
     const result = await superadminService.updateTripStatus(
       'trip-1',
       'cancelled',
+      SUPERADMIN_ACTOR,
     );
 
     expect(mockRpc).toHaveBeenCalledWith('set_trip_status', {
       p_trip_id: 'trip-1',
       p_status: 'cancelled',
-      p_actor_user_id: null,
+      p_actor_user_id: 'user-1',
     });
     expect(result).toEqual({ id: 'trip-1', status: 'cancelled' });
     expect(emailService.sendTripCancelledEmail).not.toHaveBeenCalled();
@@ -1164,12 +1198,13 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
     const result = await superadminService.updateTripStatus(
       'trip-1',
       'completed',
+      SUPERADMIN_ACTOR,
     );
 
     expect(mockRpc).toHaveBeenCalledWith('set_trip_status', {
       p_trip_id: 'trip-1',
       p_status: 'completed',
-      p_actor_user_id: null,
+      p_actor_user_id: 'user-1',
     });
     expect(result).toEqual({ id: 'trip-1', status: 'completed' });
     expect(notificationService.createForAgenciesAndAdmin).not.toHaveBeenCalled();
@@ -1186,7 +1221,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
       error: null,
     });
 
-    const result = await superadminService.archiveTrip('trip-1');
+    const result = await superadminService.archiveTrip('trip-1', SUPERADMIN_ACTOR);
 
     expect(mockRpc).toHaveBeenCalledWith('archive_trip', {
       p_trip_id: 'trip-1',
@@ -1237,7 +1272,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
       error: { message: 'ERR_TRIP_NOT_FOUND: Trip not found' },
     });
 
-    await expect(superadminService.archiveTrip('trip-1')).rejects.toBeInstanceOf(
+    await expect(superadminService.archiveTrip('trip-1', SUPERADMIN_ACTOR)).rejects.toBeInstanceOf(
       NotFoundError,
     );
   });
@@ -1257,7 +1292,7 @@ describe('WKR-007 C2 — trip RPCs behind TRIP_EFFECTS_VIA_OUTBOX', () => {
     });
 
     await expect(
-      superadminService.updateTripStatus('trip-1', 'cancelled'),
+      superadminService.updateTripStatus('trip-1', 'cancelled', SUPERADMIN_ACTOR),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 

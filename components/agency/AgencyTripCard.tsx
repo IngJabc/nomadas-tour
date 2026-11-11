@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { formatDateLong, formatTime12h } from "@/lib/timezone";
 import {
@@ -32,12 +33,22 @@ export interface AgencyTrip {
   available_seats: number;
   reserved_seats: number;
   postponed_from?: string | null;
+  /**
+   * AS-TRIP-002 — número de agencias asignadas al viaje. `1` = exclusivo
+   * de esta agencia. Solo entonces se muestra la acción "Completar viaje"
+   * (el backend vuelve a validar en el PATCH de estado).
+   */
+  agency_count?: number;
 }
 
 interface AgencyTripCardProps {
   trip: AgencyTrip;
   onSelect?: (tripId: string) => void;
   now?: Date;
+  /** AS-TRIP-002 — habilita la acción "Completar viaje" en el footer. */
+  onComplete?: (trip: AgencyTrip) => void;
+  /** true mientras el PATCH de estado de ESTE viaje está en curso. */
+  completing?: boolean;
 }
 
 function getStatusBadge(
@@ -59,12 +70,24 @@ function getStatusBadge(
   }
 }
 
-export function AgencyTripCard({ trip, onSelect, now }: AgencyTripCardProps) {
+export function AgencyTripCard({ trip, onSelect, now, onComplete, completing }: AgencyTripCardProps) {
   const clock = now ?? new Date();
   const isFull = trip.available_seats === 0;
   const isClosed = trip.status === 'cancelled' || trip.status === 'completed';
   const canCreateReservation = isTripOpenForReservation(trip, clock);
   const statusBadge = getStatusBadge(trip, clock);
+
+  // AS-TRIP-002 — visibilidad de "Completar viaje":
+  //   * viaje activo (no completado ni cancelado),
+  //   * exclusivo de esta agencia (agency_count === 1),
+  //   * ya salió (el backend rechaza completar antes de la salida).
+  // La autorización real siempre la decide el backend; esto es solo
+  // visibilidad para no ofrecer una acción que siempre fallaría.
+  const canComplete =
+    trip.status === 'active' &&
+    trip.agency_count === 1 &&
+    !isDepartureInFuture(trip.departure_time, clock);
+  const showComplete = Boolean(onComplete) && canComplete;
 
   const cardContent = (
     <>
@@ -149,6 +172,29 @@ export function AgencyTripCard({ trip, onSelect, now }: AgencyTripCardProps) {
           <ChevronRight className={`w-5 h-5 transition-colors ${isClosed ? 'text-[var(--color-brand-muted)] opacity-40' : 'text-[var(--color-brand-muted)] group-hover:text-[var(--color-brand-cyan)]'}`} />
         ) : (
           <div className="flex items-center gap-3">
+            {showComplete && (
+              <>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  loading={completing}
+                  onClick={(e) => {
+                    // La tarjeta no está envuelta en <Link> cuando hay
+                    // acción de completar; se detiene la propagación por
+                    // seguridad (nunca debe navegar ni duplicar el envío).
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onComplete?.(trip);
+                  }}
+                >
+                  Completar viaje
+                </Button>
+                {/* showComplete implica viaje activo: siempre hay al
+                    menos el enlace "Ver pasajeros" después. */}
+                <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
+              </>
+            )}
             {!isClosed && (
               <Link
                 href={`/agency/trips/${trip.id}/passengers`}
@@ -199,6 +245,19 @@ export function AgencyTripCard({ trip, onSelect, now }: AgencyTripCardProps) {
     return (
       <div className="cursor-not-allowed">
         <Card>
+          {cardContent}
+        </Card>
+      </div>
+    );
+  }
+
+  // AS-TRIP-002: si hay acción "Completar viaje", la tarjeta NO se
+  // envuelve en <Link> para no anidar elementos interactivos (el botón
+  // vive en el footer junto a "Ver pasajeros", que sigue navegando).
+  if (showComplete) {
+    return (
+      <div className="group">
+        <Card hover>
           {cardContent}
         </Card>
       </div>
