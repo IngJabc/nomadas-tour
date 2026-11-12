@@ -34,7 +34,7 @@ export function ConfirmModal({
   return (
     <Modal open={open} onClose={onCancel} size="sm" titleId={titleId} descriptionId={descriptionId}>
       <div className="p-6">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 ${variant === 'danger' ? 'bg-red-50' : 'bg-[rgba(0,212,255,0.1)]'}`}>
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-4 ${variant === 'danger' ? 'bg-red-50' : 'bg-[var(--color-cyan-bg)]'}`}>
           {variant === 'danger' ? (
             <AlertTriangle className="w-5 h-5 text-red-400" strokeWidth={1.75} />
           ) : (

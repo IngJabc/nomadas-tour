@@ -30,6 +30,9 @@
   --color-warning-bg:       rgba(245,158,11,0.1);
   --color-danger-bg:        rgba(239,68,68,0.1);
   --color-cyan-bg:          rgba(0,212,255,0.1);
+  --color-cyan-bg-soft:     rgba(0,212,255,0.06);
+  --color-cyan-ring:        rgba(0,212,255,0.15);
+  --color-cyan-shadow:      rgba(0,212,255,0.12);
   --color-brand-blue-bg:    rgba(0,128,255,0.1);
   --color-brand-dark-bg:    rgba(0,0,12,0.08);
   --color-brand-mid-bg:     rgba(10,10,46,0.08);

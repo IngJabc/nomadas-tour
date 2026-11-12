@@ -194,16 +194,23 @@ export function BuilderLayout({
 
     try {
       if (!includeAgencies) {
-        // AS-TRIP-003.1 — alta desde la agencia: payload SIN agencia ni
+        // AS-TRIP-003.1/004 — panel de agencia: payload SIN agencia ni
         // agency_ids (el backend los deriva de la sesión y el schema
-        // strict rechazaría campos extra). Endpoint propio:
-        // POST /api/agency/trips.
-        await agencyApi.createTrip({
+        // strict rechazaría campos extra). Endpoint propio según el
+        // modo: POST /api/agency/trips (alta) o
+        // PATCH /api/agency/trips/:tripId (edición).
+        const agencyPayload = {
           route_id: state.route_id,
           departure_time: state.departure_time,
           vehicle_type: state.vehicle_type as 'bus' | 'kia',
+          // Centavos COP. Omitir = create sin precio / edit preserva el actual.
           ...pricePatch,
-        });
+        };
+        if (mode === 'edit' && tripId) {
+          await agencyApi.updateTrip(tripId, agencyPayload);
+        } else {
+          await agencyApi.createTrip(agencyPayload);
+        }
       } else {
         const payload = {
           route_id: state.route_id,

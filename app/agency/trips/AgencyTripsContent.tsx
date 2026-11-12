@@ -93,15 +93,29 @@ export default function AgencyTripsContent() {
   }, [doFetch]);
 
   // ─── AS-TRIP-003.1: alta de viaje en modal (sin salir de la lista) ──
+  // AS-TRIP-004: el mismo modal también edita (`editingTripId` != null);
+  // solo uno de los dos modos puede estar activo a la vez.
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [editingTripId, setEditingTripId] = useState<string | null>(null);
+  const isEditing = editingTripId !== null;
 
   const handleBuilderSuccess = useCallback(() => {
-    // Solo llega con el backend confirmando la creación: cierra, avisa y
-    // refresca la lista. Si la creación falla, el modal sigue abierto.
+    // Solo llega con el backend confirmando la creación/edición: cierra,
+    // avisa y refresca la lista. Si la petición falla, el modal sigue
+    // abierto con el error para reintentar.
+    const wasEditing = editingTripId !== null;
     setBuilderOpen(false);
-    toast.success('Viaje creado correctamente');
+    setEditingTripId(null);
+    toast.success(
+      wasEditing ? 'Viaje actualizado correctamente' : 'Viaje creado correctamente',
+    );
     void doFetch();
-  }, [doFetch]);
+  }, [doFetch, editingTripId]);
+
+  const handleCloseBuilder = useCallback(() => {
+    setBuilderOpen(false);
+    setEditingTripId(null);
+  }, []);
 
   // ─── AS-TRIP-002: completar viaje (confirmación → PATCH → refresh) ──
   const [confirmTrip, setConfirmTrip] = useState<AgencyTrip | null>(null);
@@ -471,6 +485,7 @@ export default function AgencyTripsContent() {
                   now={now}
                   onComplete={(t) => setConfirmTrip(t)}
                   completing={completingTripId === trip.id}
+                  onEdit={(t) => setEditingTripId(t.id)}
                 />
               </motion.div>
             ))}
@@ -478,12 +493,15 @@ export default function AgencyTripsContent() {
         )}
       </AnimatePresence>
 
-      {/* AS-TRIP-003.1 — alta de viaje en modal (mismo builder que el
-          superadmin, adaptado a agencia: sin selector de agencias y con
-          la identidad derivada en el backend). */}
+      {/* AS-TRIP-003.1/004 — alta y edición de viaje en modal (mismo
+          builder que el superadmin, adaptado a agencia: sin selector de
+          agencias y con la identidad derivada en el backend). Un solo
+          componente según el modo activo. */}
       <AgencyTripBuilderModal
-        open={builderOpen}
-        onClose={() => setBuilderOpen(false)}
+        open={builderOpen || isEditing}
+        mode={isEditing ? 'edit' : 'create'}
+        tripId={editingTripId ?? undefined}
+        onClose={handleCloseBuilder}
         onSuccess={handleBuilderSuccess}
       />
 

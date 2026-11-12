@@ -522,6 +522,27 @@ export const agencyApi = {
       body: JSON.stringify(data),
     }),
   /**
+   * AS-TRIP-004 — edita un viaje propio y exclusivo de la agencia.
+   * `PATCH /api/agency/trips/:tripId`. Solo ruta, salida, vehículo y
+   * precio (schema strict en el backend); la autorización —rol, agencia
+   * de la sesión, exclusividad, estado activo y ausencia de reservas—
+   * la decide el backend, nunca el cliente.
+   */
+  updateTrip: (
+    tripId: string,
+    data: {
+      route_id: string;
+      departure_time: string;
+      vehicle_type: 'bus' | 'kia';
+      /** Centavos COP. Omitir = preservar el precio actual. */
+      seat_price?: number;
+    },
+  ) =>
+    request<{ id: string }>(`/agency/trips/${encodeURIComponent(tripId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+  /**
    * AS-TRIP-002 — marca un viaje como completado.
    * `PATCH /api/agency/trips/:tripId/status`. El backend valida el actor
    * (sesión) y que el viaje sea exclusivo de la agencia; aquí solo se

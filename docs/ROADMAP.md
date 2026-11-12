@@ -124,7 +124,7 @@ FASE 6 — Reportes                        → FUTURA
 FASE 7 — UX (legacy, ver Fase B)         → INTEGRADA EN FASE B
 FASE 8 — Escalabilidad (ver Fase D)      → INTEGRADA EN FASE D
 
-PRÓXIMA INICIATIVA — Auto-servicio de rutas y viajes por agencia → DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002/003 IMPLEMENTADOS (2026-11-10)
+PRÓXIMA INICIATIVA — Auto-servicio de rutas y viajes por agencia → DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002/003/004 IMPLEMENTADOS (2026-11-10)
 `
 
 ---
@@ -151,10 +151,12 @@ opera su día a día sin administrar su propia oferta.
    solo-lectura a sus trips asignados; desde **AS-TRIP-001/002** pueden
    **completar** viajes asignados en exclusiva que ya salieron, desde la
    UI "Completar viaje" de su panel (nunca cancelar viajes completos ni
-   archivar), y desde **AS-TRIP-003** pueden **crear** un viaje nuevo
+   archivar), desde **AS-TRIP-003** pueden **crear** un viaje nuevo
    asignado en exclusiva a su propia agencia eligiendo una ruta global
    activa (`POST /api/agency/trips`, `agency_ids` rechazado por schema
-   strict).
+   strict), y desde **AS-TRIP-004** pueden **editar** sus viajes
+   exclusivos y activos que todavía no tienen reservas (`PATCH
+   /api/agency/trips/:tripId`, RPC `update_agency_trip`).
 
 3. **Autorización RPC + RLS** - El patrón de autorización por RPC con validación
    de `agency_id` es el modelo correcto y ya está implementado en todos los RPCs
@@ -201,6 +203,24 @@ opera su día a día sin administrar su propia oferta.
   queda bloqueado hasta que exista el flujo de reembolsos** (no se
   implementan reembolsos en este incremento).
 
+- **Edición de viaje por la agencia** — **Resuelto en AS-TRIP-004**: la
+  agencia edita `route_id`, `departure_time`, `vehicle_type` y
+  `seat_price` de **sus** viajes vía `PATCH /api/agency/trips/:tripId`
+  (schema strict; actor y agencia solo de `req.ctx`). Editable **solo**
+  si: rol `agency`, exactamente una fila en `trip_agencies` y esa fila es
+  la suya (exclusivo), `status='active'` y **cero reservas de cualquier
+  estado** (incluidas canceladas). La guarda crítica corre en la RPC
+  `update_agency_trip` (migración `105_agency_trip_update.sql`, **ya
+  aplicada a Supabase el 2026-11-12**) **en la misma transacción** que el `UPDATE` bajo `FOR
+  UPDATE` de la fila del viaje — necesaria por atomicidad, para cerrar la
+  ventana en la que una reserva concurrente se coloca entre el chequeo y
+  la escritura (el trigger 104 toma `FOR SHARE` en cada INSERT de
+  reserva, serializando la carrera). La UI es la misma **"Editar viaje"**
+  del builder modal en `/agency/trips` (visibilidad: activo + exclusivo +
+  salida futura, mutuamente exclusiva con "Completar viaje"; el backend
+  es la autoridad). Viajes compartidos, ajenos, ya partidos o con
+  reservas → 403/409 con el modal abierto.
+
 - **Alta de viaje por la agencia** — **Resuelto en AS-TRIP-003** y
   afinado en **AS-TRIP-003.1**: la agencia crea un viaje nuevo con
   `POST /api/agency/trips` desde un **modal abierto en `/agency/trips`**
@@ -216,8 +236,14 @@ opera su día a día sin administrar su propia oferta.
   existente/activa, salida futura, duplicado, capacidad y precio. **No se
   crean rutas desde la agencia**; si la ruta no existe, el UI explica que
   hay que solicitarla al superadmin. Éxito → cierra el modal + toast +
-  refresca la lista; error → modal abierto para reintentar. La **edición**
-  de viajes por la agencia sigue pendiente.
+  refresca la lista; error → modal abierto para reintentar. El modal se
+  porta **dentro del scope de branding** (`getBrandingPortalHost()`), de
+  modo que sus colores —título, pasos, CTA, tintes y focus rings— siguen
+  el `primary/secondary/accent_color` de la agencia en lugar de los tokens
+  Nómadas (los tintes cyan pasaron a `var(--color-cyan-*)`, que
+  `buildAgencyBrandingStyle` deriva del accent). La **edición**
+  de viajes por la agencia está entregada en **AS-TRIP-004** (mismo
+  modal en modo edición, ver el bullet de edición de viaje).
 
 - **Definir aislamiento cross-agency** - Confirmar que políticas RLS y validaciones
   RPC previenen acceso cruzado entre agencias en todas las operaciones.
@@ -234,27 +260,28 @@ opera su día a día sin administrar su propia oferta.
    `'inactive'` **no se introduce**.
 3. Definir RPCs agency para operaciones trip management — **parcialmente
    cerrado**: completar viaje agency implementado en AS-TRIP-001
-   (RPC `set_trip_status` con autorización) y alta de viaje en
-   AS-TRIP-003 (reutiliza `create_trip` con la agencia de la sesión); el
-   resto (alta/edición de rutas y **edición** de viajes por la agencia)
-   sigue pendiente.
+   (RPC `set_trip_status` con autorización), alta de viaje en
+   AS-TRIP-003 (reutiliza `create_trip` con la agencia de la sesión) y
+   edición de viaje en AS-TRIP-004 (RPC `update_agency_trip` con guarda
+   de exclusividad y cero reservas); el
+   resto (alta/edición de rutas) sigue pendiente.
 4. Panel UI: ubicación y componentes para route/trip management en panel
    agency — **parcial**: la acción **"Completar viaje"** ya está entregada
    en **AS-TRIP-002** (lista de viajes + confirmación + errores 403/404/409)
    y el alta **"Nuevo viaje"** está en **AS-TRIP-003 / AS-TRIP-003.1**
-   (**modal desde `/agency/trips`**, sin página propia); alta/edición de
-   **rutas** y **edición** de viajes por la agencia sigue **pendiente**.
+   (**modal desde `/agency/trips`**, sin página propia); la edición
+   **"Editar viaje"** reutiliza ese mismo modal en **AS-TRIP-004**;
+   alta/edición de **rutas** por la agencia sigue **pendiente**.
 5. ~~Validación: discrepancy `'archived'` status BD vs código aplicación~~
    — **cerrada** (migración 033).
 
-**Trabajo restante explícito (post AS-TRIP-003):**
+**Trabajo restante explícito (post AS-TRIP-004):**
 
 - **Sistema de reembolsos**: prerequisite para permitir cancelar un viaje
   con reservas. Mientras no exista, `set_trip_status` responde
   `ERR_TRIP_HAS_RESERVATIONS` (409) y no cambia nada. La cancelación
   **individual** de reservas sigue siendo una operación separada que sí
   funciona.
-- **Edición de viajes por la agencia** (sigue pendiente de definición).
 - **Alta/edición de rutas por la agencia**: **no soportado** — las rutas
   son globales sin `agency_id` y su CRUD es superadmin-only. Cualquier
   ruta específica de agencia requiere una **decisión de producto aparte**
@@ -262,13 +289,17 @@ opera su día a día sin administrar su propia oferta.
   viajes **no** crea rutas: si la ruta necesaria no existe, la agencia
   debe solicitarla al superadmin.
 
-**Estado:** **DESCUBRIMIENTO COMPLETO + 3 INCREMENTOS IMPLEMENTADOS**
+**Estado:** **DESCUBRIMIENTO COMPLETO + 4 INCREMENTOS IMPLEMENTADOS**
 (DISC-AS-01…05 completados; **AS-TRIP-001** — autorización de transiciones
 de estado de viaje — con migración `104_trip_status_authorization.sql`
 **ya aplicada a Supabase**; **AS-TRIP-002** — UI "Completar viaje" en el
 panel de agencia que consume ese endpoint; **AS-TRIP-003** — alta de viaje
 por la agencia con asignación exclusiva y catálogo global de rutas, **sin
-migración nueva**). Detalle de los tickets en
+migración nueva**; **AS-TRIP-004** — edición de viajes propios y
+exclusivos sin reservas con migración `105_agency_trip_update.sql`
+**ya aplicada a Supabase, 2026-11-12**). **Validación funcional
+confirmada (2026-11-12):** creación y edición de viajes desde la agencia
+responden correctamente en el flujo autenticado. Detalle de los tickets en
 [TASKS.md](../TASKS.md).
 
 **Relación con las fases existentes:** la **Fase A sigue en progreso** y

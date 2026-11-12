@@ -109,6 +109,9 @@ function mapTripRpcError(error: { message?: string }): never {
       throw new ForbiddenError(detail);
     case "ERR_TRIP_HAS_RESERVATIONS":
       throw new ConflictError(detail);
+    case "ERR_ROUTE_INACTIVE":
+    case "ERR_DEPARTURE_NOT_FUTURE":
+      throw new ValidationError(detail);
     case "ERR_TRIP_NOT_ACTIVE":
     case "ERR_NO_AGENCIES":
     case "ERR_INVALID_VEHICLE_TYPE":
@@ -686,6 +689,149 @@ export class SuperadminService {
       ctx.userId,
       input.seat_price ?? null
     );
+  }
+
+  /**
+   * AS-TRIP-004 — edición de un viaje propio desde el panel de agencia.
+   *
+   * REGLAS (la autoridad final vive en la BD, en `update_agency_trip`):
+   * - Rol y agencia salen SIEMPRE de `req.ctx` (sesión + `public.users`);
+   *   el service ni siquiera recibe un `agency_id` del cliente, así que
+   *   body, query y headers no pueden apropiarse de un viaje ajeno.
+   * - Solo viajes con exactamente UNA fila en `trip_agencies` y esa fila
+   *   es la de la agencia del actor: los viajes compartidos y los de otra
+   *   agencia se rechazan (403) antes de tocar la base de datos.
+   * - Solo `status = 'active'` y sin reservas de ningún tipo (en este
+   *   incremento no se tocan reservas, asientos de pasajeros ni pagos).
+   * - Campos editables: ruta global activa, salida futura, tipo de
+   *   vehículo soportado y precio por asiento. El schema `strict` del
+   *   controller rechaza cualquier otro campo (status, agency_ids, …).
+   * - La verificación de reservas se repite DENTRO de la RPC con lock
+   *   `FOR UPDATE` sobre el viaje (migración 105): los chequeos de aquí
+   *   son solo para dar un mensaje amigable, nunca son la seguridad.
+   */
+  async updateAgencyTrip(
+    ctx: RequestContext,
+    tripId: string,
+    input: {
+      route_id: string;
+      departure_time: string;
+      vehicle_type: "bus" | "kia";
+      seat_price?: number | null;
+    }
+  ) {
+    if (ctx.role !== "agency" || !ctx.agencyId) {
+      throw new ForbiddenError("Solo las agencias pueden editar viajes");
+    }
+
+    // Capacidad/vehículo: la misma configuración estática que usa el
+    // superadmin (bus = 31, kia = 10). Un tipo desconocido nunca llega
+    // a tocar la base de datos.
+    if (!this.VEHICLE_CONFIG[input.vehicle_type]) {
+      throw new ValidationError("Tipo de vehículo no válido");
+    }
+
+    assertValidSeatPrice(input.seat_price);
+
+    // Existencia del viaje: getTripOperationalContext lanza un Error
+    // genérico, así que se resuelve aquí para responder 404 limpio.
+    const { data: tripExists, error: existsError } = await supabaseAdmin
+      .from("trips")
+      .select("id")
+      .eq("id", tripId)
+      .single();
+    if (existsError || !tripExists) throw new NotFoundError("Trip not found");
+
+    // ── Contexto operativo (mismo patrón Phase-1 que updateTrip) ──
+    const ctxTrip = await getTripOperationalContext(tripId);
+
+    // Bloquea completado, cancelado, archivado, salida ya pasada y
+    // pasajeros abordados (mensajes amigables en español).
+    validateTripEditable(ctxTrip);
+
+    // Exclusividad: exactamente una asignación y es la del actor.
+    if (
+      ctxTrip.currentAgencyIds.length !== 1 ||
+      ctxTrip.currentAgencyIds[0] !== ctx.agencyId
+    ) {
+      throw new ForbiddenError(
+        "El viaje no pertenece en exclusiva a tu agencia",
+      );
+    }
+
+    // Sin reservas de NINGÚN estado (incluye canceladas): la regla
+    // dura la revalida la RPC en la misma transacción que el UPDATE.
+    const { count: reservationCount, error: countError } =
+      await supabaseAdmin
+        .from("reservations")
+        .select("id", { count: "exact", head: true })
+        .eq("trip_id", tripId);
+    if (countError) throw new ValidationError(countError.message);
+    if ((reservationCount ?? 0) > 0) {
+      throw new ConflictError(
+        `No se puede editar un viaje con ${reservationCount} reserva(s) registrada(s)`,
+      );
+    }
+
+    // Cambio de vehículo con asientos bloqueados por procesos de reserva
+    // en curso (sin reservas confirmadas aún): mensaje amigable.
+    validateVehicleChange(ctxTrip, input.vehicle_type);
+
+    // Ruta global: debe existir y estar activa (la catálogo no se edita
+    // desde aquí; las rutas siguen siendo superadmin-only).
+    const { data: route, error: routeError } = await supabaseAdmin
+      .from("routes")
+      .select("id, status")
+      .eq("id", input.route_id)
+      .single();
+    if (routeError || !route) throw new NotFoundError("Route not found");
+    if (route.status === "inactive") {
+      throw new ValidationError(
+        "No se puede editar un viaje con una ruta inactiva. Activa la ruta primero.",
+      );
+    }
+
+    assertDepartureTimeInFuture(input.departure_time);
+
+    const normalizedDeparture = toUTC(input.departure_time);
+    const isChangingRoute = input.route_id !== ctxTrip.trip.route_id;
+    const isChangingDeparture =
+      new Date(normalizedDeparture).getTime() !==
+      new Date(ctxTrip.trip.departure_time).getTime();
+    if (isChangingRoute || isChangingDeparture) {
+      await assertNoDuplicateTrip(
+        input.route_id,
+        input.departure_time,
+        tripId,
+      );
+    }
+
+    // ── Único camino de escritura: RPC transaccional (migración 105) ──
+    // No hay UPDATE directo desde aquí: la RPC re-valida rol, agencia,
+    // exclusividad, estado, reservas, ruta y salida CON lock FOR UPDATE
+    // en la misma transacción que la escritura, y delega el resto en
+    // update_trip (vehículo/capacidad/precio/duplicado/outbox).
+    const { error } = await supabaseAdmin.rpc(
+      "update_agency_trip",
+      {
+        p_trip_id: tripId,
+        p_route_id: input.route_id,
+        p_departure_time: normalizedDeparture,
+        p_vehicle_type: input.vehicle_type,
+        p_actor_user_id: ctx.userId,
+        p_seat_price: input.seat_price ?? null,
+      }
+    );
+    if (error) throw mapTripRpcError(error);
+
+    const { data: trip } = await supabaseAdmin
+      .from("trips")
+      .select("*, routes(origin, destination), trip_agencies(*)")
+      .eq("id", tripId)
+      .single();
+    if (!trip) throw new NotFoundError("Trip not found");
+
+    return trip;
   }
 
   async listTrips(

@@ -36,7 +36,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="w-9 h-9 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0 mt-0.5">
+      <div className="w-9 h-9 rounded-lg bg-[var(--color-cyan-bg)] flex items-center justify-center shrink-0 mt-0.5">
         <div className="w-4 h-4 text-[var(--color-brand-cyan)]">{icon}</div>
       </div>
       <div>

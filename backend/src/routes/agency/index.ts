@@ -32,6 +32,13 @@ router.post('/trips', (req, res, next) =>
 );
 router.get('/trips/:tripId', (req, res, next) => reservationController.getAgencyTripById(req, res, next));
 router.get('/trips/:tripId/passengers', (req, res, next) => reservationController.getAgencyTripPassengers(req, res, next));
+// AS-TRIP-004 — edición de un viaje propio y exclusivo (solo ruta,
+// salida, vehículo y precio). Rol/agencia/exclusividad/estado/reservas
+// los valida el service y la RPC `update_agency_trip` (migración 105).
+// El viaje NUNCA se reasigna ni cambia de estado por este endpoint.
+router.patch('/trips/:tripId', (req, res, next) =>
+  agencyTripController.updateTrip(req, res, next),
+);
 // Trip status: la agencia solo puede COMPLETAR viajes exclusivamente suyos
 // (nunca cancelar un viaje entero ni archivar). Ver
 // controllers/agency-trip.controller.ts + migración 104.

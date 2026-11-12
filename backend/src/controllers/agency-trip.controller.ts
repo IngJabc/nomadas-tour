@@ -40,6 +40,17 @@ export const createTripSchema = z
   })
   .strict();
 
+/**
+ * AS-TRIP-004 — `PATCH /api/agency/trips/:tripId`.
+ *
+ * Mismo contrato estricto que el alta: solo ruta, salida, vehículo y
+ * precio. Cualquier otro campo (status, agency_ids, agency_id,
+ * postpone, created_by, is_published, …) se rechaza con 400 en lugar
+ * de filtrarse en silencio. La identidad de la agencia NUNCA viene del
+ * body: sale de `req.ctx` y además la RPC la resuelve en `public.users`.
+ */
+export const updateTripSchema = createTripSchema;
+
 export class AgencyTripController {
   async updateTripStatus(req: Request, res: Response, next: NextFunction) {
     try {
@@ -69,6 +80,31 @@ export class AgencyTripController {
       const data = createTripSchema.parse(req.body);
       const trip = await superadminService.createAgencyTrip(req.ctx!, data);
       res.status(201).json(trip);
+    } catch (error) {
+      next(
+        error instanceof z.ZodError
+          ? new ValidationError("Invalid input", (error as any).issues)
+          : error
+      );
+    }
+  }
+
+  /**
+   * AS-TRIP-004 — `PATCH /api/agency/trips/:tripId`. Edición de un viaje
+   * propio y exclusivo. El `tripId` de la ruta es solo identificación:
+   * la autorización (rol, agencia, exclusividad, estado y ausencia de
+   * reservas) la decide el service y, de forma final, la RPC
+   * `update_agency_trip` (migración 105) dentro de su transacción.
+   */
+  async updateTrip(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = updateTripSchema.parse(req.body);
+      const trip = await superadminService.updateAgencyTrip(
+        req.ctx!,
+        req.params.tripId as string,
+        data,
+      );
+      res.json(trip);
     } catch (error) {
       next(
         error instanceof z.ZodError
