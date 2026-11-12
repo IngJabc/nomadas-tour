@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 // ── Mock database BEFORE any imports ────────────────────────────────
 // The chainable mock must support the full Supabase query builder pattern:
@@ -158,6 +160,7 @@ import { DUPLICATE_TRIP_MESSAGE } from './trip-duplicate.guard.js';
 import { emailService } from './email.service.js';
 import { notificationService } from './notification.service.js';
 import {
+  AgencyInactiveError,
   ConflictError,
   ForbiddenError,
   NotFoundError,
@@ -1652,5 +1655,859 @@ describe('TRIP-PRICE-001 — updateTrip seat_price', () => {
       ),
     ).rejects.toThrow(ValidationError);
     expect(mockFrom).not.toHaveBeenCalled();
+  });
+});
+
+// ── AS-TRIP-003 — alta de viaje por la agencia ──────────────────────
+
+describe('createAgencyTrip (AS-TRIP-003)', () => {
+  const AGENCY_INPUT = {
+    route_id: 'route-1',
+    departure_time: FUTURE_DATE,
+    vehicle_type: 'bus' as const,
+  };
+
+  function setupAgencyCreateHappyPath() {
+    setupCreateTripHappyPath();
+    // El middleware `tenant` ya lo garantiza; aqui es defensa en profundidad.
+    // La misma cadena debe responder `.single()` (verificación de la agencia)
+    // y también como thenable (fanout de emails por `getAgenciesWithEmail`).
+    const agenciesChain = createChainable([
+      { id: 'agency-1', status: 'active', email: null, name: 'Agencia Uno' },
+    ]);
+    agenciesChain.single.mockResolvedValue({
+      data: { id: 'agency-1', status: 'active' },
+      error: null,
+    });
+    tableChains['agencies'] = agenciesChain;
+  }
+
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('crea el viaje con exactamente una asignación a la agencia de la sesión', async () => {
+    setupAgencyCreateHappyPath();
+
+    const result = await superadminService.createAgencyTrip(AGENCY_ACTOR, {
+      ...AGENCY_INPUT,
+      seat_price: 25_000_000,
+    });
+
+    expect(result.id).toBe('trip-new');
+    expect(tableChains['trips'].insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        created_by: 'user-2',
+        vehicle_type: 'bus',
+        seat_price: 25_000_000,
+      }),
+    );
+
+    const assignments = tableChains['trip_agencies'].insert.mock.calls[0][0];
+    expect(assignments).toHaveLength(1);
+    expect(assignments).toEqual([
+      { trip_id: 'trip-new', agency_id: 'agency-1' },
+    ]);
+  });
+
+  it('ignora agency_ids interpolados en el input: la asignación sale del ctx', async () => {
+    setupAgencyCreateHappyPath();
+
+    await superadminService.createAgencyTrip(AGENCY_ACTOR, {
+      ...AGENCY_INPUT,
+      // Ningún campo del payload puede convertirlo en un viaje compartido.
+      agency_ids: ['agency-2', 'agency-3'],
+      agency_id: 'agency-2',
+    } as any);
+
+    expect(tableChains['trip_agencies'].insert).toHaveBeenCalledWith([
+      { trip_id: 'trip-new', agency_id: 'agency-1' },
+    ]);
+    expect(tableChains['trip_agencies'].insert.mock.calls[0][0]).toHaveLength(1);
+  });
+
+  it('rechaza un actor que no sea de agencia sin tocar la base de datos', async () => {
+    resetTableChains();
+    mockFrom.mockClear();
+
+    await expect(
+      superadminService.createAgencyTrip(SUPERADMIN_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un ctx de agencia sin agency_id', async () => {
+    resetTableChains();
+    mockFrom.mockClear();
+
+    await expect(
+      superadminService.createAgencyTrip(
+        { userId: 'user-2', role: 'agency', agencyId: null },
+        AGENCY_INPUT,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('rechaza si la agencia de la sesión ya no existe', async () => {
+    resetTableChains();
+    tableChains['agencies'] = createChainable(null);
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('rechaza si la agencia está inactiva', async () => {
+    resetTableChains();
+    tableChains['agencies'] = createChainable({
+      id: 'agency-1',
+      status: 'suspended',
+    });
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(AgencyInactiveError);
+  });
+
+  it('rechaza una ruta global inexistente', async () => {
+    resetTableChains();
+    tableChains['agencies'] = createChainable({
+      id: 'agency-1',
+      status: 'active',
+    });
+    tableChains['routes'] = createChainable(null);
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('rechaza una ruta global inactiva (no se crea el viaje)', async () => {
+    resetTableChains();
+    tableChains['agencies'] = createChainable({
+      id: 'agency-1',
+      status: 'active',
+    });
+    tableChains['routes'] = createChainable({
+      id: 'route-1',
+      status: 'inactive',
+      origin: 'Caracas',
+      destination: 'Maracaibo',
+    });
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toThrow('ruta inactiva');
+
+    expect(tableChains['trips']).toBeUndefined();
+  });
+
+  it('rechaza una salida en el pasado', async () => {
+    setupAgencyCreateHappyPath();
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, {
+        ...AGENCY_INPUT,
+        departure_time: PAST_DATE,
+      }),
+    ).rejects.toThrow(DEPARTURE_FUTURE_MESSAGE);
+
+    expect(tableChains['trips'].insert).not.toHaveBeenCalled();
+  });
+
+  it('rechaza duplicados de ruta + salida', async () => {
+    setupAgencyCreateHappyPath();
+    tableChains['trips'].maybeSingle.mockResolvedValue({
+      data: { id: 'trip-existing' },
+      error: null,
+    });
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    expect(tableChains['trips'].insert).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un precio por asiento inválido', async () => {
+    setupAgencyCreateHappyPath();
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, {
+        ...AGENCY_INPUT,
+        seat_price: 99.9,
+      }),
+    ).rejects.toThrow(ValidationError);
+
+    expect(tableChains['trips'].insert).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un tipo de vehículo no soportado sin tocar la base de datos', async () => {
+    setupAgencyCreateHappyPath();
+    mockFrom.mockClear();
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, {
+        ...AGENCY_INPUT,
+        vehicle_type: 'van',
+      } as any),
+    ).rejects.toThrow('Tipo de vehículo no válido');
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  // ── Atomicidad (path legacy, TRIP_EFFECTS_VIA_OUTBOX = false) ──────
+
+  it('si falla la asignación, elimina asientos y viaje (sin viaje parcial)', async () => {
+    setupAgencyCreateHappyPath();
+    tableChains['trip_agencies'].insert.mockResolvedValue({
+      error: { message: 'fk violation en trip_agencies' },
+    });
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    expect(tableChains['seats'].delete).toHaveBeenCalled();
+    expect(tableChains['trips'].delete).toHaveBeenCalled();
+  });
+
+  it('si fallan los asientos, elimina el viaje y nunca asigna agencias', async () => {
+    setupAgencyCreateHappyPath();
+    tableChains['seats'].insert.mockResolvedValue({
+      error: { message: 'seats insert failed' },
+    });
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    expect(tableChains['trips'].delete).toHaveBeenCalled();
+    expect(tableChains['trip_agencies'].insert).not.toHaveBeenCalled();
+  });
+
+  // ── Path RPC (TRIP_EFFECTS_VIA_OUTBOX = true) ─────────────────────
+
+  it('usa la RPC create_trip con la sola agencia de la sesión', async () => {
+    setupAgencyCreateHappyPath();
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = true;
+    mockRpc.mockResolvedValue({
+      data: { id: 'trip-rpc', route_id: 'route-1', vehicle_type: 'bus' },
+      error: null,
+    });
+
+    const result = await superadminService.createAgencyTrip(
+      AGENCY_ACTOR,
+      AGENCY_INPUT,
+    );
+
+    expect(mockRpc).toHaveBeenCalledWith('create_trip', {
+      p_route_id: 'route-1',
+      p_departure_time: expect.any(String),
+      p_vehicle_type: 'bus',
+      p_agency_ids: ['agency-1'],
+      p_created_by: 'user-2',
+      p_seat_price: null,
+    });
+    // La RPC es transaccional: cero escrituras fuera de ella.
+    expect(tableChains['trips'].insert).not.toHaveBeenCalled();
+    expect(tableChains['seats'].insert).not.toHaveBeenCalled();
+    expect(tableChains['trip_agencies'].insert).not.toHaveBeenCalled();
+    expect(result.id).toBe('trip-rpc');
+  });
+
+  it('un error de la RPC no deja escrituras parciales', async () => {
+    setupAgencyCreateHappyPath();
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = true;
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: 'ERR_TRIP_DUPLICATE: duplicado' },
+    });
+
+    await expect(
+      superadminService.createAgencyTrip(AGENCY_ACTOR, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    expect(tableChains['trips'].insert).not.toHaveBeenCalled();
+    expect(tableChains['trip_agencies'].insert).not.toHaveBeenCalled();
+  });
+});
+
+describe('listRoutesCatalog (AS-TRIP-003)', () => {
+  beforeEach(() => {
+    resetTableChains();
+  });
+
+  it('lee solo rutas activas del catálogo global, sin métricas', async () => {
+    const routesChain = createChainable([
+      {
+        id: 'route-1',
+        origin: 'Caracas',
+        destination: 'Mérida',
+        status: 'active',
+      },
+    ]);
+    tableChains['routes'] = routesChain;
+
+    const result = await superadminService.listRoutesCatalog();
+
+    expect(routesChain.select).toHaveBeenCalledWith(
+      'id, origin, destination, status',
+    );
+    expect(routesChain.eq).toHaveBeenCalledWith('status', 'active');
+    expect(result).toHaveLength(1);
+    expect(result[0]).not.toHaveProperty('tripCount');
+    expect(result[0]).not.toHaveProperty('reservationCount');
+  });
+
+  it('devuelve una lista vacía cuando no hay rutas activas', async () => {
+    tableChains['routes'] = createChainable([]);
+
+    await expect(superadminService.listRoutesCatalog()).resolves.toEqual([]);
+  });
+
+  it('convierte un error de BD en ValidationError', async () => {
+    const routesChain = createChainable();
+    routesChain.then.mockImplementation((resolve: any) =>
+      resolve({ data: null, error: { message: 'boom' }, count: 0 }),
+    );
+    tableChains['routes'] = routesChain;
+
+    await expect(superadminService.listRoutesCatalog()).rejects.toBeInstanceOf(
+      ValidationError,
+    );
+  });
+});
+
+/**
+ * AS-TRIP-003.1 — contrato del catálogo de rutas contra el schema REAL.
+ *
+ * Producción respondía `VALIDATION_ERROR: column routes.duration_minutes
+ * does not exist`. Este test deriva las columnas de `routes` desde las
+ * migraciones del repo (las únicas fuentes de verdad del schema) y exige
+ * que el select del service solo use columnas que existan hoy, y que
+ * ninguna fuente del backend siga mencionando la columna eliminada.
+ */
+describe('listRoutesCatalog — contrato con el schema real de routes (AS-TRIP-003.1)', () => {
+  /**
+   * Aplica, en orden, las migraciones que tocan la tabla `routes` y
+   * devuelve las columnas que existen al final.
+   */
+  function routesColumnsFromMigrations(): Set<string> {
+    const dir = join(process.cwd(), '../supabase/migrations');
+    const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+    const cols = new Set<string>();
+
+    for (const file of files) {
+      const sql = readFileSync(join(dir, file), 'utf8');
+
+      // CREATE TABLE routes ( ... ) — crea la tabla con ese set de columnas.
+      const create = sql.match(/CREATE TABLE routes \(([\s\S]*?)\);/);
+      if (create) {
+        cols.clear();
+        for (const line of create[1].split('\n')) {
+          const m = line.match(
+            /^\s{2}([a-z_]+)\s+(TEXT|UUID|INTEGER|BIGINT|TIMESTAMPTZ|BOOLEAN|NUMERIC|SERIAL)\b/i,
+          );
+          if (m) cols.add(m[1]);
+        }
+      }
+
+      // ALTER TABLE routes [IF NOT EXISTS] ADD COLUMN ...
+      for (const m of sql.matchAll(
+        /ALTER TABLE routes\s+ADD COLUMN (?:IF NOT EXISTS )?([a-z_]+)/gi,
+      )) {
+        cols.add(m[1]);
+      }
+
+      // ALTER TABLE routes DROP COLUMN [IF EXISTS] ...
+      for (const m of sql.matchAll(
+        /ALTER TABLE routes\s+DROP COLUMN (?:IF EXISTS )?([a-z_]+)/gi,
+      )) {
+        cols.delete(m[1]);
+      }
+    }
+
+    return cols;
+  }
+
+  it('el select usa solo columnas que existen en las migraciones', async () => {
+    const existing = routesColumnsFromMigrations();
+
+    // Guardrails del propio test: el schema real es el esperado y
+    // duration_minutes no sobrevive a la migración 006.
+    expect(existing.has('id')).toBe(true);
+    expect(existing.has('origin')).toBe(true);
+    expect(existing.has('destination')).toBe(true);
+    expect(existing.has('status')).toBe(true);
+    expect(existing.has('duration_minutes')).toBe(false);
+
+    const routesChain = createChainable([]);
+    tableChains['routes'] = routesChain;
+
+    await superadminService.listRoutesCatalog();
+
+    const selectArg = routesChain.select.mock.calls[0][0] as string;
+    const selected = selectArg.split(',').map((c) => c.trim());
+    for (const column of selected) {
+      expect(
+        existing.has(column),
+        `routes.${column} no existe en las migraciones`,
+      ).toBe(true);
+    }
+    // El catálogo necesita exactamente estos campos para `RouteStep`.
+    expect(selected).toEqual(['id', 'origin', 'destination', 'status']);
+  });
+
+  it('ninguna fuente del backend referencia duration_minutes en código', () => {
+    // Comentarios aparte (la doc del fix sí nombra la columna): lo que
+    // importa es que ninguna consulta o lógica la referencie.
+    const stripComments = (src: string) =>
+      src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+    const sources = [
+      'src/services/superadmin.service.ts',
+      'src/controllers/agency-trip.controller.ts',
+      'src/routes/agency/index.ts',
+    ];
+    for (const rel of sources) {
+      const src = stripComments(readFileSync(join(process.cwd(), rel), 'utf8'));
+      expect(src, rel).not.toContain('duration_minutes');
+    }
+  });
+});
+
+// ── AS-TRIP-004 — edición de viajes por la agencia ─────────────────────
+
+describe('updateAgencyTrip (AS-TRIP-004)', () => {
+  const TRIP_ID = 'trip-1';
+  const AGENCY_INPUT = {
+    route_id: 'route-1',
+    departure_time: FUTURE_DATE,
+    vehicle_type: 'bus' as const,
+  };
+
+  /**
+   * Estado base: viaje activo y exclusivo de agency-1, sin reservas,
+   * ruta activa y sin duplicados. Cada test ajusta solo lo que prueba.
+   */
+  function setupAgencyUpdate(
+    overrides: {
+      tripOverrides?: Record<string, any>;
+      currentAgencies?: any[];
+      activeReservations?: any[];
+      allReservations?: any[];
+      /** Head-count de TODAS las reservas (lo que mira la regla dura). */
+      reservationCount?: number;
+      lockedCount?: number;
+      /** null = la ruta no existe. */
+      routeOverrides?: Record<string, any> | null;
+    } = {},
+  ) {
+    const {
+      tripOverrides = {},
+      currentAgencies = [{ agency_id: 'agency-1' }],
+      activeReservations = [],
+      allReservations = [],
+      reservationCount = 0,
+      lockedCount = 0,
+      routeOverrides = { id: 'route-1', status: 'active' },
+    } = overrides;
+
+    // trips: existencia (single) + contexto (single) + fetch final (single).
+    // El mismo valor sirve para los tres: el contexto solo lee columnas.
+    const trips = buildTableChain('trips');
+    trips.single.mockResolvedValue({
+      data: {
+        ...makeTripRow(tripOverrides),
+        routes: { origin: 'Caracas', destination: 'Maracaibo' },
+        trip_agencies: currentAgencies,
+      },
+      error: null,
+    });
+    trips.maybeSingle.mockResolvedValue({ data: null, error: null });
+
+    // reservas: 1) contexto (activas), 2) listado para abordados,
+    // 3) head-count de TODAS las reservas (la regla de edición).
+    const reservations = buildTableChain('reservations');
+    let resCall = 0;
+    reservations.then.mockImplementation((resolve: any) => {
+      resCall++;
+      if (resCall === 1) {
+        resolve({ data: activeReservations, error: null, count: activeReservations.length });
+      } else if (resCall === 2) {
+        resolve({ data: allReservations, error: null, count: allReservations.length });
+      } else {
+        resolve({ data: null, error: null, count: reservationCount });
+      }
+    });
+
+    const seats = buildTableChain('seats');
+    seats.then.mockImplementation((resolve: any) => {
+      resolve({ data: null, error: null, count: lockedCount });
+    });
+
+    const tripAgencies = buildTableChain('trip_agencies');
+    tripAgencies.then.mockImplementation((resolve: any) => {
+      resolve({ data: currentAgencies, error: null });
+    });
+
+    tableChains['routes'] =
+      routeOverrides === null
+        ? createChainable(null)
+        : createChainable(routeOverrides);
+  }
+
+  function happyRpc() {
+    mockRpc.mockResolvedValue({
+      data: {
+        trip_id: TRIP_ID,
+        action: 'updated',
+        event_type: 'trip.updated',
+        changed_fields: ['departure_time'],
+      },
+      error: null,
+    });
+  }
+
+  beforeEach(() => {
+    resetTableChains();
+    happyRpc();
+  });
+
+  it('edita un viaje exclusivo y sin reservas a través de la RPC', async () => {
+    setupAgencyUpdate();
+
+    const result = await superadminService.updateAgencyTrip(
+      AGENCY_ACTOR,
+      TRIP_ID,
+      { ...AGENCY_INPUT, seat_price: 25_000_000 },
+    );
+
+    expect(result.id).toBe(TRIP_ID);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+    expect(mockRpc).toHaveBeenCalledWith('update_agency_trip', {
+      p_trip_id: TRIP_ID,
+      p_route_id: 'route-1',
+      p_departure_time: FUTURE_DATE,
+      p_vehicle_type: 'bus',
+      p_actor_user_id: 'user-2',
+      p_seat_price: 25_000_000,
+    });
+
+    // Nunca hay un UPDATE directo sobre trips desde el service: la
+    // escritura y la guarda de reservas son transaccionales (RPC 105).
+    expect(tableChains['trips'].update).not.toHaveBeenCalled();
+  });
+
+  it('envía p_seat_price=null cuando no se envía precio (la RPC preserva el actual)', async () => {
+    setupAgencyUpdate();
+
+    await superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT);
+
+    const params = mockRpc.mock.calls[0][1] as Record<string, unknown>;
+    expect(params.p_seat_price).toBeNull();
+  });
+
+  it('la RPC no recibe ningún identificador de agencia: la resuelve la BD', async () => {
+    setupAgencyUpdate();
+
+    await superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT);
+
+    const params = mockRpc.mock.calls[0][1] as Record<string, unknown>;
+    expect(Object.keys(params).sort()).toEqual([
+      'p_actor_user_id',
+      'p_departure_time',
+      'p_route_id',
+      'p_seat_price',
+      'p_trip_id',
+      'p_vehicle_type',
+    ]);
+  });
+
+  it('ignora campos interpolados en el input (agency_ids, status, …)', async () => {
+    setupAgencyUpdate();
+
+    await superadminService.updateAgencyTrip(
+      AGENCY_ACTOR,
+      TRIP_ID,
+      {
+        ...AGENCY_INPUT,
+        agency_ids: ['agency-2', 'agency-3'],
+        agency_id: 'agency-2',
+        status: 'completed',
+      } as any,
+    );
+
+    const params = mockRpc.mock.calls[0][1] as Record<string, unknown>;
+    expect(Object.keys(params)).not.toContain('agency_ids');
+    expect(Object.keys(params)).not.toContain('agency_id');
+    expect(Object.keys(params)).not.toContain('status');
+    expect(tableChains['trip_agencies'].insert).not.toHaveBeenCalled();
+    expect(tableChains['trip_agencies'].delete).not.toHaveBeenCalled();
+  });
+
+  it('funciona aunque TRIP_EFFECTS_VIA_OUTBOX esté apagado (siempre la RPC)', async () => {
+    mockEnv.TRIP_EFFECTS_VIA_OUTBOX = false;
+    setupAgencyUpdate();
+
+    await superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT);
+
+    expect(mockRpc).toHaveBeenCalledWith('update_agency_trip', expect.any(Object));
+    expect(tableChains['trips'].update).not.toHaveBeenCalled();
+  });
+
+  // ── Autorización ────────────────────────────────────────────────────
+
+  it('rechaza un actor que no sea de agencia sin tocar la base de datos', async () => {
+    resetTableChains();
+    mockFrom.mockClear();
+
+    await expect(
+      superadminService.updateAgencyTrip(SUPERADMIN_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un ctx de agencia sin agency_id sin tocar la base de datos', async () => {
+    resetTableChains();
+    mockFrom.mockClear();
+
+    await expect(
+      superadminService.updateAgencyTrip(
+        { userId: 'user-2', role: 'agency', agencyId: null },
+        TRIP_ID,
+        AGENCY_INPUT,
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(mockFrom).not.toHaveBeenCalled();
+  });
+
+  it('responde 404 si el viaje no existe', async () => {
+    setupAgencyUpdate();
+    tableChains['trips'].single.mockResolvedValue({
+      data: null,
+      error: { message: 'PGRST116: no rows' },
+    });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, 'trip-ghost', AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un viaje COMPARTIDO (dos agencias) sin llamar a la RPC', async () => {
+    setupAgencyUpdate({
+      currentAgencies: [{ agency_id: 'agency-1' }, { agency_id: 'agency-2' }],
+    });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza el viaje de OTRA agencia (exclusivo pero ajeno) sin llamar a la RPC', async () => {
+    setupAgencyUpdate({ currentAgencies: [{ agency_id: 'agency-2' }] });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  // ── Estados del viaje ───────────────────────────────────────────────
+
+  it.each([
+    ['completado', { status: 'completed' }],
+    ['cancelado', { status: 'cancelled' }],
+    ['archivado', { status: 'archived' }],
+  ])('rechaza un viaje %s sin llamar a la RPC', async (_label, tripOverrides) => {
+    setupAgencyUpdate({ tripOverrides });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un viaje cuya salida ya pasó', async () => {
+    setupAgencyUpdate({ tripOverrides: { departure_time: PAST_DATE } });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toThrow('salida ya pasó');
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  // ── Reservas (regla dura de este incremento) ────────────────────────
+
+  it('rechaza un viaje con reservas sin llamar a la RPC', async () => {
+    setupAgencyUpdate({
+      activeReservations: [{ id: 'r1', agency_id: 'agency-1' }],
+      allReservations: [{ id: 'r1' }],
+      reservationCount: 1,
+    });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(tableChains['trips'].update).not.toHaveBeenCalled();
+  });
+
+  it('bloquea aunque las reservas existentes estén canceladas (cualquier reserva cuenta)', async () => {
+    // Sin reservas vivas (activas = 0) pero con historial: la regla de
+    // AS-TRIP-004 es "sin reservas de ningún tipo".
+    setupAgencyUpdate({
+      activeReservations: [],
+      allReservations: [{ id: 'r1-cancelada' }],
+      reservationCount: 1,
+    });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  // ── Ruta, salida, vehículo y precio ─────────────────────────────────
+
+  it('rechaza una ruta global inexistente sin llamar a la RPC', async () => {
+    setupAgencyUpdate({ routeOverrides: null });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una ruta global inactiva sin llamar a la RPC', async () => {
+    setupAgencyUpdate({ routeOverrides: { id: 'route-1', status: 'inactive' } });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toThrow('ruta inactiva');
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza una salida nueva en el pasado sin llamar a la RPC', async () => {
+    setupAgencyUpdate();
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, {
+        ...AGENCY_INPUT,
+        departure_time: PAST_DATE,
+      }),
+    ).rejects.toThrow(DEPARTURE_FUTURE_MESSAGE);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un tipo de vehículo no soportado sin tocar la base de datos', async () => {
+    resetTableChains();
+    mockFrom.mockClear();
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, {
+        ...AGENCY_INPUT,
+        vehicle_type: 'van',
+      } as any),
+    ).rejects.toThrow('Tipo de vehículo no válido');
+
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rechaza un precio por asiento inválido sin tocar la base de datos', async () => {
+    resetTableChains();
+    mockFrom.mockClear();
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, {
+        ...AGENCY_INPUT,
+        seat_price: 99.9,
+      }),
+    ).rejects.toBeInstanceOf(ValidationError);
+
+    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('bloquea el cambio de vehículo con asientos bloqueados por reservas en curso', async () => {
+    setupAgencyUpdate({ lockedCount: 2 });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, {
+        ...AGENCY_INPUT,
+        vehicle_type: 'kia',
+      }),
+    ).rejects.toThrow('bloqueado(s)');
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  // ── Duplicados (rutina de programación) ─────────────────────────────
+
+  it('rechaza una ruta + salida que ya ocupan otro viaje', async () => {
+    setupAgencyUpdate();
+    tableChains['trips'].maybeSingle.mockResolvedValue({
+      data: { id: 'trip-existing' },
+      error: null,
+    });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, {
+        ...AGENCY_INPUT,
+        departure_time: new Date(Date.now() + 2 * 86_400_000).toISOString(),
+      }),
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('no consulta duplicados cuando no cambia ni la ruta ni la salida', async () => {
+    setupAgencyUpdate();
+
+    await superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT);
+
+    expect(tableChains['trips'].maybeSingle).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Errores de la RPC (mapeo a tipos del backend) ───────────────────
+
+  it.each([
+    ['ERR_TRIP_HAS_RESERVATIONS', ConflictError],
+    ['ERR_TRIP_DUPLICATE', ConflictError],
+    ['ERR_TRIP_NOT_EXCLUSIVE', ForbiddenError],
+    ['ERR_ROUTE_INACTIVE', ValidationError],
+    ['ERR_DEPARTURE_NOT_FUTURE', ValidationError],
+    ['ERR_TRIP_NOT_ACTIVE', ValidationError],
+  ])('mapea %s al tipo de error correspondiente', async (code, errorType) => {
+    setupAgencyUpdate();
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: `${code}: detalle de la RPC` },
+    });
+
+    await expect(
+      superadminService.updateAgencyTrip(AGENCY_ACTOR, TRIP_ID, AGENCY_INPUT),
+    ).rejects.toBeInstanceOf(errorType);
   });
 });

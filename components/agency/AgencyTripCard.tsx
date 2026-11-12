@@ -8,6 +8,7 @@ import {
   Users,
   ChevronRight,
 } from "lucide-react";
+
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -49,6 +50,8 @@ interface AgencyTripCardProps {
   onComplete?: (trip: AgencyTrip) => void;
   /** true mientras el PATCH de estado de ESTE viaje está en curso. */
   completing?: boolean;
+  /** AS-TRIP-004 — habilita la acción "Editar viaje" en el footer. */
+  onEdit?: (trip: AgencyTrip) => void;
 }
 
 function getStatusBadge(
@@ -70,7 +73,7 @@ function getStatusBadge(
   }
 }
 
-export function AgencyTripCard({ trip, onSelect, now, onComplete, completing }: AgencyTripCardProps) {
+export function AgencyTripCard({ trip, onSelect, now, onComplete, completing, onEdit }: AgencyTripCardProps) {
   const clock = now ?? new Date();
   const isFull = trip.available_seats === 0;
   const isClosed = trip.status === 'cancelled' || trip.status === 'completed';
@@ -88,6 +91,20 @@ export function AgencyTripCard({ trip, onSelect, now, onComplete, completing }: 
     trip.agency_count === 1 &&
     !isDepartureInFuture(trip.departure_time, clock);
   const showComplete = Boolean(onComplete) && canComplete;
+
+  // AS-TRIP-004 — visibilidad de "Editar viaje":
+  //   * viaje activo (el backend solo permite editar `active`),
+  //   * exclusivo de esta agencia (agency_count === 1),
+  //   * salida aún en el futuro (editar un viaje ya partido está bloqueado).
+  // Sin reservas no se puede saber desde la lista, así que el backend
+  // responde 409 y el modal queda abierto con el mensaje para reintentar.
+  // Mutuamente exclusivo con "Completar viaje": la edición exige salida
+  // futura y la completación exige salida pasada.
+  const canEdit =
+    trip.status === 'active' &&
+    trip.agency_count === 1 &&
+    isDepartureInFuture(trip.departure_time, clock);
+  const showEdit = Boolean(onEdit) && canEdit;
 
   const cardContent = (
     <>
@@ -155,7 +172,20 @@ export function AgencyTripCard({ trip, onSelect, now, onComplete, completing }: 
         </div>
       </div>
 
-      <div className="mt-4 pt-4 border-t border-[rgba(0,0,0,0.06)] flex items-center justify-between">
+      {/*
+        Footer (AS-TRIP-002/004): DOS filas.
+        · Fila 1: solo el estado del viaje (informativo, nunca es acción);
+          si la tarjeta navega entera, el chevron va a su derecha en
+          MISMA fila (sin añadir filas vacías).
+        · Fila 2: CTA primario (Editar O Completar: mutuamente exclusivos
+          por definición de salida futura/pasada) a la IZQUIERDA, y las
+          acciones secundarias (Ver pasajeros, Nueva Reserva) a la
+          DERECHA con 16px entre sí. Sin separadores "|" — encadenaban
+          todo y apretaban el botón. Un solo CTA primario por tarjeta.
+        La fila 2 no se renderiza si no hay acciones (navegable o
+        cerrada): nunca queda una fila vacía.
+      */}
+      <div className="mt-4 pt-4 border-t border-[rgba(0,0,0,0.06)] flex flex-col gap-4">
         <div className="flex items-center gap-2 text-[12px] text-[var(--color-brand-muted)]">
           <Users className="w-3.5 h-3.5" />
           <span>
@@ -166,58 +196,78 @@ export function AgencyTripCard({ trip, onSelect, now, onComplete, completing }: 
                 : "Sin bloqueos"
             }
           </span>
+          {/* Variante navegable: el chevron queda en la MISMA fila que
+              el estado (derecha), sin añadir una fila vacía. */}
+          {onSelect && (
+            <ChevronRight className={`ml-auto w-5 h-5 transition-colors ${isClosed ? 'text-[var(--color-brand-muted)] opacity-40' : 'text-[var(--color-brand-muted)] group-hover:text-[var(--color-brand-cyan)]'}`} />
+          )}
         </div>
 
-        {onSelect ? (
-          <ChevronRight className={`w-5 h-5 transition-colors ${isClosed ? 'text-[var(--color-brand-muted)] opacity-40' : 'text-[var(--color-brand-muted)] group-hover:text-[var(--color-brand-cyan)]'}`} />
-        ) : (
-          <div className="flex items-center gap-3">
-            {showComplete && (
-              <>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  loading={completing}
-                  onClick={(e) => {
-                    // La tarjeta no está envuelta en <Link> cuando hay
-                    // acción de completar; se detiene la propagación por
-                    // seguridad (nunca debe navegar ni duplicar el envío).
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onComplete?.(trip);
-                  }}
-                >
-                  Completar viaje
-                </Button>
-                {/* showComplete implica viaje activo: siempre hay al
-                    menos el enlace "Ver pasajeros" después. */}
-                <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
-              </>
+        {/* Fila 2: acciones. Solo existe si la tarjeta no navega entera
+            y no está cerrada — nunca queda una fila vacía. */}
+        {!onSelect && !isClosed && (
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            {/* CTA primario: izquierda de la segunda fila. */}
+            {showEdit && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                className="shrink-0"
+                onClick={(e) => {
+                  // La tarjeta no navega cuando hay acción de edición
+                  // (mismo criterio que "Completar viaje"): se detiene
+                  // la propagación para no abrir el detalle por accidente.
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onEdit?.(trip);
+                }}
+              >
+                Editar viaje
+              </Button>
             )}
-            {!isClosed && (
+            {showComplete && (
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                loading={completing}
+                className="shrink-0"
+                onClick={(e) => {
+                  // La tarjeta no está envuelta en <Link> cuando hay
+                  // acción de completar; se detiene la propagación por
+                  // seguridad (nunca debe navegar ni duplicar el envío).
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onComplete?.(trip);
+                }}
+              >
+                Completar viaje
+              </Button>
+            )}
+
+            {/* Acciones secundarias: a la derecha (ml-auto las ancla al
+                borde haya o no CTA a la izquierda), mismo peso visual. */}
+            <div className="ml-auto flex items-center gap-4">
               <Link
                 href={`/agency/trips/${trip.id}/passengers`}
-                className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
+                className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline whitespace-nowrap"
                 onClick={(e) => e.stopPropagation()}
               >
                 Ver pasajeros
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
-            )}
-            {!isClosed && canCreateReservation && (
-              <>
-                <span className="text-[var(--color-brand-muted)] opacity-40">|</span>
+              {canCreateReservation && (
                 <Link
                   href={`/agency/reservations/new?trip=${trip.id}&source=trips`}
-                  className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline"
+                  className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline whitespace-nowrap"
                   onClick={(e) => e.stopPropagation()}
                 >
                   Nueva Reserva
                   <ChevronRight className="w-3.5 h-3.5" />
                 </Link>
-              </>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -251,10 +301,11 @@ export function AgencyTripCard({ trip, onSelect, now, onComplete, completing }: 
     );
   }
 
-  // AS-TRIP-002: si hay acción "Completar viaje", la tarjeta NO se
-  // envuelve en <Link> para no anidar elementos interactivos (el botón
-  // vive en el footer junto a "Ver pasajeros", que sigue navegando).
-  if (showComplete) {
+  // AS-TRIP-002/004: si hay acción "Completar viaje" o "Editar viaje",
+  // la tarjeta NO se envuelve en <Link> para no anidar elementos
+  // interactivos (el botón vive en el footer junto a "Ver pasajeros",
+  // que sigue navegando).
+  if (showComplete || showEdit) {
     return (
       <div className="group">
         <Card hover>

@@ -117,7 +117,7 @@ export function CheckoutAttemptRejectModal({
           maxLength={PAYMENT_REJECT_REASON_MAX}
           rows={3}
           placeholder="Ej: El comprobante no corresponde a este viaje"
-          className="w-full border-[1.5px] border-[#e5e7eb] rounded-[10px] px-4 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-navy)] bg-white outline-none resize-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)] transition-all duration-200"
+          className="w-full border-[1.5px] border-[#e5e7eb] rounded-[10px] px-4 py-3 font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-navy)] bg-white outline-none resize-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_var(--color-cyan-ring)] transition-all duration-200"
         />
         <div className="flex items-center justify-between mt-1.5">
           <p className="font-[family-name:var(--font-body)] text-xs text-[#ef4444]">

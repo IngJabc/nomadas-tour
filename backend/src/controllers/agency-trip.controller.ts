@@ -19,6 +19,38 @@ const updateTripStatusSchema = z.object({
   status: z.enum(["completed"]),
 });
 
+/**
+ * AS-TRIP-003 — alta de viaje por la agencia.
+ *
+ * Schema **strict**: cualquier campo que no esté listado aqui se rechaza
+ * con 400. En particular NO existen `agency_ids` / `agency_id` / `status`:
+ * la agencia no puede elegir a quién se asigna el viaje, crear viajes
+ * compartidos ni introducir estados no soportados. La asignación se
+ * deriva en el server desde `req.ctx`.
+ */
+export const createTripSchema = z
+  .object({
+    route_id: z.string().uuid(),
+    departure_time: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/),
+    vehicle_type: z.enum(["bus", "kia"]),
+    /** Centavos COP (trips.seat_price). Omitir = no publicar precio. */
+    seat_price: z.number().int().min(0).max(2_147_483_647).optional(),
+  })
+  .strict();
+
+/**
+ * AS-TRIP-004 — `PATCH /api/agency/trips/:tripId`.
+ *
+ * Mismo contrato estricto que el alta: solo ruta, salida, vehículo y
+ * precio. Cualquier otro campo (status, agency_ids, agency_id,
+ * postpone, created_by, is_published, …) se rechaza con 400 en lugar
+ * de filtrarse en silencio. La identidad de la agencia NUNCA viene del
+ * body: sale de `req.ctx` y además la RPC la resuelve en `public.users`.
+ */
+export const updateTripSchema = createTripSchema;
+
 export class AgencyTripController {
   async updateTripStatus(req: Request, res: Response, next: NextFunction) {
     try {
@@ -35,6 +67,64 @@ export class AgencyTripController {
           ? new ValidationError("Invalid input", (error as any).issues)
           : error
       );
+    }
+  }
+
+  /**
+   * AS-TRIP-003 — `POST /api/agency/trips`. Crea un viaje asignado en
+   * exclusiva a la agencia autenticada. El `agency_id` nunca se acepta
+   * del body: sale de `req.ctx`.
+   */
+  async createTrip(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = createTripSchema.parse(req.body);
+      const trip = await superadminService.createAgencyTrip(req.ctx!, data);
+      res.status(201).json(trip);
+    } catch (error) {
+      next(
+        error instanceof z.ZodError
+          ? new ValidationError("Invalid input", (error as any).issues)
+          : error
+      );
+    }
+  }
+
+  /**
+   * AS-TRIP-004 — `PATCH /api/agency/trips/:tripId`. Edición de un viaje
+   * propio y exclusivo. El `tripId` de la ruta es solo identificación:
+   * la autorización (rol, agencia, exclusividad, estado y ausencia de
+   * reservas) la decide el service y, de forma final, la RPC
+   * `update_agency_trip` (migración 105) dentro de su transacción.
+   */
+  async updateTrip(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = updateTripSchema.parse(req.body);
+      const trip = await superadminService.updateAgencyTrip(
+        req.ctx!,
+        req.params.tripId as string,
+        data,
+      );
+      res.json(trip);
+    } catch (error) {
+      next(
+        error instanceof z.ZodError
+          ? new ValidationError("Invalid input", (error as any).issues)
+          : error
+      );
+    }
+  }
+
+  /**
+   * `GET /api/agency/routes` — catálogo global de rutas activas para el
+   * selector de viaje. Solo lectura: la agencia no puede crear, editar ni
+   * desactivar rutas (eso sigue siendo superadmin-only).
+   */
+  async listRoutes(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const routes = await superadminService.listRoutesCatalog();
+      res.json(routes);
+    } catch (error) {
+      next(error);
     }
   }
 }

@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getBrandingPortalHost } from "@/lib/brand/utils";
 
 let modalCount = 0;
 
@@ -59,7 +60,9 @@ export function Modal({
   onCloseRef.current = onClose;
 
   useEffect(() => {
-    setPortalNode(document.body);
+    // Portal al scope de branding de la agencia cuando existe, para que el
+    // modal herede los tokens `--color-*` del tenant (ver getBrandingPortalHost).
+    setPortalNode(getBrandingPortalHost());
   }, []);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {

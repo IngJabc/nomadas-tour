@@ -1,4 +1,4 @@
-import type { AgencyReservation, AgencyTripPassengersResponse } from '@/types';
+import type { AgencyReservation, AgencyTripPassengersResponse, Route } from '@/types';
 import type { AuditListResponse, AuditQueryParams } from '@/types/audit';
 import type { AppUser } from '@/lib/auth/types';
 import { ApiError } from '@/lib/errors/api-error';
@@ -492,6 +492,56 @@ export const agencyApi = {
   listTrips: () => request<any[]>('/agency/trips'),
   getTrips: () => request<any[]>('/agency/trips'),
   getTrip: (tripId: string) => request<any>(`/agency/trips/${tripId}`),
+  /**
+   * AS-TRIP-003 — catálogo global de rutas activas para el selector de
+   * alta de viaje. Solo lectura: las rutas siguen siendo globales y
+   * superadmin-only (no existen endpoints de escritura de rutas aquí).
+   *
+   * AS-TRIP-003.1 — sin `duration_minutes`: esa columna no existe en la
+   * BD (la migración 006 la eliminó) y el builder no la necesita.
+   */
+  listRoutes: () =>
+    request<Array<Pick<Route, 'id' | 'origin' | 'destination' | 'status'>>>(
+      '/agency/routes',
+    ),
+  /**
+   * AS-TRIP-003 — crea un viaje asignado en exclusiva a la agencia
+   * autenticada. `POST /api/agency/trips`: el backend ignora cualquier
+   * intento de elegir la agencia desde el cliente (el schema rechaza
+   * campos no listados y la asignación sale de la sesión).
+   */
+  createTrip: (data: {
+    route_id: string;
+    departure_time: string;
+    vehicle_type: 'bus' | 'kia';
+    /** Centavos COP (trips.seat_price). */
+    seat_price?: number;
+  }) =>
+    request<{ id: string; status: string }>('/agency/trips', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  /**
+   * AS-TRIP-004 — edita un viaje propio y exclusivo de la agencia.
+   * `PATCH /api/agency/trips/:tripId`. Solo ruta, salida, vehículo y
+   * precio (schema strict en el backend); la autorización —rol, agencia
+   * de la sesión, exclusividad, estado activo y ausencia de reservas—
+   * la decide el backend, nunca el cliente.
+   */
+  updateTrip: (
+    tripId: string,
+    data: {
+      route_id: string;
+      departure_time: string;
+      vehicle_type: 'bus' | 'kia';
+      /** Centavos COP. Omitir = preservar el precio actual. */
+      seat_price?: number;
+    },
+  ) =>
+    request<{ id: string }>(`/agency/trips/${encodeURIComponent(tripId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
   /**
    * AS-TRIP-002 — marca un viaje como completado.
    * `PATCH /api/agency/trips/:tripId/status`. El backend valida el actor

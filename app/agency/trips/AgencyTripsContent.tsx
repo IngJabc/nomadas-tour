@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bus, AlertTriangle, Search, X } from 'lucide-react';
+import { Bus, AlertTriangle, Search, X, Plus } from 'lucide-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { agencyApi } from '@/lib/api';
 import { subscribeToTripSeats, subscribeToTripAgencies, subscribeToTrips } from '@/lib/realtime/subscriptions';
@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { Button } from '@/components/ui/Button';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { AgencyTripCard, type AgencyTrip } from '@/components/agency/AgencyTripCard';
+import { AgencyTripBuilderModal } from '@/components/agency/AgencyTripBuilderModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { ApiError } from '@/lib/errors/api-error';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
@@ -90,6 +91,31 @@ export default function AgencyTripsContent() {
   useEffect(() => {
     doFetch();
   }, [doFetch]);
+
+  // ─── AS-TRIP-003.1: alta de viaje en modal (sin salir de la lista) ──
+  // AS-TRIP-004: el mismo modal también edita (`editingTripId` != null);
+  // solo uno de los dos modos puede estar activo a la vez.
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [editingTripId, setEditingTripId] = useState<string | null>(null);
+  const isEditing = editingTripId !== null;
+
+  const handleBuilderSuccess = useCallback(() => {
+    // Solo llega con el backend confirmando la creación/edición: cierra,
+    // avisa y refresca la lista. Si la petición falla, el modal sigue
+    // abierto con el error para reintentar.
+    const wasEditing = editingTripId !== null;
+    setBuilderOpen(false);
+    setEditingTripId(null);
+    toast.success(
+      wasEditing ? 'Viaje actualizado correctamente' : 'Viaje creado correctamente',
+    );
+    void doFetch();
+  }, [doFetch, editingTripId]);
+
+  const handleCloseBuilder = useCallback(() => {
+    setBuilderOpen(false);
+    setEditingTripId(null);
+  }, []);
 
   // ─── AS-TRIP-002: completar viaje (confirmación → PATCH → refresh) ──
   const [confirmTrip, setConfirmTrip] = useState<AgencyTrip | null>(null);
@@ -316,7 +342,18 @@ export default function AgencyTripsContent() {
         animate="visible"
         transition={{ duration: 0.25 }}
       >
-        <PageHeader title="Mis viajes" />
+        <PageHeader
+          title="Mis viajes"
+          action={
+            <Button
+              onClick={() => setBuilderOpen(true)}
+              aria-label="Nuevo viaje"
+            >
+              <Plus className="w-4 h-4" />
+              Nuevo viaje
+            </Button>
+          }
+        />
       </motion.div>
 
       {fetchError && (
@@ -448,12 +485,25 @@ export default function AgencyTripsContent() {
                   now={now}
                   onComplete={(t) => setConfirmTrip(t)}
                   completing={completingTripId === trip.id}
+                  onEdit={(t) => setEditingTripId(t.id)}
                 />
               </motion.div>
             ))}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* AS-TRIP-003.1/004 — alta y edición de viaje en modal (mismo
+          builder que el superadmin, adaptado a agencia: sin selector de
+          agencias y con la identidad derivada en el backend). Un solo
+          componente según el modo activo. */}
+      <AgencyTripBuilderModal
+        open={builderOpen || isEditing}
+        mode={isEditing ? 'edit' : 'create'}
+        tripId={editingTripId ?? undefined}
+        onClose={handleCloseBuilder}
+        onSuccess={handleBuilderSuccess}
+      />
 
       {/* AS-TRIP-002 — confirmación antes de marcar el viaje completado */}
       <ConfirmModal

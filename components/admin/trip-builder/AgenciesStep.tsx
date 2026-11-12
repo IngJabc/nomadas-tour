@@ -5,7 +5,7 @@ import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const inputClass =
-  "w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-white outline-none transition-all duration-200 focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)]";
+  "w-full border-[1.5px] border-[#e5e7eb] rounded-xl px-3.5 py-2.5 font-[family-name:var(--font-body)] font-normal text-sm text-[var(--color-brand-navy)] bg-white outline-none transition-all duration-200 focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_var(--color-cyan-ring)]";
 
 interface AgenciesStepProps {
   agencies: { id: string; name: string; status?: string }[];
@@ -112,7 +112,7 @@ export function AgenciesStep({
             return (
               <span
                 key={id}
-                className="inline-flex items-center gap-1 font-[family-name:var(--font-body)] font-semibold text-[11px] px-[10px] py-[3px] rounded-full bg-[rgba(0,212,255,0.1)] text-[var(--color-brand-cyan)]"
+                className="inline-flex items-center gap-1 font-[family-name:var(--font-body)] font-semibold text-[11px] px-[10px] py-[3px] rounded-full bg-[var(--color-cyan-bg)] text-[var(--color-brand-cyan)]"
               >
                 {agency?.name ?? id}
                 <button
@@ -141,7 +141,7 @@ export function AgenciesStep({
                 key={a.id}
                 className={cn(
                   'flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors font-[family-name:var(--font-body)] text-sm',
-                  isSelected ? 'bg-[rgba(0,212,255,0.06)]' : 'hover:bg-slate-50',
+                  isSelected ? 'bg-[var(--color-cyan-bg-soft)]' : 'hover:bg-slate-50',
                   'border-b border-[rgba(0,0,0,0.04)] last:border-b-0',
                 )}
               >

@@ -26,6 +26,20 @@ export type TripBuilderAction =
 
 const STEPS = ['route', 'schedule', 'vehicle', 'agencies', 'review'];
 
+/** Pasos del builder SIN el paso de Agencias (alta desde la agencia). */
+const STEPS_NO_AGENCIES = ['route', 'schedule', 'vehicle', 'review'];
+
+export interface TripBuilderOptions {
+  /**
+   * false = builder sin paso de Agencias: es el alta desde el panel de
+   * agencia, donde la asignación del viaje (exactamente una fila en
+   * `trip_agencies`) la hace el backend desde la sesión. No hay selector
+   * de agencias ni validación de agencias que cumplir.
+   * Por defecto `true` (comportamiento del superadmin, sin cambios).
+   */
+  includeAgencies?: boolean;
+}
+
 export function getStepIndex(step: string): number {
   const idx = STEPS.indexOf(step);
   return idx >= 0 ? idx : 0;
@@ -33,6 +47,11 @@ export function getStepIndex(step: string): number {
 
 export function getStepLabel(stepIndex: number): string {
   return STEPS[stepIndex] || '';
+}
+
+/** Cantidad de pasos del builder según la variante (admin = 5, agencia = 4). */
+export function tripBuilderStepCount(includeAgencies: boolean = true): number {
+  return (includeAgencies ? STEPS : STEPS_NO_AGENCIES).length;
 }
 
 export const TOTAL_STEPS = STEPS.length;
@@ -76,7 +95,12 @@ function tripBuilderReducer(
   }
 }
 
-export function useTripBuilderReducer(initial?: Partial<TripBuilderState>) {
+export function useTripBuilderReducer(
+  initial?: Partial<TripBuilderState>,
+  options: TripBuilderOptions = {},
+) {
+  const includeAgencies = options.includeAgencies !== false;
+
   const [state, dispatch] = useReducer(tripBuilderReducer, {
     ...initialState,
     ...initial,
@@ -91,13 +115,15 @@ export function useTripBuilderReducer(initial?: Partial<TripBuilderState>) {
       case 2:
         return state.vehicle_type !== '';
       case 3:
-        return state.agency_ids.length > 0;
+        // Variante agencia: el paso 3 ya es "Revisión" (no hay Agencias),
+        // así que la única validación restante es haber llegado a él.
+        return includeAgencies ? state.agency_ids.length > 0 : true;
       case 4:
         return true;
       default:
         return false;
     }
-  }, [state]);
+  }, [state, includeAgencies]);
 
   const isStepValid = useCallback((step: number): boolean => {
     switch (step) {
@@ -108,13 +134,13 @@ export function useTripBuilderReducer(initial?: Partial<TripBuilderState>) {
       case 2:
         return state.vehicle_type !== '';
       case 3:
-        return state.agency_ids.length > 0;
+        return includeAgencies ? state.agency_ids.length > 0 : true;
       case 4:
         return true;
       default:
         return false;
     }
-  }, [state]);
+  }, [state, includeAgencies]);
 
   return { state, dispatch, canProceed, isStepValid };
 }

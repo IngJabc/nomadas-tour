@@ -52,8 +52,8 @@ export function VehicleStep({
               className={cn(
                 'relative flex flex-col items-center gap-2 sm:gap-3 p-4 sm:p-6 rounded-2xl border-2 text-center transition-all duration-200 cursor-pointer',
                 isSelected
-                  ? 'border-[var(--color-brand-cyan)] bg-[rgba(0,212,255,0.06)] shadow-[0_0_0_3px_rgba(0,212,255,0.15)]'
-                  : 'border-[rgba(0,0,0,0.06)] bg-[var(--color-brand-surface)] hover:border-[var(--color-brand-cyan)] hover:shadow-[0_6px_24px_rgba(0,212,255,0.12)] hover:-translate-y-0.5',
+                  ? 'border-[var(--color-brand-cyan)] bg-[var(--color-cyan-bg-soft)] shadow-[0_0_0_3px_var(--color-cyan-ring)]'
+                  : 'border-[rgba(0,0,0,0.06)] bg-[var(--color-brand-surface)] hover:border-[var(--color-brand-cyan)] hover:shadow-[0_6px_24px_var(--color-cyan-shadow)] hover:-translate-y-0.5',
               )}
             >
               {isSelected && (
@@ -113,7 +113,7 @@ export function VehicleStep({
               'w-full pl-10 pr-4 py-3 rounded-[10px] border-[1.5px] font-[family-name:var(--font-body)] text-[14px] text-[var(--color-brand-navy)] bg-[var(--color-brand-surface)] transition-all duration-200',
               showPriceError
                 ? 'border-[#ef4444] focus:outline-none focus:border-[#ef4444] focus:shadow-[0_0_0_3px_rgba(239,68,68,0.15)]'
-                : 'border-[#e5e7eb] focus:outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_rgba(0,212,255,0.15)]',
+                : 'border-[#e5e7eb] focus:outline-none focus:border-[var(--color-brand-cyan)] focus:shadow-[0_0_0_3px_var(--color-cyan-ring)]',
             )}
           />
         </div>

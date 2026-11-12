@@ -18,6 +18,12 @@ export function buildAgencyBrandingStyle(
     style['--color-brand-cyan'] = branding.accent_color;
     style['--color-cyan-bg'] =
       `color-mix(in srgb, ${branding.accent_color} 10%, transparent)`;
+    style['--color-cyan-bg-soft'] =
+      `color-mix(in srgb, ${branding.accent_color} 6%, transparent)`;
+    style['--color-cyan-ring'] =
+      `color-mix(in srgb, ${branding.accent_color} 15%, transparent)`;
+    style['--color-cyan-shadow'] =
+      `color-mix(in srgb, ${branding.accent_color} 12%, transparent)`;
   }
 
   if (isHexColor(branding.secondary_color)) {
@@ -35,4 +41,25 @@ export function buildAgencyBrandingStyle(
   }
 
   return style;
+}
+
+/** Scope donde AgencyBrandingProvider inyecta los tokens de la agencia. */
+export const AGENCY_BRANDING_SCOPE_SELECTOR = '[data-agency-branding-scope]';
+
+/**
+ * Host de portal para overlays (`Modal`, etc.).
+ *
+ * `createPortal(..., document.body)` queda FUERA del scope de branding, así
+ * que el contenido portaled perdía los colores de la agencia y usaba los
+ * tokens por defecto de Nómadas. Si hay un scope activo se porta DENTRO de
+ * él (las custom properties heredan por la cascada DOM y el `position:
+ * fixed` sigue resolviéndose contra el viewport porque el scope no crea
+ * contexto de apilado); sin provider se cae a `document.body` como antes.
+ */
+export function getBrandingPortalHost(): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  return (
+    document.querySelector<HTMLElement>(AGENCY_BRANDING_SCOPE_SELECTOR) ??
+    document.body
+  );
 }
