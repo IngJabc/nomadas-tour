@@ -4,7 +4,7 @@
 **Alcance de este documento:** Dirección de mediano y largo plazo. No es un backlog técnico de sprint.  
 **Ejecución operativa:** Ver [TASKS.md](../TASKS.md).
 
-**Última actualización:** 2026-11-10
+**Última actualización:** 2026-11-14 (prioridades de negocio acordadas)
 
 ---
 
@@ -22,7 +22,7 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 | Seguridad endurecida (RLS desde public.users, suite SEC-007/008/009) | Operativo                                                                                              |
 | Notificaciones (in-app + email)                                        | Operativo                                                                                              |
 | Deploy estabilizado (dist fuera de Git, build en Render)             | Operativo                                                                                              |
-| Cancelación de viajes con reservas                                     | Operativo                                                                                              |
+| Cancelación de viajes con reservas                                     | ❌ Bloqueado por diseño: `set_trip_status` responde `ERR_TRIP_HAS_RESERVATIONS` (409) con reservas vivas (migración 104 + tests). **Prioridad 5 = AS-TRIP-005** (tras validar reembolsos) |
 | Agencia desactivada con logout forzado                                 | Operativo                                                                                              |
 | Edición de viajes con reservas existentes                              | Operativo                                                                                              |
 | Estados inválidos protegidos                                           | Operativo                                                                                              |
@@ -50,6 +50,83 @@ Nómadas Tour superó la etapa de corrección arquitectónica. La plataforma ope
 **Fundación completada (referencia histórica):** alineación backend, dominio superadmin, flujo de reservas, abordaje QR, dashboards, design system, vehicle layouts, realtime global y hardening de seguridad. Detalle de sprints en [TASKS-HISTORY.md](TASKS-HISTORY.md).
 
 El producto ya no es únicamente un proyecto de portafolio: entra en fase de **comercialización y valor para agencias**.
+
+---
+
+## Prioridades de negocio acordadas (2026-11-14)
+
+Orden acordado para el trabajo pendiente. Este bloque es **idéntico** en
+`TASKS.md` y `docs/ROADMAP.md` de ambos repos (`nomadas-tour` y
+`nomadas-tour-marketplace`) para que no existan dos versiones de la misma
+prioridad; cada repo solo documenta su responsabilidad de implementación.
+Detalle operativo en [`TASKS.md`](../TASKS.md) → *Prioridades de negocio
+acordadas*.
+
+| # | Prioridad | IDs | Orden / dependencia | Dueño (responsabilidad de implementación) |
+| - | --------- | --- | ------------------- | ----------------------------------------- |
+| 1 | Pagos de reserva en dos partes: depósito fijo + saldo restante | **MKT-010.1** (extiende MKT-010) | Primera | Marketplace: flujo y estado de pago para el cliente · Tour: configuración del depósito y revisión · backend/DB: registros autoritativos |
+| 2 | Comisiones de plataforma: **USD 0.30 por pasajero que completa el viaje** | **MKT-009** extendido (comisiones, roadmap original) | Después de la 1 | Tour: visibilidad del adeudo en panel de agencia · backend/DB: cálculo y trazabilidad por viaje/pasajero elegible · Marketplace: aporta datos del pasajero |
+| 3 | Cancelación de reservas y reembolsos | **MKT-010.2** (extiende MKT-010) | Después de la 1; puede correr en paralelo con la 2 | Tour: cancelación y registro/gestión de reembolsos · Marketplace: visibilidad de estado para el cliente · backend/DB: cancelación + liberación de asientos atómicas y auditoría |
+| 4 | Marco legal venezolano | **LEG** (marketplace, coordinador) ↔ **LEGAL-001…005** (tour, Fase A) | En paralelo (la revisión externa requiere planificación anticipada) | Una sola investigación y revisión jurídica compartida; cada repo redacta solo su lado |
+| 5 | Cancelación de viajes con reservas existentes | **AS-TRIP-005** (tour) | Solo después de validar la prioridad 3 | Tour |
+
+Reglas de negocio (válidas para todos los ítems):
+
+- **Nada de este bloque está implementado**: todo está planificado. No se
+  marca ninguna de estas tareas como completada.
+- **Prioridad 1 — MKT-010.1:** dos pagos exactos por asiento. La agencia
+  configura el monto del depósito y las fechas; el sistema calcula el saldo
+  restante y muestra el porcentaje que representa cada monto. El segundo
+  pago vence generalmente un día antes de la salida o el día de la salida;
+  la agencia avisa al cliente por WhatsApp. Si el cliente no paga a tiempo,
+  la agencia decide cómo manejar la reserva: **sin cancelación automática**
+  basada solo en el saldo impago.
+- **Prioridad 2 — MKT-009 (extendido):** USD 0.30 por pasajero que
+  **completa** el viaje; **nada** por pasajeros cancelados o que no
+  viajan. El panel de agencia muestra el monto adeudado por viajes
+  completados; cada registro es trazable al viaje y a los pasajeros
+  elegibles. El criterio histórico "primer viaje gratis" queda como
+  **decisión pendiente** frente al nuevo criterio (no se borra el
+  historial).
+- **Prioridad 3 — MKT-010.2:** el cliente contacta a la agencia para
+  pedir la cancelación; la agencia la gestiona desde Tour. Cancelar libera
+  los asientos de la reserva en una operación **atómica**. Se registra el
+  reembolso: monto total, parcial o cero, motivo, agencia/usuario
+  responsable, fecha y estado. El dinero se mueve **fuera de la
+  plataforma** (la agencia devuelve); la agencia puede marcar el reembolso
+  como completado y adjuntar prueba opcional. Marketplace muestra el estado
+  al cliente. Auditoría completa. **No** se construye procesamiento de
+  pagos ni transferencias automáticas.
+- **Prioridad 4 — LEG/LEGAL:** investigar los requisitos venezolanos
+  aplicables y buscar plantillas o referencias autoritativas adaptables;
+  **no** asumir que existe un documento universal utilizable sin cambios;
+  registrar la necesidad de **revisión legal cualificada antes de
+  publicar**. Se conservan los IDs LEG/LEGAL existentes; el trabajo legal
+  solapado entre ambos repos se **reconcilia, no se duplica**.
+- **Prioridad 5 — AS-TRIP-005:** solo después de que los reembolsos de la
+  prioridad 3 estén disponibles y validados. Cancelar un viaje debe cubrir
+  todas las reservas afectadas, sus reembolsos, la liberación de asientos,
+  las notificaciones al cliente y los registros de auditoría. **Se
+  conservan las restricciones y reglas de autorización actuales**
+  (`ERR_TRIP_HAS_RESERVATIONS` al cancelar un viaje con reservas vivas)
+  hasta entonces.
+- **MKT-012** (panel `/admin` separado del Marketplace) queda
+  **cancelado/deferido**: la administración de la plataforma se
+  centraliza en Tour. El historial del ticket se conserva.
+- **REP** y **FDB** permanecen **pausados**: no se inician ni se
+  repriorizan.
+- **Estados que se conservan exactos:** MKT-008 con validación funcional
+  pendiente; SUP con su integración real y su env var
+  `NEXT_PUBLIC_WHATSAPP_SUPPORT_NUMBER` pendiente de configurar (no se
+  afirma que esté configurada).
+
+**Responsabilidades de este repo (Tour):** configuración del depósito y
+fechas de pago (prioridad 1), revisión de pagos y visibilidad de
+comisiones en el panel de agencia (prioridad 2), cancelación de reservas
+y registro/gestión de reembolsos (prioridad 3), IDs `LEGAL-001…005`
+reconciliados con `LEG` del marketplace (prioridad 4) e `AS-TRIP-005`
+(prioridad 5). **No duplicar** las tareas MKT-010.1/MKT-009/MKT-010.2 en
+este roadmap: viven en `nomadas-tour-marketplace`.
 
 ---
 
@@ -125,6 +202,14 @@ FASE 7 — UX (legacy, ver Fase B)         → INTEGRADA EN FASE B
 FASE 8 — Escalabilidad (ver Fase D)      → INTEGRADA EN FASE D
 
 PRÓXIMA INICIATIVA — Auto-servicio de rutas y viajes por agencia → DESCUBRIMIENTO COMPLETO + AS-TRIP-001/002/003/004 IMPLEMENTADOS (2026-11-10)
+
+PRIORIDADES DE NEGOCIO (2026-11-14) — orden de ejecución acordado (ver § Prioridades):
+  1  MKT-010.1  Pagos en dos partes (depósito + saldo) → marketplace (Tour configura/revierte)
+  2  MKT-009    Comisiones USD 0.30/pasajero completado → extendido (Tour muestra adeudo)
+  3  MKT-010.2  Cancelación de reservas + reembolsos → marketplace (Tour gestiona)
+  4  LEG/LEGAL  Marco legal VE → LEG (marketplace, coord.) ↔ LEGAL-001…005 (tour)
+  5  AS-TRIP-005 Cancelar viaje con reservas → tour; bloqueada hasta validar la 3
+  MKT-012 cancelado (admin de plataforma centralizada en tour) · REP/FDB pausados
 `
 
 ---
@@ -281,7 +366,13 @@ opera su día a día sin administrar su propia oferta.
   con reservas. Mientras no exista, `set_trip_status` responde
   `ERR_TRIP_HAS_RESERVATIONS` (409) y no cambia nada. La cancelación
   **individual** de reservas sigue siendo una operación separada que sí
-  funciona.
+  funciona. **Actualización (2026-11-14):** los reembolsos son la
+  **prioridad 3** (MKT-010.2, en `nomadas-tour-marketplace`, gestionada
+  desde Tour) y la cancelación de un viaje con reservas pasa a ser la
+  **prioridad 5** como **AS-TRIP-005**, disponible **solo después de
+  validar los reembolsos** (ver § Prioridades de negocio acordadas). Hasta
+  entonces se conservan sin cambios las restricciones y reglas de
+  autorización actuales.
 - **Alta/edición de rutas por la agencia**: **no soportado** — las rutas
   son globales sin `agency_id` y su CRUD es superadmin-only. Cualquier
   ruta específica de agencia requiere una **decisión de producto aparte**
@@ -348,6 +439,16 @@ ext/image + ormats: ['avif','webp']. |
 | LEGAL-003 | Cookie Policy (/cookies) | 🔴 Pendiente | Documentar solo cookies esenciales de Supabase Auth (sb-*-auth-token). No banner si solo esenciales. |
 | LEGAL-004 | Contact page (/contact) | 🔴 Pendiente | Form + honeypot + rate limit + email a soporte. Footer global con links legales y email soporte. |
 | LEGAL-005 | Email sender identity (DMARC/SPF/DKIM) | 🟡 Verificar | EMAIL_FROM verificado en Resend; configuración DNS del dominio. |
+
+> **Reconciliación LEGAL ↔ LEG (prioridad 4, 2026-11-14):** estas tareas
+> (Fase A.2) y la iniciativa **LEG** de `nomadas-tour-marketplace`
+> solapan temática (documentos, privacidad/cookies, revisión jurídica).
+> **No se duplica trabajo:** una sola investigación de requisitos
+> venezolanos y una sola revisión legal cualificada sirven a ambos repos;
+> Tour redacta su lado (SaaS/agencia) y el marketplace el suyo
+> (documentos del modelo dual + aceptación), con **LEG** como
+> coordinadora. No se asume un documento universal utilizable sin cambios.
+> Se conservan los IDs LEGAL-001…005 y LEG-001…005 tal como existen.
 
 #### A.3 — Analytics
 
@@ -574,8 +675,12 @@ Las fases iniciales del producto (backend, reservas, abordaje, dashboards, legac
 
 ## Fuera de alcance (por ahora)
 
-- Pagos marketplace (comprobantes, comisiones) — implementados en el repo
-  hermano `nomadas-tour-marketplace` (Fase 2). Falta facturación fiscal.
+- Pagos marketplace (comprobantes, comisiones): el **checkout con revisión
+  de comprobante (MKT-007) y el panel de revisión de pagos (MKT-006) sí
+  están implementados** en el repo hermano `nomadas-tour-marketplace`
+  (Fase 2); las **comisiones NO están implementadas** — son la **prioridad
+  2** (MKT-009 extendido: USD 0.30 por pasajero que completa el viaje; ver
+  § Prioridades de negocio acordadas). Falta facturación fiscal.
 - Marketplace B2C — implementado en `nomadas-tour-marketplace` (catálogo,
   wizard, checkout con revisión). Ver su ROADMAP.
 - Portal de pasajeros con login
