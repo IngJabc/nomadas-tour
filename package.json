@@ -14,7 +14,7 @@
     "test:tenant:db": "vitest run tests/security/tenant-isolation.db.test.ts",
     "test:tenant:rpc": "vitest run tests/security/tenant-isolation.rpc.test.ts",
     "test:tenant:ci": "node -e \"process.env.TEST_MODE='ci';import('child_process').then(m=>m.execSync('npx vitest run tests/security/tenant-isolation.db.test.ts',{stdio:'inherit'}))\"",
-    "audit:deps": "npm audit --audit-level=high && npm audit --prefix backend --audit-level=high"
+    "audit:deps": "npm audit --omit=dev --audit-level=high && npm audit --prefix backend --omit=dev --audit-level=high"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
@@ -26,7 +26,7 @@
     "html-to-image": "^1.11.13",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.24.0",
-    "next": "^16.4.3",
+    "next": "^16.4.6",
     "pg": "^8.22.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.4",

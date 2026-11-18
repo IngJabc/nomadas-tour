@@ -34,6 +34,17 @@ export interface AgencyTrip {
   available_seats: number;
   reserved_seats: number;
   postponed_from?: string | null;
+  /** TRIP-PRICE-001 — precio por puesto en CENTAVOS COP. */
+  seat_price?: number | null;
+  /**
+   * MKT-010.1 — pago en dos partes. `installment_allowed` es la
+   * bandera del plan; el importe va en centavos COP y los vencimientos
+   * son fechas ISO (NULL/`false` = plan deshabilitado).
+   */
+  installment_allowed?: boolean;
+  installment_amount_cents?: number | null;
+  deposit_deadline?: string | null;
+  balance_deadline?: string | null;
   /**
    * AS-TRIP-002 — número de agencias asignadas al viaje. `1` = exclusivo
    * de esta agencia. Solo entonces se muestra la acción "Completar viaje"
@@ -52,6 +63,8 @@ interface AgencyTripCardProps {
   completing?: boolean;
   /** AS-TRIP-004 — habilita la acción "Editar viaje" en el footer. */
   onEdit?: (trip: AgencyTrip) => void;
+  /** MKT-010.1 — habilita la acción "Plan de pago" en el footer. */
+  onPaymentPlan?: (trip: AgencyTrip) => void;
 }
 
 function getStatusBadge(
@@ -73,7 +86,15 @@ function getStatusBadge(
   }
 }
 
-export function AgencyTripCard({ trip, onSelect, now, onComplete, completing, onEdit }: AgencyTripCardProps) {
+export function AgencyTripCard({
+  trip,
+  onSelect,
+  now,
+  onComplete,
+  completing,
+  onEdit,
+  onPaymentPlan,
+}: AgencyTripCardProps) {
   const clock = now ?? new Date();
   const isFull = trip.available_seats === 0;
   const isClosed = trip.status === 'cancelled' || trip.status === 'completed';
@@ -106,12 +127,27 @@ export function AgencyTripCard({ trip, onSelect, now, onComplete, completing, on
     isDepartureInFuture(trip.departure_time, clock);
   const showEdit = Boolean(onEdit) && canEdit;
 
+  // MKT-010.1 — visibilidad de "Plan de pago": mismas condiciones que
+  // editar (viaje activo, exclusivo y salida futura). La RPC
+  // `set_trip_payment_plan` vuelve a validar todo en el backend.
+  const canConfigurePlan =
+    trip.status === 'active' &&
+    trip.agency_count === 1 &&
+    isDepartureInFuture(trip.departure_time, clock);
+  const showPaymentPlan = Boolean(onPaymentPlan) && canConfigurePlan;
+
   const cardContent = (
     <>
       <div className="flex flex-wrap items-center gap-2 mb-3">
         {statusBadge && (
           <Badge variant={statusBadge.variant} size="sm">
             {statusBadge.label}
+          </Badge>
+        )}
+        {/* MKT-010.1 — plan de pago en dos partes activo en el viaje. */}
+        {trip.installment_allowed && (
+          <Badge variant="info" size="sm">
+            Dos partes
           </Badge>
         )}
         {isFull && !onSelect && (
@@ -249,6 +285,21 @@ export function AgencyTripCard({ trip, onSelect, now, onComplete, completing, on
             {/* Acciones secundarias: a la derecha (ml-auto las ancla al
                 borde haya o no CTA a la izquierda), mismo peso visual. */}
             <div className="ml-auto flex items-center gap-4">
+              {/* MKT-010.1 — configurar depósito + vencimientos. */}
+              {showPaymentPlan && (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors bg-transparent border-none p-0 cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onPaymentPlan?.(trip);
+                  }}
+                >
+                  Plan de pago
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
               <Link
                 href={`/agency/trips/${trip.id}/passengers`}
                 className="inline-flex items-center gap-1 text-[12px] font-[family-name:var(--font-body)] font-medium text-[var(--color-brand-muted)] hover:text-[var(--color-brand-cyan)] transition-colors no-underline whitespace-nowrap"
@@ -301,11 +352,11 @@ export function AgencyTripCard({ trip, onSelect, now, onComplete, completing, on
     );
   }
 
-  // AS-TRIP-002/004: si hay acción "Completar viaje" o "Editar viaje",
-  // la tarjeta NO se envuelve en <Link> para no anidar elementos
-  // interactivos (el botón vive en el footer junto a "Ver pasajeros",
-  // que sigue navegando).
-  if (showComplete || showEdit) {
+  // AS-TRIP-002/004: si hay acción "Completar viaje", "Editar viaje" o
+  // "Plan de pago", la tarjeta NO se envuelve en <Link> para no anidar
+  // elementos interactivos (el botón vive en el footer junto a "Ver
+  // pasajeros", que sigue navegando).
+  if (showComplete || showEdit || showPaymentPlan) {
     return (
       <div className="group">
         <Card hover>

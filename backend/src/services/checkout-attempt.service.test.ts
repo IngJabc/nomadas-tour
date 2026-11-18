@@ -324,3 +324,112 @@ describe('CheckoutAttemptService.reject — customer_id (Task 2)', () => {
     expect(mockFrom).not.toHaveBeenCalled();
   });
 });
+
+// ─── MKT-010.1 · plan congelado del intento (payment_plan) ─────────────
+
+describe('CheckoutAttemptService.getDetail — payment_plan (MKT-010.1)', () => {
+  const AGENCY_ID = '99999999-9999-4999-8999-999999999999';
+
+  function attemptRow(partial: Record<string, unknown> = {}) {
+    return {
+      id: ATTEMPT_ID,
+      status: 'pending_review',
+      trip_id: '11111111-1111-4111-8111-111111111111',
+      agency_id: AGENCY_ID,
+      customer_id: CUSTOMER_ID,
+      seat_ids: ['seat-1'],
+      passenger_data: [
+        {
+          seat_id: 'seat-1',
+          first_name: 'Ana',
+          last_name: 'Lopez',
+          document: '12345678',
+          phone: '04141234567',
+        },
+      ],
+      unit_price: 60000,
+      amount_cents: 30000,
+      proof_count: 0,
+      payment_reference: null,
+      bank_origin: null,
+      payment_datetime: null,
+      proof_path: null,
+      proof_submitted_at: null,
+      review_started_at: null,
+      rejection_reason: null,
+      rejection_count: 0,
+      history: [],
+      expires_at: null,
+      created_at: '2026-11-01T10:00:00.000Z',
+      closed_at: null,
+      verified_at: null,
+      verified_by: null,
+      payment_method_id: null,
+      payment_method_snapshot: null,
+      trips: [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          departure_time: '2026-12-01T10:00:00.000Z',
+          vehicle_type: 'kia',
+          seat_price: 60000,
+          routes: [{ origin: 'Caracas', destination: 'Maracaibo' }],
+        },
+      ],
+      ...partial,
+    };
+  }
+
+  function stubDetail(row: Record<string, unknown> | null, error: { message: string } | null = null) {
+    tableChains['checkout_attempts'] = createAttemptChain({ data: row, error });
+
+    // seats: `.in(...)` resuelve como promesa (no es parte de la cadena
+    // base de este harness).
+    const seatsChain: Record<string, unknown> = {};
+    const seatsSelf = () => seatsChain;
+    seatsChain.select = vi.fn(seatsSelf);
+    seatsChain.in = vi.fn(() =>
+      Promise.resolve({ data: [{ id: 'seat-1', seat_code: 'A1' }], error: null }),
+    );
+    tableChains['seats'] = seatsChain as ReturnType<typeof createAttemptChain>;
+
+    return tableChains['checkout_attempts'];
+  }
+
+  it('defaults payment_plan to "single" for rows without the column', async () => {
+    stubDetail(attemptRow());
+
+    const detail = await checkoutAttemptService.getDetail({
+      attemptId: ATTEMPT_ID,
+      agencyId: AGENCY_ID,
+    });
+
+    expect(detail.attempt.payment_plan).toBe('single');
+    expect(detail.attempt.deposit_cents).toBeNull();
+  });
+
+  it('passes through the frozen two_stage plan and deposit', async () => {
+    stubDetail(
+      attemptRow({
+        payment_plan: 'two_stage',
+        deposit_cents: 30000,
+        amount_cents: 30000,
+      }),
+    );
+
+    const detail = await checkoutAttemptService.getDetail({
+      attemptId: ATTEMPT_ID,
+      agencyId: AGENCY_ID,
+    });
+
+    expect(detail.attempt.payment_plan).toBe('two_stage');
+    expect(detail.attempt.deposit_cents).toBe(30000);
+  });
+
+  it('throws 404 when the attempt is missing', async () => {
+    stubDetail(null);
+
+    await expect(
+      checkoutAttemptService.getDetail({ attemptId: ATTEMPT_ID, agencyId: AGENCY_ID }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+  });
+});

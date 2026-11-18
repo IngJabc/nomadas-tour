@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 import {
   ArrowLeft,
   AlertTriangle,
@@ -21,6 +22,8 @@ import {
   ReceiptText,
   ExternalLink,
   WifiOff,
+  Wallet,
+  MessageCircle,
 } from 'lucide-react';
 import { agencyApi } from '@/lib/api';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -29,14 +32,17 @@ import { SectionTitle } from '@/components/ui/SectionTitle';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { PaymentDetailSkeleton } from '@/components/ui/Skeleton';
-import { formatDateTimeShort } from '@/lib/timezone';
+import { formatDateShort, formatDateTimeShort } from '@/lib/timezone';
 import { formatSeatPriceCents } from '@/lib/price';
 import { isUuid } from '@/lib/utils';
+import { whatsappHref, buildBalanceRequestWhatsAppMessage } from '@/lib/whatsapp';
 import { PaymentProofViewerModal } from '@/components/agency/payments/PaymentProofViewerModal';
 import { PaymentVerifyModal } from '@/components/agency/payments/PaymentVerifyModal';
 import { PaymentRejectModal } from '@/components/agency/payments/PaymentRejectModal';
 import {
+  PAYMENT_STAGE_LABELS,
   PAYMENT_STATUS_LABELS,
+  paymentStageBadgeVariant,
   paymentStatusBadgeVariant,
   type AgencyPaymentDetail,
 } from '@/lib/payments';
@@ -113,6 +119,61 @@ function TotalRow({
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+/**
+ * MKT-010.1 — bloque de una etapa dentro de "Progreso del pago"
+ * (depósito / pagado / saldo). El vencimiento es SOLO informativo:
+ * nunca cancela la reserva ni libera asientos.
+ */
+function ProgressTile({
+  icon,
+  label,
+  value,
+  pct,
+  context,
+  deadline,
+  overdue,
+  highlight,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  pct?: number | null;
+  context?: string;
+  deadline?: string | null;
+  overdue?: boolean;
+  highlight?: boolean;
+}) {
+  return (
+    <div className="p-4 rounded-xl bg-slate-50 border border-[rgba(0,0,0,0.06)]">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
+          <span className="w-4 h-4 text-[var(--color-brand-cyan)]">{icon}</span>
+          {label}
+        </span>
+        {typeof pct === 'number' && <Badge variant="info" size="sm">{pct}%</Badge>}
+      </div>
+      <p
+        className={`font-[family-name:var(--font-heading)] font-extrabold text-lg mt-2 ${
+          highlight ? 'text-[var(--color-brand-cyan)]' : 'text-[var(--color-brand-navy)]'
+        }`}
+      >
+        {value}
+      </p>
+      {context && (
+        <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] mt-0.5">
+          {context}
+        </p>
+      )}
+      {deadline && (
+        <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] mt-2 flex flex-wrap items-center gap-1.5">
+          Vence {formatDateShort(deadline)}
+          {overdue && <Badge variant="warning" size="sm">Vencido</Badge>}
+        </p>
+      )}
     </div>
   );
 }
@@ -194,6 +255,45 @@ export default function PaymentDetailPage() {
     setRejectOpen(false);
   };
 
+  /**
+   * MKT-010.1 — abre WhatsApp con el mensaje de solicitud de SALDO hacia
+   * el reservante. Mismo patrón que el aviso de rechazo: número inválido
+   * → toast de error, sin abrir ventanas.
+   */
+  const handleBalanceWhatsapp = () => {
+    const progress = detail?.progress ?? null;
+    if (!detail || !progress || progress.plan !== 'two_stage') return;
+    if (progress.balance_cents <= 0) return;
+
+    const phone = (detail.reservation.booker_phone ?? '').trim() || null;
+    const href = whatsappHref(phone);
+    if (!href) {
+      toast.error('No hay teléfono del reservante');
+      return;
+    }
+
+    const tripData = detail.trip;
+    const message = buildBalanceRequestWhatsAppMessage({
+      bookerName: detail.reservation.booker_name || null,
+      seatCodes: detail.passengers
+        .map((p) => p.seat_code)
+        .filter((code): code is string => Boolean(code)),
+      origin: tripData?.origin ?? null,
+      destination: tripData?.destination ?? null,
+      departureLabel: tripData ? formatDateTimeShort(tripData.departure_time) : null,
+      agencyName: progress.agency?.name ?? null,
+      balanceLabel: formatSeatPriceCents(progress.balance_cents),
+      balanceDeadlineLabel: progress.balance_deadline
+        ? formatDateShort(progress.balance_deadline)
+        : null,
+    });
+    window.open(
+      `${href}?text=${encodeURIComponent(message)}`,
+      '_blank',
+      'noopener,noreferrer',
+    );
+  };
+
   if (loading) {
     return (
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -233,9 +333,12 @@ export default function PaymentDetailPage() {
     );
   }
 
-  const { payment, reservation, trip, passengers, allocations, totals } = detail;
+  const { payment, reservation, trip, passengers, allocations, totals, progress } = detail;
   const isPending = payment.status === 'pending';
   const hasReservationLink = isUuid(reservation.id);
+  // MKT-010.1 — el progreso solo se muestra en reservas de DOS PARTES
+  // con saldo de interés; en plan 'single' la tarjeta no aparece.
+  const showProgress = progress?.plan === 'two_stage';
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
@@ -258,9 +361,17 @@ export default function PaymentDetailPage() {
         <PageHeader
           title={`Pago · ${formatSeatPriceCents(payment.amount_cents)}`}
           action={
-            <Badge variant={paymentStatusBadgeVariant(payment.status)}>
-              {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
-            </Badge>
+            <div className="flex items-center gap-2">
+              {/* MKT-010.1 — etapa solo cuando no es de monto total. */}
+              {payment.stage && payment.stage !== 'full' && (
+                <Badge variant={paymentStageBadgeVariant(payment.stage)}>
+                  {PAYMENT_STAGE_LABELS[payment.stage] ?? payment.stage}
+                </Badge>
+              )}
+              <Badge variant={paymentStatusBadgeVariant(payment.status)}>
+                {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
+              </Badge>
+            </div>
           }
         />
       </motion.div>
@@ -338,6 +449,71 @@ export default function PaymentDetailPage() {
                 {payment.rejection_reason}
               </p>
             </div>
+          </motion.div>
+        )}
+
+        {/* MKT-010.1 — Progreso del pago (solo plan de dos partes) */}
+        {showProgress && progress && (
+          <motion.div variants={staggerItem}>
+            <Card>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <SectionTitle>Progreso del pago</SectionTitle>
+                <Badge variant={progress.seats_held ? 'active' : 'inactive'} size="sm">
+                  {progress.seats_held ? 'Asientos reservados' : 'Sin asientos reservados'}
+                </Badge>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <ProgressTile
+                  icon={<Wallet className="w-4 h-4" strokeWidth={1.75} />}
+                  label="Depósito"
+                  value={
+                    progress.deposit_cents != null
+                      ? formatSeatPriceCents(progress.deposit_cents)
+                      : '—'
+                  }
+                  pct={progress.deposit_pct}
+                  context={
+                    progress.deposit_verified_at ? 'Verificado' : 'Pendiente de pago'
+                  }
+                  deadline={progress.deposit_deadline}
+                  overdue={progress.deposit_overdue}
+                />
+                <ProgressTile
+                  icon={<CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />}
+                  label="Pagado"
+                  value={formatSeatPriceCents(progress.paid_cents)}
+                  context={`de ${formatSeatPriceCents(progress.total_cents)} · ${
+                    progress.passenger_count
+                  } pasajeros`}
+                />
+                <ProgressTile
+                  icon={<ReceiptText className="w-4 h-4" strokeWidth={1.75} />}
+                  label="Saldo"
+                  value={formatSeatPriceCents(progress.balance_cents)}
+                  pct={progress.balance_pct}
+                  context={
+                    progress.balance_cents > 0 ? 'Pendiente por cobrar' : 'Saldado'
+                  }
+                  deadline={progress.balance_deadline}
+                  overdue={progress.balance_overdue}
+                  highlight={progress.balance_cents > 0}
+                />
+              </div>
+
+              {progress.balance_cents > 0 && (
+                <div className="mt-4 pt-4 border-t border-[rgba(0,0,0,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
+                    Los vencimientos son informativos: no cancelan la reserva
+                    ni liberan los asientos.
+                  </p>
+                  <Button variant="secondary" onClick={handleBalanceWhatsapp}>
+                    <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
+                    Solicitar saldo por WhatsApp
+                  </Button>
+                </div>
+              )}
+            </Card>
           </motion.div>
         )}
 
@@ -534,6 +710,7 @@ export default function PaymentDetailPage() {
       <PaymentRejectModal
         open={rejectOpen}
         paymentId={payment.id}
+        stage={payment.stage}
         onClose={() => setRejectOpen(false)}
         onSuccess={handleActionSuccess}
       />

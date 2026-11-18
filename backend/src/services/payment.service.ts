@@ -13,9 +13,19 @@ export const PROOF_SIGNED_URL_TTL_SECONDS = 300;
 
 export type AgencyPaymentStatusFilter = 'pending' | 'verified' | 'rejected';
 
+/**
+ * MKT-010.1 — etapa del pago dentro del plan de dos partes.
+ * `full` es el valor por defecto de la columna `payments.stage`
+ * (pagos de una sola parte / legacy); `deposit` y `balance` solo
+ * existen cuando el viaje corre con `payment_plan = 'two_stage'`.
+ */
+export type AgencyPaymentStageFilter = 'full' | 'deposit' | 'balance';
+
 export interface ListAgencyPaymentsInput {
   agencyId: string;
   status?: AgencyPaymentStatusFilter;
+  /** Filtra por etapa del pago (MKT-010.1). Sin valor = todas. */
+  stage?: AgencyPaymentStageFilter;
   page: number;
   limit: number;
 }
@@ -23,6 +33,8 @@ export interface ListAgencyPaymentsInput {
 export interface AgencyPaymentListItem {
   id: string;
   status: string;
+  /** Etapa del pago: `full` | `deposit` | `balance` (default `full`). */
+  stage: string;
   amount_cents: number;
   currency: string;
   submitted_at: string;
@@ -69,10 +81,67 @@ export interface AgencyPaymentAllocation {
   created_at: string;
 }
 
+/**
+ * MKT-010.1 — un pago de la etapa `deposit`/`balance` de una reserva
+ * del marketplace, tal y como lo devuelve la RPC
+ * `reservation_payment_progress` (migración 106).
+ */
+export interface AgencyPaymentProgressPayment {
+  id: string;
+  stage: string;
+  status: string;
+  amount_cents: number;
+  currency: string;
+  external_reference: string | null;
+  bank_origin: string | null;
+  payment_datetime: string | null;
+  submitted_at: string;
+  verified_at: string | null;
+  rejection_reason: string | null;
+}
+
+/**
+ * MKT-010.1 — progreso de pago de una reserva (RPC
+ * `reservation_payment_progress`, migración 106). Solo aplica a
+ * reservas `source = 'marketplace'`; en el resto el detalle lo trae
+ * como `progress: null`.
+ *
+ * `overdue` (deposit_overdue / balance_overdue) es SOLO informativo:
+ * nunca cancela ni libera asientos (`seats_held` informa que siguen
+ * reservados).
+ */
+export interface AgencyPaymentProgress {
+  reservation_id: string;
+  reservation_status: string;
+  payment_status: string | null;
+  plan: 'single' | 'two_stage';
+  passenger_count: number;
+  total_cents: number;
+  deposit_cents: number | null;
+  deposit_verified_at: string | null;
+  paid_cents: number;
+  balance_cents: number;
+  deposit_pct: number | null;
+  balance_pct: number | null;
+  deposit_deadline: string | null;
+  balance_deadline: string | null;
+  deposit_overdue: boolean;
+  balance_overdue: boolean;
+  seats_held: boolean;
+  payments: AgencyPaymentProgressPayment[];
+  agency: {
+    id: string;
+    name: string | null;
+    whatsapp_phone: string | null;
+  } | null;
+}
+
 export interface AgencyPaymentDetail {
   payment: {
     id: string;
     status: string;
+    /** Etapa del pago: `full` | `deposit` | `balance` (default `full`). */
+    stage: string;
     amount_cents: number;
     currency: string;
     submitted_at: string;
@@ -100,6 +169,11 @@ export interface AgencyPaymentDetail {
   } | null;
   passengers: AgencyPaymentPassenger[];
   allocations: AgencyPaymentAllocation[];
+  /**
+   * MKT-010.1 — progreso del pago (solo reservas `source =
+   * 'marketplace'`; `null` en reservas legacy / de agencia).
+   */
+  progress: AgencyPaymentProgress | null;
   totals: {
     active_passenger_count: number;
     expected_cents: number;
@@ -128,6 +202,8 @@ export interface VerifyPaymentResult {
   payment_id: string;
   reservation_id: string;
   status: string;
+  /** MKT-010.1 — etapa verificada: `full` | `deposit` | `balance`. */
+  stage?: string;
   already_verified: boolean;
   amount_cents: number;
   currency: string;
@@ -143,6 +219,8 @@ export interface RejectPaymentResult {
   payment_id: string;
   reservation_id: string;
   status: string;
+  /** MKT-010.1 — etapa rechazada: `full` | `deposit` | `balance`. */
+  stage?: string;
   already_rejected: boolean;
   rejection_reason: string;
   outcome: string;
@@ -160,6 +238,8 @@ export interface RejectPaymentResult {
 interface PaymentListRow {
   id: string;
   status: string;
+  /** MKT-010.1 — etapa del pago; `null`/ausente = `full`. */
+  stage?: string | null;
   amount_cents: number;
   currency: string;
   submitted_at: string;
@@ -174,6 +254,8 @@ interface PaymentListRow {
 interface PaymentDetailRow {
   id: string;
   status: string;
+  /** MKT-010.1 — etapa del pago; `null`/ausente = `full`. */
+  stage?: string | null;
   amount_cents: number;
   currency: string;
   submitted_at: string;
@@ -200,12 +282,14 @@ type NormalizedReservation = {
   contact_email: string | null;
   status: string;
   payment_status: string | null;
+  /** MKT-010.1 — `marketplace` activa el bloque de progreso. */
+  source?: string | null;
   created_at?: string;
   trips: unknown;
 };
 
 const LIST_SELECT = `
-  id, status, amount_cents, currency, submitted_at, verified_at,
+  id, status, stage, amount_cents, currency, submitted_at, verified_at,
   rejection_reason, proof_url, reservation_id, idempotency_key,
   reservations (
     id, booker_name, contact_email, status, payment_status,
@@ -217,11 +301,11 @@ const LIST_SELECT = `
 `;
 
 const DETAIL_SELECT = `
-  id, status, amount_cents, currency, submitted_at, verified_at,
+  id, status, stage, amount_cents, currency, submitted_at, verified_at,
   verified_by, rejection_reason, proof_url, reservation_id,
   reservations (
     id, booker_name, booker_phone, contact_email, status, payment_status,
-    created_at,
+    source, created_at,
     trips (
       id, departure_time, vehicle_type, seat_price,
       routes ( origin, destination )
@@ -279,6 +363,9 @@ function mapListItem(row: PaymentListRow): AgencyPaymentListItem {
   return {
     id: row.id,
     status: row.status,
+    // `payments.stage` nace con default 'full' (migración 106); una
+    // fila antigua sin la columna se normaliza igual a 'full'.
+    stage: row.stage || 'full',
     amount_cents: row.amount_cents,
     currency: row.currency,
     submitted_at: row.submitted_at,
@@ -331,6 +418,15 @@ function mapAdminRpcError(error: { message: string }): Error {
       return new ConflictError('Un pago verificado no puede ser rechazado');
     case 'ERR_PAYMENT_NOT_PENDING':
       return new ConflictError('El pago ya no está pendiente de revisión');
+    // MKT-010.1 — el depósito se verifica junto al intento de compra
+    // (verify_checkout_attempt), nunca desde la revisión de pagos.
+    case 'ERR_PAYMENT_STAGE_DEPOSIT':
+      return new ConflictError(
+        'El depósito se verifica con la compra, no desde esta pantalla',
+      );
+    // MKT-010.1 — el saldo ya está saldado: no hay nada que verificar.
+    case 'ERR_BALANCE_ALREADY_SETTLED':
+      return new ConflictError('El saldo de esta reserva ya está saldado');
     case 'ERR_PAYMENT_RESERVATION_STATE':
       return new ConflictError(
         'La reserva no está en un estado compatible con esta operación',
@@ -346,6 +442,7 @@ function mapAdminRpcError(error: { message: string }): Error {
     case 'ERR_PAYMENT_VERIFY_SEAT_MISSING':
     case 'ERR_PAYMENT_VERIFY_ALLOCATIONS':
     case 'ERR_PAYMENT_VERIFY_ALLOC_COUNT':
+    case 'ERR_PAYMENT_VERIFY_ALLOC_TOTAL':
       return new UnprocessableError(
         'No se pudo verificar el pago: los datos de la reserva no son consistentes',
         'PAYMENT_VERIFY_INCONSISTENT',
@@ -368,6 +465,33 @@ function mapAdminRpcError(error: { message: string }): Error {
 }
 
 const UUID_DIR_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * MKT-010.1 — errores de la RPC `reservation_payment_progress`
+ * (migración 106) dentro del detalle de un pago. Como el detalle ya
+ * falla en serio ante cualquier error de lectura, el progreso también
+ * falla en serio (nunca se degruda en silencio).
+ */
+function mapPaymentProgressError(error: { message: string }): Error {
+  const code = rpcErrorCode(error.message || '');
+
+  switch (code) {
+    case 'ERR_PAYMENT_PROGRESS_INPUT':
+    case 'ERR_PAYMENT_PROGRESS_NOT_FOUND':
+      return new NotFoundError('Reserva no encontrada');
+    case 'ERR_PAYMENT_PROGRESS_AMOUNT':
+      return new UnprocessableError(
+        'No se pudo cargar el progreso: los montos de la reserva no son consistentes',
+        'PAYMENT_PROGRESS_INCONSISTENT',
+      );
+    default:
+      return new AppError(
+        'No se pudo cargar el pago. Intenta de nuevo',
+        500,
+        'PAYMENT_DETAIL_ERROR',
+      );
+  }
+}
 
 /**
  * Comprueba que `payments.proof_url` viva bajo un directorio UUID válido:
@@ -432,6 +556,11 @@ export class PaymentService {
       query = query.eq('status', input.status);
     }
 
+    // MKT-010.1 — filtro por etapa (full | deposit | balance).
+    if (input.stage) {
+      query = query.eq('stage', input.stage);
+    }
+
     const { data, error, count } = await query;
 
     if (error) {
@@ -479,6 +608,16 @@ export class PaymentService {
     const route = normalizeRoute(trip?.routes);
     const reservationId = reservation?.id ?? row.reservation_id;
 
+    // MKT-010.1 — progreso del pago en paralelo con el resto. Solo
+    // reservas del marketplace (source = 'marketplace'); en reservas
+    // legacy / de agencia no se toca la RPC y el bloque queda en null.
+    const progressPromise =
+      reservation?.source === 'marketplace'
+        ? supabaseAdmin.rpc('reservation_payment_progress', {
+            p_reservation_id: reservationId,
+          })
+        : Promise.resolve({ data: null, error: null });
+
     const [passengersResult, allocationsResult] = await Promise.all([
       supabaseAdmin
         .from('reservation_passengers')
@@ -500,6 +639,15 @@ export class PaymentService {
         500,
         'PAYMENT_DETAIL_ERROR',
       );
+    }
+
+    // MKT-010.1 — el progreso se resuelve en serio: un fallo de la RPC
+    // tumbaría el detalle igual que cualquier otra lectura de la página.
+    let progress: AgencyPaymentProgress | null = null;
+    if (reservation?.source === 'marketplace') {
+      const progressResult = await progressPromise;
+      if (progressResult.error) throw mapPaymentProgressError(progressResult.error);
+      progress = (progressResult.data as AgencyPaymentProgress | null) ?? null;
     }
 
     type PassengerRow = {
@@ -567,6 +715,8 @@ export class PaymentService {
       payment: {
         id: row.id,
         status: row.status,
+        // `payments.stage` nace con default 'full' (migración 106).
+        stage: row.stage ?? 'full',
         amount_cents: row.amount_cents,
         currency: row.currency,
         submitted_at: row.submitted_at,
@@ -596,6 +746,7 @@ export class PaymentService {
         : null,
       passengers,
       allocations,
+      progress,
       totals: {
         active_passenger_count: activePassengers.length,
         expected_cents: expectedCents,

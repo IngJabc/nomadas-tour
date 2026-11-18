@@ -65,15 +65,21 @@ acordadas*.
 | # | Prioridad | IDs | Orden / dependencia | Dueño (responsabilidad de implementación) |
 | - | --------- | --- | ------------------- | ----------------------------------------- |
 | 1 | Pagos de reserva en dos partes: depósito fijo + saldo restante | **MKT-010.1** (extiende MKT-010) | Primera | Marketplace: flujo y estado de pago para el cliente · Tour: configuración del depósito y revisión · backend/DB: registros autoritativos |
-| 2 | Comisiones de plataforma: **USD 0.30 por pasajero que completa el viaje** | **MKT-009** extendido (comisiones, roadmap original) | Después de la 1 | Tour: visibilidad del adeudo en panel de agencia · backend/DB: cálculo y trazabilidad por viaje/pasajero elegible · Marketplace: aporta datos del pasajero |
+| 2 | Comisiones de plataforma: **USD 0.30 por pasajero que completa el viaje** | **MKT-015** (tarea dedicada de comisiones; 1.er viaje completado sin comisión) | Después de la 1 | Tour: visibilidad del adeudo en panel de agencia · backend/DB: cálculo y trazabilidad por viaje/pasajero elegible · Marketplace: aporta datos del pasajero |
 | 3 | Cancelación de reservas y reembolsos | **MKT-010.2** (extiende MKT-010) | Después de la 1; puede correr en paralelo con la 2 | Tour: cancelación y registro/gestión de reembolsos · Marketplace: visibilidad de estado para el cliente · backend/DB: cancelación + liberación de asientos atómicas y auditoría |
 | 4 | Marco legal venezolano | **LEG** (marketplace, coordinador) ↔ **LEGAL-001…005** (tour, Fase A) | En paralelo (la revisión externa requiere planificación anticipada) | Una sola investigación y revisión jurídica compartida; cada repo redacta solo su lado |
 | 5 | Cancelación de viajes con reservas existentes | **AS-TRIP-005** (tour) | Solo después de validar la prioridad 3 | Tour |
 
 Reglas de negocio (válidas para todos los ítems):
 
-- **Nada de este bloque está implementado**: todo está planificado. No se
-  marca ninguna de estas tareas como completada.
+- **Estado (2026-11-17):** la **Prioridad 1 (MKT-010.1)** está
+  **implementada localmente en ambos repos**, con suites de pruebas y
+  builds de producción verificados; **sin commit, sin despliegue y sin
+  aplicar en base de datos** (la migración `106_two_part_payments.sql`
+  está creada, **no aplicada**). Las prioridades 2–5 siguen
+  **planificadas**: ninguna de estas tareas se marca como completada
+  hasta verificar el despliegue y la aplicación de migraciones en
+  producción.
 - **Prioridad 1 — MKT-010.1:** dos pagos exactos por asiento. La agencia
   configura el monto del depósito y las fechas; el sistema calcula el saldo
   restante y muestra el porcentaje que representa cada monto. El segundo
@@ -81,13 +87,17 @@ Reglas de negocio (válidas para todos los ítems):
   la agencia avisa al cliente por WhatsApp. Si el cliente no paga a tiempo,
   la agencia decide cómo manejar la reserva: **sin cancelación automática**
   basada solo en el saldo impago.
-- **Prioridad 2 — MKT-009 (extendido):** USD 0.30 por pasajero que
-  **completa** el viaje; **nada** por pasajeros cancelados o que no
-  viajan. El panel de agencia muestra el monto adeudado por viajes
-  completados; cada registro es trazable al viaje y a los pasajeros
-  elegibles. El criterio histórico "primer viaje gratis" queda como
-  **decisión pendiente** frente al nuevo criterio (no se borra el
-  historial).
+- **Prioridad 2 — MKT-015 (comisiones, criterio confirmado):** USD 0.30
+  por pasajero que **completa** el viaje; **nada** por pasajeros
+  cancelados o que no viajan. **Excepción confirmada:** el primer viaje
+  completado en el Marketplace de cada agencia es **sin comisión**; desde
+  el **segundo** viaje completado en adelante la plataforma gana USD 0.30
+  por pasajero que **realmente viajó**. El panel de agencia muestra el
+  monto adeudado por viajes completados; cada registro es trazable al
+  viaje y a los pasajeros elegibles. **Decisión resuelta (2026-11-14):**
+  sustituye a la "decisión pendiente" anterior sin borrar el historial.
+  **MKT-009 conserva su significado original** (compras independientes
+  en paralelo); las comisiones viven en **MKT-015**.
 - **Prioridad 3 — MKT-010.2:** el cliente contacta a la agencia para
   pedir la cancelación; la agencia la gestiona desde Tour. Cancelar libera
   los asientos de la reserva en una operación **atómica**. Se registra el
@@ -125,7 +135,7 @@ fechas de pago (prioridad 1), revisión de pagos y visibilidad de
 comisiones en el panel de agencia (prioridad 2), cancelación de reservas
 y registro/gestión de reembolsos (prioridad 3), IDs `LEGAL-001…005`
 reconciliados con `LEG` del marketplace (prioridad 4) e `AS-TRIP-005`
-(prioridad 5). **No duplicar** las tareas MKT-010.1/MKT-009/MKT-010.2 en
+(prioridad 5). **No duplicar** las tareas MKT-010.1/MKT-015/MKT-010.2 en
 este roadmap: viven en `nomadas-tour-marketplace`.
 
 ---
@@ -205,7 +215,7 @@ PRÓXIMA INICIATIVA — Auto-servicio de rutas y viajes por agencia → DESCUBRI
 
 PRIORIDADES DE NEGOCIO (2026-11-14) — orden de ejecución acordado (ver § Prioridades):
   1  MKT-010.1  Pagos en dos partes (depósito + saldo) → marketplace (Tour configura/revierte)
-  2  MKT-009    Comisiones USD 0.30/pasajero completado → extendido (Tour muestra adeudo)
+  2  MKT-015    Comisiones USD 0.30/pasajero completado → tarea dedicada (1.er viaje gratis; Tour muestra adeudo)
   3  MKT-010.2  Cancelación de reservas + reembolsos → marketplace (Tour gestiona)
   4  LEG/LEGAL  Marco legal VE → LEG (marketplace, coord.) ↔ LEGAL-001…005 (tour)
   5  AS-TRIP-005 Cancelar viaje con reservas → tour; bloqueada hasta validar la 3
@@ -679,7 +689,8 @@ Las fases iniciales del producto (backend, reservas, abordaje, dashboards, legac
   de comprobante (MKT-007) y el panel de revisión de pagos (MKT-006) sí
   están implementados** en el repo hermano `nomadas-tour-marketplace`
   (Fase 2); las **comisiones NO están implementadas** — son la **prioridad
-  2** (MKT-009 extendido: USD 0.30 por pasajero que completa el viaje; ver
+  2** (MKT-015: USD 0.30 por pasajero que completa el viaje desde el
+  2º viaje completado de la agencia; el 1º es sin comisión; ver
   § Prioridades de negocio acordadas). Falta facturación fiscal.
 - Marketplace B2C — implementado en `nomadas-tour-marketplace` (catálogo,
   wizard, checkout con revisión). Ver su ROADMAP.

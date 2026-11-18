@@ -232,6 +232,64 @@ describe('PaymentService.listAgencyPayments', () => {
       paymentService.listAgencyPayments({ agencyId: AGENCY_A, page: 1, limit: 20 }),
     ).rejects.toMatchObject({ code: 'PAYMENT_LIST_ERROR', statusCode: 500 });
   });
+
+  // ─── MKT-010.1 · etapa del pago (plan de dos partes) ────────────────
+
+  it('normalizes a missing stage to "full"', async () => {
+    tableChains['payments'] = createChainable({
+      data: [listRow()],
+      error: null,
+      count: 1,
+    });
+
+    const result = await paymentService.listAgencyPayments({
+      agencyId: AGENCY_A,
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.payments[0].stage).toBe('full');
+  });
+
+  it('passes through an explicit stage', async () => {
+    tableChains['payments'] = createChainable({
+      data: [listRow({ stage: 'deposit' })],
+      error: null,
+      count: 1,
+    });
+
+    const result = await paymentService.listAgencyPayments({
+      agencyId: AGENCY_A,
+      page: 1,
+      limit: 20,
+    });
+
+    expect(result.payments[0].stage).toBe('deposit');
+  });
+
+  it('applies the optional stage filter', async () => {
+    tableChains['payments'] = createChainable({ data: [], error: null, count: 0 });
+
+    await paymentService.listAgencyPayments({
+      agencyId: AGENCY_A,
+      stage: 'deposit',
+      page: 1,
+      limit: 20,
+    });
+
+    expect(tableChains['payments'].eq).toHaveBeenCalledWith('stage', 'deposit');
+  });
+
+  it('does not filter by stage when none is given', async () => {
+    tableChains['payments'] = createChainable({ data: [], error: null, count: 0 });
+
+    await paymentService.listAgencyPayments({ agencyId: AGENCY_A, page: 1, limit: 20 });
+
+    const stageCalls = tableChains['payments'].eq.mock.calls.filter(
+      (call: unknown[]) => call[0] === 'stage',
+    );
+    expect(stageCalls).toHaveLength(0);
+  });
 });
 
 describe('PaymentService.getAgencyPaymentDetail', () => {
@@ -358,6 +416,153 @@ describe('PaymentService.getAgencyPaymentDetail', () => {
     await expect(
       paymentService.getAgencyPaymentDetail({ paymentId: PAYMENT_1, agencyId: AGENCY_A }),
     ).rejects.toMatchObject({ code: 'PAYMENT_DETAIL_ERROR', statusCode: 500 });
+  });
+
+  // ─── MKT-010.1 · stage + progreso del pago ──────────────────────────
+
+  function marketplaceDetailRow(partial: Record<string, unknown> = {}) {
+    const row = detailRow();
+    const reservation = (row.reservations as Record<string, unknown>[])[0];
+    return {
+      ...row,
+      ...partial,
+      reservations: [{ ...reservation, source: 'marketplace' }],
+    };
+  }
+
+  function stageDetailTables() {
+    tableChains['reservation_passengers'] = createChainable({
+      data: [
+        {
+          id: PASSENGER_1,
+          seat_id: 'seat-1',
+          name: 'Ana Lopez',
+          unit_price: 30000,
+          status: 'active',
+          seats: [{ seat_code: 'A1' }],
+        },
+      ],
+      error: null,
+    });
+    tableChains['payment_allocations'] = createChainable({ data: [], error: null });
+  }
+
+  it('normalizes a missing payment stage to "full" in the detail', async () => {
+    tableChains['payments'] = createChainable({ data: detailRow(), error: null });
+    stageDetailTables();
+
+    const result = await paymentService.getAgencyPaymentDetail({
+      paymentId: PAYMENT_1,
+      agencyId: AGENCY_A,
+    });
+
+    expect(result.payment.stage).toBe('full');
+    expect(result.progress).toBeNull();
+  });
+
+  it('passes through an explicit payment stage in the detail', async () => {
+    tableChains['payments'] = createChainable({
+      data: { ...detailRow(), stage: 'balance' },
+      error: null,
+    });
+    stageDetailTables();
+
+    const result = await paymentService.getAgencyPaymentDetail({
+      paymentId: PAYMENT_1,
+      agencyId: AGENCY_A,
+    });
+
+    expect(result.payment.stage).toBe('balance');
+  });
+
+  it('never calls the progress RPC for non-marketplace reservations', async () => {
+    tableChains['payments'] = createChainable({ data: detailRow(), error: null });
+    stageDetailTables();
+
+    const result = await paymentService.getAgencyPaymentDetail({
+      paymentId: PAYMENT_1,
+      agencyId: AGENCY_A,
+    });
+
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(result.progress).toBeNull();
+  });
+
+  it('fetches progress for marketplace reservations', async () => {
+    tableChains['payments'] = createChainable({
+      data: marketplaceDetailRow({ stage: 'deposit' }),
+      error: null,
+    });
+    stageDetailTables();
+
+    const progressRow = {
+      reservation_id: RESERVATION_1,
+      reservation_status: 'reserved',
+      payment_status: 'deposit_paid',
+      plan: 'two_stage',
+      passenger_count: 1,
+      total_cents: 60000,
+      deposit_cents: 30000,
+      deposit_verified_at: T1,
+      paid_cents: 30000,
+      balance_cents: 30000,
+      deposit_pct: 50,
+      balance_pct: 50,
+      deposit_deadline: '2026-11-20T23:59:59',
+      balance_deadline: '2026-11-30T23:59:59',
+      deposit_overdue: false,
+      balance_overdue: true,
+      seats_held: true,
+      payments: [],
+      agency: { id: AGENCY_A, name: 'Agencia Central', whatsapp_phone: '04141234567' },
+    };
+    mockRpc.mockResolvedValue({ data: progressRow, error: null });
+
+    const result = await paymentService.getAgencyPaymentDetail({
+      paymentId: PAYMENT_1,
+      agencyId: AGENCY_A,
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith('reservation_payment_progress', {
+      p_reservation_id: RESERVATION_1,
+    });
+    expect(result.progress).toEqual(progressRow);
+    expect(result.progress?.plan).toBe('two_stage');
+    expect(result.progress?.balance_overdue).toBe(true);
+  });
+
+  it('keeps progress null when the RPC returns no data', async () => {
+    tableChains['payments'] = createChainable({
+      data: marketplaceDetailRow(),
+      error: null,
+    });
+    stageDetailTables();
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    const result = await paymentService.getAgencyPaymentDetail({
+      paymentId: PAYMENT_1,
+      agencyId: AGENCY_A,
+    });
+
+    expect(result.progress).toBeNull();
+  });
+
+  it.each([
+    ['ERR_PAYMENT_PROGRESS_INPUT', 404, 'NOT_FOUND'],
+    ['ERR_PAYMENT_PROGRESS_NOT_FOUND', 404, 'NOT_FOUND'],
+    ['ERR_PAYMENT_PROGRESS_AMOUNT', 422, 'PAYMENT_PROGRESS_INCONSISTENT'],
+    ['ERR_SOMETHING_ELSE', 500, 'PAYMENT_DETAIL_ERROR'],
+  ])('maps %s from the progress RPC', async (code, statusCode, errCode) => {
+    tableChains['payments'] = createChainable({
+      data: marketplaceDetailRow(),
+      error: null,
+    });
+    stageDetailTables();
+    mockRpc.mockResolvedValue({ data: null, error: { message: `${code}: detalle` } });
+
+    await expect(
+      paymentService.getAgencyPaymentDetail({ paymentId: PAYMENT_1, agencyId: AGENCY_A }),
+    ).rejects.toMatchObject({ statusCode, code: errCode });
   });
 });
 
@@ -486,6 +691,19 @@ describe('PaymentService.verifyPayment / rejectPayment', () => {
     expect(result.already_verified).toBe(true);
   });
 
+  it('verify passes through the MKT-010.1 stage when the RPC returns it', async () => {
+    mockRpc.mockResolvedValue({
+      data: { ...verifyRow, stage: 'balance' },
+      error: null,
+    });
+
+    const result = await paymentService.verifyPayment({
+      paymentId: PAYMENT_1,
+      actorUserId: ACTOR_1,
+    });
+    expect(result.stage).toBe('balance');
+  });
+
   it('reject calls the RPC with payment + actor + reason', async () => {
     const rejectRow = {
       payment_id: PAYMENT_1,
@@ -531,8 +749,13 @@ describe('PaymentService.verifyPayment / rejectPayment', () => {
     ['ERR_PAYMENT_VERIFIED_NO_REJECT', ConflictError],
     ['ERR_PAYMENT_NOT_PENDING', ConflictError],
     ['ERR_PAYMENT_RESERVATION_STATE', ConflictError],
+    ['ERR_PAYMENT_STAGE_DEPOSIT', ConflictError],
+    ['ERR_BALANCE_ALREADY_SETTLED', ConflictError],
     ['ERR_PAYMENT_VERIFY_AMOUNT', UnprocessableError],
     ['ERR_PAYMENT_VERIFY_NO_PASSENGERS', UnprocessableError],
+    ['ERR_PAYMENT_VERIFY_ALLOCATIONS', UnprocessableError],
+    ['ERR_PAYMENT_VERIFY_ALLOC_COUNT', UnprocessableError],
+    ['ERR_PAYMENT_VERIFY_ALLOC_TOTAL', UnprocessableError],
     ['ERR_PAYMENT_VERIFY_RACE', ConflictError],
     ['ERR_PAYMENT_REJECT_RACE', ConflictError],
     ['ERR_PAYMENT_REJECT_REASON', ValidationError],

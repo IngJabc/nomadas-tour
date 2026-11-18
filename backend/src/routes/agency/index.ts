@@ -45,6 +45,13 @@ router.patch('/trips/:tripId', (req, res, next) =>
 router.patch('/trips/:tripId/status', (req, res, next) =>
   agencyTripController.updateTripStatus(req, res, next),
 );
+// MKT-010.1 — plan de pago en dos partes (depósito + saldo). Solo la
+// forma se valida aquí; la autorización final (agencia, exclusividad,
+// estado) la decide la RPC `set_trip_payment_plan` (migración 106) y el
+// actor sale SIEMPRE de `req.ctx`.
+router.patch('/trips/:tripId/payment-plan', (req, res, next) =>
+  agencyTripController.updatePaymentPlan(req, res, next),
+);
 router.get('/reservations', (req, res, next) => reservationController.getAgencyReservations(req, res, next));
 router.get('/reservations/links', (req, res, next) =>
   reservationLinkController.list(req, res, next),

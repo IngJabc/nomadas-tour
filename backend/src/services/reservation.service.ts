@@ -1179,6 +1179,15 @@ export class ReservationService {
         total_seats: seats.total,
         available_seats: seats.available,
         reserved_seats: seats.reserved,
+        // MKT-010.1 — precio y plan de pago en dos partes para la tarjeta
+        // ("Dos partes") y la precarga del modal de configuración. Los
+        // campos nacieron en migraciones anteriores + 106; un viaje sin
+        // plan los trae en NULL / false.
+        seat_price: t.seat_price ?? null,
+        installment_allowed: Boolean(t.installment_allowed),
+        installment_amount_cents: t.installment_amount_cents ?? null,
+        deposit_deadline: t.deposit_deadline ?? null,
+        balance_deadline: t.balance_deadline ?? null,
         // La lista solo contiene viajes asignados a esta agencia, así
         // que count >= 1 siempre; 1 = exclusivo.
         agency_count: assignmentCount[t.id] ?? 1,

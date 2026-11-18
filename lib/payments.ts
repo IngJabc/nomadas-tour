@@ -7,9 +7,21 @@ export type AgencyPaymentStatusFilter = 'pending' | 'verified' | 'rejected';
 
 export type AgencyPaymentStatus = string;
 
+/**
+ * MKT-010.1 — etapa del pago dentro del plan de dos partes.
+ * `full` = pago único (legado o plan single); `deposit` = primera
+ * parte; `balance` = saldo restante.
+ */
+export type AgencyPaymentStage = 'full' | 'deposit' | 'balance';
+
+/** Filtro de lista por etapa (`''` / ausente = todas). */
+export type AgencyPaymentStageFilter = AgencyPaymentStage | '';
+
 export interface AgencyPaymentListItem {
   id: string;
   status: string;
+  /** MKT-010.1 — etapa del pago (`full` por defecto). */
+  stage: AgencyPaymentStage;
   amount_cents: number;
   currency: string;
   submitted_at: string;
@@ -56,10 +68,65 @@ export interface AgencyPaymentAllocation {
   created_at: string;
 }
 
+/**
+ * MKT-010.1 — un pago de la reserva con su etapa, tal y como lo devuelve
+ * la RPC `reservation_payment_progress` (solo reservas marketplace).
+ */
+export interface AgencyPaymentProgressPayment {
+  id: string;
+  stage: AgencyPaymentStage;
+  status: string;
+  amount_cents: number;
+  currency: string;
+  external_reference: string | null;
+  bank_origin: string | null;
+  payment_datetime: string | null;
+  submitted_at: string;
+  verified_at: string | null;
+  rejection_reason: string | null;
+}
+
+/**
+ * MKT-010.1 — progreso de pago de la reserva (total, depósito, pagado,
+ * saldo, porcentajes server-side, vencimientos en vivo e info de
+ * WhatsApp de la agencia).
+ *
+ * `deposit_overdue` / `balance_overdue` son SOLO informativos: nunca
+ * cancelan ni liberan asientos (`seats_held` indica que siguen
+ * reservados). `plan === 'two_stage'` ⇔ existe un depósito verificado.
+ */
+export interface AgencyPaymentProgress {
+  reservation_id: string;
+  reservation_status: string;
+  payment_status: string | null;
+  plan: 'single' | 'two_stage';
+  passenger_count: number;
+  total_cents: number;
+  deposit_cents: number | null;
+  deposit_verified_at: string | null;
+  paid_cents: number;
+  balance_cents: number;
+  deposit_pct: number | null;
+  balance_pct: number | null;
+  deposit_deadline: string | null;
+  balance_deadline: string | null;
+  deposit_overdue: boolean;
+  balance_overdue: boolean;
+  seats_held: boolean;
+  payments: AgencyPaymentProgressPayment[];
+  agency: {
+    id: string;
+    name: string | null;
+    whatsapp_phone: string | null;
+  } | null;
+}
+
 export interface AgencyPaymentDetail {
   payment: {
     id: string;
     status: AgencyPaymentStatus;
+    /** MKT-010.1 — etapa del pago (`full` por defecto). */
+    stage: AgencyPaymentStage;
     amount_cents: number;
     currency: string;
     submitted_at: string;
@@ -87,6 +154,11 @@ export interface AgencyPaymentDetail {
   } | null;
   passengers: AgencyPaymentPassenger[];
   allocations: AgencyPaymentAllocation[];
+  /**
+   * MKT-010.1 — progreso del pago. `null` en reservas que no son del
+   * marketplace (legacy / creadas desde la agencia).
+   */
+  progress: AgencyPaymentProgress | null;
   totals: {
     active_passenger_count: number;
     expected_cents: number;
@@ -104,6 +176,8 @@ export interface VerifyPaymentResult {
   payment_id: string;
   reservation_id: string;
   status: string;
+  /** MKT-010.1 — etapa verificada (`full` | `deposit` | `balance`). */
+  stage?: AgencyPaymentStage;
   already_verified: boolean;
   amount_cents: number;
   currency: string;
@@ -119,6 +193,8 @@ export interface RejectPaymentResult {
   payment_id: string;
   reservation_id: string;
   status: string;
+  /** MKT-010.1 — etapa rechazada (`full` | `deposit` | `balance`). */
+  stage?: AgencyPaymentStage;
   already_rejected: boolean;
   rejection_reason: string;
   outcome: string;
@@ -135,6 +211,8 @@ export interface RejectPaymentResult {
 
 export interface AgencyPaymentListQuery {
   status?: AgencyPaymentStatusFilter;
+  /** MKT-010.1 — filtra por etapa del pago. */
+  stage?: AgencyPaymentStageFilter;
   page?: number;
   limit?: number;
 }
@@ -144,6 +222,45 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   verified: 'Verificado',
   rejected: 'Rechazado',
 };
+
+/** MKT-010.1 — etiquetas de etapa del pago. */
+export const PAYMENT_STAGE_LABELS: Record<AgencyPaymentStage, string> = {
+  full: 'Total',
+  deposit: 'Depósito',
+  balance: 'Saldo',
+};
+
+/**
+ * MKT-010.1 — chips de etapa de la vista Pagos. `''` = sin filtrar.
+ * Vive aquí (y no en la página) para quedar cubierto a nivel unitario.
+ * La vista Pagos se expone en /agency/payments con el toggle Pagos/Compras.
+ */
+export const PAYMENT_STAGE_FILTERS: {
+  value: AgencyPaymentStageFilter;
+  label: string;
+}[] = [
+  { value: '', label: 'Todas' },
+  { value: 'deposit', label: 'Depósito' },
+  { value: 'balance', label: 'Saldos' },
+  { value: 'full', label: 'Total' },
+];
+
+/**
+ * MKT-010.1 — badge de la etapa. `full` no se muestra nunca (es el
+ * estado por defecto de un pago único); `deposit` y `balance` sí.
+ */
+export function paymentStageBadgeVariant(
+  stage: AgencyPaymentStage,
+): 'info' | 'warning' | 'active' | 'inactive' {
+  switch (stage) {
+    case 'deposit':
+      return 'info';
+    case 'balance':
+      return 'warning';
+    default:
+      return 'inactive';
+  }
+}
 
 /** Badge variant asociada a cada estado de pago. */
 export function paymentStatusBadgeVariant(
@@ -229,6 +346,13 @@ export interface AgencyCheckoutAttemptDetail {
     status: string;
     reservation_id: string | null;
     amount_cents: number;
+    /**
+     * MKT-010.1 — plan congelado del intento: `single` = pago total;
+     * `two_stage` = depósito + saldo (`amount_cents` refleja el depósito).
+     */
+    payment_plan: 'single' | 'two_stage';
+    /** MKT-010.1 — depósito total del intento (NULL en `single`). */
+    deposit_cents: number | null;
     unit_price: number;
     passenger_count: number;
     proof_count: number;
@@ -280,6 +404,19 @@ export interface VerifyCheckoutAttemptResult {
   payment_id: string | null;
   amount_cents: number;
   currency: string;
+  /**
+   * MKT-010.1 — datos del plan devueltos por la RPC al aprobar.
+   * Opcionales: los resultados idempotentes de filas antiguas pueden
+   * no traerlos.
+   */
+  payment_plan?: 'single' | 'two_stage';
+  deposit_cents?: number | null;
+  total_cents?: number | null;
+  balance_cents?: number | null;
+  deposit_pct?: number | null;
+  balance_pct?: number | null;
+  deposit_deadline?: string | null;
+  balance_deadline?: string | null;
   proof_count: number;
   allocation_count: number;
   passenger_count: number;

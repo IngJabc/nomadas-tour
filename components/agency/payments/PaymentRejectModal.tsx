@@ -9,12 +9,19 @@ import { agencyApi } from '@/lib/api';
 import {
   PAYMENT_REJECT_REASON_MAX,
   PAYMENT_REJECT_REASON_REQUIRED,
+  type AgencyPaymentStage,
   type RejectPaymentResult,
 } from '@/lib/payments';
 
 interface PaymentRejectModalProps {
   open: boolean;
   paymentId: string;
+  /**
+   * MKT-010.1 — etapa del pago. En `balance` el rechazo NO cancela la
+   * reserva ni libera asientos (solo deja el saldo por cobrar), así que
+   * el texto lo aclara antes de confirmar.
+   */
+  stage?: AgencyPaymentStage;
   onClose: () => void;
   onSuccess: (result: RejectPaymentResult) => void;
 }
@@ -22,11 +29,14 @@ interface PaymentRejectModalProps {
 /**
  * Modal de rechazo de pago. Requiere motivo (1–500 caracteres, validado
  * también en backend). Un rechazo puede cancelar la reserva y liberar
- * asientos según la RPC, por eso pide confirmación explícita.
+ * asientos según la RPC, por eso pide confirmación explícita. Con
+ * `stage="balance"` esa advertencia cambia: el saldo pendiente jamás
+ * cancela la reserva.
  */
 export function PaymentRejectModal({
   open,
   paymentId,
+  stage,
   onClose,
   onSuccess,
 }: PaymentRejectModalProps) {
@@ -96,8 +106,9 @@ export function PaymentRejectModal({
           id={descriptionId}
           className="text-sm text-[var(--color-brand-muted)] text-center mb-4"
         >
-          El rechazo puede cancelar la reserva y liberar los asientos. Explica
-          el motivo para dejar registro.
+          {stage === 'balance'
+            ? 'Rechazar este pago de SALDO no cancela la reserva ni libera los asientos: queda el saldo por cobrar. Explica el motivo para dejar registro.'
+            : 'El rechazo puede cancelar la reserva y liberar los asientos. Explica el motivo para dejar registro.'}
         </p>
 
         <label

@@ -14,6 +14,8 @@ import { formatDateTimeShort } from '@/lib/timezone';
 import { formatSeatPriceCents } from '@/lib/price';
 import {
   PAYMENT_STATUS_LABELS,
+  PAYMENT_STAGE_LABELS,
+  paymentStageBadgeVariant,
   paymentStatusBadgeVariant,
   type AgencyPaymentListItem,
 } from '@/lib/payments';
@@ -33,9 +35,18 @@ export function AgencyPaymentCard({ payment }: { payment: AgencyPaymentListItem 
               Enviado {formatDateTimeShort(payment.submitted_at)}
             </p>
           </div>
-          <Badge variant={paymentStatusBadgeVariant(payment.status)} size="sm">
-            {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
-          </Badge>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* MKT-010.1 — etapa solo cuando el pago no es de monto
+                total ('full' es el estado por defecto y no aporta). */}
+            {payment.stage && payment.stage !== 'full' && (
+              <Badge variant={paymentStageBadgeVariant(payment.stage)} size="sm">
+                {PAYMENT_STAGE_LABELS[payment.stage] ?? payment.stage}
+              </Badge>
+            )}
+            <Badge variant={paymentStatusBadgeVariant(payment.status)} size="sm">
+              {PAYMENT_STATUS_LABELS[payment.status] ?? payment.status}
+            </Badge>
+          </div>
         </div>
 
         {trip ? (
