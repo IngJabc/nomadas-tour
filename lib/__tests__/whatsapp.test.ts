@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   whatsappHref,
   buildCheckoutRejectWhatsAppMessage,
+  buildBalanceRequestWhatsAppMessage,
 } from '@/lib/whatsapp';
 
 describe('whatsappHref', () => {
@@ -76,5 +77,76 @@ describe('buildCheckoutRejectWhatsAppMessage', () => {
     expect(message).toContain('Motivo: —');
     expect(message).not.toContain('undefined');
     expect(message).not.toContain('null');
+  });
+});
+
+// ─── MKT-010.1 · solicitud de saldo (plan de pago en dos partes) ───────
+
+describe('buildBalanceRequestWhatsAppMessage', () => {
+  const base = {
+    bookerName: 'Ana Pérez',
+    seatCodes: ['A1', 'A2'],
+    origin: 'Caracas',
+    destination: 'Maracaibo',
+    departureLabel: '15 oct 2026, 07:00',
+    agencyName: 'Agencia Central',
+    balanceLabel: '$ 120.000,00',
+    balanceDeadlineLabel: '20/11/2026',
+  };
+
+  it('incluye todos los datos del saldo pendiente', () => {
+    const message = buildBalanceRequestWhatsAppMessage(base);
+    expect(message).toContain('Hola Ana Pérez:');
+    expect(message).toContain('los asientos A1, A2');
+    expect(message).toContain('Caracas → Maracaibo');
+    expect(message).toContain('15 oct 2026, 07:00');
+    expect(message).toContain('con la agencia Agencia Central');
+    expect(message).toContain('saldo pendiente de $ 120.000,00');
+    expect(message).toContain('Fecha límite de pago: 20/11/2026.');
+    expect(message).toContain('Equipo Nómadas Tour');
+    expect(message).not.toContain('undefined');
+    expect(message).not.toContain('null');
+  });
+
+  it('omite la línea de fecha límite cuando no hay vencimiento', () => {
+    const message = buildBalanceRequestWhatsAppMessage({
+      ...base,
+      balanceDeadlineLabel: null,
+    });
+    expect(message).not.toContain('Fecha límite de pago');
+    expect(message).toContain('saldo pendiente de $ 120.000,00');
+    expect(message).not.toContain('undefined');
+    expect(message).not.toContain('null');
+  });
+
+  it('usa fallbacks neutros cuando faltan datos', () => {
+    const message = buildBalanceRequestWhatsAppMessage({
+      bookerName: null,
+      seatCodes: [],
+      origin: null,
+      destination: null,
+      departureLabel: null,
+      agencyName: null,
+      balanceLabel: '',
+      balanceDeadlineLabel: undefined,
+    });
+    expect(message).toContain('Hola cliente:');
+    expect(message).toContain('los asientos —');
+    expect(message).toContain('— → —');
+    expect(message).toContain('con la agencia la agencia');
+    expect(message).toContain('saldo pendiente de —.');
+    expect(message).not.toContain('Fecha límite de pago');
+    expect(message).not.toContain('undefined');
+    expect(message).not.toContain('null');
+  });
+
+  it('no deja espacios dobles ni etiquetas vacías', () => {
+    const message = buildBalanceRequestWhatsAppMessage({
+      ...base,
+      balanceLabel: '  ',
+      balanceDeadlineLabel: '   ',
+    });
+    expect(message).toContain('saldo pendiente de —.');
+    expect(message).not.toContain('  .');
   });
 });

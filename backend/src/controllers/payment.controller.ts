@@ -10,6 +10,11 @@ const uuidSchema = z.string().uuid();
 
 const listQuerySchema = z.object({
   status: z.enum(['pending', 'verified', 'rejected']).optional(),
+  /**
+   * MKT-010.1 — etapa del pago dentro del plan de dos partes.
+   * Sin valor = todas las etapas.
+   */
+  stage: z.enum(['full', 'deposit', 'balance']).optional(),
   page: z.coerce.number().int().min(1).max(10_000).default(1),
   limit: z.coerce.number().int().min(1).max(MAX_LIST_LIMIT).default(DEFAULT_LIST_LIMIT),
 });
@@ -42,6 +47,7 @@ export class PaymentController {
       const result = await paymentService.listAgencyPayments({
         agencyId: requireAgencyId(req),
         status: query.status,
+        stage: query.stage,
         page: query.page,
         limit: query.limit,
       });

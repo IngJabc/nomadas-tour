@@ -27,6 +27,15 @@ vi.mock('../services/superadmin.service.js', () => ({
   },
 }));
 
+// MKT-010.1: el controller importa payment-plan.service, que arrastra
+// config/database (env). Aquí no se prueba — su cobertura vive en
+// payment-plan.service.test.ts.
+vi.mock('../services/payment-plan.service.js', () => ({
+  paymentPlanService: {
+    setTripPaymentPlan: vi.fn(),
+  },
+}));
+
 import { agencyTripController, updateTripSchema } from './agency-trip.controller.js';
 
 const SESSION_AGENCY = {

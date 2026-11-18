@@ -553,6 +553,37 @@ export const agencyApi = {
       `/agency/trips/${encodeURIComponent(tripId)}/status`,
       { method: 'PATCH', body: JSON.stringify({ status: 'completed' }) },
     ),
+  /**
+   * MKT-010.1 — habilita/deshabilita el pago en dos partes de un viaje
+   * propio y exclusivo. `PATCH /api/agency/trips/:tripId/payment-plan`.
+   *
+   * - `enabled: false` limpia importe y vencimientos (el backend los
+   *   ignora y la RPC los pone en NULL).
+   * - Al habilitar, `deposit_amount_cents` va en CENTAVOS COP y las
+   *   fechas como `YYYY-MM-DD` (fin de día lo resuelve el backend).
+   * - La autorización (agencia de la sesión, exclusividad, estado
+   *   activo) la decide el backend; aquí solo se envía la intención.
+   */
+  updateTripPaymentPlan: (
+    tripId: string,
+    data: {
+      enabled: boolean;
+      deposit_amount_cents?: number | null;
+      deposit_deadline?: string | null;
+      balance_deadline?: string | null;
+    },
+  ) =>
+    request<{
+      trip_id: string;
+      payment_plan: 'single' | 'two_stage';
+      deposit_amount_cents: number | null;
+      deposit_deadline: string | null;
+      balance_deadline: string | null;
+      audit_id: string | null;
+    }>(`/agency/trips/${encodeURIComponent(tripId)}/payment-plan`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
   getTripPassengers: (tripId: string) =>
     request<AgencyTripPassengersResponse>(`/agency/trips/${tripId}/passengers`),
   listReservations: () => request<AgencyReservation[]>('/agency/reservations'),
@@ -667,6 +698,8 @@ export const agencyApi = {
     request<ListAgencyPaymentsResult>('/agency/payments', {
       params: {
         status: params?.status,
+        // MKT-010.1 — etapa del pago; '' (vacío) = sin filtrar.
+        stage: params?.stage || undefined,
         page: params?.page !== undefined ? String(params.page) : undefined,
         limit: params?.limit !== undefined ? String(params.limit) : undefined,
       },

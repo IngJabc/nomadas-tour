@@ -94,11 +94,107 @@ describe('agencyApi — Fase 2 pagos', () => {
     expect(JSON.parse(init.body)).toEqual({ reason: 'Comprobante inválido' });
   });
 
+  it('listPayments envía el filtro de etapa (MKT-010.1)', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payments: [], page: 1, limit: 20, total: 0 }));
+
+    await agencyApi.listPayments({ stage: 'deposit' });
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE}/agency/payments?stage=deposit`);
+  });
+
+  it('listPayments omite la etapa vacía (sin filtrar)', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ payments: [], page: 1, limit: 20, total: 0 }));
+
+    await agencyApi.listPayments({ stage: '' });
+
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE}/agency/payments`);
+  });
+
+  it('updateTripPaymentPlan hace PATCH con el body del plan', async () => {
+    const payload = {
+      trip_id: 't1',
+      payment_plan: 'two_stage',
+      deposit_amount_cents: 50000,
+      deposit_deadline: '2026-11-20T23:59:59',
+      balance_deadline: '2026-11-30T23:59:59',
+      audit_id: 'a1',
+    };
+    fetchMock.mockResolvedValue(jsonResponse(payload));
+
+    const result = await agencyApi.updateTripPaymentPlan('t1', {
+      enabled: true,
+      deposit_amount_cents: 50000,
+      deposit_deadline: '2026-11-20',
+      balance_deadline: '2026-11-30',
+    });
+
+    expect(result).toEqual(payload);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE}/agency/trips/t1/payment-plan`);
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body)).toEqual({
+      enabled: true,
+      deposit_amount_cents: 50000,
+      deposit_deadline: '2026-11-20',
+      balance_deadline: '2026-11-30',
+    });
+  });
+
+  it('updateTripPaymentPlan deshabilita solo con enabled=false', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        trip_id: 't1',
+        payment_plan: 'single',
+        deposit_amount_cents: null,
+        deposit_deadline: null,
+        balance_deadline: null,
+        audit_id: 'a2',
+      }),
+    );
+
+    await agencyApi.updateTripPaymentPlan('t1', { enabled: false });
+
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(`${API_BASE}/agency/trips/t1/payment-plan`);
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body)).toEqual({ enabled: false });
+  });
+
   it('expone los tipos de estado del catálogo', async () => {
     const { PAYMENT_STATUS_LABELS, paymentStatusBadgeVariant } = await import('@/lib/payments');
     expect(PAYMENT_STATUS_LABELS.pending).toBe('Pendiente');
     expect(paymentStatusBadgeVariant('pending')).toBe('warning');
     expect(paymentStatusBadgeVariant('verified')).toBe('active');
     expect(paymentStatusBadgeVariant('rejected')).toBe('cancelled');
+  });
+
+  it('expone los tipos de etapa del catálogo (MKT-010.1)', async () => {
+    const {
+      PAYMENT_STAGE_LABELS,
+      PAYMENT_STAGE_FILTERS,
+      paymentStageBadgeVariant,
+    } = await import('@/lib/payments');
+    expect(PAYMENT_STAGE_LABELS.full).toBe('Total');
+    expect(PAYMENT_STAGE_LABELS.deposit).toBe('Depósito');
+    expect(PAYMENT_STAGE_LABELS.balance).toBe('Saldo');
+    expect(paymentStageBadgeVariant('deposit')).toBe('info');
+    expect(paymentStageBadgeVariant('balance')).toBe('warning');
+    expect(paymentStageBadgeVariant('full')).toBe('inactive');
+    // Chips de la vista Pagos (alcanzable con el toggle Pagos/Compras →
+    // aquí se cubren a nivel unitario; el flujo está en PaymentsPages).
+    expect(PAYMENT_STAGE_FILTERS.map((f) => f.label)).toEqual([
+      'Todas',
+      'Depósito',
+      'Saldos',
+      'Total',
+    ]);
+    expect(PAYMENT_STAGE_FILTERS.map((f) => f.value)).toEqual([
+      '',
+      'deposit',
+      'balance',
+      'full',
+    ]);
   });
 });

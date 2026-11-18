@@ -36,7 +36,8 @@ const LIST_SELECT = `
 
 const DETAIL_SELECT = `
   id, status, trip_id, agency_id, customer_id, seat_ids, passenger_data,
-  unit_price, amount_cents, proof_count, payment_reference, bank_origin,
+  unit_price, amount_cents, payment_plan, deposit_cents, proof_count,
+  payment_reference, bank_origin,
   payment_datetime, proof_path, proof_submitted_at, review_started_at,
   rejection_reason, rejection_count, history, expires_at, created_at,
   closed_at, verified_at, verified_by,
@@ -98,6 +99,10 @@ interface CheckoutAttemptDetailRow {
   passenger_data: PassengerSnapshot[];
   unit_price: number;
   amount_cents: number;
+  /** MKT-010.1 — plan congelado del intento (`single` | `two_stage`). */
+  payment_plan?: string | null;
+  /** MKT-010.1 — depósito total del intento (NULL en `single`). */
+  deposit_cents?: number | null;
   proof_count: number;
   payment_reference: string | null;
   bank_origin: string | null;
@@ -176,6 +181,13 @@ export interface CheckoutAttemptDetail {
     status: string;
     reservation_id: string | null;
     amount_cents: number;
+    /**
+     * MKT-010.1 — plan congelado del intento. `single` (default de la
+     * columna) = pago total; `two_stage` = depósito + saldo.
+     */
+    payment_plan: string;
+    /** MKT-010.1 — depósito total del intento (NULL en `single`). */
+    deposit_cents: number | null;
     unit_price: number;
     passenger_count: number;
     proof_count: number;
@@ -216,6 +228,19 @@ export interface VerifyCheckoutAttemptResult {
   payment_id: string | null;
   amount_cents: number;
   currency: string;
+  /**
+   * MKT-010.1 — campos del plan que la RPC agrega al aprobar.
+   * `payment_plan` puede faltar en resultados idempotentes de filas
+   * antiguas; por eso todos son opcionales.
+   */
+  payment_plan?: string;
+  deposit_cents?: number | null;
+  total_cents?: number | null;
+  balance_cents?: number | null;
+  deposit_pct?: number | null;
+  balance_pct?: number | null;
+  deposit_deadline?: string | null;
+  balance_deadline?: string | null;
   proof_count: number;
   allocation_count: number;
   passenger_count: number;
@@ -522,6 +547,10 @@ export class CheckoutAttemptService {
         status: row.status,
         reservation_id: reservationId,
         amount_cents: row.amount_cents,
+        // MKT-010.1 — plan del intento; las filas previas a la
+        // migración 106 caen al default de la columna ('single').
+        payment_plan: row.payment_plan ?? 'single',
+        deposit_cents: row.deposit_cents ?? null,
         unit_price: row.unit_price,
         passenger_count: row.seat_ids?.length ?? 0,
         proof_count: row.proof_count,

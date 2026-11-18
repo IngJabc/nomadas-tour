@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { superadminService } from "../services/superadmin.service.js";
+import { paymentPlanService } from "../services/payment-plan.service.js";
 import { ValidationError } from "../errors/index.js";
 
 /**
@@ -50,6 +51,63 @@ export const createTripSchema = z
  * body: sale de `req.ctx` y además la RPC la resuelve en `public.users`.
  */
 export const updateTripSchema = createTripSchema;
+
+/**
+ * MKT-010.1 — `PATCH /api/agency/trips/:tripId/payment-plan`.
+ *
+ * Schema **strict**: solo la bandera del plan y, al habilitarlo, el
+ * depósito por pasajero (centavos) y los dos vencimientos como fechas
+ * de negocio `YYYY-MM-DD` (el DatePicker nunca envía otra forma).
+ * Cualquier otro campo (actor_user_id, agency_id, seat_price, …) se
+ * rechaza con 400 en lugar de filtrarse en silencio. El actor sale
+ * SIEMPRE de `req.ctx`.
+ *
+ * Al deshabilitar (`enabled: false`) los demás campos se ignoran con
+ * seguridad: la RPC limpia importe y vencimientos en NULL.
+ */
+export const updatePaymentPlanSchema = z
+  .object({
+    enabled: z.boolean(),
+    deposit_amount_cents: z
+      .number()
+      .int()
+      .min(1)
+      .max(2_147_483_647)
+      .nullish(),
+    deposit_deadline: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido (YYYY-MM-DD)")
+      .nullish(),
+    balance_deadline: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Formato de fecha inválido (YYYY-MM-DD)")
+      .nullish(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (!value.enabled) return;
+    if (value.deposit_amount_cents == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["deposit_amount_cents"],
+        message: "El depósito por pasajero es obligatorio al habilitar el plan",
+      });
+    }
+    if (!value.deposit_deadline) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["deposit_deadline"],
+        message: "El vencimiento del depósito es obligatorio",
+      });
+    }
+    if (!value.balance_deadline) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["balance_deadline"],
+        message: "El vencimiento del saldo es obligatorio",
+      });
+    }
+  });
 
 export class AgencyTripController {
   async updateTripStatus(req: Request, res: Response, next: NextFunction) {
@@ -105,6 +163,33 @@ export class AgencyTripController {
         data,
       );
       res.json(trip);
+    } catch (error) {
+      next(
+        error instanceof z.ZodError
+          ? new ValidationError("Invalid input", (error as any).issues)
+          : error
+      );
+    }
+  }
+
+  /**
+   * MKT-010.1 — `PATCH /api/agency/trips/:tripId/payment-plan`.
+   *
+   * Habilita/deshabilita el pago en dos partes (depósito fijo por
+   * pasajero + saldo). El `tripId` de la ruta es solo identificación:
+   * la autorización (rol agency, viaje activo y exclusivo de la agencia
+   * del actor) la decide la RPC `set_trip_payment_plan` (migración 106)
+   * con `FOR UPDATE`. El actor sale SIEMPRE de `req.ctx`, nunca del body.
+   */
+  async updatePaymentPlan(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = updatePaymentPlanSchema.parse(req.body);
+      const result = await paymentPlanService.setTripPaymentPlan(
+        req.ctx!,
+        req.params.tripId as string,
+        data,
+      );
+      res.json(result);
     } catch (error) {
       next(
         error instanceof z.ZodError

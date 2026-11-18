@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/Button';
 import { DatePicker } from '@/components/ui/DatePicker';
 import { AgencyTripCard, type AgencyTrip } from '@/components/agency/AgencyTripCard';
 import { AgencyTripBuilderModal } from '@/components/agency/AgencyTripBuilderModal';
+import { TripPaymentPlanModal } from '@/components/agency/TripPaymentPlanModal';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { ApiError } from '@/lib/errors/api-error';
 import { pageFade, staggerContainer, staggerItem } from '@/lib/motion/variants';
@@ -120,6 +121,18 @@ export default function AgencyTripsContent() {
   // ─── AS-TRIP-002: completar viaje (confirmación → PATCH → refresh) ──
   const [confirmTrip, setConfirmTrip] = useState<AgencyTrip | null>(null);
   const [completingTripId, setCompletingTripId] = useState<string | null>(null);
+
+  // ─── MKT-010.1: plan de pago en dos partes (depósito + saldo) ──────
+  // Modal propio por viaje: el builder solo edita ruta/salida/vehículo
+  // y precio, nunca el plan.
+  const [paymentPlanTrip, setPaymentPlanTrip] = useState<AgencyTrip | null>(null);
+
+  const handlePaymentPlanSuccess = useCallback(() => {
+    // El modal ya mostró el toast de éxito; aqui solo se cierra y se
+    // refresca la lista para reflejar el plan nuevo en la tarjeta.
+    setPaymentPlanTrip(null);
+    void doFetch();
+  }, [doFetch]);
 
   const handleCompleteTrip = async () => {
     // Anti doble envío: mientras haya una petición en curso no se repite.
@@ -486,6 +499,7 @@ export default function AgencyTripsContent() {
                   onComplete={(t) => setConfirmTrip(t)}
                   completing={completingTripId === trip.id}
                   onEdit={(t) => setEditingTripId(t.id)}
+                  onPaymentPlan={(t) => setPaymentPlanTrip(t)}
                 />
               </motion.div>
             ))}
@@ -503,6 +517,15 @@ export default function AgencyTripsContent() {
         tripId={editingTripId ?? undefined}
         onClose={handleCloseBuilder}
         onSuccess={handleBuilderSuccess}
+      />
+
+      {/* MKT-010.1 — configuración del pago en dos partes (depósito +
+          vencimientos) por viaje, sin pasar por el builder. */}
+      <TripPaymentPlanModal
+        open={paymentPlanTrip !== null}
+        trip={paymentPlanTrip}
+        onClose={() => setPaymentPlanTrip(null)}
+        onSuccess={handlePaymentPlanSuccess}
       />
 
       {/* AS-TRIP-002 — confirmación antes de marcar el viaje completado */}

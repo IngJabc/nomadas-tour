@@ -14,9 +14,12 @@ import { AgencyPaymentCard } from '@/components/agency/payments/AgencyPaymentCar
 import { AgencyCheckoutAttemptCard } from '@/components/agency/payments/AgencyCheckoutAttemptCard';
 import {
   PAYMENT_STATUS_LABELS,
+  PAYMENT_STAGE_FILTERS,
+  PAYMENT_STAGE_LABELS,
   CHECKOUT_ATTEMPT_STATUS_LABELS,
   type AgencyPaymentListItem,
   type AgencyPaymentStatusFilter,
+  type AgencyPaymentStageFilter,
   type AgencyCheckoutAttemptListItem,
   type AgencyCheckoutAttemptStatusFilter,
 } from '@/lib/payments';
@@ -54,8 +57,9 @@ const ATTEMPT_STATUS_FILTERS: {
 ];
 
 export default function AgencyPaymentsPage() {
-  // Pagos se conserva en el codigo pero ya no se expone en la UI: la vista
-  // por defecto (y unica visible) es Compras (checkout attempts, MKT-007).
+  // Vista por defecto: Compras (checkout attempts, MKT-007). El toggle
+  // Pagos/Compras expone también la vista Pagos (MKT-010.1): es la única
+  // que lista filas de `payments` con su etapa (depósito / saldo).
   const [viewMode, setViewMode] = useState<ViewMode>('attempts');
   const [payments, setPayments] = useState<AgencyPaymentListItem[]>([]);
   const [attempts, setAttempts] = useState<AgencyCheckoutAttemptListItem[]>([]);
@@ -64,6 +68,8 @@ export default function AgencyPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<AgencyPaymentStatusFilter | ''>('');
+  // MKT-010.1 — etapa del pago (depósito / saldo / total).
+  const [stageFilter, setStageFilter] = useState<AgencyPaymentStageFilter>('');
   const [attemptFilter, setAttemptFilter] =
     useState<AgencyCheckoutAttemptStatusFilter>('');
 
@@ -89,6 +95,7 @@ export default function AgencyPaymentsPage() {
       } else {
         const data = await agencyApi.listPayments({
           status: statusFilter || undefined,
+          stage: stageFilter || undefined,
           page,
           limit: PAGE_LIMIT,
         });
@@ -106,7 +113,7 @@ export default function AgencyPaymentsPage() {
     } finally {
       if (seq === fetchSeqRef.current) setLoading(false);
     }
-  }, [viewMode, statusFilter, attemptFilter, page]);
+  }, [viewMode, statusFilter, stageFilter, attemptFilter, page]);
 
   useEffect(() => {
     doFetch();
@@ -145,6 +152,21 @@ export default function AgencyPaymentsPage() {
     setStatusFilter(value);
     setPage(1);
   };
+
+  // MKT-010.1 — cambia la etapa y vuelve a la primera página.
+  const handleStageFilter = (value: AgencyPaymentStageFilter) => {
+    setStageFilter(value);
+    setPage(1);
+  };
+
+  /** Limpia ambos filtros de la vista Pagos (estado + etapa). */
+  const clearPaymentFilters = () => {
+    setStatusFilter('');
+    setStageFilter('');
+    setPage(1);
+  };
+
+  const hasPaymentFilters = Boolean(statusFilter || stageFilter);
 
   const handleAttemptFilter = (value: AgencyCheckoutAttemptStatusFilter) => {
     setAttemptFilter(value);
@@ -200,20 +222,52 @@ export default function AgencyPaymentsPage() {
         transition={{ duration: 0.25 }}
       >
         <PageHeader
-          title="Compras"
+          title={viewMode === 'payments' ? 'Pagos' : 'Compras'}
           action={
-            <Link
-              href="/agency/reservations"
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-[var(--color-brand-navy)] font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 hover:bg-slate-200"
-            >
-              Ver reservas
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* MKT-010.1 — toggle restaurado: la vista Pagos es la única
+                  que lista filas de `payments` con etapa (depósito / saldo);
+                  los pagos por etapa no aparecen en Compras (attempts). */}
+              <div
+                role="group"
+                aria-label="Vista de la página"
+                className="flex items-center gap-1 bg-slate-100 rounded-xl h-9 px-1"
+              >
+                <button
+                  type="button"
+                  aria-pressed={viewMode === 'attempts'}
+                  onClick={() => handleViewModeChange('attempts')}
+                  className={`px-3 h-7 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold transition-colors duration-200 ${
+                    viewMode === 'attempts'
+                      ? 'bg-[var(--color-brand-cyan)] text-white'
+                      : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
+                  }`}
+                >
+                  Compras
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={viewMode === 'payments'}
+                  onClick={() => handleViewModeChange('payments')}
+                  className={`px-3 h-7 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-semibold transition-colors duration-200 ${
+                    viewMode === 'payments'
+                      ? 'bg-[var(--color-brand-cyan)] text-white'
+                      : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
+                  }`}
+                >
+                  Pagos
+                </button>
+              </div>
+              <Link
+                href="/agency/reservations"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 text-[var(--color-brand-navy)] font-[family-name:var(--font-body)] font-semibold text-sm rounded-xl no-underline transition-colors duration-200 hover:bg-slate-200"
+              >
+                Ver reservas
+              </Link>
+            </div>
           }
         />
       </motion.div>
-
-      {/* Vista unica de Compras: el toggle Pagos/Compras se retiro de la UI
-          (Pagos sigue disponible en el codigo pero oculto). */}
 
       {fetchError && (
         <motion.div
@@ -261,21 +315,45 @@ export default function AgencyPaymentsPage() {
         transition={{ duration: 0.25, delay: 0.05 }}
       >
         {viewMode === 'payments' ? (
-          <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-            {STATUS_FILTERS.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => handleStatusFilter(value)}
-                className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors shrink-0 ${
-                  statusFilter === value
-                    ? 'bg-[var(--color-brand-cyan)] text-white'
-                    : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {STATUS_FILTERS.map(({ value, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => handleStatusFilter(value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors shrink-0 ${
+                    statusFilter === value
+                      ? 'bg-[var(--color-brand-cyan)] text-white'
+                      : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* MKT-010.1 — etapa del pago (plan de dos partes). */}
+            <div
+              role="group"
+              aria-label="Filtrar por etapa del pago"
+              className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            >
+              {PAYMENT_STAGE_FILTERS.map(({ value, label }) => (
+                <button
+                  key={value || 'all-stage'}
+                  type="button"
+                  onClick={() => handleStageFilter(value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-[family-name:var(--font-body)] font-medium transition-colors shrink-0 ${
+                    stageFilter === value
+                      ? 'bg-[var(--color-brand-cyan)] text-white'
+                      : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -297,7 +375,7 @@ export default function AgencyPaymentsPage() {
         )}
 
         <AnimatePresence>
-          {((viewMode === 'payments' && statusFilter) ||
+          {((viewMode === 'payments' && hasPaymentFilters) ||
             (viewMode === 'attempts' && attemptFilter)) && (
             <motion.button
               initial={{ opacity: 0, width: 0, scaleX: 0 }}
@@ -306,7 +384,7 @@ export default function AgencyPaymentsPage() {
               transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
               type="button"
               onClick={() =>
-                viewMode === 'payments' ? handleStatusFilter('') : handleAttemptFilter('')
+                viewMode === 'payments' ? clearPaymentFilters() : handleAttemptFilter('')
               }
               className="shrink-0 h-9 px-3 rounded-xl border border-[1.5px] border-[#e5e7eb] bg-white text-[var(--color-brand-muted)] hover:text-[#ef4444] hover:border-[#ef4444] transition-colors duration-150 flex items-center gap-1.5 text-xs font-[family-name:var(--font-body)] font-medium overflow-hidden origin-left"
             >
@@ -323,13 +401,19 @@ export default function AgencyPaymentsPage() {
           <EmptyState
             icon={<CreditCard className="w-8 h-8" />}
             message={
-              statusFilter
-                ? `No hay pagos ${PAYMENT_STATUS_LABELS[statusFilter]?.toLowerCase() ?? ''}`
-                : 'Aún no hay pagos de marketplace'
+              !hasPaymentFilters
+                ? 'Aún no hay pagos de marketplace'
+                : statusFilter && stageFilter
+                  ? 'No hay pagos con estos filtros'
+                  : statusFilter
+                    ? `No hay pagos ${PAYMENT_STATUS_LABELS[statusFilter]?.toLowerCase() ?? ''}`
+                    : stageFilter
+                      ? `No hay pagos de etapa ${PAYMENT_STAGE_LABELS[stageFilter].toLowerCase()}`
+                      : 'Aún no hay pagos de marketplace'
             }
             action={
-              statusFilter
-                ? { label: 'Ver todos', onClick: () => handleStatusFilter('') }
+              hasPaymentFilters
+                ? { label: 'Ver todos', onClick: clearPaymentFilters }
                 : { label: 'Ver reservas', href: '/agency/reservations' }
             }
           />
