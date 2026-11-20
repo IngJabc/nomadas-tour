@@ -273,9 +273,9 @@ export default function CheckoutAttemptDetailPage() {
           action={
             <div className="flex items-center gap-2">
               {/* MKT-010.1 — en plan de dos partes este monto es el
-                  DEPÓSITO, no el total de la reserva. */}
+                  PRIMER PAGO, no el total de la reserva. */}
               {attempt.payment_plan === 'two_stage' && (
-                <Badge variant="info">Depósito</Badge>
+                <Badge variant="info">Primer pago</Badge>
               )}
               <Badge variant={checkoutAttemptStatusBadgeVariant(attempt.status)}>
                 {CHECKOUT_ATTEMPT_STATUS_LABELS[attempt.status] ?? attempt.status}
@@ -373,14 +373,14 @@ export default function CheckoutAttemptDetailPage() {
                 </div>
                 <div>
                   <p className="font-[family-name:var(--font-body)] text-[11px] text-[var(--color-brand-muted)] uppercase tracking-wide">
-                    {attempt.payment_plan === 'two_stage' ? 'Depósito' : 'Monto'}
+                    {attempt.payment_plan === 'two_stage' ? 'Primer pago' : 'Monto'}
                   </p>
                   <p className="font-[family-name:var(--font-heading)] font-extrabold text-xl text-[var(--color-brand-navy)]">
                     {formatSeatPriceCents(attempt.amount_cents)}
                   </p>
                   {attempt.payment_plan === 'two_stage' && (
                     <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] mt-0.5">
-                      Primera parte del pago en dos partes
+                      Pago en dos partes
                     </p>
                   )}
                 </div>

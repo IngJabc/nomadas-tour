@@ -107,7 +107,7 @@ export function PaymentRejectModal({
           className="text-sm text-[var(--color-brand-muted)] text-center mb-4"
         >
           {stage === 'balance'
-            ? 'Rechazar este pago de SALDO no cancela la reserva ni libera los asientos: queda el saldo por cobrar. Explica el motivo para dejar registro.'
+            ? 'Rechazar este pago no cancela la reserva ni libera los asientos: queda el pago restante por cobrar. Explica el motivo para dejar registro.'
             : 'El rechazo puede cancelar la reserva y liberar los asientos. Explica el motivo para dejar registro.'}
         </p>
 

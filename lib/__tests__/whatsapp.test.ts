@@ -80,7 +80,7 @@ describe('buildCheckoutRejectWhatsAppMessage', () => {
   });
 });
 
-// ─── MKT-010.1 · solicitud de saldo (plan de pago en dos partes) ───────
+// ─── MKT-010.1 · solicitud del pago restante (plan de dos partes) ───────
 
 describe('buildBalanceRequestWhatsAppMessage', () => {
   const base = {
@@ -94,14 +94,14 @@ describe('buildBalanceRequestWhatsAppMessage', () => {
     balanceDeadlineLabel: '20/11/2026',
   };
 
-  it('incluye todos los datos del saldo pendiente', () => {
+  it('incluye todos los datos del pago restante', () => {
     const message = buildBalanceRequestWhatsAppMessage(base);
     expect(message).toContain('Hola Ana Pérez:');
     expect(message).toContain('los asientos A1, A2');
     expect(message).toContain('Caracas → Maracaibo');
     expect(message).toContain('15 oct 2026, 07:00');
     expect(message).toContain('con la agencia Agencia Central');
-    expect(message).toContain('saldo pendiente de $ 120.000,00');
+    expect(message).toContain('pago restante de $ 120.000,00');
     expect(message).toContain('Fecha límite de pago: 20/11/2026.');
     expect(message).toContain('Equipo Nómadas Tour');
     expect(message).not.toContain('undefined');
@@ -114,7 +114,7 @@ describe('buildBalanceRequestWhatsAppMessage', () => {
       balanceDeadlineLabel: null,
     });
     expect(message).not.toContain('Fecha límite de pago');
-    expect(message).toContain('saldo pendiente de $ 120.000,00');
+    expect(message).toContain('pago restante de $ 120.000,00');
     expect(message).not.toContain('undefined');
     expect(message).not.toContain('null');
   });
@@ -134,7 +134,7 @@ describe('buildBalanceRequestWhatsAppMessage', () => {
     expect(message).toContain('los asientos —');
     expect(message).toContain('— → —');
     expect(message).toContain('con la agencia la agencia');
-    expect(message).toContain('saldo pendiente de —.');
+    expect(message).toContain('pago restante de —.');
     expect(message).not.toContain('Fecha límite de pago');
     expect(message).not.toContain('undefined');
     expect(message).not.toContain('null');
@@ -146,7 +146,7 @@ describe('buildBalanceRequestWhatsAppMessage', () => {
       balanceLabel: '  ',
       balanceDeadlineLabel: '   ',
     });
-    expect(message).toContain('saldo pendiente de —.');
+    expect(message).toContain('pago restante de —.');
     expect(message).not.toContain('  .');
   });
 });

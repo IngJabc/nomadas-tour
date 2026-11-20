@@ -219,15 +219,35 @@ export interface AgencyPaymentListQuery {
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   pending: 'Pendiente',
-  verified: 'Verificado',
+  verified: 'Pago aprobado',
   rejected: 'Rechazado',
+};
+
+/**
+ * Plurales de cada estado para el mensaje vacío «No hay pagos …»
+ * de la vista Pagos (el singular del badge no encaja en esa frase).
+ */
+export const PAYMENT_STATUS_PLURALS: Record<AgencyPaymentStatusFilter, string> = {
+  pending: 'pendientes',
+  verified: 'aprobados',
+  rejected: 'rechazados',
 };
 
 /** MKT-010.1 — etiquetas de etapa del pago. */
 export const PAYMENT_STAGE_LABELS: Record<AgencyPaymentStage, string> = {
   full: 'Total',
-  deposit: 'Depósito',
-  balance: 'Saldo',
+  deposit: 'Primer pago',
+  balance: 'Pago restante',
+};
+
+/**
+ * Sustantivos en minúscula de cada etapa para el mensaje vacío
+ * «No hay {sustantivo} registrado» de la vista Pagos.
+ */
+export const PAYMENT_STAGE_NOUNS: Record<AgencyPaymentStage, string> = {
+  full: 'pago total',
+  deposit: 'primer pago',
+  balance: 'pago restante',
 };
 
 /**
@@ -240,8 +260,8 @@ export const PAYMENT_STAGE_FILTERS: {
   label: string;
 }[] = [
   { value: '', label: 'Todas' },
-  { value: 'deposit', label: 'Depósito' },
-  { value: 'balance', label: 'Saldos' },
+  { value: 'deposit', label: 'Primer pago' },
+  { value: 'balance', label: 'Pago restante' },
   { value: 'full', label: 'Total' },
 ];
 

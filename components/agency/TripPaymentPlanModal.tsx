@@ -28,11 +28,11 @@ interface TripPaymentPlanModalProps {
 }
 
 const REQUIRED_DEPOSIT_MESSAGE =
-  'El depósito por puesto es obligatorio para habilitar el plan.';
+  'El primer pago por puesto es obligatorio para habilitar el plan.';
 const REQUIRED_DEADLINES_MESSAGE =
-  'Ambos vencimientos son obligatorios (depósito y saldo).';
+  'Las fechas límite del primer pago y del pago restante son obligatorias.';
 const DEPOSIT_LT_PRICE_MESSAGE =
-  'El depósito debe ser menor que el precio por puesto.';
+  'El primer pago debe ser menor que el precio por puesto.';
 const SAVE_ERROR_MESSAGE =
   'No se pudo guardar el plan de pago. Intenta de nuevo.';
 
@@ -196,8 +196,8 @@ export function TripPaymentPlanModal({
                     Pago en dos partes
                   </span>
                   <span className="block font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] mt-0.5">
-                    Cobra primero un depósito fijo por puesto y después el
-                    saldo restante.
+                    Cobra primero el primer pago fijo por puesto y después el
+                    pago restante.
                   </span>
                 </span>
                 <span className="relative inline-flex shrink-0">
@@ -219,7 +219,7 @@ export function TripPaymentPlanModal({
               {enabled && (
                 <div className="space-y-4">
                   <Input
-                    label="Depósito por puesto (COP)"
+                    label="Primer pago por puesto (COP)"
                     value={depositInput}
                     onChange={(e) => {
                       setDepositInput(e.target.value);
@@ -243,7 +243,7 @@ export function TripPaymentPlanModal({
                         htmlFor={depositDateId}
                         className="font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)] uppercase tracking-wider"
                       >
-                        Vencimiento del depósito
+                        Fecha límite del primer pago
                       </label>
                       <DatePicker
                         value={depositDeadline}
@@ -262,7 +262,7 @@ export function TripPaymentPlanModal({
                         htmlFor={balanceDateId}
                         className="font-[family-name:var(--font-body)] font-medium text-xs text-[var(--color-brand-muted)] uppercase tracking-wider"
                       >
-                        Vencimiento del saldo
+                        Fecha límite del pago restante
                       </label>
                       <DatePicker
                         value={balanceDeadline}
@@ -282,7 +282,7 @@ export function TripPaymentPlanModal({
                       className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[var(--color-brand-cyan)]"
                       strokeWidth={1.75}
                     />
-                    Los vencimientos son informativos: no cancelan la
+                    Las fechas límite son informativas: no cancelan la
                     reserva ni liberan los asientos.
                   </p>
                 </div>
