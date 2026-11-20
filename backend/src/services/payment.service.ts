@@ -415,18 +415,18 @@ function mapAdminRpcError(error: { message: string }): Error {
     case 'ERR_PAYMENT_ALREADY_REJECTED':
       return new ConflictError('Este pago ya fue rechazado');
     case 'ERR_PAYMENT_VERIFIED_NO_REJECT':
-      return new ConflictError('Un pago verificado no puede ser rechazado');
+      return new ConflictError('Un pago aprobado no puede ser rechazado');
     case 'ERR_PAYMENT_NOT_PENDING':
       return new ConflictError('El pago ya no está pendiente de revisión');
-    // MKT-010.1 — el depósito se verifica junto al intento de compra
+    // MKT-010.1 — el primer pago se verifica junto al intento de compra
     // (verify_checkout_attempt), nunca desde la revisión de pagos.
     case 'ERR_PAYMENT_STAGE_DEPOSIT':
       return new ConflictError(
-        'El depósito se verifica con la compra, no desde esta pantalla',
+        'El primer pago se verifica con la compra, no desde esta pantalla',
       );
-    // MKT-010.1 — el saldo ya está saldado: no hay nada que verificar.
+    // MKT-010.1 — el pago restante ya está pagado: no hay nada que verificar.
     case 'ERR_BALANCE_ALREADY_SETTLED':
-      return new ConflictError('El saldo de esta reserva ya está saldado');
+      return new ConflictError('El pago restante de esta reserva ya está pagado');
     case 'ERR_PAYMENT_RESERVATION_STATE':
       return new ConflictError(
         'La reserva no está en un estado compatible con esta operación',

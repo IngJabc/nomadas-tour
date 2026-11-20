@@ -77,7 +77,7 @@ export function buildBalanceRequestWhatsAppMessage(
 
   return (
     `Hola ${name}:\n\n` +
-    `Tu reserva de los asientos ${seats} del viaje ${origin} → ${destination} del ${departure} con la agencia ${agency} tiene un saldo pendiente de ${balance}.` +
+    `Tu reserva de los asientos ${seats} del viaje ${origin} → ${destination} del ${departure} con la agencia ${agency} tiene un pago restante de ${balance}.` +
     (deadline ? `\n\nFecha límite de pago: ${deadline}.` : '') +
     '\n\nCoordina el pago con la agencia y envía el comprobante para completar la reserva.' +
     '\n\n— Equipo Nómadas Tour'

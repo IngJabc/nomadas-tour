@@ -93,7 +93,7 @@ function checkbox(): HTMLInputElement {
 }
 
 function depositInput(): HTMLInputElement {
-  return screen.getByLabelText('Depósito por puesto (COP)') as HTMLInputElement;
+  return screen.getByLabelText('Primer pago por puesto (COP)') as HTMLInputElement;
 }
 
 function saveButton(): HTMLButtonElement {
@@ -117,20 +117,27 @@ describe('TripPaymentPlanModal — MKT-010.1', () => {
 
     await openDialog();
     expect(checkbox().checked).toBe(false);
-    expect(screen.queryByLabelText('Depósito por puesto (COP)')).toBeNull();
+    expect(screen.queryByLabelText('Primer pago por puesto (COP)')).toBeNull();
 
     fireEvent.click(checkbox());
 
     expect(depositInput()).toBeTruthy();
     expect(depositInput().placeholder).toBe('Ej: 50000');
-    expect(screen.getByText('Vencimiento del depósito')).toBeTruthy();
-    expect(screen.getByText('Vencimiento del saldo')).toBeTruthy();
+    expect(screen.getByText('Fecha límite del primer pago')).toBeTruthy();
+    expect(screen.getByText('Fecha límite del pago restante')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Cobra primero el primer pago fijo por puesto y después el pago restante.',
+      ),
+    ).toBeTruthy();
     expect(
       screen.getAllByRole('button', { name: 'Elige una fecha' }),
     ).toHaveLength(2);
     expect(screen.getByText(/Debe ser menor que el precio por puesto \(\$250,00\)/)).toBeTruthy();
     expect(
-      screen.getByText(/no cancelan la reserva ni liberan los asientos/),
+      screen.getByText(
+        /Las fechas límite son informativas: no cancelan la reserva\s+ni liberan los asientos/,
+      ),
     ).toBeTruthy();
   });
 
@@ -168,7 +175,7 @@ describe('TripPaymentPlanModal — MKT-010.1', () => {
     await openDialog();
     fireEvent.click(checkbox()); // apaga el plan
 
-    expect(screen.queryByLabelText('Depósito por puesto (COP)')).toBeNull();
+    expect(screen.queryByLabelText('Primer pago por puesto (COP)')).toBeNull();
     expect(saveButton().textContent).toContain('Deshabilitar plan');
 
     fireEvent.click(saveButton());
@@ -195,7 +202,7 @@ describe('TripPaymentPlanModal — MKT-010.1', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain(
-      'El depósito por puesto es obligatorio para habilitar el plan.',
+      'El primer pago por puesto es obligatorio para habilitar el plan.',
     );
     expect(mockUpdateTripPaymentPlan).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
@@ -211,13 +218,13 @@ describe('TripPaymentPlanModal — MKT-010.1', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain(
-      'Ambos vencimientos son obligatorios (depósito y saldo).',
+      'Las fechas límite del primer pago y del pago restante son obligatorias.',
     );
     expect(mockUpdateTripPaymentPlan).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
   });
 
-  it('un depósito igual al precio del puesto bloquea el guardado', async () => {
+  it('un primer pago igual al precio del puesto bloquea el guardado', async () => {
     // Viaje con plan ya habilitado: los vencimientos vienen precargados,
     // así que la validación de precio es la única que puede dispararse.
     const { onSuccess } = renderModal({ trip: ENABLED_TRIP });
@@ -228,7 +235,7 @@ describe('TripPaymentPlanModal — MKT-010.1', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toContain(
-      'El depósito debe ser menor que el precio por puesto.',
+      'El primer pago debe ser menor que el precio por puesto.',
     );
     expect(mockUpdateTripPaymentPlan).not.toHaveBeenCalled();
     expect(onSuccess).not.toHaveBeenCalled();
@@ -314,7 +321,7 @@ describe('TripPaymentPlanModal — MKT-010.1', () => {
 
     await openDialog();
     expect(checkbox().checked).toBe(false);
-    expect(screen.queryByLabelText('Depósito por puesto (COP)')).toBeNull();
+    expect(screen.queryByLabelText('Primer pago por puesto (COP)')).toBeNull();
     expect(saveButton().textContent).toContain('Deshabilitar plan');
   });
 });

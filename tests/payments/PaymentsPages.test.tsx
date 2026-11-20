@@ -399,12 +399,12 @@ describe('AgencyPaymentsPage — MKT-010.1 vista Pagos (etapas)', () => {
     render(<AgencyPaymentsPage />);
   };
 
-  it('el toggle «Pagos» consulta listPayments y actualiza el título', async () => {
+  it('el toggle «Pagos recibidos» consulta listPayments y actualiza el título', async () => {
     renderWithAttempts();
     mockListPayments.mockResolvedValue(paymentsResponse([BALANCE_CARD]));
     await screen.findAllByText('En revisión');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pagos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pagos recibidos' }));
 
     await waitFor(() => {
       expect(mockListPayments).toHaveBeenCalledWith({
@@ -415,45 +415,45 @@ describe('AgencyPaymentsPage — MKT-010.1 vista Pagos (etapas)', () => {
       });
     });
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Pagos' }),
+      await screen.findByRole('heading', { level: 1, name: 'Pagos recibidos' }),
     ).toBeTruthy();
     expect(await screen.findByRole('link', { name: /Mario Saldo/ })).toBeTruthy();
   });
 
-  it('etiqueta cada pago con su etapa: Depósito y Saldo en la tarjeta', async () => {
+  it('etiqueta cada pago con su parte: Primer pago y Pago restante en la tarjeta', async () => {
     mockListPayments.mockResolvedValue(
       paymentsResponse([DEPOSIT_CARD, BALANCE_CARD]),
     );
     renderWithAttempts();
     await screen.findAllByText('En revisión');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pagos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pagos recibidos' }));
 
     const depositCard = await screen.findByRole('link', {
       name: /Rosa Depósito/,
     });
-    expect(within(depositCard).getByText('Depósito')).toBeTruthy();
+    expect(within(depositCard).getByText('Primer pago')).toBeTruthy();
 
     const balanceCard = screen.getByRole('link', { name: /Mario Saldo/ });
-    expect(within(balanceCard).getByText('Saldo')).toBeTruthy();
+    expect(within(balanceCard).getByText('Pago restante')).toBeTruthy();
     // 'full' nunca muestra badge de etapa (estado por defecto).
     expect(
       within(balanceCard).queryByText('Total'),
     ).toBeNull();
   });
 
-  it('el chip «Saldos» filtra listPayments por stage=balance', async () => {
+  it('el chip «Pago restante» filtra listPayments por stage=balance', async () => {
     renderWithAttempts();
     mockListPayments.mockResolvedValue(paymentsResponse([BALANCE_CARD]));
     await screen.findAllByText('En revisión');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Pagos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pagos recibidos' }));
     await screen.findByRole('link', { name: /Mario Saldo/ });
 
     const stageGroup = screen.getByRole('group', {
-      name: 'Filtrar por etapa del pago',
+      name: 'Filtrar por parte del pago',
     });
-    fireEvent.click(within(stageGroup).getByRole('button', { name: 'Saldos' }));
+    fireEvent.click(within(stageGroup).getByRole('button', { name: 'Pago restante' }));
 
     await waitFor(() => {
       expect(mockListPayments).toHaveBeenCalledWith({
@@ -483,7 +483,13 @@ describe('PaymentDetailPage (detalle)', () => {
     // booker_name + pasajero con el mismo nombre
     expect(screen.getAllByText('Ana Pérez').length).toBeGreaterThan(0);
     expect(screen.getByText('Luis Pérez')).toBeTruthy();
-    expect(screen.getByText('Restante')).toBeTruthy();
+    expect(screen.getByText('Detalle del pago')).toBeTruthy();
+    expect(screen.getByText('Resumen de pagos')).toBeTruthy();
+    expect(screen.getByText('Pasajeros con reserva activa')).toBeTruthy();
+    expect(screen.getByText('Total por cobrar')).toBeTruthy();
+    expect(screen.getByText('Total recibido')).toBeTruthy();
+    expect(screen.getByText('Diferencia pendiente')).toBeTruthy();
+    expect(screen.getByText('Historial de pagos')).toBeTruthy();
   });
 
   it('abre el modal de verificación y llama verifyPayment', async () => {
@@ -548,6 +554,7 @@ describe('PaymentDetailPage (detalle)', () => {
     render(<PaymentDetailPage />);
 
     expect(await screen.findByText('Ver comprobante')).toBeTruthy();
+    expect(screen.getAllByText('Pago aprobado').length).toBeGreaterThan(0);
     expect(screen.queryByText('Verificar pago')).toBeNull();
     expect(screen.queryByText('Rechazar pago')).toBeNull();
   });
@@ -861,27 +868,30 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
 
     render(<PaymentDetailPage />);
 
-    const heading = await screen.findByText('Progreso del pago');
+    const heading = await screen.findByText('Estado de los pagos');
     expect(heading).toBeTruthy();
-    expect(screen.getByText('Asientos reservados')).toBeTruthy();
-    // Tres bloques: depósito, pagado y saldo. «Depósito» aparece también
-    // como badge de etapa del encabezado (2 en total).
-    expect(screen.getAllByText('Depósito')).toHaveLength(2);
+    expect(screen.getByText('Asientos apartados')).toBeTruthy();
+    // Tres bloques: primer pago, pagado y pago restante. «Primer pago»
+    // aparece también como badge de etapa del encabezado (2 en total).
+    expect(screen.getAllByText('Primer pago')).toHaveLength(2);
     expect(screen.getByText('Pagado')).toBeTruthy();
-    expect(screen.getByText('Saldo')).toBeTruthy();
+    expect(screen.getByText('Pago restante')).toBeTruthy();
     // Montos acotados a la tarjeta de progreso: los tres bloques suman
-    // $250,00 (depósito 25000, pagado 25000 y saldo 25000 del fixture).
+    // $250,00 (primer pago 25000, pagado 25000 y pago restante 25000 del fixture).
     const progressCard = heading.parentElement!.parentElement!.parentElement!;
     const progress = within(progressCard);
     expect(progress.getAllByText('$250,00')).toHaveLength(3);
     expect(progress.getByText('de $500,00 · 2 pasajeros')).toBeTruthy();
     expect(progress.getByText('Pendiente por cobrar')).toBeTruthy();
     // Vencimientos en vivo + badge de vencido (solo informativo).
+    expect(progress.getAllByText(/Fecha límite de pago:/)).toHaveLength(2);
     expect(progress.getByText(/20\/11\/2026/)).toBeTruthy();
     expect(progress.getByText(/30\/11\/2026/)).toBeTruthy();
     expect(progress.getByText('Vencido')).toBeTruthy();
     expect(
-      progress.getByText(/no cancelan la reserva\s+ni liberan los asientos/),
+      progress.getByText(
+        /Las fechas límite son informativas: no cancelan la reserva\s+ni liberan los asientos/,
+      ),
     ).toBeTruthy();
   });
 
@@ -895,8 +905,8 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
 
     render(<PaymentDetailPage />);
 
-    expect(await screen.findByText('Progreso del pago')).toBeTruthy();
-    expect(screen.getAllByText('Depósito').length).toBeGreaterThan(0);
+    expect(await screen.findByText('Estado de los pagos')).toBeTruthy();
+    expect(screen.getAllByText('Primer pago').length).toBeGreaterThan(0);
     expect(screen.getByText('Pendiente')).toBeTruthy();
   });
 
@@ -910,9 +920,22 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
 
     render(<PaymentDetailPage />);
 
-    expect(await screen.findByText('Progreso del pago')).toBeTruthy();
-    // Solo el bloque «Depósito» del progreso; ningún badge extra.
-    expect(screen.getAllByText('Depósito')).toHaveLength(1);
+    expect(await screen.findByText('Estado de los pagos')).toBeTruthy();
+    // Solo el bloque «Primer pago» del progreso; ningún badge extra.
+    expect(screen.getAllByText('Primer pago')).toHaveLength(1);
+  });
+
+  it('muestra «Asientos liberados» cuando los asientos ya no están retenidos', async () => {
+    mockGetPayment.mockResolvedValue(
+      detailWith({
+        progress: { ...TWO_STAGE_PROGRESS, seats_held: false },
+      }),
+    );
+
+    render(<PaymentDetailPage />);
+
+    expect(await screen.findByText('Asientos liberados')).toBeTruthy();
+    expect(screen.queryByText('Asientos apartados')).toBeNull();
   });
 
   it('no muestra la tarjeta de progreso en plan single', async () => {
@@ -925,8 +948,8 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
     render(<PaymentDetailPage />);
 
     expect(await screen.findByText('Verificar pago')).toBeTruthy();
-    expect(screen.queryByText('Progreso del pago')).toBeNull();
-    expect(screen.queryByText('Solicitar saldo por WhatsApp')).toBeNull();
+    expect(screen.queryByText('Estado de los pagos')).toBeNull();
+    expect(screen.queryByText('Solicitar el pago restante por WhatsApp')).toBeNull();
   });
 
   it('no muestra la tarjeta cuando el backend no trae progreso', async () => {
@@ -935,10 +958,10 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
     render(<PaymentDetailPage />);
 
     expect(await screen.findByText('Verificar pago')).toBeTruthy();
-    expect(screen.queryByText('Progreso del pago')).toBeNull();
+    expect(screen.queryByText('Estado de los pagos')).toBeNull();
   });
 
-  it('abre wa.me con el mensaje de saldo hacia el reservante', async () => {
+  it('abre wa.me con el mensaje del pago restante hacia el reservante', async () => {
     mockGetPayment.mockResolvedValue(
       detailWith({
         payment: { ...DETAIL.payment, stage: 'balance' },
@@ -948,7 +971,7 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
 
     render(<PaymentDetailPage />);
 
-    fireEvent.click(await screen.findByText('Solicitar saldo por WhatsApp'));
+    fireEvent.click(await screen.findByText('Solicitar el pago restante por WhatsApp'));
 
     await waitFor(() => {
       expect(openSpy).toHaveBeenCalledTimes(1);
@@ -963,7 +986,7 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
     expect(message).toContain('los asientos A1, A2');
     expect(message).toContain('Caracas → Maracaibo');
     expect(message).toContain('con la agencia Agencia Central');
-    expect(message).toContain('saldo pendiente de $250,00');
+    expect(message).toContain('pago restante de $250,00');
     expect(message).toContain('Fecha límite de pago: 30/11/2026.');
     expect(message).not.toContain('undefined');
     expect(message).not.toContain('null');
@@ -980,7 +1003,7 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
 
     render(<PaymentDetailPage />);
 
-    fireEvent.click(await screen.findByText('Solicitar saldo por WhatsApp'));
+    fireEvent.click(await screen.findByText('Solicitar el pago restante por WhatsApp'));
 
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith('No hay teléfono del reservante');
@@ -988,7 +1011,7 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
     expect(openSpy).not.toHaveBeenCalled();
   });
 
-  it('oculta el botón de saldo cuando el saldo ya está saldado', async () => {
+  it('oculta el botón cuando el pago restante ya está pagado', async () => {
     mockGetPayment.mockResolvedValue(
       detailWith({
         payment: { ...DETAIL.payment, stage: 'balance', status: 'verified' },
@@ -1003,9 +1026,10 @@ describe('PaymentDetailPage — MKT-010.1 progreso de dos partes', () => {
 
     render(<PaymentDetailPage />);
 
-    expect(await screen.findByText('Progreso del pago')).toBeTruthy();
-    expect(screen.getByText('Saldado')).toBeTruthy();
-    expect(screen.queryByText('Solicitar saldo por WhatsApp')).toBeNull();
+    expect(await screen.findByText('Estado de los pagos')).toBeTruthy();
+    // «Pagado»: etiqueta del bloque central + contexto del pago restante en 0.
+    expect(screen.getAllByText('Pagado')).toHaveLength(2);
+    expect(screen.queryByText('Solicitar el pago restante por WhatsApp')).toBeNull();
   });
 });
 
@@ -1017,7 +1041,7 @@ describe('PaymentRejectModal — MKT-010.1 etapa balance', () => {
     mockUseParamsId.mockReturnValue('pay-1');
   });
 
-  it('aclara que rechazar el saldo no cancela la reserva', async () => {
+  it('aclara que rechazar el pago restante no cancela la reserva', async () => {
     mockGetPayment.mockResolvedValue({
       ...DETAIL,
       payment: { ...DETAIL.payment, stage: 'balance' },
@@ -1030,7 +1054,7 @@ describe('PaymentRejectModal — MKT-010.1 etapa balance', () => {
 
     expect(
       await screen.findByText(
-        'Rechazar este pago de SALDO no cancela la reserva ni libera los asientos: queda el saldo por cobrar. Explica el motivo para dejar registro.',
+        'Rechazar este pago no cancela la reserva ni libera los asientos: queda el pago restante por cobrar. Explica el motivo para dejar registro.',
       ),
     ).toBeTruthy();
   });
@@ -1052,12 +1076,65 @@ describe('PaymentRejectModal — MKT-010.1 etapa balance', () => {
 
 // ─── MKT-010.1 — badge de etapa en la lista ───────────────────────────────────
 
-// Los chips de etapa («Todas / Depósito / Saldos / Total») viven en la vista
-// Pagos de /agency/payments, alcanzable de nuevo con el toggle Pagos/Compras
-// restaurado por MKT-010.1. Sus etiquetas se cubren además a nivel unitario
-// en agencyApi.payments.test.ts sobre PAYMENT_STAGE_FILTERS; el flujo completo
-// (toggle → listPayments → badges Depósito/Saldo → filtro stage) está en el
-// describe «AgencyPaymentsPage — MKT-010.1 vista Pagos (etapas)».
+// Los chips de parte del pago («Todas / Primer pago / Pago restante / Total»)
+// viven en la vista Pagos de /agency/payments, alcanzable de nuevo con el
+// toggle Solicitudes de reserva/Pagos recibidos restaurado por MKT-010.1. Sus
+// etiquetas se cubren además a nivel unitario en agencyApi.payments.test.ts
+// sobre PAYMENT_STAGE_FILTERS; el flujo completo (toggle → listPayments →
+// badges Primer pago/Pago restante → filtro stage) está en el describe
+// «AgencyPaymentsPage — MKT-010.1 vista Pagos (etapas)».
+
+// ─── Pestañas con descripción (copy de dos partes) ───────────────────────────
+
+describe('AgencyPaymentsPage — descripción de cada pestaña', () => {
+  it('muestra la descripción de «Solicitudes de reserva» en la vista por defecto', async () => {
+    mockListCheckoutAttempts.mockResolvedValue({
+      attempts: [],
+      page: 1,
+      limit: 20,
+      total: 0,
+    });
+
+    render(<AgencyPaymentsPage />);
+
+    expect(
+      await screen.findByText(
+        'Revisa las compras iniciadas por los pasajeros y gestiona la aprobación o el rechazo de sus comprobantes de pago.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        'Consulta los pagos registrados de tus reservas, incluyendo el primer pago y el pago restante de cada pasajero.',
+      ),
+    ).toBeNull();
+  });
+
+  it('cambia la descripción al alternar a «Pagos recibidos»', async () => {
+    mockListCheckoutAttempts.mockResolvedValue({
+      attempts: [ATTEMPT_LIST_ITEM],
+      page: 1,
+      limit: 20,
+      total: 1,
+    });
+    mockListPayments.mockResolvedValue({ payments: [], page: 1, limit: 20, total: 0 });
+
+    render(<AgencyPaymentsPage />);
+    await screen.findAllByText('En revisión');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pagos recibidos' }));
+
+    expect(
+      await screen.findByText(
+        'Consulta los pagos registrados de tus reservas, incluyendo el primer pago y el pago restante de cada pasajero.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(
+        'Revisa las compras iniciadas por los pasajeros y gestiona la aprobación o el rechazo de sus comprobantes de pago.',
+      ),
+    ).toBeNull();
+  });
+});
 
 // ─── MKT-007.1 — notificación WhatsApp tras rechazo ──────────────────────────
 

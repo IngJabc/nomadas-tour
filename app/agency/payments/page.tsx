@@ -13,9 +13,9 @@ import { PaymentCardSkeleton } from '@/components/ui/Skeleton';
 import { AgencyPaymentCard } from '@/components/agency/payments/AgencyPaymentCard';
 import { AgencyCheckoutAttemptCard } from '@/components/agency/payments/AgencyCheckoutAttemptCard';
 import {
-  PAYMENT_STATUS_LABELS,
+  PAYMENT_STATUS_PLURALS,
   PAYMENT_STAGE_FILTERS,
-  PAYMENT_STAGE_LABELS,
+  PAYMENT_STAGE_NOUNS,
   CHECKOUT_ATTEMPT_STATUS_LABELS,
   type AgencyPaymentListItem,
   type AgencyPaymentStatusFilter,
@@ -41,7 +41,7 @@ type ViewMode = 'payments' | 'attempts';
 const STATUS_FILTERS: { value: AgencyPaymentStatusFilter | ''; label: string }[] = [
   { value: '', label: 'Todos' },
   { value: 'pending', label: 'Pendientes' },
-  { value: 'verified', label: 'Verificados' },
+  { value: 'verified', label: 'Aprobados' },
   { value: 'rejected', label: 'Rechazados' },
 ];
 
@@ -55,6 +55,17 @@ const ATTEMPT_STATUS_FILTERS: {
   { value: 'rejected', label: 'Rechazadas' },
   { value: 'expired', label: 'Expiradas' },
 ];
+
+/**
+ * Descripción corta bajo cada pestaña de la vista activa: explica qué
+ * contiene y la distingue de /agency/reservations.
+ */
+const VIEW_DESCRIPTIONS: Record<ViewMode, string> = {
+  attempts:
+    'Revisa las compras iniciadas por los pasajeros y gestiona la aprobación o el rechazo de sus comprobantes de pago.',
+  payments:
+    'Consulta los pagos registrados de tus reservas, incluyendo el primer pago y el pago restante de cada pasajero.',
+};
 
 export default function AgencyPaymentsPage() {
   // Vista por defecto: Compras (checkout attempts, MKT-007). El toggle
@@ -222,7 +233,7 @@ export default function AgencyPaymentsPage() {
         transition={{ duration: 0.25 }}
       >
         <PageHeader
-          title={viewMode === 'payments' ? 'Pagos' : 'Compras'}
+          title={viewMode === 'payments' ? 'Pagos recibidos' : 'Solicitudes de reserva'}
           action={
             <div className="flex flex-wrap items-center gap-2">
               {/* MKT-010.1 — toggle restaurado: la vista Pagos es la única
@@ -243,7 +254,7 @@ export default function AgencyPaymentsPage() {
                       : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
                   }`}
                 >
-                  Compras
+                  Solicitudes de reserva
                 </button>
                 <button
                   type="button"
@@ -255,7 +266,7 @@ export default function AgencyPaymentsPage() {
                       : 'text-[var(--color-brand-muted)] hover:text-[var(--color-brand-navy)]'
                   }`}
                 >
-                  Pagos
+                  Pagos recibidos
                 </button>
               </div>
               <Link
@@ -268,6 +279,15 @@ export default function AgencyPaymentsPage() {
           }
         />
       </motion.div>
+
+      {/* Descripción de la pestaña activa: aclara el alcance de la vista
+          y la distingue de /agency/reservations. */}
+      <p
+        key={viewMode}
+        className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)] max-w-3xl mb-6"
+      >
+        {VIEW_DESCRIPTIONS[viewMode]}
+      </p>
 
       {fetchError && (
         <motion.div
@@ -336,7 +356,7 @@ export default function AgencyPaymentsPage() {
             {/* MKT-010.1 — etapa del pago (plan de dos partes). */}
             <div
               role="group"
-              aria-label="Filtrar por etapa del pago"
+              aria-label="Filtrar por parte del pago"
               className="flex items-center gap-1.5 bg-[var(--color-brand-surface)] rounded-xl h-9 px-1 border border-[rgba(0,0,0,0.06)] shrink-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             >
               {PAYMENT_STAGE_FILTERS.map(({ value, label }) => (
@@ -406,9 +426,9 @@ export default function AgencyPaymentsPage() {
                 : statusFilter && stageFilter
                   ? 'No hay pagos con estos filtros'
                   : statusFilter
-                    ? `No hay pagos ${PAYMENT_STATUS_LABELS[statusFilter]?.toLowerCase() ?? ''}`
+                    ? `No hay pagos ${PAYMENT_STATUS_PLURALS[statusFilter]}`
                     : stageFilter
-                      ? `No hay pagos de etapa ${PAYMENT_STAGE_LABELS[stageFilter].toLowerCase()}`
+                      ? `No hay ${PAYMENT_STAGE_NOUNS[stageFilter]} registrado`
                       : 'Aún no hay pagos de marketplace'
             }
             action={

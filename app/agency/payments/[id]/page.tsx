@@ -124,8 +124,8 @@ function TotalRow({
 }
 
 /**
- * MKT-010.1 — bloque de una etapa dentro de "Progreso del pago"
- * (depósito / pagado / saldo). El vencimiento es SOLO informativo:
+ * MKT-010.1 — bloque de una parte dentro de "Estado de los pagos"
+ * (primer pago / pagado / pago restante). El vencimiento es SOLO informativo:
  * nunca cancela la reserva ni libera asientos.
  */
 function ProgressTile({
@@ -170,7 +170,7 @@ function ProgressTile({
       )}
       {deadline && (
         <p className="font-[family-name:var(--font-body)] text-xs text-[var(--color-brand-muted)] mt-2 flex flex-wrap items-center gap-1.5">
-          Vence {formatDateShort(deadline)}
+          Fecha límite de pago: {formatDateShort(deadline)}
           {overdue && <Badge variant="warning" size="sm">Vencido</Badge>}
         </p>
       )}
@@ -307,7 +307,7 @@ export default function PaymentDetailPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <PageHeader
           title="Pago"
-          breadcrumbs={[{ label: 'Pagos', href: '/agency/payments' }]}
+          breadcrumbs={[{ label: 'Pagos recibidos', href: '/agency/payments' }]}
         />
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#fef2f2] border border-[#fee2e2]">
           <div className="flex items-center gap-3">
@@ -452,21 +452,21 @@ export default function PaymentDetailPage() {
           </motion.div>
         )}
 
-        {/* MKT-010.1 — Progreso del pago (solo plan de dos partes) */}
+        {/* MKT-010.1 — Estado de los pagos (solo plan de dos partes) */}
         {showProgress && progress && (
           <motion.div variants={staggerItem}>
             <Card>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <SectionTitle>Progreso del pago</SectionTitle>
-                <Badge variant={progress.seats_held ? 'active' : 'inactive'} size="sm">
-                  {progress.seats_held ? 'Asientos reservados' : 'Sin asientos reservados'}
+                <SectionTitle>Estado de los pagos</SectionTitle>
+                <Badge variant={progress.seats_held ? 'info' : 'inactive'} size="sm">
+                  {progress.seats_held ? 'Asientos apartados' : 'Asientos liberados'}
                 </Badge>
               </div>
 
               <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <ProgressTile
                   icon={<Wallet className="w-4 h-4" strokeWidth={1.75} />}
-                  label="Depósito"
+                  label="Primer pago"
                   value={
                     progress.deposit_cents != null
                       ? formatSeatPriceCents(progress.deposit_cents)
@@ -474,7 +474,7 @@ export default function PaymentDetailPage() {
                   }
                   pct={progress.deposit_pct}
                   context={
-                    progress.deposit_verified_at ? 'Verificado' : 'Pendiente de pago'
+                    progress.deposit_verified_at ? 'Pago aprobado' : 'Pendiente de pago'
                   }
                   deadline={progress.deposit_deadline}
                   overdue={progress.deposit_overdue}
@@ -489,11 +489,11 @@ export default function PaymentDetailPage() {
                 />
                 <ProgressTile
                   icon={<ReceiptText className="w-4 h-4" strokeWidth={1.75} />}
-                  label="Saldo"
+                  label="Pago restante"
                   value={formatSeatPriceCents(progress.balance_cents)}
                   pct={progress.balance_pct}
                   context={
-                    progress.balance_cents > 0 ? 'Pendiente por cobrar' : 'Saldado'
+                    progress.balance_cents > 0 ? 'Pendiente por cobrar' : 'Pagado'
                   }
                   deadline={progress.balance_deadline}
                   overdue={progress.balance_overdue}
@@ -504,12 +504,12 @@ export default function PaymentDetailPage() {
               {progress.balance_cents > 0 && (
                 <div className="mt-4 pt-4 border-t border-[rgba(0,0,0,0.06)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <p className="font-[family-name:var(--font-body)] text-sm text-[var(--color-brand-muted)]">
-                    Los vencimientos son informativos: no cancelan la reserva
+                    Las fechas límite son informativas: no cancelan la reserva
                     ni liberan los asientos.
                   </p>
                   <Button variant="secondary" onClick={handleBalanceWhatsapp}>
                     <MessageCircle className="w-4 h-4" strokeWidth={1.75} />
-                    Solicitar saldo por WhatsApp
+                    Solicitar el pago restante por WhatsApp
                   </Button>
                 </div>
               )}
@@ -521,7 +521,7 @@ export default function PaymentDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <motion.div variants={staggerItem}>
             <Card>
-              <SectionTitle>Resumen del pago</SectionTitle>
+              <SectionTitle>Detalle del pago</SectionTitle>
               <div className="mt-4 space-y-4">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-[rgba(0,212,255,0.1)] flex items-center justify-center shrink-0">
@@ -544,7 +544,7 @@ export default function PaymentDetailPage() {
                 {payment.verified_at && (
                   <InfoRow
                     icon={<CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />}
-                    label="Verificado"
+                    label="Pago aprobado"
                     value={formatDateTimeShort(payment.verified_at)}
                   />
                 )}
@@ -574,23 +574,23 @@ export default function PaymentDetailPage() {
 
           <motion.div variants={staggerItem}>
             <Card>
-              <SectionTitle>Totales</SectionTitle>
+              <SectionTitle>Resumen de pagos</SectionTitle>
               <div className="mt-4 space-y-3">
                 <TotalRow
-                  label="Pasajeros activos"
+                  label="Pasajeros con reserva activa"
                   value={String(totals.active_passenger_count)}
                 />
                 <TotalRow
-                  label="Esperado"
+                  label="Total por cobrar"
                   value={formatSeatPriceCents(totals.expected_cents)}
                 />
                 <TotalRow
-                  label="Asignado"
+                  label="Total recibido"
                   value={formatSeatPriceCents(totals.allocated_cents)}
                 />
                 <div className="pt-3 border-t border-[rgba(0,0,0,0.06)]">
                   <TotalRow
-                    label="Restante"
+                    label="Diferencia pendiente"
                     value={formatSeatPriceCents(totals.remaining_cents)}
                     highlight={totals.remaining_cents > 0}
                   />
@@ -669,7 +669,7 @@ export default function PaymentDetailPage() {
         {allocations.length > 0 && (
           <motion.div variants={staggerItem}>
             <Card>
-              <SectionTitle>Asignaciones del pago</SectionTitle>
+              <SectionTitle>Historial de pagos</SectionTitle>
               <div className="mt-4 space-y-2">
                 {allocations.map((a) => (
                   <div

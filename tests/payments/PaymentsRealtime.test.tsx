@@ -451,7 +451,7 @@ describe('RT-06 · detalle de pago', () => {
 
     act(() => findCall('payments').onChange());
 
-    // 'Verificado' aparece en el badge y en la fila "Verificado" (verified_at).
+    // 'Pago aprobado' aparece en el badge y en la fila "Pago aprobado" (verified_at).
     expect(
       (await screen.findAllByText(PAYMENT_STATUS_LABELS.verified, W)).length,
     ).toBeGreaterThan(0);

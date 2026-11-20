@@ -163,8 +163,11 @@ describe('agencyApi — Fase 2 pagos', () => {
   });
 
   it('expone los tipos de estado del catálogo', async () => {
-    const { PAYMENT_STATUS_LABELS, paymentStatusBadgeVariant } = await import('@/lib/payments');
+    const { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_PLURALS, paymentStatusBadgeVariant } =
+      await import('@/lib/payments');
     expect(PAYMENT_STATUS_LABELS.pending).toBe('Pendiente');
+    expect(PAYMENT_STATUS_LABELS.verified).toBe('Pago aprobado');
+    expect(PAYMENT_STATUS_PLURALS.verified).toBe('aprobados');
     expect(paymentStatusBadgeVariant('pending')).toBe('warning');
     expect(paymentStatusBadgeVariant('verified')).toBe('active');
     expect(paymentStatusBadgeVariant('rejected')).toBe('cancelled');
@@ -174,20 +177,24 @@ describe('agencyApi — Fase 2 pagos', () => {
     const {
       PAYMENT_STAGE_LABELS,
       PAYMENT_STAGE_FILTERS,
+      PAYMENT_STAGE_NOUNS,
       paymentStageBadgeVariant,
     } = await import('@/lib/payments');
     expect(PAYMENT_STAGE_LABELS.full).toBe('Total');
-    expect(PAYMENT_STAGE_LABELS.deposit).toBe('Depósito');
-    expect(PAYMENT_STAGE_LABELS.balance).toBe('Saldo');
+    expect(PAYMENT_STAGE_LABELS.deposit).toBe('Primer pago');
+    expect(PAYMENT_STAGE_LABELS.balance).toBe('Pago restante');
+    expect(PAYMENT_STAGE_NOUNS.deposit).toBe('primer pago');
+    expect(PAYMENT_STAGE_NOUNS.balance).toBe('pago restante');
     expect(paymentStageBadgeVariant('deposit')).toBe('info');
     expect(paymentStageBadgeVariant('balance')).toBe('warning');
     expect(paymentStageBadgeVariant('full')).toBe('inactive');
-    // Chips de la vista Pagos (alcanzable con el toggle Pagos/Compras →
-    // aquí se cubren a nivel unitario; el flujo está en PaymentsPages).
+    // Chips de la vista Pagos (alcanzable con el toggle Solicitudes de
+    // reserva/Pagos recibidos → aquí se cubren a nivel unitario; el flujo
+    // está en PaymentsPages).
     expect(PAYMENT_STAGE_FILTERS.map((f) => f.label)).toEqual([
       'Todas',
-      'Depósito',
-      'Saldos',
+      'Primer pago',
+      'Pago restante',
       'Total',
     ]);
     expect(PAYMENT_STAGE_FILTERS.map((f) => f.value)).toEqual([
